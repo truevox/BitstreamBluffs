@@ -43,7 +43,7 @@ const BOUNDARY=argv.includes('--repeat-boundaries');
 const MOVING=argv.includes('--repeat-moving');
 const TERMINAL=argv.includes('--natural-terminal');
 const NATURAL=argv.includes('--natural-run')||TERMINAL, PROBE=argv.includes('--natural-probe');
-const NATURAL_START=TERMINAL?960:0;
+const NATURAL_START=TERMINAL?936:0;
 const naturalLimitFlag=argv.indexOf('--natural-limit');
 const NATURAL_LIMIT=naturalLimitFlag===-1?4800:Number(argv[naturalLimitFlag+1]);
 if((NATURAL||PROBE)&&(!STRICT||NATURAL&&PROBE||TERMINAL&&argv.includes('--natural-run')||MOVING||BOUNDARY||repeatFlag!==-1||

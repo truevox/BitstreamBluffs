@@ -342,11 +342,7 @@
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
     if (global.__ssCanonical) {
       MKit().preflight(snap.matter);
-      // The shipped canonical fingerprint observes the RAW detector list,
-      // including stale removed bodies. We cannot reconstruct those from the
-      // live body inventory. Reject that boundary rather than weaken parity.
-      if(snap.matter.worldModified&&snap.matter.detectorOrder.some(k=>!Object.hasOwn(snap.matter.ids,k)))
-        throw new Error('Matter preflight: unsupported removed-body detector history');
+      // Retired detector terrain entries are validated by the V3 Matter preflight.
     }
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;

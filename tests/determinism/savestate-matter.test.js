@@ -67,7 +67,7 @@ describe('savestate feasibility: pure Matter round trip (contact-heavy fixture)'
   });
 });
 
-test('diagnostic snapshot V2 captures changed gravity and rejects absent or nonfinite gravity before restore', () => {
+test('diagnostic snapshot V3 captures changed gravity and rejects absent or nonfinite gravity before restore', () => {
   const a = buildWorld(Matter);
   Object.assign(a.engine.gravity, { x: 0.125, y: 0.67, scale: 0.002 });
   const snap = JSON.parse(JSON.stringify(kit.capture(a.engine, a.keyOf, {selectBody:()=>true})));
@@ -116,12 +116,12 @@ test('unsupported constraints are audited rather than silently omitted',()=>{
   expect(snap.audit).toContain('unsupported Matter constraints');
 });
 
-test('modified world permits stale detector entries only when the order will be rebuilt',()=>{
+test('modified world rejects unclassified stale detector entries',()=>{
   const a=buildWorld(Matter);
   const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
   good.worldModified=true;
   good.detectorOrder=[null,null,'stale:removed'];
-  expect(kit.preflight(good)).toBe(true);
+  expect(()=>kit.preflight(good)).toThrow(/world\/detector order/);
   good.worldModified=false;
   expect(()=>kit.preflight(good)).toThrow(/world\/detector order/);
 });
@@ -288,7 +288,7 @@ test('pending detector rebuild must not alias a removed body to its same-key rep
   const snap=kit.capture(a.engine,keyOf,{selectBody:()=>true});
   expect(snap.worldModified).toBe(true);
   expect(snap.worldOrder).toContain(key);
-  expect(snap.detectorOrder).toContain(null);
+  expect(snap.detectorOrder).toContainEqual({retiredId:old.id,label:'terrain',minX:old.bounds.min.x,minY:old.bounds.min.y});
   expect(snap.detectorOrder).not.toContain(key);
   expect(kit.preflight(snap)).toBe(true);
 });
@@ -300,4 +300,26 @@ test('pending detector rebuild rejects duplicate live body references',()=>{
   s.worldModified=true;
   s.detectorOrder.push(s.detectorOrder[0]);
   expect(()=>kit.preflight(s)).toThrow(/world\/detector order/);
+});
+
+test('retired terrain is restored only in the detector until the mandatory rebuild',()=>{
+  const a=buildWorld(Matter), b=buildWorld(Matter);
+  Matter.Engine.update(a.engine,1000/240);
+  const old=a.engine.detector.bodies.find(x=>x.isStatic);
+  const key=a.keyOf(old);
+  Matter.Composite.remove(a.engine.world,old);
+  Matter.Composite.remove(b.engine.world,Matter.Composite.allBodies(b.engine.world).find(x=>b.keyOf(x)===key));
+  const snap=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const retired=snap.detectorOrder.find(x=>typeof x==='object');
+  expect(retired.retiredId).toBe(old.id);
+  for(const mutate of [s=>{s.worldModified=false;},s=>s.detectorOrder.push(retired),s=>{s.detectorOrder[s.detectorOrder.indexOf(retired)]={...retired,retiredId:s.ids.sled[0]};}]){
+    const bad={...snap,detectorOrder:[...snap.detectorOrder]};mutate(bad);
+    expect(()=>kit.preflight(bad)).toThrow(/world\/detector order/);
+  }
+  kit.restore(b.engine,snap,b.keyOf,'full',{completePreflight:true});
+  expect(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}).detectorOrder).toEqual(snap.detectorOrder);
+  expect(Matter.Composite.allBodies(b.engine.world).some(x=>x.id===old.id)).toBe(false);
+  Matter.Engine.update(a.engine,1000/240);Matter.Engine.update(b.engine,1000/240);
+  expect(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}).detectorOrder).toEqual(kit.capture(a.engine,a.keyOf,{selectBody:()=>true}).detectorOrder);
+  expect(kit.digest(b.engine,b.keyOf)).toEqual(kit.digest(a.engine,a.keyOf));
 });

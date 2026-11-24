@@ -16,10 +16,10 @@ const args = process.argv.slice(2);
 const repeatArg=args[0]==='--repeat-ticks'&&args.length===2&&/^[1-9][0-9]*$/.test(args[1])&&Number(args[1])<=120;
 const boundaryArg=args.length===1&&args[0]==='--repeat-boundaries';
 const movingArg=args.length===1&&args[0]==='--repeat-moving';
-const naturalArg=['--natural-run','--natural-probe','--natural-terminal'].includes(args[0])&&(args.length===1||(args.length===3&&args[1]==='--natural-limit'&&/^[1-9][0-9]*$/.test(args[2])&&Number(args[2])>(args[0]==='--natural-terminal'?960:0)&&Number(args[2])<=12000));
+const naturalArg=['--natural-run','--natural-probe','--natural-terminal'].includes(args[0])&&(args.length===1||(args.length===3&&args[1]==='--natural-limit'&&/^[1-9][0-9]*$/.test(args[2])&&Number(args[2])>(args[0]==='--natural-terminal'?936:0)&&Number(args[2])<=12000));
 if (!(args.length===0||(args.length===1&&args[0]==='--full')||repeatArg||boundaryArg||movingArg||naturalArg)) {
   console.error('Usage: npm run gate:heavy -- [--full | --repeat-ticks 1..120 | --repeat-boundaries | --repeat-moving | --natural-run [--natural-limit N] | --natural-probe [--natural-limit N] | --natural-terminal [--natural-limit N]]');
-  console.error('Natural limits: 1..12000; terminal window: 961..12000');
+  console.error('Natural limits: 1..12000; terminal window: 937..12000');
   process.exit(2);
 }
 const full = args[0] === '--full';

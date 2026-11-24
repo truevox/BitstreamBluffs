@@ -28,7 +28,7 @@
 
 const LEVELS = ['pose', 'kinematic', 'contacts', 'full'];
 const SNAPSHOT_KIND = 'bb-matter-diagnostic-snapshot';
-const SNAPSHOT_VERSION = 2;
+const SNAPSHOT_VERSION = 3;
 
 const ROOT_SCALARS = ['angle', 'anglePrev', 'angularVelocity', 'angularSpeed', 'speed', 'motion', 'sleepCounter',
   'isSleeping', 'deltaTime', 'torque', 'totalContacts', 'timeScale'];
@@ -77,7 +77,7 @@ function vec(v) { return v ? [v.x, v.y] : null; }
 function setVec(t, a) { if (t && a) { t.x = a[0]; t.y = a[1]; } }
 
 /**
- * Explicit diagnostic Matter V2 schema preflight. Validates the complete
+ * Explicit diagnostic Matter V3 schema preflight. Validates the complete
  * body/part identity graph and raw geometry before reconstruction. Not a
  * production admission parser: no support for orphan pairs, constraints,
  * nested composites, or arbitrary third-party extensions.
@@ -126,12 +126,23 @@ export function preflightMatterSnapshot(snap, Matter) {
       partIdsByKey.set(key+'#'+i,id);
     }
   }
+  // Retired terrain entries are observational only until the mandatory next
+  // Engine.update rebuild. No live body, pair or composite can refer to them.
+  const detectorIds=new Set();
+  const detectorEntry=k=>{
+    if(typeof k==='string'&&Object.hasOwn(snap.ids,k)){
+      const id=snap.ids[k][0]; if(detectorIds.has(id))return false;
+      detectorIds.add(id); return true;
+    }
+    if(!snap.worldModified||!exact(k,['retiredId','label','minX','minY'])||
+      !uint(k.retiredId)||k.retiredId>=snap.nextId||ids.has(k.retiredId)||detectorIds.has(k.retiredId)||
+      k.label!=='terrain'||!finite(k.minX)||!finite(k.minY))return false;
+    detectorIds.add(k.retiredId);return true;
+  };
   if (typeof snap.worldModified !== 'boolean' || !dense(snap.worldOrder) ||
       snap.worldOrder.length!==roots.length || !unique(snap.worldOrder) || !snap.worldOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)) ||
       !dense(snap.detectorOrder) ||
-      (snap.worldModified
-        ? !snap.detectorOrder.every(k=>k===null||typeof k==='string')||!unique(snap.detectorOrder.filter(k=>k!==null))
-        : !unique(snap.detectorOrder)||snap.detectorOrder.length!==roots.length||!snap.detectorOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)))) fail('world/detector order');
+      (!snap.worldModified&&snap.detectorOrder.length!==roots.length)||!snap.detectorOrder.every(detectorEntry)) fail('world/detector order');
   if (!exact(snap.gravity,['x','y','scale']) || !Object.values(snap.gravity).every(finite) ||
       !exact(snap.timing,['timestamp','timeScale','lastDelta']) || !Object.values(snap.timing).every(finite)) fail('gravity/timing');
   if ( !exact(snap.statics,Object.keys(MODULE_STATICS).filter(k=>Matter[k])) ||
@@ -341,7 +352,10 @@ export function createMatterSnapshotKit(Matter) {
       timing: { timestamp: engine.timing.timestamp, timeScale: engine.timing.timeScale, lastDelta: engine.timing.lastDelta },
       detectorOrder: (engine.detector.bodies || []).map(b => {
         const k = keyOf(b);
-        return ix.byKey.get(k) === b ? k : null;
+        if(ix.byKey.get(k)===b)return k;
+        if(engine.world.isModified&&b.isStatic&&b.label==='terrain'&&!b.bbPad&&!b.isSensor)
+          return {retiredId:b.id,label:b.label,minX:b.bounds.min.x,minY:b.bounds.min.y};
+        return null; // unsupported stale body type; strict admission rejects
       }),
       // Composite order: Engine iterates it, and Detector.setBodies copies it on every world change, so it breaks
       // bounds.min.x ties in the (stable) broadphase sort after the next add/remove.
@@ -450,8 +464,12 @@ export function createMatterSnapshotKit(Matter) {
       engine.timing.lastDelta = snap.timing.lastDelta;
       // Detector: bodies array is sorted in place by bounds.min.x every step (stable sort), so the previous
       // order breaks ties. Rebuild it in the snapshot's order and clear isModified so Engine.update keeps it.
-      if (!skip.has("detectorOrder") && snap.detectorOrder.every(k=>ix.byKey.has(k))) {
-        engine.detector.bodies = snap.detectorOrder.map(k=>ix.byKey.get(k));
+      if (!skip.has("detectorOrder") && snap.detectorOrder.every(k=>ix.byKey.has(k)||
+          (opt.completePreflight&&snap.worldModified&&k&&typeof k==='object'))) {
+        // These retired static terrain projections are never added to the
+        // composite and are overwritten by Engine.update before collision.
+        engine.detector.bodies = snap.detectorOrder.map(k=>ix.byKey.has(k)?ix.byKey.get(k):
+          {id:k.retiredId,label:k.label,isStatic:true,isSensor:false,bounds:{min:{x:k.minX,y:k.minY}}});
         Composite.setModified(engine.world, snap.worldModified, true, true);
       } else {
         Composite.setModified(engine.world, true, true, false);
