@@ -10,6 +10,10 @@ const root=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 if(!root||!existsSync(join(root,'catalog.json'))||!existsSync(join(root,'packs')))
 	throw Error('Set BSB291_PRIVATE_AUDIO_ROOT to verified private media');
 const host=process.env.BSB291_HOST||'127.0.0.1',port=Number(process.env.BSB291_PORT||8220);
+// This server exposes original unlicensed OGGs without authentication.
+// Do not allow LAN/Tailscale/wildcard binding via an environment typo.
+if(!['127.0.0.1','::1','localhost'].includes(host))
+	throw Error('Private QA media overlay must bind loopback only');
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid private QA port');
 const media=resolve(root);
 const plugin={

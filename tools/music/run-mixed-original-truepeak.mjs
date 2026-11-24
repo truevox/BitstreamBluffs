@@ -113,6 +113,7 @@ try{
 		report.summary.overUnityMixedTruePeak4xFrames?'FAILED_ESTIMATED_4X_TRUE_PEAK':
 		'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
 	report.browserErrors=errors;report.httpErrors=httpErrors;
+	if(report.status!=='PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE')process.exitCode=1;
 	console.log('MIXED_OUTPUT_AUDIT',report.status,JSON.stringify(report.summary),
 		'max_dBTP',report.highestMixed.estimatedTruePeakDbTp4x.toFixed(2));
 }catch(error){

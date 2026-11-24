@@ -13,6 +13,7 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 		this.left = new Float32Array(1024);
 		this.right = new Float32Array(1024);
 		this.firstFrame = 0;
+		this.expectedFrame = null;
 		this.active = true;
 		this.port.onmessage = ({data})=>{
 			if(data?.type==='stop') {
@@ -36,6 +37,17 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 		// This node is deliberately side-chained through a gain of zero;
 		// its output is always silent and cannot amplify the soundtrack.
 		const input=inputs[0];
+		if(this.active&&input?.[0]){
+			// Validate every render quantum BEFORE buffering: a missing or
+			// duplicated 128-frame block inside a 1024-frame chunk must not
+			// be hidden by chunk timestamps or compensating discontinuities.
+			if(this.expectedFrame!==null&&currentFrame!==this.expectedFrame){
+				this.port.postMessage({type:'discontinuity',actual:currentFrame,
+					expected:this.expectedFrame,delta:currentFrame-this.expectedFrame});
+				this.active=false;
+			}
+			if(this.active)this.expectedFrame=currentFrame+input[0].length;
+		}
 		if(this.active&&input?.[0]){
 			for(let i=0;i<input[0].length;i++){
 				if(this.frames===0)this.firstFrame=currentFrame+i;

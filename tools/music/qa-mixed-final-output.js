@@ -88,11 +88,13 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
 	for(const role of originals.roles){
 		const source=originals.sources.get(role);
 		const effects=mode==='dry-originals'?[]:
-			role==='vocals'?[]:
+			role==='vocals'?(originals.manifest.effects?.[role]||[]):
 			role.startsWith('voice:')?melodyPreset(biome):
 			[...sourceOnlyExtras(biome,role),...orchestraPreset(biome,role)];
 		const gain=role==='vocals'?1:role.startsWith('voice:')?.18:1;
 		const input=mixer.addSource(role,{gain,effects});
+		if(mode!=='dry-originals'&&(role==='vocals'||role.startsWith('voice:')))
+			mixer.setRoomSend(role,originals.manifest.roomSends?.[role]??null);
 		const playback=ctx.createBufferSource();
 		playback.buffer=source;
 		playback.connect(input);
@@ -141,8 +143,11 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 			await ctx.resume();
 		}),
 	}));
-	const pcm=await ctx.startRendering();
-	await Promise.all(programs.map(x=>x.promise));
+	const rendering=ctx.startRendering();
+	// An event handler can reject while OfflineAudioContext is suspended;
+	// awaiting rendering first would hang forever on that error.
+	const pcm=await Promise.race([rendering,
+		Promise.all(programs.map(x=>x.promise)).then(()=>rendering)]);
 	const window=measureFourTimesTruePeak(pcm,{
 		startFrame:Math.floor(.20*RATE),
 		endFrame:Math.floor(3.85*RATE),
@@ -296,8 +301,10 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 		}
 		await ctx.resume();
 	}));
-	const pcm=await ctx.startRendering();
-	await Promise.all(events);
+	const rendering=ctx.startRendering();
+	// Propagate missing real-drum or event-scheduling failures immediately,
+	// even when their suspend handler never reached ctx.resume().
+	const pcm=await Promise.race([rendering,Promise.all(events).then(()=>rendering)]);
 	if(includeCountIn&&!program)throw Error('Missing source drum count-in evidence');
 	const measured=measureFourTimesTruePeak(pcm,{
 		startFrame:Math.floor(.18*RATE),endFrame:Math.floor(5.40*RATE)});

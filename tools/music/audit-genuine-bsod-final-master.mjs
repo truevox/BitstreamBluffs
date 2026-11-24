@@ -14,6 +14,7 @@
 import assert from 'node:assert/strict';
 import {existsSync,writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
+import {classifyLiveFailure} from './classify-live-qa-failure.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:8221/';
 const output=process.env.REPORT_OUT;
 const songIndex=Number(process.env.QA_SONG_INDEX||0);
@@ -121,11 +122,12 @@ try{
 		a.nodes.peakGuard.connect(tap);
 		tap.connect(silent);silent.connect(c.destination);
 		const chunks=[];
-		const state={chunks,stopped:false,sampleRate:c.sampleRate,
+		const state={chunks,discontinuities:[],stopped:false,sampleRate:c.sampleRate,
 			installedAt:c.currentTime};
 		tap.port.onmessage=e=>{
 			const msg=e.data;
 			if(msg?.type==='pcm')chunks.push(msg);
+			if(msg?.type==='discontinuity')state.discontinuities.push(msg);
 			if(msg?.type==='stopped')state.stopped=true;
 		};
 		window.__bbLiveFinalAudit={tap,silent,state};
@@ -254,6 +256,9 @@ try{
 		while(!installed.state.stopped&&Date.now()<until)
 			await new Promise(resolve=>setTimeout(resolve,30));
 		if(!installed.state.stopped)throw Error('Worklet did not finish capture');
+		if(installed.state.discontinuities.length)
+			throw Error('INVALID_INSTRUMENT_CAPTURE: render quantum chronology '+
+				JSON.stringify(installed.state.discontinuities));
 		installed.tap.disconnect();installed.silent.disconnect();
 		a.nodes.peakGuard.disconnect(installed.tap);
 		const allChunks=installed.state.chunks;
@@ -333,6 +338,10 @@ try{
 			eventLog:window.__bbFinalAuditEvents,
 		};
 	},crash);
+	// Persist valid observed PCM metrics before validating any audio limit.
+	// A measured clip MUST survive the final failure report and must not be
+	// reclassified as a retryable instrument fault.
+	report.liveFinalMaster=measured;
 	assert.equal(measured.gaps,0);
 	assert.ok(measured.duration>3);
 	assert.equal(measured.sourceId,pre.trackId);
@@ -361,7 +370,7 @@ try{
 	report.status='PASS_ACTUAL_PHYSICS_BSOD_FULL_OUTPUT_4X_ESTIMATE_NOT_MASTERED';
 	console.log('REAL_PHYSICS_BSOD_LIVE_FINAL_OUTPUT_PASS',JSON.stringify({
 		songId:measured.songId,duration:measured.duration.toFixed(3),
-		originalDrumHits:4,
+		scheduledOriginalDrumHits:4,
 		samplePeak:measured.finalMasterMetrics.samplePeak,
 		estimatedTruePeak4x:measured.finalMasterMetrics.estimatedTruePeak4x,
 		estimatedDbTp:measured.finalMasterMetrics.estimatedTruePeakDbTp4x,
@@ -369,7 +378,7 @@ try{
 		peakGuard:'production',readOnlyTap:'AudioWorklet',httpErrors:0
 	}));
 }catch(error){
-	report.status='FAIL_OR_INCOMPLETE';
+	report.status=classifyLiveFailure(error,report.liveFinalMaster?.finalMasterMetrics);
 	report.error=String(error);
 	report.errors=errors;
 	report.unexpectedHttp=httpErrors;

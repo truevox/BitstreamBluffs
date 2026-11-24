@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
+import {isRetryableInstrumentFailure} from './classify-live-qa-failure.js';
 const mediaRoot=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 const reportRoot=process.env.REPORT_ROOT;
 const output=process.env.REPORT_OUT;
@@ -44,7 +45,10 @@ const chosenFull33=full33?Array.from({length:33},(_,index)=>{
 			if(selected)throw Error('Multiple ambiguous passing live captures of original '+id);
 			selected={index,file:filename,vocals:true};
 		}else{
-			assert.equal(item.status,'FAIL_OR_INCOMPLETE');
+			// A valid clip, an ambiguous legacy failure, or an unclassified
+			// error is NEVER retryable: it must fail the entire aggregate.
+			assert.ok(isRetryableInstrumentFailure(item),
+				'Non-retryable or ambiguous source/audio failure in '+filename);
 			rejectedAttempts.push({index,attempt,filename,sha256:sha(bytes),
 				reason:String(item.error).slice(0,240)});
 		}
@@ -154,7 +158,7 @@ for(const {index,file,vocals} of sequence){
 		outputPeak4x:meter.estimatedTruePeak4x,
 		dbTp4x:meter.estimatedTruePeakDbTp4x,
 		startupGapFrames:(live.discardedStartupGapDetails||[]).reduce((a,x)=>a+x.delta,0),
-		realDrumHits:4,originalDrumSourceSha256:fileBytes.sha256,
+		scheduledDrumHits:4,originalDrumSourceSha256:fileBytes.sha256,
 	});
 	reportEvidence.push({file,sha256:sha(bytes)});
 }
@@ -165,7 +169,7 @@ const summary={
 	distinctOriginalSongIds:new Set(checked.map(x=>x.trackId)).size,
 	vocalsUnlockedCases:checked.filter(x=>x.vocals).length,
 	vocalsLockedControlCases:checked.filter(x=>!x.vocals).length,
-	originalRecordedDrumOnsets:checked.length*4,
+	scheduledOriginalRecordedDrumOnsets:checked.length*4,
 	independentlyVerifiedDrumOggSources:sourceFiles.size,
 	noPostStartupPcmGaps:true,
 	sampleClips:0,estimated4xOvers:0,nonfiniteSamples:0,
@@ -183,7 +187,7 @@ const aggregate={
 	notes:[
 		'This is an actual physics-resolved BSOD collision after QA accelerates and positions the authoritative real wall. It is not a natural player/replay trajectory.',
 		'True final PCM captured read-only after game production OutputPeakGuard by silent-output AudioWorklet. Startup diagnostic gaps discarded only before collision; every counted crash interval is contiguous.',
-		'The original drum source was fetched in Chromium and independently SHA-256 verified from private unmodified disk OGG bytes for each counted collision.',
+		'Original drum source OGG is SHA-256 verified and four hits are scheduled; non-silent full-master windows alone do NOT prove each isolated drum was audible over wind/crash tails.',
 		'Each case uses one 33-song original first segment, naturally starting in Debutmont. If QA_FULL33=1, exactly one first segment per song; not a coverage claim for full-length tracks or all 12 game biomes.',
 		'The four recorded original drum excerpts use the production count-in synthetic-unverified grid; original beats have NOT been certified.',
 		'Browser audio context playback at native device sample rate (usually 44.1 kHz); 4x sinc estimate is not an independent mastering reference.',
