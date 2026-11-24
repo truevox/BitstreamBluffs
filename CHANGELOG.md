@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.21.1 — readable World Dance (2026-11-24)
+
+- #212: owner-accepted scenery auditions for Steampunk, Sky Jellyfish, Candy Cane Canyon, Micro Mountain, Vertigo Vents and Arcade. Stronger visual-only accents, individual motif motion and accessible neutral settings.
+- Preserve original audio transport, meter, physics and SIM9. Controlled motif auditions and live accessibility checks passed; natural traversal and Chromebook performance remain follow-up QA.
+
 ## v2.21.0 — original-stem soundtrack and crossfades (2026-11-24)
 
 - #306: integrate original-stem soundtrack processing for twelve biome identities, music library and explicit all-off silence, Arcade bridge and clean menu presentation. Optional audio failures cannot interrupt the simulation. Only installed music packs are selectable.
@@ -7,6 +12,11 @@
 - #291 / #310: source-grounded private-catalog audio QA, strict sample-clock receipts, original OGG provenance and bounded final-output guard. This is sampled evidence, not calibrated mastering, verified musical timing or permission to distribute private audio.
 - Code-only release: keep the four existing public packs; private original/derived audio and estimated timing metadata remain unpublished. Experimental tighter guard (#321) is separate.
 - Preserve current main's SIM9 AirBrake, crash-priority scoring and persistence durability. Audio consumes read-only joined terrain and physics observations; no new simulation revision or old-tape compatibility promise.
+
+## v2.20.3 — Heavy Mode developer diagnostics (2026-11-24)
+
+- Add isolated fresh-build savestate capture/restore verification, strict Matter and recorder preflight, and repeated reload probes across input/checkpoint boundaries and a generated moving hazard.
+- Developer-only tools and evidence: no player savestate UI, storage, ranking or physics changes. SIM9 unchanged; #119 and #242 remain open.
 
 ## v2.20.2 — save integrity (2026-11-24)
 

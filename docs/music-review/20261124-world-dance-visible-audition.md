@@ -76,3 +76,7 @@ Owner approved V8 Vertigo Vents. The five previously accepted motifs remain unch
 Arcade sun now has a bounded vertical hop (22px maximum centre lift) combined with broad horizontal squash and vertical compression. Its horizontal centre, palette and transition-controlled opacity remain independent of dance. The bridge grid and veil logic are untouched. Added actual sprite-transform tests at partial and full veil, including reduced motion and zero-envelope reset. 136/136 focused background, dance, transition and ruleset tests passed.
 
 96 matched real game frame pairs over original One More Run, with the presentation-only Arcade veil forced to full coverage then swept through partial coverage (not natural sector traversal). Peak envelope .724, maximum measured sun centre lift 20.09px, identical opacity in both arms, no page errors. Fresh live original-OGG browser smoke passed music reactivity, mute, OS reduced motion, explicit reduced-motion overrides and World Dance OFF. Private silent audition only; no media committed. Natural traversal and Chromebook performance still pending.
+
+## Owner acceptance and integration
+
+Owner accepted Arcade V9 as good enough for now and raised possible dancing buildings as a future idea, not a requirement for this release. All six individual audition candidates are accepted for current visual tuning. Preserve existing building art for this release. Natural traversal and Chromebook performance remain separate evidence gaps.

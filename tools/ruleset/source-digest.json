@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: renderFrame passes held visual-only WorldDance strength to decorative background; onset detector, billboard, game simulation and music clock unchanged",
+  "attestation": "no-behavior-change: retain released SIM9 and pass visual-only held World Dance envelope to decorative background",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],

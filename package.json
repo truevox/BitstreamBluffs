@@ -1,6 +1,6 @@
 {
   "name": "bitstream-bluffs",
-  "version": "2.21.0",
+  "version": "2.21.1",
   "type": "module",
   "description": "2D side-scrolling infinite sledder game",
   "scripts": {
@@ -13,6 +13,7 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:puppeteer": "node ./node_modules/mocha/bin/mocha.js tests/puppeteer-tests.js --timeout 30000",
     "test:all": "npm run test && npm run test:puppeteer",
+    "gate:heavy": "node tools/savestate-experiment/run-heavy-gate.mjs",
     "gate:playthrough": "npm run build && node tools/sim/gate-playthrough.mjs --with-boosts"
   },
   "jest": {
@@ -59,6 +60,7 @@
     "@stdlib/math-base-special-tan": "0.3.1",
     "@stdlib/math-base-special-tanh": "0.2.4",
     "chai": "^5.2.0",
+    "esbuild": "0.25.4",
     "express": "^5.1.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
