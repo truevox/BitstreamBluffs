@@ -314,6 +314,14 @@ describe('air brake and parachute', () => {
     });
   });
 
+  test('short paid AirBrake preserves the current tracked flight unfinished spin penalty',()=>{
+    const r=rig();
+    r.frame({grounded:true,state:{heliDeg:0,midSpin:0}});
+    r.frame({input:{airBrakeKicked:true,heli:1},state:{heliDeg:60,midSpin:60}});
+    const landed=r.frame({grounded:true,state:{heliDeg:100,midSpin:100}});
+    expect(landed.landing).toMatchObject({quality:'sloppy',midSpin:true,shortAirBrakeTouchdown:true});
+  });
+
   test('a crash frame never credits a paid AirBrake trick',()=>{
     const r=rig();
     r.run(2,{grounded:true});

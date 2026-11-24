@@ -237,7 +237,8 @@ export class TrickTracker {
     }
 
     // grounded
-    const trackedAirMs=this._air?Math.max(0,t-this._airStart):Math.max(0,dt);
+    const trackedFlight = this._air;
+    const trackedAirMs=trackedFlight?Math.max(0,t-this._airStart):Math.max(0,dt);
     // A physical one-shot kick could already have earned a trick on an earlier
     // airborne tick. If touchdown happens before the normal min-air threshold,
     // we MUST bank that pending trick even though this particular frame has
@@ -278,7 +279,7 @@ export class TrickTracker {
         airtimeMs:airBrakeTouchdownMs });
     }
     if (!landing && (input.airBrakeKicked || pendingShortBrake)) {
-        if (!this._air) {
+        if (!trackedFlight) {
           // A paid kick and real touchdown can fit between tracker samples.
           // This is a NEW flight; no prior helicopter/corkscrew attempt may
           // downgrade its landing or contaminate its rotation totals.
@@ -293,7 +294,7 @@ export class TrickTracker {
         // invent a perfect-landing bonus or an additional trick-speed launch.
         // Ordinary sloppy/crash safety classification still applies.
         landing={...measured, airtimeMs:airBrakeTouchdownMs, rotationDeg:0,
-          midSpin:false, shortAirBrakeTouchdown:true,
+          midSpin:measured.midSpin, shortAirBrakeTouchdown:true,
           quality:measured.quality==='perfect'?'good':measured.quality};
     }
     this._prevAngle = angle;
