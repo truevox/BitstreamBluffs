@@ -26,14 +26,7 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 		this.armFrame=this.armed?0:null;
 		this.active = true;
 		this.port.onmessage = ({data})=>{
-			if(data?.type==='stop') {
-				this.flush();
-				this.active=false;
-				this.port.postMessage({type:'stopped',sampleRate,
-					quantumValidationVersion:this.warmupFramesRequired>0?3:2,
-					armed:this.armed,armFrame:this.armFrame,
-					warmupGaps:this.warmupGaps});
-			}
+			if(data?.type==='stop'&&this.active)this.stopRequested=true;
 		};
 	}
 	flush(){
@@ -56,7 +49,11 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 				Number.isSafeInteger(quantumFrames)&&quantumFrames>0;
 			const continuous=good&&(this.nextQuantumFrame===null||
 				currentFrame===this.nextQuantumFrame);
-			if(!this.armed){
+			if(this.stopRequested&&!this.armed){
+				this.active=false;
+				this.port.postMessage({type:'stopped',sampleRate,
+					quantumValidationVersion:4,armed:false,armFrame:null});
+			}else if(!this.armed){
 				// Never put warmup frames into evidence, even if there
 				// were no visible gaps. A full contiguous duration must
 				// be observed BEFORE measurement begins.
@@ -88,6 +85,16 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 					this.right[this.frames]=input[1]?.[i]??input[0][i];
 					this.frames++;
 					if(this.frames===this.left.length)this.flush();
+				}
+				// Confirm the next actual quantum AFTER the stop request and
+				// retain its PCM. A missing terminal quantum fails above.
+				if(this.stopRequested){
+					this.flush();this.active=false;
+					this.port.postMessage({type:'stopped',sampleRate,
+						quantumValidationVersion:4,armed:this.armed,
+						armFrame:this.armFrame,warmupGaps:this.warmupGaps,
+						finalQuantumStart:currentFrame,finalQuantumFrames:quantumFrames,
+						captureEndFrame:this.nextQuantumFrame});
 				}
 			}
 		}

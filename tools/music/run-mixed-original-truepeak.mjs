@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Real original-OGG / production master mixed-output QA, no source mutation. */
 import assert from 'node:assert/strict';
+import {mixedOverlapCases} from './mixed-overlap-cases.js';
 import {existsSync,writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 import {auditVerdictExitCode} from './audit-verdict-exit.js';
@@ -24,11 +25,7 @@ if(songFilter!==null&&(!Number.isInteger(songFilter)||songFilter<0||songFilter>3
 	throw Error('QA_SONG_INDEX must be original song index 0..3');
 const overlap=process.env.QA_OVERLAP==='1';
 const scenarios=overlap?
-	[0,1,2,3].map((songIndex)=>({
-		songIndex,segment:songIndex===1?12:0,
-		biome:['vertigo-vents','garbage-dump-glacier','crystal-cavern','bitstream-bluffs'][songIndex],
-		scenario:'mixed-game-stress',profile:'crash-static-overlap',
-	})):
+	mixedOverlapCases():
 	songFilter===null?allScenarios:allScenarios.filter(x=>x.songIndex===songFilter);
 if(!scenarios.length)throw Error('No source scenario selected');
 const results=[],errors=[],httpErrors=[];

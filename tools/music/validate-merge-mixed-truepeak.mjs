@@ -5,6 +5,7 @@
  * duplicate cases, changed source OGGs and overlapping report paths.
  */
 import assert from 'node:assert/strict';
+import {assertMixedOverlapCase} from './mixed-overlap-cases.js';
 import {existsSync,readFileSync,writeFileSync,statSync} from 'node:fs';
 import {join,resolve,sep} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -124,6 +125,7 @@ if(overlapFile){
 		assert.equal(v.originalVocalFxAndRoomSendsFromPack,true,
 			'Historic overlap mix lacks pack vocal FX and room sends');
 		const song=songs.find(x=>x.id===v.trackId);
+		assertMixedOverlapCase(v,songs);
 		assert.ok(song&&!checkUnique.has(song.id));
 		checkUnique.add(song.id);
 		const base=join(source,'packs',song.manifest.split('/')[1]);

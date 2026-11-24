@@ -29,7 +29,7 @@ const report={
 		'BSOD collision itself is accelerated by QA positioning/speed of the real wall before calling real physics headlessStep; not organically played or recorded player input',
 		'Captures limited seconds of one original track, not full 33-song continuous audio or each biome',
 		'4x Hann-windowed-sinc intersample estimate is NOT a calibrated mastering BS.1770 meter',
-		'Quantum-v3 begins recording only AFTER a 450ms strictly contiguous warmup; startup worklet activation gaps are excluded BEFORE arming, while EVERY post-arm quantum must remain continuous, without filling or overlooking gaps',
+		'Quantum-v4 begins recording only AFTER a 450ms strictly contiguous warmup; startup worklet activation gaps are excluded BEFORE arming, while EVERY post-arm quantum must remain continuous, without filling or overlooking gaps; stop requires a final contiguous quantum, and all recorded samples are metered',
 		'Non-silent master audio during four original drum source onsets does not establish that those drums were independently audible above wind and other program audio; only scheduled source identity is verified',
 		'AudioWorklet is a read-only sidechain with silent output to destination; live AudioContext device/platform timing affects observed signal',
 		'No private PCM or source media is stored in this public code repository; report includes only analysis metrics and event identities',
@@ -140,6 +140,9 @@ try{
 			if(msg?.type==='stopped'){
 				state.stopped=true;
 				state.quantumValidationVersion=msg.quantumValidationVersion;
+				state.finalQuantumStart=msg.finalQuantumStart;
+				state.finalQuantumFrames=msg.finalQuantumFrames;
+				state.captureEndFrame=msg.captureEndFrame;
 			}
 		};
 		window.__bbLiveFinalAudit={tap,silent,state};
@@ -206,7 +209,7 @@ try{
 			preCrashSeconds:ctx.currentTime-state.armFrame/ctx.sampleRate,
 			bufferedChunks:state.chunks.length,warmupGaps:state.warmupGaps};
 	});
-	console.log('QUALIFIED_V3_PRECRASH_SAMPLE_CLOCK',JSON.stringify(captureReady));
+	console.log('QUALIFIED_V4_PRECRASH_SAMPLE_CLOCK',JSON.stringify(captureReady));
 	const crash=await page.evaluate(()=>{
 		const g=window.__bbGame,r=g.scene.getScene('RunScene'),
 			a=g.registry.get('audioSynth'),d=a._stemMusic;
@@ -316,10 +319,10 @@ try{
 		while(!installed.state.stopped&&Date.now()<until)
 			await new Promise(resolve=>setTimeout(resolve,30));
 		if(!installed.state.stopped)throw Error('INSTRUMENT_CAPTURE: Worklet did not finish capture');
-		if(installed.state.quantumValidationVersion!==3||
+		if(installed.state.quantumValidationVersion!==4||
 			!installed.state.armed||
 			!Number.isSafeInteger(installed.state.armFrame))
-			throw Error('INSTRUMENT_CAPTURE: Missing qualified quantum-v3 arm proof');
+			throw Error('INSTRUMENT_CAPTURE: Missing qualified quantum-v4 arm proof');
 		installed.tap.disconnect();installed.silent.disconnect();
 		a.nodes.peakGuard.disconnect(installed.tap);
 		if(installed.state.chronologyErrors.length)
@@ -358,15 +361,18 @@ try{
 			left.set(chunk.left,off);right.set(chunk.right,off);
 			off+=chunk.frames;priorEnd=chunk.frame+chunk.frames;
 		}
+		if(!Number.isSafeInteger(installed.state.finalQuantumStart)||
+			!Number.isSafeInteger(installed.state.finalQuantumFrames)||
+			installed.state.finalQuantumFrames<=0||
+			installed.state.finalQuantumStart+installed.state.finalQuantumFrames!==priorEnd||
+			installed.state.captureEndFrame!==priorEnd)
+			throw Error('INSTRUMENT_CAPTURE: Missing exact terminal quantum proof');
 		if(priorEnd/sampleRate<collision.countIn.bandAt+.15)
 			throw Error('INSTRUMENT_CAPTURE: Capture ended before authentic original band recovery');
 		const {measureFourTimesTruePeak}=await import('/tools/music/estimate-true-peak-4x.js');
 		const pcm={sampleRate,numberOfChannels:2,length:frames,
 			getChannelData:channel=>channel===0?left:right};
-		const result=measureFourTimesTruePeak(pcm,{
-			startFrame:Math.min(48,Math.round(frames*.01)),
-			endFrame:frames-Math.min(48,Math.round(frames*.01))
-		});
+		const result=measureFourTimesTruePeak(pcm);
 		const origin=firstFrame/sampleRate;
 		const clockWindows=crashTimes=>{
 			const out={};
@@ -392,6 +398,9 @@ try{
 			chunks:chunks.length,frames,gaps:0,duration:frames/sampleRate,
 			captureContinuityVersion:installed.state.quantumValidationVersion,
 			captureArmFrame:installed.state.armFrame,
+			captureEndFrame:installed.state.captureEndFrame,
+			finalQuantumStart:installed.state.finalQuantumStart,
+			finalQuantumFrames:installed.state.finalQuantumFrames,
 			startupWarmupGapsExcludedBeforeArm:installed.state.warmupGaps,
 			captureQuantumIntegrity:{checkedEveryQuantum:true,
 				chronologyErrors:installed.state.chronologyErrors.length,

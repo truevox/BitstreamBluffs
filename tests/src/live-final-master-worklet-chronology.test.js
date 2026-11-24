@@ -84,12 +84,13 @@ describe('live final-output AudioWorklet quantum integrity',()=>{
 		expect(a.messages.filter(m=>m.type==='pcm')).toHaveLength(0);
 		a.process(896);a.process(1024);
 		a.port.onmessage({data:{type:'stop'}});
+		a.process(1152);
 		const pcm=a.messages.find(m=>m.type==='pcm');
-		expect(pcm).toMatchObject({frame:896,frames:256});
+		expect(pcm).toMatchObject({frame:896,frames:384});
 		expect(a.getErrors()).toHaveLength(0);
 		expect(a.messages.at(-1)).toMatchObject({
-			type:'stopped',quantumValidationVersion:3,
-			armed:true,armFrame:896,warmupGaps:1
+			type:'stopped',quantumValidationVersion:4,
+			armed:true,armFrame:896,warmupGaps:1,finalQuantumStart:1152,finalQuantumFrames:128,captureEndFrame:1280
 		});
 	});
 	test('v3 post-arming gap aborts even if startup had a harmless excluded gap',()=>{
@@ -107,17 +108,29 @@ describe('live final-output AudioWorklet quantum integrity',()=>{
 		const a=liveCapture({stableWarmupFrames:1024});
 		a.process(0);
 		a.port.onmessage({data:{type:'stop'}});
+		a.process(128);
 		expect(a.messages.at(-1)).toMatchObject({
-			type:'stopped',quantumValidationVersion:3,armed:false,armFrame:null
+			type:'stopped',quantumValidationVersion:4,armed:false,armFrame:null
 		});
 	});
 	test('stop flushes a partial chunk with an exact audio sample timestamp',()=>{
 		const a=liveCapture();
 		a.process(1000);a.process(1128);
 		a.port.onmessage({data:{type:'stop'}});
+		a.process(1256);
 		expect(a.messages.find(m=>m.type==='pcm')).toMatchObject({
-			frame:1000,frames:256
+			frame:1000,frames:384
 		});
 		expect(a.messages.at(-1).type).toBe('stopped');
 	});
+});
+
+test('missing terminal quantum never produces a successful stop receipt',()=>{
+	const a=liveCapture({stableWarmupFrames:128});
+	a.process(0);a.process(128);
+	a.port.onmessage({data:{type:'stop'}});
+	expect(a.messages.some(m=>m.type==='stopped')).toBe(false);
+	a.process(384); // expected 256
+	expect(a.getErrors()[0]).toMatchObject({expected:256,actual:384});
+	expect(a.messages.some(m=>m.type==='stopped')).toBe(false);
 });

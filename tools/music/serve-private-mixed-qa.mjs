@@ -6,7 +6,7 @@
 import {createServer} from 'vite';
 import {createReadStream,existsSync,statSync} from 'node:fs';
 import {join,resolve,sep} from 'node:path';
-import {assertPrivateAudioQaLoopbackHost} from './private-qa-loopback.js';
+import {assertPrivateAudioQaLoopbackHost,isPrivateQaRequestHost} from './private-qa-loopback.js';
 const root=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 if(!root||!existsSync(join(root,'catalog.json'))||!existsSync(join(root,'packs')))
 	throw Error('Set BSB291_PRIVATE_AUDIO_ROOT to verified private media');
@@ -22,6 +22,12 @@ const plugin={
 			try{url=decodeURIComponent((req.url||'').split('?')[0]);}
 			catch{res.writeHead(400);res.end();return}
 			if(!url.startsWith('/music/packs/')&&url!=='/music/catalog.json')return next();
+			if(!isPrivateQaRequestHost(req.headers.host,host,port)){
+				res.writeHead(403);res.end();return;
+			}
+			if(req.method!=='GET'&&req.method!=='HEAD'){
+				res.writeHead(405);res.end();return;
+			}
 			const pieces=url.split('/').filter(Boolean);
 			if(pieces.some(x=>!/^[-_A-Za-z0-9.]+$/.test(x)||x==='.'||x==='..')){
 				res.writeHead(400);res.end();return;

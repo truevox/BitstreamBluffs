@@ -52,3 +52,12 @@ describe('4x band-limited intersample QA, strictly separate from game mastering'
 		expect(()=>measureFourTimesTruePeak(null)).toThrow();
 	});
 });
+
+test('sample clipping and nonfinite at either capture edge are still measured',()=>{
+	const p=measureFourTimesTruePeak(audio(48000,250,(i,ch)=>
+		i===0||i===249?1.1:i===1||i===248?NaN:0));
+	expect(p.sampleClips).toBe(4);
+	expect(p.nonfiniteSamples).toBe(4);
+	expect(p.samplesPerChannel).toBe(250);
+	expect(p.edgeFramesNotInterpolated).toBe(48);
+});

@@ -24,10 +24,13 @@ test('contiguous render quanta flush exact continuous PCM',()=>{
   expect(messages.filter(m=>m.type==='pcm')).toHaveLength(1);
   expect(messages.find(m=>m.type==='pcm').frames).toBe(1024);
   const stopped=makeTap();
+  stopped.next(0);
   stopped.tap.port.onmessage({data:{type:'stop'}});
-  // The report must require the worklet's explicit continuity-v2 proof.
+  expect(stopped.tap.active).toBe(true);
+  stopped.next(128);
+  // The report must require the worklet's explicit continuity-v4 proof.
   expect(stopped.tap.active).toBe(false);
-  expect(stopped.messages.find(m=>m.type==='stopped').quantumValidationVersion).toBe(2);
+  expect(stopped.messages.find(m=>m.type==='stopped').quantumValidationVersion).toBe(4);
 });
 
 test.each([

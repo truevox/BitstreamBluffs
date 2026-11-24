@@ -4,13 +4,15 @@ import {
 } from '../../tools/music/live-capture-review-policy.js';
 function report(status=PASS_CAPTURE,patch={}){
 	return {status,liveFinalMaster:{
-		gaps:0,captureContinuityVersion:3,captureArmFrame:4096,
+		gaps:0,captureContinuityVersion:4,captureArmFrame:4096,
+		frames:1024,captureEndFrame:5120,finalQuantumStart:4992,finalQuantumFrames:128,
 		firstFrame:4096,startupWarmupGapsExcludedBeforeArm:1,
 		discardedStartupChunks:0,
 		captureQuantumIntegrity:{checkedEveryQuantum:true,
 			chronologyErrors:0,nextQuantumVerified:true},
 		finalMasterMetrics:{samplePeak:.94,estimatedTruePeak4x:.95,
-			sampleClips:0,estimatedTrueClips4x:0,nonfiniteSamples:0,...patch},
+			sampleClips:0,estimatedTrueClips4x:0,nonfiniteSamples:0,
+			windowStartFrame:0,windowEndFrame:1024,samplesPerChannel:1024,...patch},
 	}};
 }
 describe('#310 strict captured-audio review policy',()=>{
@@ -77,4 +79,14 @@ test('never discard an instrument gap when the same run had browser or source er
     {error:'Unexplained source replacement'},
   ])expect(classifyLiveCaptureAttempt({...base,...extra})).toBe('INVALID_QA_OR_SOURCE');
   expect(classifyLiveCaptureAttempt({...base,unexpectedHttp:[{status:404,url:'http://127.0.0.1/music/packs/a/adaptive/debutmont/missing.ogg'}]})).toBe(INVALID_CAPTURE);
+});
+
+test('v3, truncated edge meter, and inconsistent final quantum cannot pass v4',()=>{
+	for(const patch of [
+		{captureContinuityVersion:3},{captureEndFrame:4992},
+		{finalQuantumStart:4864},{finalMasterMetrics:{...report().liveFinalMaster.finalMasterMetrics,windowStartFrame:48}},
+	]){
+		const x=report();Object.assign(x.liveFinalMaster,patch);
+		expect(classifyLiveCaptureAttempt(x)).toBe('INVALID_QA_OR_SOURCE');
+	}
 });

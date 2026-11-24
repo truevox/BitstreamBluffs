@@ -33,14 +33,14 @@ const full33=process.env.QA_FULL33==='1';
 const strictReview=process.env.QA_REVIEW_STRICT==='1';
 const rejectedAttempts=[];
 const chosenFull33=full33?Array.from({length:33},(_,index)=>{
-	// ALL 33 indexes must use new quantum-v3 ARMED capture reports.
+	// ALL 33 indexes must use fresh quantum-v4 terminal-verified reports.
 	// v2 and the earlier chunk-only captures remain immutable historical
 	// evidence and must NEVER be grandfathered into this aggregate.
 	const id=String(index).padStart(2,'0');
 	let selected=null;
 	for(let attempt=1;attempt<=3;attempt++){
 		const filename=strictReview?
-			'issue291-qualified-v3b-live-index-'+id+'-attempt'+attempt+'-20261124.json':
+			'issue291-qualified-v4-live-index-'+id+'-attempt'+attempt+'-20261124.json':
 			'issue291-real-bsod-live-full33-index-'+id+'-attempt-'+attempt+'-20261124.json';
 		const path=join(reports,filename);
 		if(!existsSync(path))continue;
@@ -133,8 +133,8 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(live.sourceId,actual.id);
 	assert.equal(live.clockStart,crash.before.clockStart);
 	assert.equal(live.gaps,0);
-	assert.equal(live.captureContinuityVersion,3,
-		'Missing quantum-v3 qualified arm proof: recapture required');
+	assert.equal(live.captureContinuityVersion,4,
+		'Missing quantum-v4 qualified arm and terminal proof: recapture required');
 	assert.equal(live.captureArmFrame,live.firstFrame,
 		'Recording must begin EXACTLY at its qualified sample-clock arm');
 	assert.ok(Number.isSafeInteger(live.startupWarmupGapsExcludedBeforeArm)&&
@@ -168,6 +168,11 @@ for(const {index,file,vocals} of sequence){
 	assert.ok(meter.estimatedTruePeak4x<1);
 	assert.equal(meter.sampleRate,live.sampleRate);
 	assert.equal(meter.channels,2);
+	assert.equal(meter.windowStartFrame,0);
+	assert.equal(meter.windowEndFrame,live.frames);
+	assert.equal(meter.samplesPerChannel,live.frames);
+	assert.equal(live.captureEndFrame,live.firstFrame+live.frames);
+	assert.equal(live.captureEndFrame,live.finalQuantumStart+live.finalQuantumFrames);
 	for(let i=1;i<=4;i++){
 		const hit=live.countInMasterWindows['drum'+i];
 		assert.ok(hit&&hit.rms>.0002&&hit.samplesPerChannel>1000,

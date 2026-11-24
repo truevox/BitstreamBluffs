@@ -24,7 +24,14 @@ export function classifyLiveCaptureAttempt(report) {
 		return AUDIO_LIMIT_FAILURE;
 	if(report.status===AUDIO_LIMIT_FAILURE) return AUDIO_LIMIT_FAILURE;
 	const complete=metricValid&&live.gaps===0&&
-		live.captureContinuityVersion===3&&
+		live.captureContinuityVersion===4&&
+		Number.isSafeInteger(live.frames)&&live.frames>0&&
+		Number.isSafeInteger(live.finalQuantumStart)&&live.finalQuantumStart>=live.firstFrame&&
+		Number.isSafeInteger(live.finalQuantumFrames)&&live.finalQuantumFrames>0&&
+		live.captureEndFrame===live.firstFrame+live.frames&&
+		live.captureEndFrame===live.finalQuantumStart+live.finalQuantumFrames&&
+		meter.windowStartFrame===0&&meter.windowEndFrame===live.frames&&
+		meter.samplesPerChannel===live.frames&&
 		Number.isSafeInteger(live.captureArmFrame)&&live.captureArmFrame>=0&&
 		live.firstFrame===live.captureArmFrame&&
 		Number.isSafeInteger(live.startupWarmupGapsExcludedBeforeArm)&&

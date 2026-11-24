@@ -1,6 +1,6 @@
 # #291 — All 33 authentic song-to-song handoffs and original OGG boundaries
 
-**2026-11-24. PASS for tested real-scheduler handoffs, frame-accurate original decoding and source provenance. NOT full-song playback or mastering certification.** QA tools/docs only; no production player, private OGG or approved mix change. Stacked on draft PR #310, with [skip netlify].
+**2026-11-24. PASS for tested real-scheduler handoffs, frame-accurate original decoding and independent source-file integrity (not scheduler-buffer provenance). NOT full-song playback or mastering certification.** QA tools/docs only; no production player, private OGG or approved mix change. Stacked on draft PR #310, with [skip netlify].
 
 ## Actual production scheduler, 33/33 song endings
 
@@ -10,7 +10,7 @@ This is genuine live source scheduling **near the end**, not hours of uninterrup
 
 ## Independent OGG source, frame and SHA-256 verification
 
-The companion browser-and-disk verifier tools/music/verify-real-song-handoff-sources.mjs checks the exact original first/last segments on both sides of all 33 boundaries. It fetched 396 unique original OGGs in Chromium, hashed their encoded bytes using browser crypto, decoded at 48 kHz, and verified **396/396 exact expected decoded segment frame counts**. It then read the 396 canonical original files directly from the private owner's archive, independently checked SHA-256 and encoded byte length, verified the manifest/role/segment identity, and matched the real game scheduler's 33 source-pair reports.
+The companion browser-and-disk verifier tools/music/verify-real-song-handoff-sources.mjs checks the exact original first/last segments on both sides of all 33 boundaries. It fetched 396 unique original OGGs in Chromium, hashed their encoded bytes using browser crypto, decoded at 48 kHz, and verified **396/396 exact expected decoded segment frame counts**. It then read the 396 canonical original files directly from the private owner's archive, independently checked SHA-256 and encoded byte length, verified the manifest/role/segment identity, and matched the reported song identities in the real game scheduler's 33 source-pair reports. These are two separate measurements: the separately fetched OGG bytes are not cryptographically bound to the exact cached buffers scheduled by the player.
 
 **All 33 handoffs and 396 SHA-256 file/decoded-frame checks passed.** Original private OGGs were not altered or uploaded. Immutable private aggregate SHA-256: **b817176d935b6ab3b91505dbd9f802599b832b1880359254eaaedcf2d04857bb**. An earlier immutable frame-and-hash-only aggregate SHA-256 was **21341b46adf23dd6399c913c21d7918a1579297698f4603ad7d653378862487c**.
 

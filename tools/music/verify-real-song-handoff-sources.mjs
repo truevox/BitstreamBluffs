@@ -27,7 +27,7 @@ const cases=[],rawSources=[];
 let report={format:'bsb-33-real-webaudio-song-handoff-boundary-source-verified-v1',
 	status:'INCOMPLETE',cases,sourceFiles:rawSources,
 	limitations:[
-		'Actual native 33-song end-of-track handoff schedule cases are independently read from exclusive-create private reports; this verifies real original terminal/next-opening OGGs at precisely those schedules',
+		'Actual native 33-song end-of-track handoff schedule cases are independently read from exclusive-create private reports; the separate source verification checks corresponding terminal/next-opening OGGs, not the exact buffers consumed by the native scheduler',
 		'All six original recorded source roles are fetched and decoded in Chromium with 48kHz AudioContext and matched to the exact private on-disk OGG SHA-256 and expected frames',
 		'Tests last and first segment per transition only, NOT every intra-song segment or continuous multi-minute playback',
 		'An exact source-frame count prevents hidden 6.5ms Opus truncation but is NOT itself proof of intentional artist-approved track-to-track fade/no silence',
@@ -209,6 +209,7 @@ try{
 		independentlyVerifiedBrowserOggSourceUsages:396,
 		uniqueCanonicalOriginalOggFiles:sourceFiles.size,
 		allDecodedAudioSegmentsFrameExact:true,
+		schedulerBufferBytesCryptographicallyBound:false,
 		dryOriginalEndingTailEnergyProxiesComputed:true,
 		endsUnder20PercentOfPriorHalfSecond:cases.filter(c=>
 			c.endingHalfSecondEnergyRatio!==null&&
