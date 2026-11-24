@@ -1,13 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 20:50 UTC. Main `29587b64fc86ba70ec647e31c4c73a3ec4c02976` (#334), v2.21.1 live, SIM9. #333 merged R2 soundtrack catalog and fallback as `d9d41c7`; #334 adds billboard thumbnails. Exact #334 Pages push `45480500227` green; public `main-BcKROgaR.js` SHA-256 `dd09ab01d587f6ca35c600dbabb659291ffde1f42551887c3392f9a45ed17334`, runtime version v2.21.1. Live catalog contains 33 tracks with CORS; no new pause or every-track test by Morgan.
+Last verified: 2026-11-24 21:44 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **Requested #325 review completed:** open non-draft v2.21.2 head
+- **Requested #325 review completed and shipped:** reviewed v2.21.2 head
   `b4b52e1d6040f3b9ac998536f70362848b80d7dc` on main `29587b64`.
   Final delta from locally built `8c5b81a` is only docs and a QA tool.
   P2: strong sways exceed the 40px decor cull margin. At Micro Mountain
@@ -22,7 +22,9 @@ means resume this queue, not take over another lane or merge a draft.
   original scroll 8270→8271 now moves the visible tip from x13.925 to
   x13.855, without cutoff; 125 focused tests and exact-head CI green.
   Conservative per-motif margins preserve tile phase. User informed.
-  Real Chromebook performance remains open. No PR write or merge.
+  Owner accepted Chromebook performance (not a measured benchmark), and
+  Gal merged approved fix as `3197b762677abb88a0e108796384d61dde1d8215`.
+  Verified public release and told Marvin. No PR write or merge by Morgan.
 
 1. **#157 / #287**: current draft `morgan/issue-157-utility-score-baseline` @
    `eace461ce67d113215ee5d6f3e24346704461e36`, based on exact v2.20.1.
@@ -72,6 +74,14 @@ means resume this queue, not take over another lane or merge a draft.
    delivered cue fix but do not claim full Pulp or take over Team B.
 
 ## Changes landed and published
+
+- #332 developer-only Heavy Mode milestone: isolated SIM9 neutral-input
+  fresh reconstruction 977/977 through terminal crash; strict suffixes
+  300/300 contact + 280/280 hazard, with strengthened negative controls.
+  No production save/load or ranking; #119/#242/#329 still open. Do not
+  unblock product #75/#100/#74 on these bounded fixtures alone. An exact
+  #79 fixture-only integration can use this as additional evidence after
+  verifying matching build, causal prefix and input constraints.
 
 - #327 merged `b67f944` as v2.20.3 Heavy Mode developer diagnostics,
   also preserved in #328. Covers strict preflight and bounded fresh
