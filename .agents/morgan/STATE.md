@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 12:51 UTC. Main: `398c8b6ae1248642478c913ce218cac9a65dbe48` (#311 portable Pages hosting). SIM8 v2.19.22 remains live on GitHub Pages at #311 and Netlify at `2dcd07fa`.
+Last verified: 2026-11-24 13:45 UTC. Main: `398c8b6ae1248642478c913ce218cac9a65dbe48` (#311 portable Pages hosting). SIM8 v2.19.22 remains live on GitHub Pages at #311 and Netlify at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -24,8 +24,8 @@ going” means resume this queue, not take over other lanes or merge a draft.
    the exact local subpath build; actual Chromium title/run, manifest/icons,
    four public tracks, 44 same-origin responses, zero errors. Netlify still
    serves the earlier root build. Distinct origins keep separate browser
-   scores, preferences and ghosts; do not imply automatic migration. v2.19.23
-   is proposed by #300: leave both release ordering and next Morgan slot
+   scores, preferences and ghosts; do not imply automatic migration. #300
+   and #306 both propose 2.20.0; leave release ordering and next Morgan slot
    with the release owner. SIM7's #294 BSOD changes are in source history,
    not a separate changelog entry. Exact build ID now 7641c907…; preserve
    old receipts as historical and recapture exact evidence on each release.
@@ -210,40 +210,49 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   remains open; leave release and broader work in their lane.
   #248 is historical preview only. Owner approved the tested 60% AirBrake
   kick and unchanged upward impulse. #299 SIM8 landed as 2dcd07fa. Gal/Home's
-  #300 latest draft `f7931826232c61b6b6c6d757c4428339a5e51682`
-  (SIM9, proposed v2.19.23) refines actual contact slope, ordered
-  per-touchdown bluff credit, protected Hop-lift scaling, and sloppy landing
-  recovery. #306 integrated music draft
-  `8fbdc753ad6e1f15b4d47bf3ae76bc7a9efdd30b` proposes v2.20.0.
-  Both await independent exact-head review. #311 additionally touches
-  StemMusicDirector.js and Views.js; previous local composition was on
-  e3fdd81, not the new hosting base. It merged RunScene cleanly, but the source-digest, changelog, package and
-  lock conflict. Re-attest on the actual release base; coordinate version
-  and preserve both runtime routes. Scratch resolution only: 188 focused
-  tests, ruleset/identity and production build passed. Real normal-entry
-  Chromium: matched 440-tick physical path, paid kick 37, actual landing
-  104, despite 440 motion callback exceptions and a separate landing
-  callback exception at 104. Ordinary landing SFX and the later gameplay
-  listener still fired. No outbound or page errors; no live release.
-  Same-tick buffered relaunch remains unit-test evidence.
-  #310 QA draft `992eb3f4c1c32d24dc7eba525e86bf7e661938bf` is stacked on
-  that #306 head and adds scripted original-drum fatal-count-in tests.
-  Earlier 52-case estimate (-0.364 dBTP worst) is on a previous base.
-  Independent FFmpeg true-peak passed official EBU 3341 vectors 15–23
-  but both 4x meters underread a separate 19.2kHz synthetic control by
-  about 0.43 dB; 16x diagnostic recovered its known peak. No evidence
-  of actual game overs. Next in the existing #291 lane: same-host,
-  float-PCM remeasurement on exact source of worst/overlap/fatal cases and
-  full transition tails; keep bytes private and gains unchanged. The
-  private original-source run is still pending. No approval, publishing,
-  or mastered/beat-grid claim from a sampled stress check.
-  #287 passes 111/111 on landed SIM8. Two held-input expectations fail
-  both on earlier #300 `10df014` and on this exact newer composition:
-  SIM9 credits the
-  actual paid kick instead of held AirBrake. Hold or coordinate the release
-  order; replace held positives with paid pulse and spent/held negatives
-  after SIM9, preserving separate parachute and score/flow assertions.
-  No scoring coefficient changes. #266 is future identity, not old-tape mandate.
+  #300 latest draft `f91134e7d48306bb9f0a9a3447969a97c7a858da`
+  reconciles the two parents without force-pushing. It retains the
+  approved one-shot 60% cut/same pop, ordered substep settlement, Flow
+  elapsed before touchdown, and no vacuum payment. The candidate is SIM9
+  with last-released still 8; no release seal until authorized.
+  #306 music draft `8fbdc753ad6e1f15b4d47bf3ae76bc7a9efdd30b` and #300
+  BOTH propose 2.20.0. Do not release both separately as 2.20.0, nor infer
+  order or a joint release. Re-evaluate the second on actual landed main.
+  Exact #311 + these heads auto-merge RunScene, Views and StemMusicDirector;
+  only changelog and source digest conflict textually; matching package
+  metadata hides the semantic version conflict. Local scratch resolution
+  passed 274 focused tests (including conditional #287), the exact Pages
+  subpath build/identity and actual Chromium title/run/catalog/install
+  smoke. Paired 440-tick physics paths match despite 440 motion exceptions
+  and injected landing fault at 104. The paid kick at 37, actual later
+  contact, ordinary landing SFX and downstream listener remain intact.
+  No deploy; same-tick relaunch is separately unit-tested. Both drafts
+  still require fresh independent exact-head review and release order.
+  #287 unchanged passes 111/111 on landed SIM8; exact #311+#300 f91134e7
+  still shows two expected held-input failures. Conditional test-only
+  follow-up (not pushed): charge a consumed pulse, not held input; add
+  immediate 40-point pulse and held/duplicate negatives; keep separate
+  canopy, pending, bank, landing bonus, combo and earned-flow controls.
+  152 focused tests pass on just #311+#300; replacing paid with raw-held
+  and removing duplicate guard each fail as intended. Refresh after
+  actual SIM9 release; no #287 head or point coefficient change.
+  #310 QA draft `cf0ba71de69a7cb818516a18db063e829bb28c7b` is on #306
+  8fbdc75. Author reports qualified, scripted QA-triggered live crashes on
+  all 33 opening segments in one biome, worst estimated -0.404 dBTP.
+  Exact-source synthetic audit: all armed samples are captured, but native
+  finite/peak metrics trim 48 frames per side. Full-range existing meter
+  catches previously missed edge impulses, unity, NaN, and Infinity,
+  still reporting 48 interpolation-only edge frames. No real clipping
+  observed by this synthetic test; do not re-label old private receipts.
+  Independently calibrated FFmpeg passed EBU 3341 vectors 15–23, but both
+  4x meters underread the synthetic 19.2kHz control by about 0.43 dB;
+  16x diagnostic recovered its known peak. Next in #291: full-buffer
+  native gate and fresh same-host float reference metering of worst,
+  overlap, crash and transition tails, retaining only metrics. Preserve
+  gains, private media and all release/listening/beat gates.
+  #312 is separate listening work in the music lane: 15 low dry-stem
+  endings despite source clock handoffs. Not a measured audible gap or an
+  approved fade; retain original masters and await actual private A/B.
 - Main stays release-controlled. Keep synthetic developer evidence out of
   gameplay, saved formats, scoring and ranked eligibility unless authorized.
 
