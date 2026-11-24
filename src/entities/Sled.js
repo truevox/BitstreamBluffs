@@ -264,10 +264,10 @@ export class Sled {
       vx *= f;
       vy *= f;
     }
-    // Only the player's actual original hop launch may be shortened by
-    // variable-hop release; never truncate a separately paid AirBrake impulse.
-    // Two instantaneous AirBrake kicks; neither holding nor re-tapping buys
-    // extra lift until actual terrain contact. Normal gravity acts thereafter.
+    // Only the player's own Space-hop ascent may be shortened by release.
+    // A fresh paid AirBrake impulse is independent and must survive the cutoff.
+    // Neither holding nor re-tapping AirBrake buys extra lift until touchdown.
+    let airBrakeKickedThisStep = false;
     if (this.airBrakeActive && !this.airBrakeKickUsed) {
       this.airBrakeKickUsed = true;
       const kicked = airBrakeKickStep({ vx, vy,
@@ -284,11 +284,18 @@ export class Sled {
       // a subsequent tick. When no lift was actually purchased (vacuum, very
       // slow rider, or already faster upward), retain normal hop semantics.
       if (kicked.vy < vy) {
-        this.airBrakeLiftProtected = true; // the *brake* lift is not part of the Hop-cutoff budget
-        this._protectedHopExtraVyPxS = 0; // a fresh paid kick supersedes any earlier Hop cutoff
-        this._playerHopActive = false;
+        this.airBrakeLiftProtected = true;
+        // If Space Hop came FIRST, its current upward velocity remains
+        // eligible for variable-release cutoff. Only the ADDITIONAL AirBrake
+        // ascent is protected. Capture the pre-brake upward Hop budget; if
+        // AirBrake came first, a later Hop records its own increment below.
+        this._protectedHopExtraVyPxS = this._playerHopActive
+          ? Math.max(0, -vy) : 0;
       }
-      if (kicked.spentSpeedPxS > 0) this.airBrakeKickPulse = 1;
+      if (kicked.spentSpeedPxS > 0) {
+        this.airBrakeKickPulse = 1;
+        airBrakeKickedThisStep = true;
+      }
       vx = kicked.vx;
       vy = kicked.vy;
     }
@@ -384,7 +391,7 @@ export class Sled {
     // ground snap / crest smoothing: kill the small upward drift off convex crests (see TUNING.snap*)
     if (this._sinceLaunchMs > TUNING.snapQuietMs && this._groundRunMs >= TUNING.snapMinGroundMs
       && this.msSinceContact < TUNING.snapWindowMs && this.dropAheadDeg < TUNING.snapMaxDropDeg
-      && pmath.hypot(vx, vy) > TUNING.snapMinSpeedPxS && !chute && !this.airBrakeActive) {
+      && pmath.hypot(vx, vy) > TUNING.snapMinSpeedPxS && !chute && !airBrakeKickedThisStep) {
       const vn2 = vx * nx + vy * ny;
       if (vn2 > TUNING.snapKeepVnPxS && vn2 < TUNING.snapMaxVnPxS) {
         const cut = vn2 - TUNING.snapKeepVnPxS;

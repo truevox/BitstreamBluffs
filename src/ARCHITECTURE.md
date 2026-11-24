@@ -23,14 +23,21 @@ Existing parachute and BSOD-driven wind remain unchanged. Variable-hop
 release truncates only its own original jump; if a coyote-hop triggers in
 the same substep OR in a later substep during the 90ms coyote window, it
 cannot erase the separately paid AirBrake ascent. `airBrakeLiftProtected`
-tracks that ownership across ticks until real terrain collision. The additional
-coyote Hop is nevertheless releasable: `_protectedHopExtraVyPxS` records
+tracks that ownership across ticks until real terrain collision. A variable-height
+Hop that fired BEFORE AirBrake is also releasable: the pre-brake upward Hop
+velocity remains tracked separately from paid AirBrake ascent. A coyote Hop
+that fires AFTER AirBrake is likewise releasable: `_protectedHopExtraVyPxS` records
 ONLY the extra vertical velocity the Hop added atop the paid brake kick and
 truncates that increment on release (including quad-drag attenuation), never
 the brake. Both are SIM9 causal state fingerprinted in sled schema v3
 alongside `airBrakeKickUsed`. The full physical one-shot immediately earns the regular
 AirBrake trick on its one-tick `airBrakeKickPulse`, not after 250ms holding
-an already-spent key. This single-tick event is consumed before the replay
+an already-spent key. A physically paid kick on the same tick as touchdown
+still receives its trick credit; two consecutive short real flights must not
+lose a later kick because the UI tracker failed to observe an airborne frame.
+The AirBrake held-input state also does NOT block the normal crest snap after
+its one-shot impulse has been used; only the actual kick tick gets an exemption.
+This single-tick event is consumed before the replay
 checkpoint but is STILL listed as causal (and fingerprinted in sled schema v3):
 it can affect TrickTracker, BSOD bluff scoring and later progression. Do not
 misclassify it as non-causal merely because the checkpoint normally sees zero.

@@ -97,6 +97,31 @@ try {
     }
     const lowRelease=actual('shortened low-speed Hop preserves paid AirBrake');
 
+    // Review case: Hop FIRST, then paid AirBrake. Releasing Hop must strip
+    // only its original -360px/s ascent, leaving the extra AirBrake impulse.
+    prepare(530,0,60);
+    sled._playerHopActive=false;
+    sled.applyControls({...input,hop:true,airBrake:false,pressed:{hop:true}},
+      scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const hopBefore=actual('first coyote Hop');
+    sled.msSinceContact=68;
+    sled.applyControls({...input,hop:true,airBrake:true,pressed:{airBrake:true}},
+      scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const hopThenBrake=actual('AirBrake paid after earlier Hop');
+    sled._playerHopElapsedMs=180;
+    sled.applyControls({...input,hop:false,airBrake:false,pressed:{}},
+      scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const hopThenBrakeReleased=actual('release earlier Hop but keep paid AirBrake');
+
+    // Holding a spent AirBrake button cannot suppress normal crest smoothing.
+    prepare(400,-50,80);
+    sled.airBrakeKickUsed=true;
+    sled._sinceLaunchMs=500; sled._groundRunMs=200; sled.dropAheadDeg=0; sled.groundAngleDeg=0;
+    sled._playerHopActive=false;
+    sled.applyControls({...input,hop:false,airBrake:true,pressed:{}},
+      scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const spentBrakeCrest=actual('spent AirBrake held during crest smoothing');
+
     prepare(530,-150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
     const vacuum=actual('vacuum: no paid vertical impulse');
@@ -114,6 +139,7 @@ try {
     const landedTracker=new scene.tricks.constructor();
     const landedFrame={...frame,grounded:true,input:{...frame.input,airBrakeKicked:true},crashed:false};
     const landedTricks=landedTracker.update(landedFrame).tricks.map(x=>x.type);
+    const secondTouchdown=landedTracker.update({...landedFrame,timeMs:landedFrame.timeMs+8}).tricks.map(x=>x.type);
     const heldTricks=[];
     for(let i=1;i<=40;i++){
       const nextFrame={...frame,timeMs:frame.timeMs+i*8,
@@ -121,7 +147,8 @@ try {
       heldTricks.push(...tracker.update(nextFrame).tricks.map(x=>x.type));
     }
     return {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,
-      lowBrake,lowHop,lowRelease,vacuum,paidEvent,paidTricks,landedTricks,heldTricks};
+      lowBrake,lowHop,lowRelease,hopBefore,hopThenBrake,hopThenBrakeReleased,
+      spentBrakeCrest,vacuum,paidEvent,paidTricks,landedTricks,secondTouchdown,heldTricks};
   });
   assert.deepEqual(errors,[],'compiled browser has no fatal page errors');
   const {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,vacuum}=measurements;
@@ -153,6 +180,16 @@ try {
     'Hop release removes Hop-added velocity but preserves original AirBrake ascent');
   assert.equal(measurements.lowRelease.protectedHopExtra,0);
   assert.deepEqual(measurements.landedTricks,['airBrake'],'paid kick on touchdown counts immediately');
+  assert.deepEqual(measurements.secondTouchdown,['airBrake'],'second genuine paid touchdown pulse must credit despite no sampled airborne frame');
+  console.log('HOP_BEFORE_BRAKE_PROBE',JSON.stringify({before:measurements.hopBefore,braked:measurements.hopThenBrake,released:measurements.hopThenBrakeReleased,crest:measurements.spentBrakeCrest}));
+  assert(measurements.hopBefore.vy < -100,'Hop must launch before AirBrake');
+  assert(measurements.hopThenBrake.vy < measurements.hopBefore.vy,'AirBrake buys a distinct added kick after Hop');
+  const paidExtra=measurements.hopThenBrake.vy-measurements.hopBefore.vy;
+  assert(Math.abs(measurements.hopThenBrakeReleased.vy-paidExtra)<5,
+    'releasing Hop must cut original Hop ascent but retain just the incremental AirBrake lift');
+  assert.equal(measurements.hopThenBrakeReleased.protectedHopExtra,0);
+  assert(Math.abs(measurements.spentBrakeCrest.vy)<1,'held spent AirBrake may not bypass crest snap');
+
   assert.equal(measurements.paidEvent,true,'Sled must expose real paid kick');
   assert.deepEqual(measurements.paidTricks,['airBrake'],'one-shot tap must earn regular trick immediately');
   assert.deepEqual(measurements.heldTricks,[],'holding a spent AirBrake cannot earn another trick');

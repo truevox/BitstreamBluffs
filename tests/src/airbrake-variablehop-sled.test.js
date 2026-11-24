@@ -127,3 +127,46 @@ test('low-speed paid brake -60, later Hop -360: release cuts Hop +300 but preser
   expect(toPx(s.body.velocity.y)).toBeCloseTo(-60,6);
   expect(s._protectedHopExtraVyPxS).toBe(0);
 });
+
+test('AirBrake AFTER player Hop: releasing Hop removes original Hop ascent but preserves newly paid AirBrake lift',()=>{
+  const s=makeSled(530,0);
+  s.msSinceContact=60;
+  s._playerHopActive=false;
+  step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
+  const fromHop=toPx(s.body.velocity.y);
+  expect(fromHop).toBeCloseTo(-360,6);
+  expect(s._playerHopActive).toBe(true);
+  s.msSinceContact=68;
+  // Brake is paid during a sustained Hop. The lift cap means AirBrake adds only
+  // the incremental ascent from -360 to -420, not 318 free extra px/s.
+  step(s,{hop:true,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  expect(s.airBrakeLiftProtected).toBe(true);
+  expect(s._playerHopActive).toBe(true);
+  expect(s._protectedHopExtraVyPxS).toBeCloseTo(360,6);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-420,6);
+  s._playerHopElapsedMs=TUNING.hopMinimumHoldMs+2;
+  step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(s._playerHopActive).toBe(false);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-60,6);
+  expect(s.airBrakeLiftProtected).toBe(true);
+});
+
+test('holding an already-spent AirBrake cannot suppress ordinary crest smoothing',()=>{
+  const prepared=()=>{
+    const s=makeSled(400,-50);
+    s.airBrakeKickUsed=true;
+    s.msSinceContact=80;
+    s._sinceLaunchMs=500;
+    s._groundRunMs=200;
+    s.dropAheadDeg=0;
+    s._playerHopActive=false;
+    return s;
+  };
+  const held=prepared(),released=prepared();
+  step(held,{hop:false,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{}});
+  step(released,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(toPx(held.body.velocity.y)).toBeCloseTo(0,6);
+  expect(toPx(held.body.velocity.y)).toBeCloseTo(toPx(released.body.velocity.y),6);
+  expect(toPx(held.body.velocity.x)).toBeCloseTo(toPx(released.body.velocity.x),6);
+});

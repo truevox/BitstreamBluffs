@@ -260,7 +260,12 @@ export class TrickTracker {
     // discard that trick as an ordinary short bump/grounded input; the
     // physical kick happened and the player paid horizontal speed. Crashes
     // were already rejected above.
-    if (!this._brakeDone && input.airBrakeKicked) {
+    if (input.airBrakeKicked) {
+      // A real Matter touchdown can rearm Sled between two TrickTracker
+      // samples. Consecutive very short hops may therefore BOTH produce
+      // valid paid pulses while the tracker never observes an airborne
+      // sample to reset _brakeDone. Trust each actual one-shot physics event,
+      // not stale presentation-phase state. Held input has no pulse.
       this._brakeDone = true;
       tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0,
         airtimeMs: Math.max(0, t - this._airStart) });

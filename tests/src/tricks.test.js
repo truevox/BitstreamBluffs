@@ -262,6 +262,16 @@ describe('air brake and parachute', () => {
     expect(allTricks(held)).toEqual([]);
   });
 
+  test('two genuine touchdown-only kick pulses both receive credit despite no sampled airborne tick',()=>{
+    const r=rig();
+    const first=r.frame({grounded:true,input:{airBrakeKicked:true,airBrake:true}});
+    const second=r.frame({grounded:true,input:{airBrakeKicked:true,airBrake:true}});
+    expect(allTricks([first]).map(t=>t.type)).toEqual(['airBrake']);
+    expect(allTricks([second]).map(t=>t.type)).toEqual(['airBrake']);
+    const merelyHeld=r.frame({grounded:true,input:{airBrakeKicked:false,airBrake:true}});
+    expect(allTricks([merelyHeld])).toEqual([]);
+  });
+
   test('a crash frame never credits a paid AirBrake trick',()=>{
     const r=rig();
     r.run(2,{grounded:true});
