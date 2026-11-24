@@ -1,6 +1,6 @@
 import {WorldDanceEnvelope,worldDanceMotionAllowed,sunDanceGeometry,biomeDanceStyle,visibleDanceStrength}
  from '../../src/systems/WorldDance.js';
-import {Background,motifDecor} from '../../src/entities/Background.js';
+import {Background,motifDecor,motifGeometry} from '../../src/entities/Background.js';
 import {AudioSynth} from '../../src/systems/AudioSynth.js';
 
 const audio=(timeMs,bass,mid=0.08,revision='song1:1')=>({timeMs,bass,mid,revision});
@@ -417,4 +417,51 @@ test('Arcade EQ building slices wrap, stay grounded, track bands, fade and resto
  expect(fx.arcSkyline.visible).toBe(true);
  expect(fx.arcSkyline.tilePositionX).toBe(50);
  expect(fx.arcTowers.every(s=>!s.visible&&s.scaleY===1)).toBe(true);
+});
+
+test('animated grass survives both old anchor cutoffs while its tip is still in view',()=>{
+ const W=480, factor=motifGeometry('dew-drops',0).layers.map(l=>l.factor);
+ const blades=(scroll,t)=>motifDecor('dew-drops',scroll,t,0,{dance:1,bees:false})
+   .filter(p=>p.kind==='poly'&&p.color==='lime');
+ const root=p=>(p.pts[0].x+p.pts.at(-1).x)/2;
+ const found=[false,false];
+ for(let i=0;i<32;i++){
+  const t=i*Math.PI*2*330/32;
+  for(const p of blades(0,t)){
+   const x=root(p);
+   if(x<80||x>400)continue;
+   const offsets=p.pts.map(q=>q.x-x);
+   for(let side=0;side<2;side++){
+    if(found[side]|| (side===0?Math.max(...offsets)<44:Math.min(...offsets)>-44))continue;
+    for(const anchor of side===0?[-39,-41]:[W+39,W+41]){
+     const scroll=(x-anchor)/factor[p.depth];
+     const match=blades(scroll,t).find(q=>q.depth===p.depth&&Math.abs(root(q)-anchor)<1e-6);
+     expect(match).toBeDefined();
+     for(let k=0;k<offsets.length;k++)expect(match.pts[k].x-anchor).toBeCloseTo(offsets[k],7);
+     expect(side===0?Math.max(...match.pts.map(q=>q.x)):W-Math.min(...match.pts.map(q=>q.x))).toBeGreaterThan(0);
+    }
+    found[side]=true;
+   }
+  }
+ }
+ expect(found).toEqual([true,true]);
+});
+
+test('dancing planet ring survives both old cull edges and is culled beyond its safe extent',()=>{
+ const planet=(scroll)=>motifDecor('stars',scroll,0,0,{dance:1});
+ let scroll=0,p;
+ for(;scroll<80000;scroll+=4000){
+  p=planet(scroll).find(q=>q.kind==='circle'&&q.color==='lime'&&q.x>80&&q.x<400);
+  if(p)break;
+ }
+ expect(p).toBeDefined();
+ for(const anchor of [-41,521]){
+  const q=planet(scroll+(p.x-anchor)/.012);
+  const ring=q.find(v=>v.kind==='poly'&&v.color==='amber');
+  expect(ring).toBeDefined();
+  expect(anchor<0?Math.max(...ring.pts.map(v=>v.x)):480-Math.min(...ring.pts.map(v=>v.x))).toBeGreaterThan(0);
+ }
+ for(const anchor of [-61,541]){
+  expect(planet(scroll+(p.x-anchor)/.012).some(v=>v.kind==='poly'&&v.color==='amber')).toBe(false);
+ }
 });

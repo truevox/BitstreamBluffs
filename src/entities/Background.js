@@ -265,8 +265,14 @@ function mulberry32(a) {
 
 /** Horizontal tile the decor items repeat over; wider than the screen so nothing pops at the seams. */
 const DECOR_TILE = 960;
-/** Items are emitted only while their anchor is within this many px of the screen. */
+/** Original tile phase and default anchor cull. Never change the phase when extending the cull. */
 const DECOR_MARGIN = 40;
+// Conservative full-animation horizontal extents, including stroke:
+// planet: 15*1.9*1.9 < 55; cane: 44px arc + 13px hook + stroke;
+// grass: 18px lean + 25 + 100*.48 sway + 12px width + stroke.
+// Keep the wider margin even while neutral, so an accent cannot change
+// which tile copy is selected near the edge. The tile has ample space.
+const DECOR_CULL = Object.freeze({ planet: 60, cane: 64, blade: 112, vent: 60 });
 /** Per-motif base seed for the decor layout (any fixed odd number; changing one re-lays that motif). */
 const DECOR_SEEDS = {
   stars: 0x5ca7, 'candy-stripes': 0xc4d1, jellyfish: 0x1e11, 'brass-pipes': 0xb4a5, 'dew-drops': 0xde3d, vents: 0x7e57,
@@ -274,11 +280,14 @@ const DECOR_SEEDS = {
 const EMPTY_DECOR = Object.freeze([]);
 
 /** Screen x of an item anchored at tile x `x0` scrolling at `factor`, or null if it is off screen. */
-function tileX(x0, scrollX, factor) {
+function tileX(x0, scrollX, factor, margin = DECOR_MARGIN) {
   let x = (x0 - scrollX * factor) % DECOR_TILE;
   if (x < 0) x += DECOR_TILE;
   x -= DECOR_MARGIN;
-  return x > GAME_WIDTH + DECOR_MARGIN ? null : x;
+  // The original anchor phase is unchanged. Recover the previous tile
+  // copy on the left when its animated geometry can still be on screen.
+  if (x >= DECOR_TILE - margin) x -= DECOR_TILE;
+  return x < -margin || x > GAME_WIDTH + margin ? null : x;
 }
 
 /**
@@ -396,7 +405,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       }
     }
     const pl = lay.planet;
-    const px = tileX(pl.x0, sx, 0.012);
+    const px = tileX(pl.x0, sx, 0.012, DECOR_CULL.planet);
     if (px !== null) {
       const r = pl.r * (1 + 0.9 * dance);
       const py=pl.y-28*dance;
@@ -422,7 +431,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     // Candy canes standing on the far ridge: a striped stick and hook, drawn as alternating segments.
     const L0 = def.layers[0];
     for (const c of lay.canes) {
-      const x = tileX(c.x0, sx, L0.factor);
+      const x = tileX(c.x0, sx, L0.factor, DECOR_CULL.cane);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L0, sx, x, horizonDance) + 2;
       const dir = c.flip ? -1 : 1;
@@ -556,7 +565,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   } else if (motif === 'dew-drops') {
     for (const b of lay.blades) {
       const L = def.layers[b.layer];
-      const x = tileX(b.x0, sx, L.factor);
+      const x = tileX(b.x0, sx, L.factor, DECOR_CULL.blade);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L, sx, x, horizonDance) + 3;
       // Neighbouring blades share a travelling wave, with a local phase offset.
@@ -598,13 +607,13 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     def.layers.forEach((L, li) => {
       const s71 = L.seed * 71;
       const off = sx * L.factor;
-      const c0 = Math.floor((off - DECOR_MARGIN + s71) / CONE_W);
-      const c1 = Math.floor((off + W + DECOR_MARGIN + s71) / CONE_W);
+      const c0 = Math.floor((off - DECOR_CULL.vent + s71) / CONE_W);
+      const c1 = Math.floor((off + W + DECOR_CULL.vent + s71) / CONE_W);
       const plumeH = li === 0 ? 58 : 44;
       for (let c = c0; c <= c1; c++) {
         if (hash01(c, L.seed * 1000 + 17) < 0.25) continue;
         const cx = (c + 0.5) * CONE_W - s71 - off;
-        if (cx < -60 || cx > W + 60) continue;
+        if (cx < -DECOR_CULL.vent || cx > W + DECOR_CULL.vent) continue;
         const top = layerYAt(def.shape, L, sx, cx, horizonDance) + 1;
         out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * DECOR_DANCE.ventMouth });
         const cell = hash01(c, 4242);
