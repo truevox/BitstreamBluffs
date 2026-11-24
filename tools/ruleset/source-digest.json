@@ -3,8 +3,10 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 8,
-  "attestation": "no-behavior-change: freeze previously attested SIM8 joined-polyline marker behavior for versioned release; this followup only annotates the helper and last-released metadata",
+  "attestation": "sim-revision-bumped: #253 released SIM7 marker rendering could mutate active terrain and cache; SIM8 makes visual BEST/DIED HERE sample only physically joined Matter polyline with no generator reads, freezes this new causal identity",
   "changedFiles": [
+    "src/entities/TerrainMesh.js",
+    "src/scenes/RunScene.js",
     "src/systems/MarkerLayout.js"
   ],
   "files": {
