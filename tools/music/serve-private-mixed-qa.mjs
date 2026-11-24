@@ -14,7 +14,8 @@ const host=assertPrivateAudioQaLoopbackHost(process.env.BSB291_HOST||'127.0.0.1'
 const port=Number(process.env.BSB291_PORT||8220);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid private QA port');
 const media=resolve(root);
-const gridFile=process.env.BSB312_GRID_FILE ? resolve(process.env.BSB312_GRID_FILE) : null;
+const gridFile=process.env.BSB312_GRID_FILE ? resolve(process.env.BSB312_GRID_FILE) :
+	new URL('../../public/music/transition-grids.json',import.meta.url).pathname;
 const plugin={
 	name:'qa-private-original-media-overlay',enforce:'pre',
 	configureServer(vite){

@@ -385,9 +385,9 @@ export class SoundManagerView extends View {
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicShuffle===true,
         set:v=>updateSetting(game,'musicShuffle',v)},
-      {kind:'choice',label:'SONG CROSSFADE',badge:'PREVIEW',options:[
+      {kind:'choice',label:'SONG CROSSFADE',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
-        get:()=>settings().musicCrossfade===true,
+        get:()=>settings().musicCrossfade!==false,
         set:v=>updateSetting(game,'musicCrossfade',v)},
       {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
         badgeColor:'magenta',options:[

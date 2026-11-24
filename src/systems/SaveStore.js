@@ -31,6 +31,7 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {'tricksRight'|'tricksLeft'|'classic'} controlLayout
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
  * @property {boolean} musicShuffle     Shuffle following tracks without repeats; first launch track remains One More Run.
+ * @property {boolean} musicCrossfade  Default ON; false preserves exact-boundary song handoffs.
  * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
@@ -80,7 +81,7 @@ export function defaultSettings() {
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     musicShuffle: false,
-    musicCrossfade: false,
+    musicCrossfade: true,
     dynamicOrchestra: false,
     reduceMotion: 'auto',
     worldDance: true,
@@ -122,7 +123,7 @@ export function sanitizeSettings(raw) {
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
     musicShuffle: typeof raw.musicShuffle === 'boolean' ? raw.musicShuffle : d.musicShuffle,
-    musicCrossfade: raw.musicCrossfade === true,
+    musicCrossfade: typeof raw.musicCrossfade === 'boolean' ? raw.musicCrossfade : d.musicCrossfade,
     dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
     reduceMotion: ['auto', 'on', 'off'].includes(raw.reduceMotion) ? raw.reduceMotion : d.reduceMotion,
     worldDance: typeof raw.worldDance === 'boolean' ? raw.worldDance : d.worldDance,

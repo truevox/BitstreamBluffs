@@ -12,8 +12,9 @@ try{
 	await page.keyboard.press('x');
 	await page.waitForFunction(()=>window.__bbGame?.registry.get('audioSynth')?.ctx?.state==='running',null,{timeout:30000});
 	const count=await page.evaluate(async()=>{
-		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
-		d.setCrossfade(true);await d._gridRequest;
+		const a=window.__bbGame.registry.get('audioSynth'),d=a._stemMusic;
+		if(a.settings.musicCrossfade!==true||d.crossfadeEnabled!==true)throw Error('Owner-approved default ON missing');
+		await d._gridRequest;
 		d.setMenuMode(true);d.setShuffle(false);d.setDynamicOrchestra(false);
 		return d.transitionGrids.size;
 	});
@@ -50,5 +51,7 @@ try{
 		assert.ok(clean,'Outgoing nodes remain after transition');
 		console.log('REAL_GAME_CROSSFADE_PASS',JSON.stringify({index,...observed.fade,overlapSeconds:observed.fade.end-observed.fade.start}));
 	}
+	const off=await page.evaluate(()=>{const a=window.__bbGame.registry.get('audioSynth');a.applySettings({...a.settings,musicCrossfade:false});return {settings:a.settings.musicCrossfade,director:a._stemMusic.crossfadeEnabled};});
+	assert.deepEqual(off,{settings:false,director:false});
 	assert.deepEqual(errors,[]);
 }finally{await browser.close();}

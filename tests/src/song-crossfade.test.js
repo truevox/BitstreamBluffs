@@ -36,3 +36,12 @@ test('transition only commits with complete preloaded incoming and scheduled out
 	d._trySongCrossfade(106.9,96.9,100);
 	expect(d._beginTrack).toHaveBeenCalledWith(1,107.2,0,expect.objectContaining({oldToken:5,end:110,from:'a'}));
 });
+
+test('explicit OFF prevents automatic transition without changing physics or transport',()=>{
+	const d=Object.create(StemMusicDirector.prototype);
+	d.crossfadeEnabled=true;d._beginTrack=jest.fn();
+	d.setCrossfade(false);
+	d._trySongCrossfade(96.9,96.9,100);
+	expect(d.crossfadeEnabled).toBe(false);
+	expect(d._beginTrack).not.toHaveBeenCalled();
+});

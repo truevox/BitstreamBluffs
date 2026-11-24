@@ -51,7 +51,7 @@ export class StemMusicDirector {
 		this._effectSignatures = new Map();
 		this.activeNodes = new Set();
 		this._sourceEnvelopes=new Map();
-		this.crossfadeEnabled=false;
+		this.crossfadeEnabled=true;
 		this.transitionGrids=new Map();
 		this._incomingFade=null;
 		this.cache = new Map();
@@ -151,7 +151,7 @@ export class StemMusicDirector {
 		this.setVocals(settings.musicVocals === true);
 		this.setSongSelection(settings.musicEnabledSongs);
 		this.setShuffle(settings.musicShuffle === true);
-		this.setCrossfade(settings.musicCrossfade === true);
+		this.setCrossfade(settings.musicCrossfade !== false);
 		this.setDynamicOrchestra(settings.dynamicOrchestra === true);
 	}
 

@@ -57,7 +57,7 @@ try{
 		// Use production clean-menu mode so a source/voice not encoded
 		// for a selected biome cannot create a false mandatory mismatch.
 		a.applySettings({...a.settings,masterVolume:1,musicVolume:1,sfxVolume:1,
-			windVolume:1,windEnabled:true});
+			windVolume:1,windEnabled:true,musicCrossfade:false}); // exact-boundary QA, not overlaps
 		d.setMenuMode(true);
 		const audit={events:[],calls:[],call:null};
 		window.__bbHandoffAudit=audit;
