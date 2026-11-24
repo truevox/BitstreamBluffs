@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.19.23 — owner-approved 60% one-shot AirBrake (SIM_REVISION 9, #247) (2026-11-23)
+
+- **Marvin's direct approval after playtest:** the sharper AirBrake was a huge improvement; the tested **60% instantaneous airborne horizontal speed reduction** with the **same vertical pop** is the approved production behavior, not a provisional feel experiment. Original direct owner affirmation: “I absolutely authorize that. It was a huge improvement over the original.”
+- **Exactly one kick per real airtime:** the brake spends horizontal velocity once, triggers the original-speed-budget upward impulse, and then gravity/landing naturally resumes. No held AirBrake float, continuing lift or falling-speed suppression; parachute remains the held airborne control. Existing AirBrake upgrades scale the already-tested upward impulse, not extra hidden ascent from stronger braking.
+- **Deterministic release SIM 9:** `sled.flags.airBrakeKickUsed` is causal and fingerprinted under sled schema v3. SIM8 cache-pure terrain marker correction and SIM7 owner-approved Fast Approach / Soft Finish BSOD wall remain intact. Historical archives/fixtures are retained as pre-release provenance, not silently rewritten or promised compatible at runtime.
+- **Release boundary:** exact-commit source review, real Chromium physics/replay verification and canonical source/build identity must pass before this stack lands in the default game. The old experimental AirBrake PR #248 stays separate; this release does not merge its stale BSOD change.
+
 ## v2.19.22 — protect replay terrain from visual marker prefetch (SIM_REVISION 8, #253) (2026-11-23)
 
 - **Real causal retry bug fixed:** BEST and DIED HERE gate labels sample only the already-joined Matter collision polyline without calling `TerrainGenerator.heightAt` at any time, even when the marker is inside streamed terrain. The new `joinedMarkerHeight` wrapper defers first marker placement until the exact ground chunk is joined; the marker still draws at its true collider-ground height after that; the generator lookup cache is never changed by marker rendering. No gameplay features, AirBrake tuning or owner-approved SIM7 BSOD chase physics are changed.
