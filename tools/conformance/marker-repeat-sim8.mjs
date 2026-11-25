@@ -243,6 +243,24 @@ try {
       assert(b.marker.onscreen.best&&b.marker.onscreen.death,'both labels must intersect camera during genuine rendered frames');
       assert(b.marker.capturedFrame.best&&b.marker.capturedFrame.death,
         'both label text bounds must intersect camera ON THE FRAME BEING CAPTURED');
+      // Capture the genuine game first, BEFORE the isolated pixel-only test.
+      // The renderer then gets a blank world except the actual marker text;
+      // changing decorative scenery cannot poison exact restored text bytes.
+      const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
+      assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
+        createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with markers');
+      await marked.p.evaluate(()=>{
+        const game=window.__bbGame,run=game.scene.getScene('RunScene');
+        const preserved=new Set([run.bestMarker.label,run.deathMarker.label]);
+        const tick=run.simClock.tick;
+        for(const scene of game.scene.getScenes(true)){
+          scene.update=()=>{}; // cosmetic and physics update disabled after proof
+          for(const child of scene.children?.list||[]){
+            if(!preserved.has(child))child.setVisible(false);
+          }
+        }
+        if(run.simClock.tick!==tick)throw Error('Text raster isolation advanced simulation');
+      });
       // Camera shake draws a NEW cosmetic RNG offset even for dt=0: an
       // identical simulation tick may otherwise move the whole screenshot
       // several pixels between visibility toggles. Stabilize ONLY the local
@@ -324,9 +342,6 @@ try {
           fs.writeFileSync(`${process.env.RASTER_OUT}-${label}-hidden.png`,hiddenPixels,{flag:'wx'});
         }
       }
-      const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
-      assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
-        createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with both markers');
       if(process.env.RASTER_OUT){
         fs.writeFileSync(`${process.env.RASTER_OUT}-normal.png`,screenshotA,{flag:'wx'});
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
