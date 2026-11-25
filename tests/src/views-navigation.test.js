@@ -858,3 +858,12 @@ test('open Music Library refreshes the installed song roster on async catalog di
   expect(v.tracks).toHaveLength(4);
   expect(v._build).toHaveBeenCalledTimes(2);
 });
+
+test('Offline Music is capability-gated and requires a separate explicit confirm; closing does not cancel a consented transfer',async()=>{
+  const {SoundManagerView}=Views;const t=makeScene(null,{[REG.PROFILE]:defaultProfile(),[REG.SETTINGS]:{}});const theme=new Theme(t);let v=new SoundManagerView(t,theme,{onClose:()=>{}});
+  expect(v.menu.items.some(i=>i.label==='OFFLINE MUSIC')).toBe(false);v.destroy();
+  const controller={state:{status:'download-required',missingBytes:4000000},refresh:jest.fn(async()=>{}),start:jest.fn(async()=>{}),cancel:jest.fn()};t.registry.set('offlineMusicDownloads',controller);v=new SoundManagerView(t,theme,{onClose:()=>{}});
+  v.menu.items.find(i=>i.label==='OFFLINE MUSIC').onSelect();await flush();const off=v.offlineView;expect(controller.refresh).toHaveBeenCalledTimes(1);expect(controller.start).not.toHaveBeenCalled();expect(off.menu.items[1].disabled).toBe(true);
+  off.menu.items[0].onSelect();expect(controller.start).not.toHaveBeenCalled();expect(off.menu.items[1].disabled).toBe(false);expect(texts(off.panel).join(' ')).toContain('4.00 MB');
+  off.menu.items[1].onSelect();await flush();expect(controller.start).toHaveBeenCalledWith({consent:true});off.close();expect(v.offlineView).toBeNull();expect(controller.cancel).not.toHaveBeenCalled();v.destroy();
+});

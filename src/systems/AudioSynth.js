@@ -1423,6 +1423,17 @@ export class AudioSynth {
   }
 
   _startScheduler() {
+    // Offline-recording previews must NEVER synthesize substitute music when
+    // a verified original recording is unavailable. The source/SFX buses are
+    // independent; default builds retain the existing procedural fallback.
+    if (this.game?.registry?.get('offlineMusicDownloads')) {
+      if (this._musicTimer) clearInterval(this._musicTimer);
+      this._musicTimer = null;
+      try { if (this.ctx && this.nodes?.musicSrc?.gain)
+        this.nodes.musicSrc.gain.setTargetAtTime(0,this.ctx.currentTime,.03); }
+      catch {} // failed optional music must never interrupt controls/SFX
+      return;
+    }
     if (this._musicTimer) return;
     if (this._nextTime == null || this._nextTime < this.ctx.currentTime) this._nextTime = this.ctx.currentTime + 0.08;
     this._musicTimer = setInterval(() => {
