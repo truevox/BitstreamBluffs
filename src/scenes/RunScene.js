@@ -49,6 +49,7 @@ import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { resolveReplaySetup } from '../systems/replay/manifest.js';
 import { scheduleRunEvidence, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
 import { SIM_REVISION } from '../systems/replay/ruleset.js';
+import { CURRENT_RULESET_ID, currentBuildId } from '../systems/replay/currentRulesetId.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
@@ -569,6 +570,11 @@ export class RunScene extends Phaser.Scene {
       // compile-time SIM_REVISION is the safe fallback, not legacy physicsVersion.
       simRevision: this.registry.get(RULESET_KEY)?.doc?.simRevision === SIM_REVISION
         ? this.registry.get(RULESET_KEY).doc.simRevision : SIM_REVISION,
+      // #72: the exact ruleset id of THIS build (compile-time, synchronous; never null in a real build) and, once the
+      // ruleset has loaded, its build id. A takeover refuses tapes without a matching rulesetId. Header only: neither
+      // field is a causal input, a checkpoint, a fingerprint channel or part of the RunRecord / ledger hash.
+      rulesetId: CURRENT_RULESET_ID,
+      buildId: currentBuildId(this.registry.get(RULESET_KEY)),
       mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
       dailyRuleId: this.dailyRuleId || null,
       dailyRuleSource: DailyPatch.dateKeyFromSeed(this.seed) ? 'seed-date' : 'clock-at-start',
