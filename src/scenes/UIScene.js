@@ -1419,7 +1419,7 @@ export class UIScene extends Phaser.Scene {
     }
     // glitch jitter of the HUD (subtle)
     if (this.nowMs < this.glitchUntil) {
-      this.hud.setPosition(Phaser.Math.Between(-this.glitchPower, this.glitchPower), 0);
+      this.hud.setPosition(cosmeticRandom('ui/glitch').int(-this.glitchPower, this.glitchPower), 0);
       this.hud.setAlpha(cosmeticRandom('ui/glitch').next() < 0.3 ? 0.6 : 1);
     } else if (this.hud.x !== 0 || this.hud.alpha !== 1) {
       this.hud.setPosition(0, 0).setAlpha(1);

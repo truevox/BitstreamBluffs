@@ -24,6 +24,7 @@ import { addScanlines } from '../ui/Scanlines.js';
 import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -335,22 +336,22 @@ export class PauseScene extends Phaser.Scene {
       }
     }
     if (this.glitchT > 0) return;
-    this.glitchT = Phaser.Math.Between(1800, 3600);
+    this.glitchT = cosmeticRandom('pause/glitch').int(1800, 3600);
     this.glitchLeft = 110;
     const pal = this.theme.pal;
     g.clear();
-    const n = Phaser.Math.Between(2, 4);
+    const n = cosmeticRandom('pause/glitch').int(2, 4);
     for (let i = 0; i < n; i++) {
-      const y = Phaser.Math.Between(0, GAME_HEIGHT - 12);
-      const h = Phaser.Math.Between(2, 9);
+      const y = cosmeticRandom('pause/glitch').int(0, GAME_HEIGHT - 12);
+      const h = cosmeticRandom('pause/glitch').int(2, 9);
       g.fillStyle(i % 2 ? pal.cyan : pal.magenta, 0.1);
       g.fillRect(0, y, GAME_WIDTH, h);
       g.fillStyle(pal.text, 0.12);
       g.fillRect(0, y, GAME_WIDTH, 1);
     }
-    const j = Phaser.Math.Between(2, 4);
+    const j = cosmeticRandom('pause/glitch').int(2, 4);
     this.hdrA.setX(this.hdrX - j);
     this.hdrB.setX(this.hdrX + j);
-    this.hdr.setX(this.hdrX + Phaser.Math.Between(-1, 1));
+    this.hdr.setX(this.hdrX + cosmeticRandom('pause/glitch').int(-1, 1));
   }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
+
+- Replace indirect Phaser `Math.Between` calls (which use unseeded `Math.random`) in HUD, Pause and Game Over with independent named seeded cosmetic streams, including `pause/glitch`.
+- Fix hidden Phaser RNG paths: trail spark lifespan/speed/angle now have seeded `onEmit` callbacks with an explicit `__BASE` texture frame; Game Over camera impact shake uses a bounded seeded cosmetic offset instead of Phaser's unseeded Shake.
+- Add static and real-Chromium regression coverage, including a throwing `Math.random` negative control that exercises real particles and shake. No change to the canonical physics RNG.
+- Presentation-only: SIM_REVISION 9, authoritative physics, scoring, saved records and replay protocol unchanged. Public verification and Heavy Mode savestates remain separate trust work.
+
 ## Unreleased — #245 dual-proof contract v1 (2026-11-25)
 
 - Add pure, separately versioned public-eligibility policy (`bb-dual-proof` v1) with independent replay, trusted entitlement and explicit publication-consent decisions. Free peer and paid hosted routes produce the same canonical verdict; payment cannot change competitive eligibility or rewards.
