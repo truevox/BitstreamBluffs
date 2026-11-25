@@ -1,11 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 13:45 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
+Last verified: 2026-11-25 14:41 UTC. Main `c09074cf9f0be605603b492945efe49cdb5038a0` (#360), v2.22.4/SIM9; seeded cosmetic RNG audit merged, no authority/restore unblock. #355 remains a diagnostic follow-up; #350 #30, #348 offline recovery and #340 audio guard were previously shipped. No new live playback check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
+
+- **Exact-head Gal review handoffs posted Nov 25:** [#287](https://github.com/truevox/BitstreamBluffs/pull/287#issuecomment-7165631762), [#341](https://github.com/truevox/BitstreamBluffs/pull/341#issuecomment-7165639493), [#345](https://github.com/truevox/BitstreamBluffs/pull/345#issuecomment-7165640675). Drafts unchanged, review requests only. Do not repost absent new evidence/head. #338 independently awaits strict cutoff playback precondition.
 
 - **Requested #339/#340 reviews completed (Gal/Home audio lane):**
   #339 `43d4daf467133e40c50daafe07e49d57f27f53a7`: hold QA-only merge for two
