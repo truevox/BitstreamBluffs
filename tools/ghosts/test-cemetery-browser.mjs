@@ -27,7 +27,7 @@ try{
   registry.set(REG.SETTINGS,{...save,cemeteryMontage:false});
   registry.set(REG.LAST_GHOST_TAPE,tape);
   // Actual GameOver capture policy, invoked on a non-scoring scene stub.
-  GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId}});
+  GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId,cause:'crash'}});
   return {offCount:(await course()).length,setting:registry.get(REG.SETTINGS).cemeteryMontage};
  },fixture);
  assert.equal(before.offCount,0,'OFF must never retain an attempt');
@@ -36,7 +36,7 @@ try{
    import('/src/scenes/GameOverScene.js'),import('/src/systems/ghost/CemeteryArchive.js'),import('/src/constants.js')]);
   const scene=window.__bbGame.scene.getScenes()[0],registry=scene.registry,archive=new CemeteryArchive();
   registry.set(REG.SETTINGS,{...registry.get(REG.SETTINGS),cemeteryMontage:true});
-  GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId}});
+  GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId,cause:'crash'}});
   let first=[];
   for(let i=0;i<25;i++){
    first=await archive.list(tape.seed,tape.biomeMask);

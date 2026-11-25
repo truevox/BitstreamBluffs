@@ -220,7 +220,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   _archiveCemeteryPose() {
-    if (this.registry.get(REG.SETTINGS)?.cemeteryMontage !== true) return;
+    if (this.registry.get(REG.SETTINGS)?.cemeteryMontage !== true || this.rec?.cause !== 'crash') return;
     const tape=this.registry.get(REG.LAST_GHOST_TAPE);
     if (!tape || tape.runId !== this.rec?.id || !tape.trace) return;
     // A failure/quota never interrupts the screen or claims durable retention.
