@@ -9,6 +9,7 @@
  * Game keys (Space, arrows) get preventDefault so the page never scrolls; keys typed into text fields are ignored.
  *
  * INPUT_ACTION emitted per press (pressed:true) and release (pressed:false), source keyboard|gamepad|touch:
+ *   AirBrake (Tricks Right A / Tricks Left Left Arrow / Classic Up Arrow / pad X) also brakes on the ground.
  *   W/ArrowUp 'up' (+ArrowUp 'airBrake'), S/ArrowDown 'down' (+ArrowDown 'parachute'), A/ArrowLeft 'left',
  *   D/ArrowRight 'right', Space 'hop'+'confirm', Enter 'confirm', Shift 'reset', Esc 'pause' (menus: treat as back),
  *   Backspace 'cancel'; gamepad A 'hop'+'confirm', B 'cancel', X 'airBrake', Y 'parachute', Back 'reset',

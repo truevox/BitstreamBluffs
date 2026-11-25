@@ -44,7 +44,7 @@ export function keyboardRows(layout) {
       { keys: ['S'], label: 'BRAKE' },
       ...common,
       { keys: ['←', '→'], join: '/', label: 'HELI SPIN' },
-      { keys: ['↑'], label: 'AIR BRAKE' },
+      { keys: ['↑'], label: 'AIR/GND BRAKE' },
       { keys: ['↓'], label: 'CHUTE' },
       ...tail,
     ];
@@ -60,7 +60,7 @@ export function keyboardRows(layout) {
     { keys: [tricks[2]], label: 'HELI SPIN' },
     { keys: [tricks[3]], label: 'CORKSCREW' },
     { keys: [aero[0]], label: 'CHUTE' },
-    { keys: [aero[1]], label: 'AIR BRAKE' },
+    { keys: [aero[1]], label: 'AIR/GND BRAKE' },
     { keys: [aero[2]], label: 'DIVEBOMB' },
     { keys: [aero[3]], label: 'TUCK' },
     ...tail,
@@ -78,7 +78,7 @@ export const GAMEPAD_ROWS = Object.freeze([
   { glyphs: [{ text: 'RT', shape: 'pill', color: 'cyan' }], label: 'PUSH' },
   { glyphs: [{ text: 'LT', shape: 'pill', color: 'cyan' }], label: 'TUCK' },
   { glyphs: [{ text: 'B', shape: 'face', color: 'magenta' }], label: 'BRAKE' },
-  { glyphs: [{ text: 'X', shape: 'face', color: 'cyan' }], label: 'AIR BRAKE' },
+  { glyphs: [{ text: 'X', shape: 'face', color: 'cyan' }], label: 'AIR/GND BRAKE' },
   { glyphs: [{ text: 'Y', shape: 'face', color: 'amber' }], label: 'CHUTE' },
   { glyphs: [{ text: 'LB', shape: 'pill', color: 'lime' }, { text: 'RB', shape: 'pill', color: 'lime' }], label: 'SPIN' },
   { glyphs: [{ text: 'BACK', shape: 'pill', color: 'amber' }], label: 'RESET' },
@@ -127,7 +127,7 @@ export function touchGroups(layout) {
 }
 
 /** One line of advice under the sections. */
-export const HOW_TO_PLAY_TIP = 'IN THE AIR, HOLD TILT TO FLIP. LAND FLAT FOR A SPEED BOOST.';
+export const HOW_TO_PLAY_TIP = 'AIR BRAKE SLOWS GROUND RUNS; IN AIR IT TRADES SPEED FOR LIFT.';
 
 const GLYPH_H = 8;
 const CAP_H = 11;
