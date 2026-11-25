@@ -1,12 +1,26 @@
 /** Offline PWA acceptance: real local physics, pause/resume and original music. */
 import {readFile} from 'node:fs/promises';
+import {gunzipSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {preview} from 'vite';
 import {chromium} from 'playwright';
 const [dist,inventoryPath,base='/BitstreamBluffs/']=process.argv.slice(2);if(!dist||!inventoryPath)throw Error('Usage: test-real-offline-run-browser BUILT_DIST VERIFIED_INVENTORY BASE');
-const inventory=JSON.parse(await readFile(inventoryPath)),objects=new Map(inventory.objects.map(e=>[e.key,e]));
-const catalog=JSON.parse(await readFile(objects.get('catalog.json').path)),song=catalog.tracks.find(t=>t.title.includes('One More Run'))||catalog.tracks[0];
+let catalog;
+if(inventoryPath.endsWith('.bin')){
+ const index=JSON.parse(gunzipSync(await readFile(inventoryPath)));
+ if(index.format!=='bb-melody-runtime-index-v1'||!index.release.startsWith('https://bsb-audio.bearcave.win/releases/'))throw Error('Wrong compressed catalog index');
+ const r=await fetch(index.release+'catalog.json',{redirect:'error'});
+ if(!r.ok)throw Error('Published release catalog unavailable');
+ const raw=Buffer.from(await r.arrayBuffer());
+ if(raw.length!==index.catalog[0]||createHash('sha256').update(raw).digest('hex')!==index.catalog[1])throw Error('Published catalog violates release integrity');
+ catalog=JSON.parse(raw);
+}else{
+ const inventory=JSON.parse(await readFile(inventoryPath)),objects=new Map(inventory.objects.map(e=>[e.key,e]));
+ catalog=JSON.parse(await readFile(objects.get('catalog.json').path));
+}
+const song=catalog.tracks.find(t=>t.title.includes('One More Run'))||catalog.tracks[0];
 const selection=Object.fromEntries(catalog.tracks.map(t=>[t.id,t.id===song.id]));
 const root=fileURLToPath(new URL('../../',import.meta.url));let browser,server;
 try{

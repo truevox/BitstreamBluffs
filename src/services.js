@@ -58,8 +58,8 @@ export async function createServices(game) {
   });
   game.registry.set(REG.MISSIONS_SERVICE, missions);
   progression.missions = missions;
-  // Only explicit candidate builds contain the pinned index digest. Default
-  // production/dev builds never register a worker or install a controller.
+  // Only PWA-enabled builds include the pinned release index digest. Ordinary
+  // Netlify/dev builds do not register a worker or install this controller.
   if (typeof __BB_OFFLINE_INDEX_SHA256__ === 'string') {
     try { await (await import('./systems/music/OfflinePreview.js')).installOfflinePreview(game); }
     catch (e) { console.warn('[offline-preview] unavailable: '+(e?.message||e)); }

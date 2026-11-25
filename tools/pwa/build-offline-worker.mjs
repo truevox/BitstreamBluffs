@@ -1,4 +1,4 @@
-/** #172 prototype: deterministic, integrity-checked standalone offline worker. NOT registered by the app. */
+/** Deterministic, integrity-checked offline worker for explicitly PWA-enabled builds. */
 import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
@@ -77,7 +77,7 @@ export function renderOfflineWorker(inventory, {monoDev=false,melodyDev=false} =
   const base = checkedBase(inventory.base);
   const cacheToken = '__BB_SHELL_CACHE_ID__';
   const paths = inventory.entries.map(x => [x.path, x.sha256]);
-  const script = `/* Bitstream Bluffs #172: deterministic offline experiment. Deploy only when deliberately registered. */\n` +
+  const script = `/* Bitstream Bluffs: integrity-checked versioned offline shell. */\n` +
 `'use strict';\n` +
 `const CACHE_NAME = ${JSON.stringify(cacheToken)};\n` +
 `const CACHE_PREFIX = ${JSON.stringify(CACHE_PREFIX)};\n` +

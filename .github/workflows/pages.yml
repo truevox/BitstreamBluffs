@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/pages.yml'
       - 'tools/hosting-browser-smoke.mjs'
+      - 'tools/pwa/**'
       - 'src/**'
       - 'public/**'
       - '*.html'
@@ -45,11 +46,11 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - run: npm test -- --runInBand tests/src/pwa-install-shell.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js
+      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
-        run: npm run build -- --base "$BASE"
+        run: node tools/pwa/build-pwa-release.mjs "$BASE" dist
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Smoke test production game
@@ -61,6 +62,13 @@ jobs:
           trap 'kill "$server" 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:4173$BASE" >/dev/null && break; sleep 1; done
           node tools/hosting-browser-smoke.mjs "http://127.0.0.1:4173$BASE"
+      - name: Check installability and real offline gameplay
+        env:
+          BASE: ${{ steps.base.outputs.path }}
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/pwa/test-installability-persistent-browser.mjs dist "$BASE"
+          node tools/pwa/test-real-offline-run-browser.mjs dist tools/pwa/releases/melody-only-748a0670/offline-melody-index.bin "$BASE"
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
