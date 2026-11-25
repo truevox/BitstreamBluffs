@@ -159,6 +159,30 @@ try {
  assert.equal(memoryDownload.suggestedFilename(),`${memory.digest.slice(7)}.bbreplay`);
  assert(fs.readFileSync(await memoryDownload.path()).length>2000);
  results.push('quota-failed memory-only canonical input remains explicitly exportable but cannot be pinned');
+ const recovered=await p.evaluate(async missingDigest=>{
+  const {view,store}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape}=await import('/src/systems/replay/manifest.js');
+  const tape=window.__qaEvidence.legacyTape;
+  const base=evidenceBundle({manifest:legacyManifestFromTape(tape),tape});
+  const different={...base,claims:{...base.claims,score:base.claims.score+6}};
+  await store.put(different,{runId:'unrelated-success'}); // flush previous failed write
+  await view._refresh();
+  const durable=await store.isBundleDurable(missingDigest,{runId:'ui-smoke-run'});
+  const enabled=view.buttons[0].disabled===false;
+  const message=view.status.main.text;
+  if(enabled){
+    await view._keepOrUnpin();
+    const afterPin=store.protectedCount(missingDigest);
+    await view._keepOrUnpin();
+    return {durable,enabled,message,afterPin,afterUnpin:store.protectedCount(missingDigest)};
+  }
+  return {durable,enabled,message};
+ },memory.digest);
+ assert(recovered.durable && recovered.enabled && recovered.message.includes('RECOVERED'));
+ assert.equal(recovered.afterPin,1);
+ assert.equal(recovered.afterUnpin,0);
+ results.push('once quota-failed capture becomes durable under exact run ID, Refresh enables Keep/Unpin');
+
 
  const navigation=await p.evaluate(async t=>{
   const [{GameOverScene},{GhostFavoritesView},{REG},{GhostLibrary}]=await Promise.all([

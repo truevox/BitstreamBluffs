@@ -9,7 +9,7 @@ import { Button } from './Button.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize } from './PixelFont.js';
 import { LocalEvidenceActions } from '../systems/replay/localEvidenceActions.js';
-import { sharedEvidenceStore, EVIDENCE_STATUS_KEY, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
+import { sharedEvidenceStore, EVIDENCE_STATUS_KEY, EVIDENCE_STATUS_BY_RUN_KEY, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
 import { MAX_OUTPUT_BYTES } from '../systems/replay/canonicalJson.js';
 import { digestFromLocalReplayFilename, currentRunEvidence } from '../systems/replay/archiveUiPolicy.js';
 
@@ -64,7 +64,10 @@ export class ReplayEvidenceView extends View {
   }
 
   _captureStatus() {
-    const s=this.scene.registry.get(EVIDENCE_STATUS_KEY);
+    const byRun=this.scene.registry.get(EVIDENCE_STATUS_BY_RUN_KEY);
+    const s=byRun instanceof Map && byRun.has(this.tape.runId)
+      ? byRun.get(this.tape.runId)
+      : this.scene.registry.get(EVIDENCE_STATUS_KEY);
     if (!s || s.runId !== this.tape.runId) return null;
     return s;
   }
@@ -106,6 +109,9 @@ export class ReplayEvidenceView extends View {
       // NOT prevent someone from saving those bytes to their own file.
       this.buttons[1].setDisabled(false);
       const persisted=await control.store.isBundleDurable(capture.digest);
+      // Quota-failed captures may have been automatically flushed after IDB
+      // recovery. Check the persisted run-ID, not the old capture.ok flag.
+      const boundToCurrentRun=persisted && await control.store.isBundleDurable(capture.digest,{runId:this.tape.runId});
       if (!live() || this._captureStatus()!==status) return;
       let held=false;
       try {
@@ -118,11 +124,17 @@ export class ReplayEvidenceView extends View {
         // Keep/Unpin remain disabled; no guessed pin state from stale cache.
         return;
       }
-      this.pinReady=status.ok===true && persisted;
+      this.pinReady=Boolean(boundToCurrentRun);
       this.buttons[0].setDisabled(!this.pinReady);
       this.buttons[0].setLabel(held?'UNPIN':'KEEP');
-      if (!status.ok) this._show('DISK SAVE FAILED — EXPORT NOW',
-        `STILL IN SESSION MEMORY: ${status.code || 'STORAGE ERROR'}`);
+      if (!status.ok && boundToCurrentRun)
+        this._show('RECOVERED — KEPT ON THIS DEVICE', 'KEEP AVAILABLE; BROWSER SITE DATA CAN STILL BE CLEARED');
+      else if (!status.ok && persisted)
+        this._show('RECOVERED BYTES — EXPORT ONLY','RUN ID DOES NOT MATCH THE FINISHED RUN');
+      else if (!status.ok)
+        this._show('DISK SAVE FAILED — EXPORT NOW',`STILL IN SESSION MEMORY: ${status.code || 'STORAGE ERROR'}`);
+      else if (!boundToCurrentRun && persisted)
+        this._show('RUN ID NOT CONFIRMED — EXPORT ONLY','CURRENT DEVICE BINDING DOES NOT MATCH');
       else this._show(held?'LOCAL EVIDENCE PINNED':persisted?'SAVED LOCALLY':'SESSION ONLY — EXPORT NOW',
         persisted?'CAN BE LOST IF BROWSER SITE DATA IS CLEARED':'DISK NOT CONFIRMED: EXPORT TO A FILE');
     } catch(e) {
@@ -146,9 +158,14 @@ export class ReplayEvidenceView extends View {
 
   _keepOrUnpin() {return this._run(async()=>{
     if (!this.pinReady) {this._show('KEEP/UNPIN NOT READY','REFRESH ARCHIVE STATUS FIRST');return;}
-    const capture=currentRunEvidence(this._captureStatus(),this.tape.runId);
+    const capture=currentRunEvidence(this._captureStatus(),this.tape.runId,{allowFailed:true});
     if (!capture) {this._show('EVIDENCE NOT SAVED YET','REFRESH AFTER THE RUN FINISHES');return;}
     const control=await this._getActions();
+    if (!(await control.store.isBundleDurable(capture.digest,{runId:this.tape.runId}))) {
+      this.pinReady=false;this.buttons[0].setDisabled(true);
+      this._show('RUN BINDING NOT CONFIRMED — EXPORT','REFRESH AFTER DURABLE STORAGE RECOVERS');
+      return;
+    }
     // The player's visible action is the authority. Never interpret a stale
     // KEEP label as permission to UNPIN a reference created in another tab.
     const wantsUnpin=this.buttons[0].label.main.text==='UNPIN';
@@ -255,7 +272,7 @@ export class ReplayEvidenceView extends View {
     const imported=await control.import(bytes,{expectedDigest});
     this._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED',
       imported.protectionCount===null?'PIN STATUS UNKNOWN — REFRESH LATER':
-        imported.localDurable?'SAVED ON DEVICE, NOT VERIFIED':'SESSION ONLY — EXPORT A COPY');
+        imported.localDurable?'SAVED ON DEVICE, NOT VERIFIED':'KEEP YOUR ORIGINAL FILE — IMPORT WAS NOT DURABLE');
   });}
 
   destroy() {
