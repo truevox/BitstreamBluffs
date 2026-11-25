@@ -9,7 +9,7 @@ import { uiSfx } from './Sound.js';
 import { fmtInt } from './Format.js';
 import { ellipsize } from './PixelFont.js';
 import { copyText } from './Clipboard.js';
-import { createGhostLink, GHOST_LINK_RECOMMENDED_URL, GhostLinkError } from '../systems/ghost/GhostLink.js';
+import { createGhostLink,createGhostFile,GHOST_LINK_RECOMMENDED_URL,GhostLinkError } from '../systems/ghost/GhostLink.js';
 import { GHOST_COURSE_ROWS, readGhostCourseRows } from './ghost-course-rows.js';
 
 const ROW_Y = 49;
@@ -34,6 +34,7 @@ export class GhostFavoritesView extends View {
     this._shareBusy = false;
     this._shareArmed = false;
     this._shareLink = null;
+    this._shareFile = null;
     this._shareEpoch = 0;
     const text = (x, y, value, color = 'text') => this.panel.add(
       new NeonText(scene, theme, x, y, value, { color, outline: 'none' }));
@@ -84,14 +85,15 @@ export class GhostFavoritesView extends View {
     return save ? this._save(i) : this._toggle(i);
   }
 
-  /** An explicit two-press copy action: no auto-uploads, no official credit.
-   * First press only PREPARES and discloses the URL data; second press copies.
-   * The URL contains the player's input actions, equipment and score.
+  /** Explicit two-step share: ordinary URL -> COPY LINK, excessive URL ->
+   * local SAVE FILE, never a silent upload or background download. Both
+   * transports disclose input actions/equipment/score before the second click.
    */
   _disarmShare() {
     this._shareEpoch++;
     this._shareArmed = false;
     this._shareLink = null;
+    this._shareFile = null;
     this.shareBtn?.setLabel('SHARE LINK');
   }
 
@@ -115,9 +117,24 @@ export class GhostFavoritesView extends View {
         this.status.setText('SHARES INPUTS + SCORE. SELECT AGAIN.');
       } catch (e) {
         if (!this.alive || epoch !== this._shareEpoch) return;
-        this._disarmShare();
-        this.status.setText(e instanceof GhostLinkError && e.code === 'url-too-long'
-          ? 'LINK TOO LONG: NO UPLOAD PERFORMED' : 'CANNOT SHARE THIS GHOST');
+        if (e instanceof GhostLinkError && e.code === 'url-too-long') {
+          try {
+            const bytes=await createGhostFile(this.tape);
+            if (!this.alive || epoch !== this._shareEpoch) return;
+            this._shareFile=bytes;
+            this._shareArmed=true;
+            this._shareLink=null;
+            this.shareBtn.setLabel('SAVE FILE');
+            this.status.setText('FILE SHARES INPUTS + SCORE. SELECT AGAIN.');
+          } catch {
+            if (!this.alive || epoch !== this._shareEpoch) return;
+            this._disarmShare();
+            this.status.setText('GHOST TOO BIG FOR LINK OR LOCAL FILE');
+          }
+        } else {
+          this._disarmShare();
+          this.status.setText('CANNOT SHARE THIS GHOST');
+        }
       } finally {
         this._shareBusy = false;
         if (this.alive) this.shareBtn.setDisabled(false);
@@ -126,17 +143,40 @@ export class GhostFavoritesView extends View {
     }
     // Clipboard permission is gesture-sensitive: initiate writing directly
     // in the second user click, before any awaiting or other interaction.
-    const link = this._shareLink;
+    const link = this._shareLink,file=this._shareFile;
     this._disarmShare();
     this._shareBusy = true;
     this.shareBtn.setDisabled(true);
     try {
-      const copied = await copyText(link);
-      if (!this.alive) return;
-      this.status.setText(!copied ? 'CLIPBOARD BLOCKED: NO LINK COPIED'
-        : link.length > GHOST_LINK_RECOMMENDED_URL
-          ? 'LONG LINK COPIED: SOME APPS TRUNCATE' : 'UNVERIFIED PRACTICE LINK COPIED');
-      uiSfx(this.scene, copied ? 'uiSelect' : 'uiBack');
+      if(file){
+        // Only this SECOND real user gesture downloads the explicitly prepared
+        // private local file. No fetch, POST, R2 token, upload or account.
+        if(typeof document==='undefined'||!URL.createObjectURL)throw Error('Native download unavailable');
+        const blob=new Blob([file],{type:'application/octet-stream'});
+        const objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
+        const seed=String(this.tape.seed||'course').replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,32)||'course';
+        anchor.download=`bitstream-ghost-${seed}.bbghost`;
+        anchor.href=objectUrl;
+        anchor.style.display='none';
+        document.body.appendChild(anchor);
+        try{anchor.click();}finally{anchor.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),15000);}
+        if(this.alive)this.status.setText('LOCAL GHOST FILE DOWNLOAD REQUESTED');
+        uiSfx(this.scene,'uiSelect');
+      }else{
+        const copied = await copyText(link);
+        if (!this.alive) return;
+        this.status.setText(!copied ? 'CLIPBOARD BLOCKED: NO LINK COPIED'
+          : link.length > GHOST_LINK_RECOMMENDED_URL
+            ? 'LONG LINK COPIED: SOME APPS TRUNCATE' : 'UNVERIFIED PRACTICE LINK COPIED');
+        uiSfx(this.scene, copied ? 'uiSelect' : 'uiBack');
+      }
+    } catch (e) {
+      // A disabled Blob URL/download capability is a local failure, not a
+      // reason to switch to unconsented network hosting or wedge the panel.
+      if(this.alive)this.status.setText(file
+        ?'FILE DOWNLOAD BLOCKED: TRY SHARE AGAIN'
+        :'CLIPBOARD BLOCKED: NO LINK COPIED');
+      uiSfx(this.scene,'uiBack');
     } finally {
       this._shareBusy = false;
       if (this.alive) this.shareBtn.setDisabled(false);

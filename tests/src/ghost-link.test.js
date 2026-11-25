@@ -13,7 +13,7 @@ import {GHOST_TAPE_FORMAT,GHOST_TAPE_VERSION,GHOST_PHYSICS_VERSION} from '../../
 import {RUN_RANDOM_VERSION} from '../../src/systems/RunRandom.js';
 import {SIM_REVISION} from '../../src/systems/replay/ruleset.js';
 import {SIM_TICK_HZ} from '../../src/systems/SimClock.js';
-import {createGhostLink,parseGhostLink,GhostLinkError,GHOST_LINK_MAX_URL,GHOST_LINK_RECOMMENDED_URL} from '../../src/systems/ghost/GhostLink.js';
+import {createGhostLink,parseGhostLink,createGhostFile,parseGhostFile,GHOST_FILE_MAGIC,GHOST_FILE_MAX_BYTES,GhostLinkError,GHOST_LINK_MAX_URL,GHOST_LINK_RECOMMENDED_URL} from '../../src/systems/ghost/GhostLink.js';
 const URL='https://simulate.sledhead.ing/?session=private#old-hash';
 const floatTrace=(triples=[[42,170,0],[55,180,.1]])=>Buffer.from(new Float32Array(triples.flat()).buffer).toString('base64');
 const valid=()=>({
@@ -107,4 +107,51 @@ test('URI transport does not require a server, account, import side effect or wr
  try{const t=valid(),url=await createGhostLink(t,'https://simulate.sledhead.ing/');
   expect((await parseGhostLink(url)).tape.seed).toBe(t.seed);expect(fetcher).not.toHaveBeenCalled();
  }finally{if(oldFetch===undefined)delete globalThis.fetch;else globalThis.fetch=oldFetch;}
+});
+
+
+test('explicit .bbghost file round-trip preserves only allowlisted ghost data and remains UNVERIFIED',async()=>{
+ const t=valid(),bytes=await createGhostFile(t);
+ expect(bytes).toBeInstanceOf(Uint8Array);
+ expect(bytes.byteLength).toBeLessThanOrEqual(GHOST_FILE_MAX_BYTES);
+ expect(new TextDecoder().decode(bytes.subarray(0,GHOST_FILE_MAGIC.length))).toBe(GHOST_FILE_MAGIC);
+ const got=await parseGhostFile(bytes);
+ expect(got.source).toBe('user-selected-ghost-file');
+ expect(got.trust).toBe('unverified-local-practice');
+ expect(got).toMatchObject({canCreditScore:false,canCreditWallet:false,canSubmitOfficial:false});
+ for(const k of ['ownerName','cloudToken','privateHealth','wallet'])expect(got.tape).not.toHaveProperty(k);
+ expect(got.tape.runId).not.toBe(t.runId);
+ expect(got.tape.inputs).toEqual(t.inputs);expect(got.tape.checkpoints).toEqual(t.checkpoints);
+ expect(got.tape.trace).toBe(t.trace);expect(got.tape.seed).toBe(t.seed);
+ const link=await createGhostLink(t,URL),urlCandidate=await parseGhostLink(link);
+ expect(got.digest).toBe(urlCandidate.digest); // identical compressed allowlisted payload
+ expect(got.tape).toEqual(urlCandidate.tape);
+});
+
+test('file is truly useful for oversized URL fragments without sending a network request',async()=>{
+ const t=valid();
+ const n=1900;
+ t.endTick=n+20;
+ t.inputs=Array.from({length:n},(_,i)=>[1,Math.imul(i+117,2654435761)>>>0,(i*71%255)-127]);
+ t.checkpoints=[];
+ await mustReject(createGhostLink(t,URL),'url-too-long');
+ const file=await createGhostFile(t);
+ expect(file.byteLength).toBeGreaterThan(6000);
+ expect(file.byteLength).toBeLessThanOrEqual(GHOST_FILE_MAX_BYTES);
+ const imported=await parseGhostFile(file);
+ expect(imported.tape.inputs).toEqual(t.inputs);
+ expect(imported.canCreditScore).toBe(false);
+});
+
+test('untrusted file fails closed for corruption, unsupported version, oversized data and forged score',async()=>{
+ const base=await createGhostFile(valid());
+ const changed=base.slice();changed[changed.length-1]^=1;
+ await mustReject(parseGhostFile(changed),'corrupt-link');
+ const renamed=base.slice();renamed[7]='2'.charCodeAt(0);
+ await mustReject(parseGhostFile(renamed),'unsupported-file');
+ await mustReject(parseGhostFile(new Uint8Array(GHOST_FILE_MAX_BYTES+1)),'invalid-file');
+ await mustReject(parseGhostFile(new Uint8Array(0)),'invalid-file');
+ const fake=await parseGhostFile(await createGhostFile({...valid(),score:99999999}));
+ expect(fake.tape.score).toBe(99999999);
+ expect(fake.canSubmitOfficial).toBe(false);
 });

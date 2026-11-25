@@ -10,7 +10,7 @@ import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
 import { ellipsize } from './PixelFont.js';
 import { isReducedMotion } from './Motion.js';
-import { parseGhostLink, GhostLinkError, GHOST_LINK_MAX_URL } from '../systems/ghost/GhostLink.js';
+import { parseGhostLink,parseGhostFile,GHOST_FILE_MAX_BYTES,GhostLinkError,GHOST_LINK_MAX_URL } from '../systems/ghost/GhostLink.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../systems/SimClock.js';
 import { REG, PIXELS_PER_METER } from '../constants.js';
@@ -65,7 +65,7 @@ export function visualGuestGapM(guest,local,tick){
 function messageFor(e){
  if(!(e instanceof GhostLinkError))return 'INVALID OR UNSUPPORTED GHOST DATA';
  if(e.code==='url-too-long'||e.code==='oversize')return 'GHOST LINK TOO LARGE - NOT IMPORTED';
- if(e.code==='unsupported-ruleset'||e.code==='unsupported-tape'||e.code==='unsupported-link')
+ if(e.code==='unsupported-ruleset'||e.code==='unsupported-tape'||e.code==='unsupported-link'||e.code==='unsupported-file')
   return 'INCOMPATIBLE GHOST OR GAME VERSION';
  if(e.code==='corrupt-link'||e.code==='bad-gzip'||e.code==='invalid-json')
   return 'GHOST LINK DAMAGED - NOT IMPORTED';
@@ -94,6 +94,11 @@ export class GhostLinkView extends View {
   this.status=new NeonText(scene,theme,12,24,
    'PASTE A LINK. NOTHING IS SAVED OR SUBMITTED.',{color:'cyan',outline:'none'});
   this.panel.add(this.status);
+  // Distinct native OPEN FILE action shares the bottom control band without
+  // overlapping header keyboard hints or the native paste textarea.
+  this.fileBtn=new Button(scene,theme,{x:109,y:185,w:75,h:16,label:'OPEN FILE',color:'cyan',onClick:()=>this._openFilePicker()});
+  this.panel.add(this.fileBtn);
+  this._installFileInput();
   this.box=new DomTextBox(scene,theme,{
    x:this.panel.x+PLOT.x,y:this.panel.y+39,w:394,h:45,maxLength:GHOST_LINK_MAX_URL,
    multiline:true,value:o.initial||'',placeholder:'PASTE GHOST LINK HERE (CTRL+V)',
@@ -113,19 +118,19 @@ export class GhostLinkView extends View {
   this.position=new NeonText(scene,theme,12,168,
    'PREVIEW ONLY. NO SCORE / REWARD / GHOST SAVE.',{color:'text',outline:'none'});
   this.panel.add(this.position);
-  this.previewBtn=new Button(scene,theme,{x:12,y:185,w:105,h:16,
-   label:'PREVIEW LINK',color:'lime',onClick:()=>this.inspect()});
+  this.previewBtn=new Button(scene,theme,{x:12,y:185,w:94,h:16,
+   label:'PREVIEW',color:'lime',onClick:()=>this.inspect()});
   this.panel.add(this.previewBtn);
-  this.prevBtn=new Button(scene,theme,{x:126,y:185,w:38,h:16,
+  this.prevBtn=new Button(scene,theme,{x:187,y:185,w:29,h:16,
    label:'<<',color:'cyan',onClick:()=>this.scrub(-1)});
   this.panel.add(this.prevBtn);
-  this.nextBtn=new Button(scene,theme,{x:170,y:185,w:38,h:16,
+  this.nextBtn=new Button(scene,theme,{x:220,y:185,w:29,h:16,
    label:'>>',color:'cyan',onClick:()=>this.scrub(1)});
   this.panel.add(this.nextBtn);
-  this.playBtn=new Button(scene,theme,{x:215,y:185,w:81,h:16,
+  this.playBtn=new Button(scene,theme,{x:253,y:185,w:57,h:16,
    label:'WATCH',color:'magenta',onClick:()=>this.togglePlayback()});
   this.panel.add(this.playBtn);
-  this.practiceBtn=new Button(scene,theme,{x:302,y:185,w:106,h:16,
+  this.practiceBtn=new Button(scene,theme,{x:314,y:185,w:94,h:16,
    label:'RACE GUEST',color:'amber',onClick:()=>this.startGuestPractice()});
   this.practiceBtn.setDisabled(true);
   this.panel.add(this.practiceBtn);
@@ -133,6 +138,52 @@ export class GhostLinkView extends View {
   scene.events.on(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this._draw();
   scene.time.delayedCall(30,()=>this.alive&&this.box.focus());
+ }
+ /** Keep a native picker outside Phaser's canvas, with explicit teardown. */
+ _installFileInput(){
+  if(typeof document==='undefined')return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='.bbghost,application/octet-stream';
+  input.tabIndex=-1;
+  input.style.position='fixed';input.style.left='-10000px';input.style.top='-10000px';
+  input.style.width='1px';input.style.height='1px';
+  this._fileInput=input;
+  this._onFileChange=()=>{
+   const file=input.files?.[0]||null;
+   input.value='';
+   if(file)this._readGuestFile(file);
+  };
+  input.addEventListener('change',this._onFileChange);
+  document.body.appendChild(input);
+ }
+ _openFilePicker(){
+  if(!this.alive||this.busy||!this._fileInput)return;
+  this._disarmPractice();
+  this._fileInput.click(); // direct user click/tap, not auto-open or network
+ }
+ async _readGuestFile(file){
+  if(!this.alive||this.busy)return;
+  this._inputChanged(); // file selection invalidates stale URL/guest preview
+  const token=this.token;
+  this.status.setText('CHECKING SELECTED UNTRUSTED GHOST FILE...');
+  this.busy=true;this.previewBtn.setDisabled(true);this.fileBtn.setDisabled(true);
+  try{
+   if(file.size>GHOST_FILE_MAX_BYTES)throw new GhostLinkError('oversize');
+   const bytes=new Uint8Array(await file.arrayBuffer());
+   if(!this.alive||token!==this.token)return;
+   const parsed=await parseGhostFile(bytes);
+   await this._admitPreview(parsed,token);
+  }catch(e){
+   if(!this.alive||token!==this.token)return;
+   const notice=e instanceof GhostLinkError&&e.code==='oversize'
+    ?'GHOST FILE TOO LARGE - NOT IMPORTED'
+    :e instanceof GhostLinkError&&['corrupt-link','bad-gzip','invalid-json'].includes(e.code)
+      ?'GHOST FILE DAMAGED - NOT IMPORTED'
+      :messageFor(e);
+   this.status.setText(notice);this._draw();
+  }finally{
+   if(token===this.token){this.busy=false;this.previewBtn.setDisabled(false);this.fileBtn.setDisabled(false);}
+  }
  }
  /** An edit invalidates every prior candidate and any in-flight async read. */
  _inputChanged(){
@@ -144,6 +195,7 @@ export class GhostLinkView extends View {
   this.practiceArmed=false;
   this.practiceBtn?.setLabel('RACE GUEST');this.practiceBtn?.setDisabled(true);
   this.previewBtn?.setDisabled(false);
+  this.fileBtn?.setDisabled(false); // editing while a file read is in flight must not wedge the picker
   this.playBtn?.setLabel('WATCH');
   this.meta?.setText('NO GHOST LOADED');
   this.position?.setText('PREVIEW ONLY. NOTHING WRITTEN.');
@@ -166,6 +218,19 @@ export class GhostLinkView extends View {
   this.busy=true;this.previewBtn.setDisabled(true);
   try{
    const parsed=await parseGhostLink(raw);
+   await this._admitPreview(parsed,token);
+  }catch(e){
+   if(!this.alive||token!==this.token)return;
+   this.status.setText(messageFor(e));
+   this._draw();
+  }finally{
+   if(token===this.token){this.busy=false;if(this.alive)this.previewBtn.setDisabled(false);}
+  }
+ }
+ /** Shared admission path for explicitly pasted URL or user-selected file.
+  * Neither transport can ever write to GhostLibrary, RunRecord or wallet.
+  */
+ async _admitPreview(parsed,token){
    const model=guestPreview(parsed.tape);
    // This is a READ of the player's existing locally saved GhostLibrary.
    // A matching SIM9 course may have an authentic personal BEST/LATEST trace,
@@ -195,13 +260,6 @@ export class GhostLinkView extends View {
     (this.localPreview?'  GUEST MAGENTA / LOCAL CYAN':''),372));
    this.cursor=0;this.elapsedMs=0;
    this._draw();
-  }catch(e){
-   if(!this.alive||token!==this.token)return;
-   this.status.setText(messageFor(e));
-   this._draw();
-  }finally{
-   if(token===this.token){this.busy=false;if(this.alive)this.previewBtn.setDisabled(false);}
-  }
  }
  /** One initial click discloses the unranked consequences; the next click
   * starts a NEW live player-controlled practice run. Never writes the guest. */
@@ -326,6 +384,10 @@ export class GhostLinkView extends View {
   this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.playing=false;
   this.scene.events.off(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this.box?.destroy();this.box=null;
+  if(this._fileInput){
+   this._fileInput.removeEventListener('change',this._onFileChange);
+   this._fileInput.remove();this._fileInput=null;this._onFileChange=null;
+  }
   super.destroy();
  }
 }

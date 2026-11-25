@@ -5,6 +5,7 @@ on:
       - '.github/workflows/pages.yml'
       - 'tools/hosting-browser-smoke.mjs'
       - 'tools/test-real-ghost-link-browser.mjs'
+      - 'tools/test-real-ghost-file-browser.mjs'
       - 'tests/src/ghost-link*.test.js'
       - 'tests/src/ghost-guest-practice.test.js'
       - 'tools/pwa/**'
@@ -75,6 +76,14 @@ jobs:
           # Opt-in-only unranked playable guest QA; no wallet/run/ghost writes.
           BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
           BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
+      - name: Verify explicit long ghost file handoff in real Chromium
+        run: |
+          npm exec vite -- --host 127.0.0.1 --port 18395 --strictPort > /tmp/ghost-file-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18395/ >/dev/null && break; sleep 1; done
+          GAME_URL=http://127.0.0.1:18395/ node tools/test-real-ghost-file-browser.mjs
+          BSB_LINK_MOBILE=1 GAME_URL=http://127.0.0.1:18395/ node tools/test-real-ghost-file-browser.mjs
       - name: Check installability and real offline gameplay
         if: steps.rollout.outputs.mode == 'pwa'
         env:

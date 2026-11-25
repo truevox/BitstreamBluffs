@@ -20,6 +20,8 @@ export const GHOST_LINK_RECOMMENDED_URL=1900;
 export const GHOST_LINK_MAX_URL=8192;
 export const GHOST_LINK_MAX_GZIP=20000;
 export const GHOST_LINK_MAX_JSON=96000;
+export const GHOST_FILE_MAGIC='BBGHOST1:';
+export const GHOST_FILE_MAX_BYTES=GHOST_LINK_MAX_GZIP+GHOST_FILE_MAGIC.length+24+1;
 const MAX_TICKS=120*600,MAX_CHANGES=30000,MAX_CHECKPOINTS=600,MAX_TRACE_CHARS=85000;
 const TAPE_FIELDS=[
  'format','version','physicsVersion','simTickHz','runRandomVersion','edgeRows',
@@ -149,13 +151,35 @@ async function ungzip(bytes){
  catch(e){if(e instanceof GhostLinkError)throw e;reject('bad-gzip','Cannot decompress ghost data');}
 }
 
-/** Explicit export. A URL fragment is local to the browser until someone shares it. */
-export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL}={}){
+/** Pack only the existing allowlisted tape. The compressed bytes/checksum are
+ * exactly the same for URL and file transports; no second trust path exists.
+ */
+async function pack(tape){
  if(!plain(tape))reject('invalid-tape');
  const payload={format:GHOST_LINK_FORMAT,version:GHOST_LINK_VERSION,tape:selected(tape)};
- const raw=new TextEncoder().encode(JSON.stringify(payload));if(raw.length>GHOST_LINK_MAX_JSON)reject('oversize');
- const zipped=await gzip(raw);if(zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
- const checksum=(await digest(zipped)).slice(0,24); // integrity check, NOT producer authentication
+ const raw=new TextEncoder().encode(JSON.stringify(payload));
+ if(raw.length>GHOST_LINK_MAX_JSON)reject('oversize');
+ const zipped=await gzip(raw);
+ const checksum=(await digest(zipped)).slice(0,24);
+ return {zipped,checksum};
+}
+async function unpack(zipped,check,origin){
+ if(zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
+ const actual=(await digest(zipped)).slice(0,24);
+ if(actual!==check)reject('corrupt-link','Compressed replay checksum mismatch');
+ const raw=await ungzip(zipped);
+ let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));}catch{reject('invalid-json');}
+ if(!plain(body)||body.format!==GHOST_LINK_FORMAT||body.version!==GHOST_LINK_VERSION||!plain(body.tape))reject('unsupported-link');
+ const t=selected(body.tape);
+ // Neither transport can authorize producer identity, score, wallet or ranks.
+ return {trust:'unverified-local-practice',source:origin,digest:actual,
+  tape:{...t,runId:`shared:${actual}`,startedAt:0,endedAt:0},
+  canCreditScore:false,canCreditWallet:false,canSubmitOfficial:false};
+}
+
+/** Explicit export. A URL fragment is local to the browser until someone shares it. */
+export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL}={}){
+ const {zipped,checksum}=await pack(tape);
  const encoded=`${GHOST_LINK_VERSION}.${checksum}.${base64url(zipped)}`;
  let target;try{target=new URL(baseUrl);}catch{reject('invalid-url');}
  if(target.username||target.password||!(['https:','http:'].includes(target.protocol))||
@@ -163,6 +187,31 @@ export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL
  target.username='';target.password='';target.search='';target.hash=`${GHOST_LINK_PARAMETER}=${encoded}`;
  if(target.href.length>Math.min(GHOST_LINK_MAX_URL,maxLength))reject('url-too-long','Ghost exceeds portable link length; no automatic hosting or upload');
  return target.href;
+}
+
+/** Portable binary fallback for >8,192-character URLs. The FILE is created
+ * only after a deliberate user action; this function performs no download,
+ * upload, network request or IndexedDB write. A 20 KiB bound still applies.
+ */
+export async function createGhostFile(tape){
+ const {zipped,checksum}=await pack(tape);
+ const prefix=new TextEncoder().encode(`${GHOST_FILE_MAGIC}${checksum}\n`);
+ const out=new Uint8Array(prefix.length+zipped.length);
+ if(out.length>GHOST_FILE_MAX_BYTES)reject('oversize');
+ out.set(prefix);out.set(zipped,prefix.length);
+ return out;
+}
+
+/** Select-file explicit import, never an automatic run/ledger write. */
+export async function parseGhostFile(bytes){
+ if(!(bytes instanceof Uint8Array)||bytes.length>GHOST_FILE_MAX_BYTES||bytes.length<GHOST_FILE_MAGIC.length+24+2)
+  reject('invalid-file','Unsupported or oversize ghost file');
+ const prefixBytes=bytes.subarray(0,GHOST_FILE_MAGIC.length+24+1);
+ let header;try{header=new TextDecoder('ascii',{fatal:true}).decode(prefixBytes);}catch{reject('invalid-file');}
+ const expected=new RegExp('^'+GHOST_FILE_MAGIC+'([a-f0-9]{24})\\n$');
+ const match=expected.exec(header);
+ if(!match)reject('unsupported-file','Unsupported ghost-file version');
+ return unpack(bytes.subarray(prefixBytes.length),match[1],'user-selected-ghost-file');
 }
 
 /** Parse as untrusted local practice; NEVER directly save/import or confer a wallet/replay verdict. */
@@ -176,16 +225,5 @@ export async function parseGhostLink(url,{maxLength=GHOST_LINK_MAX_URL}={}){
  if(!fragment.startsWith(prefix)||fragment.indexOf('&')>=0)reject('invalid-fragment');
  const match=/^1\.([a-f0-9]{24})\.([A-Za-z0-9_-]+)$/.exec(fragment.slice(prefix.length));
  if(!match)reject('unsupported-link','Malformed or future ghost-link version');
- const zipped=fromUrl64(match[2]);if(zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
- const check=(await digest(zipped)).slice(0,24);
- if(check!==match[1])reject('corrupt-link','Compressed replay checksum mismatch');
- const raw=await ungzip(zipped);
- let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));}catch{reject('invalid-json');}
- if(!plain(body)||body.format!==GHOST_LINK_FORMAT||body.version!==GHOST_LINK_VERSION||!plain(body.tape))reject('unsupported-link');
- const t=selected(body.tape);
- // Never carry over remotely supplied names, original run ID or timestamps.
- // This is explicitly an UNVERIFIED local-practice import candidate only.
- return {trust:'unverified-local-practice',source:'user-pasted-url-fragment',
-  digest:check,tape:{...t,runId:`shared:${check}`,startedAt:0,endedAt:0},
-  canCreditScore:false,canCreditWallet:false,canSubmitOfficial:false};
+ return unpack(fromUrl64(match[2]),match[1],'user-pasted-url-fragment');
 }
