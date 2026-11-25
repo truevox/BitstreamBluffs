@@ -59,6 +59,10 @@ export class LocalEvidenceActions {
 
   /** Only releases retention; does NOT remove the underlying canonical bytes. */
   async unpin(key, { expectedGeneration } = {}) {
+    // Never let a caller omit the generation and accidentally remove a
+    // replacement reference that appeared after the player's last Refresh.
+    if (typeof expectedGeneration !== 'string' || !/^[0-9a-f]{32}$/.test(expectedGeneration))
+      throw new EvidenceStoreError('generation-required', 'Unpin requires the generation displayed to the player');
     const changed=await this.store.unprotect(key, { expectedGeneration });
     // Only confirm the ref was released. Another tab may delete the bytes as
     // soon as the final pin is gone; no retained-byte claim is made here.

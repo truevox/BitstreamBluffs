@@ -47,7 +47,7 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect(held).toMatchObject({ok:true,localDurable:true,browserPersistence:false,publicRankEligible:false});
     expect(store.protectedCount(d)).toBe(1);
     await expect(control.keep({digest:d,runId:'foreign-run'})).rejects.toMatchObject({code:'run-id-mismatch'});
-    const unpinned=await control.unpin(held.reference.key);
+    const unpinned=await control.unpin(held.reference.key,{expectedGeneration:held.reference.generation});
     expect(unpinned).toEqual({ok:true,publicRankEligible:false});
     expect(await store.get(d)).not.toBeNull();
   });
@@ -113,7 +113,7 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
 
   test('missing unpin never claims that evidence bytes remain stored',async()=>{
     const {control}=await ready();
-    expect(await control.unpin('not-found')).toEqual({ok:false,publicRankEligible:false});
+    expect(await control.unpin('not-found',{expectedGeneration:'a'.repeat(32)})).toEqual({ok:false,publicRankEligible:false});
   });
 
   test('archive-only import ignores a conflicting session run binding, preserving both claims',async()=>{
@@ -200,6 +200,14 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     const action=new LocalEvidenceActions(store);
     await expect(action.unpin(one.key,{expectedGeneration:one.generation})).rejects.toMatchObject({code:'stale-protection'});
     expect((await action.unpin(two.key,{expectedGeneration:two.generation})).ok).toBe(true);
+  });
+
+  test('omitting the visible pin generation is always refused, even for a valid key',async()=>{
+    const {control,d}=await ready();
+    const held=await control.keep({digest:d,runId:'intentional-local-run'});
+    await expect(control.unpin(held.reference.key)).rejects.toMatchObject({code:'generation-required'});
+    await expect(control.unpin(held.reference.key,{expectedGeneration:'bad'})).rejects.toMatchObject({code:'generation-required'});
+    expect((await control.unpin(held.reference.key,{expectedGeneration:held.reference.generation})).ok).toBe(true);
   });
 
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
