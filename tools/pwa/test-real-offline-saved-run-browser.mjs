@@ -66,5 +66,17 @@ try{
    audioCatalog:g.registry.get('audioSynth')?._stemMusic?.catalog?.length||0};
  },finished.record.id);
  if(restored.runId!==finished.record.id||restored.persisted!=='committed'||restored.ledgerValid!==true||restored.ghostBackend!=='idb'||restored.ghostCourse!==finished.record.id||restored.ghostRunId!==finished.record.id||restored.ghostTraceLength<20||errors.length||sameOriginFailures.length)throw Error('Actual offline run/ghost failed to survive reopen '+JSON.stringify({finished,restored,errors,sameOriginFailures}));
- console.log('PASS_PWA_REAL_OFFLINE_SCORED_GHOST_PERSISTENCE',JSON.stringify({installed,first,second,paused,resumed,finished,restored,errors,sameOriginFailures}));
+ // Start the SAME course again, still disconnected: the saved ghost must
+ // instantiate in the actual RunScene and visibly advance from persisted trace.
+ await reopened.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('sim-05@0'));
+ await reopened.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&window.__bbGame.scene.getScene('RunScene').ghostRiders?.length>0,null,{timeout:30000});
+ await reopened.waitForTimeout(450);
+ const replayed=await reopened.evaluate(()=>{
+  const g=window.__bbGame,r=g.scene.getScene('RunScene');return {active:g.scene.isActive('RunScene'),
+   simTick:r.simClock?.tick,seed:r.seed,ghosts:(r.ghostRiders||[]).map(x=>({runId:x.runId,roles:x.roles,
+    visible:x.visible,traceFrames:x.trace?.length||0,rendered:!!x.gfx&&!!x.label}))};
+ });
+ if(!replayed.active||replayed.seed!=='sim-05'||!replayed.ghosts.some(x=>x.runId===finished.record.id&&x.visible&&x.rendered&&x.traceFrames>0)||errors.length||sameOriginFailures.length)
+  throw Error('Saved real ghost not visible in new offline run '+JSON.stringify({finished,replayed,errors,sameOriginFailures}));
+ console.log('PASS_PWA_REAL_OFFLINE_SCORED_GHOST_PERSISTENCE',JSON.stringify({installed,first,second,paused,resumed,finished,restored,replayed,errors,sameOriginFailures}));
 }finally{if(browser)await browser.close();if(server)await new Promise((r,j)=>server.httpServer.close(e=>e?j(e):r()));}
