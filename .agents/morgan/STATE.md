@@ -1,11 +1,29 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 02:12 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
+Last verified: 2026-11-25 02:22 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
+
+- **Requested #339/#340 reviews completed (Gal/Home audio lane, no merge):**
+  #339 `43d4daf467133e40c50daafe07e49d57f27f53a7`: hold QA-only merge for two
+  reproduced P2 false passes. Candidate linear 0.95 (−0.446 dBTP) with
+  stored −2 dBTP passes both mixed/window verifiers; the mixed gate also
+  lets missing candidate data bypass the explicit −1 requirement. The live
+  wrapper verifies six synthetic private-mode/Debutmont receipts as R2 hot
+  cases. Require a candidate, derive dB from linear, and pin R2 route and
+  expected biome. 89 tests passed; findings do not invalidate original
+  captures by themselves. #340 `171fb5cab2131c380e76ee40a5c87329271542b1`:
+  no standalone runtime blocker, all 8193 curve points match #339's v2
+  curve, 94 tests and identity passed, exact build SHA
+  `3c0884e8e86acfdef433bf17cbe1ad644a9eb9070de5a4dc0a22de628ec7927b`.
+  Two independent index-1 headless post-guard taps using public R2 source
+  bytes rejected repeated 128-frame timestamps; no qualified independent
+  live peak or audio-glitch conclusion. Keep draft pending corrected QA,
+  owner blind listening and physical device acceptance. No PR mutation.
+
 
 - **Requested #325 review completed and shipped:** reviewed v2.21.2 head
   `b4b52e1d6040f3b9ac998536f70362848b80d7dc` on main `29587b64`.
