@@ -909,6 +909,30 @@ describe('protected local evidence references (#244)', () => {
     expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
   });
 
+  test('P1: unknown pending generation survives later failed reads and writes without resurrection',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failGet=new Error('cannot establish original deletion generation');
+    await expect(stale.put(target,{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+    idb.hooks.failGet=null;
+    await other.put(target,{archiveOnly:true});await other.remove(digest);
+    idb.hooks.failPut=new Error('transient after deletion');
+    for(let repeat=0;repeat<2;repeat++){
+      await expect(stale.put(target,{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+      expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+      expect(stale.pendingMeta.get(digest).runId).toBe('old-run');
+      expect(stale._unsafePending.has(digest)).toBe(true);
+    }
+    idb.hooks.failPut=null;
+    expect(await stale.retryPending({digest})).toMatchObject({attempted:0,recovered:0,remaining:1});
+    await stale.put({...target,claims:{...target.claims,score:907}},{runId:'unrelated'});
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(await re.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});

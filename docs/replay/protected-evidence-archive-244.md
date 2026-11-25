@@ -101,3 +101,5 @@ Third independent-review correction: direct put calls are queued per canonical d
 Fourth review correction: explicit Save and Delete now share a per-digest queue registered before the first await, so later same-tab Delete cannot be overtaken by a queued direct put. An unknown deletion-generation read is NOT treated as null/known absence; it cannot authorize replacing a conflicting pending run.
 
 Fifth review correction: cleanup/replacement of pending claims also requires a KNOWN earlier generation; unknown is not equivalent to null. A subsequent unbound import cannot clear an unknown-generation claimed pending write, and automatic recovery remains quarantined until identity can be resolved.
+
+Sixth review correction: an existing pending claim with UNKNOWN deletion generation cannot acquire a later generation merely because another failed write managed to read a tombstone. Its run ID and quarantine remain bound to the original unresolved attempt, across repeated failures and unrelated successful saves.

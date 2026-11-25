@@ -390,7 +390,7 @@ export class EvidenceStore {
         const newerDelete=priorPendingKnown && writeReceipt.classification!=='unknown' &&
           writeReceipt.deletionGeneration!==priorPendingGeneration;
         if(writeReceipt.classification!=='unknown' &&
-           (!this._pendingDeletionGeneration.has(digest)||newerDelete))
+           (!pendingClaim || newerDelete))
           this._pendingDeletionGeneration.set(digest,writeReceipt.deletionGeneration ?? null);
         // An IDB lookup error cannot distinguish a novel failed write from
         // an already-durable duplicate. Keep its bytes exportable but never
