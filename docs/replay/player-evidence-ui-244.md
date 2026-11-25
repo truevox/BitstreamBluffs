@@ -22,3 +22,8 @@ Still pending before claiming #244 complete: real-player multi-run archive selec
 ## Reviewer hardening of the player-facing controls
 
 Native file selection is disabled while any Keep/Unpin/Export/Import action is pending, so a chosen file cannot be silently lost to a busy-action guard. After file choice or cancellation, focus is released from the native input to restore global keyboard/gamepad menu routing. `REFRESH` reads the actual persisted protection-reference snapshot (not the current tab's cached map); cross-tab pin/unpin is reflected before offering `KEEP` or `UNPIN`, and the transaction still checks any subsequent race. The real Chromium integration adds browser checks for native input focus restoration, in-flight disabled state, and cross-tab refresh.
+
+
+## Independent review: refresh ordering, export recovery, native Escape
+
+A canonical bundle that passes `get()` integrity checks remains **Export-enabled** even when the separate persisted pin-reference query fails. In that case Keep/Unpin stay disabled and the panel explains `PIN STATUS UNAVAILABLE — EXPORT WORKS`. Refresh carries a monotonically increasing operation version; any newer user action supersedes an outstanding Refresh, so late IDB results cannot replace user-visible Import success or failure messages. The native file input has an Escape key handler because the game input router intentionally ignores events focused on native inputs; pressing Escape closes the panel and removes the input and listeners. The real Chromium QA suite now has **13 cases** including all three failure paths. The browser fixture remains a legacy full evidence bundle, not exhaustive current-production run coverage.
