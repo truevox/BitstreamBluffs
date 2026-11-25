@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 22:38 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
+Last verified: 2026-11-25 02:12 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -54,7 +54,7 @@ means resume this queue, not take over another lane or merge a draft.
    passed. A longer experimental hazard playback hit the existing 60s
    wall limit and is not in the draft. No raw tapes, profile data, game
    behavior, deployment, or issue closure. Await exact-head review;
-   lifecycle `45502797485`, identity `45502797488` started. No merge.
+   lifecycle `45502797485` and identity `45502797488` green. No merge.
    #79 replay annotation QA (independent prior slice):
    Exact public normal v2.20.2 entry and shipped SIM9 identity: four
    fresh Chromium contexts, positive record+replay and cutoff record+replay.
@@ -77,7 +77,19 @@ means resume this queue, not take over another lane or merge a draft.
    files, an importable receipt, or product code. If review-ready proof
    is needed, package a pinned developer-QA recipe without runtime claims;
    otherwise move to the next unblocked slice rather than repeating this.
-3. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
+3. **#126 / #341**: open five-file developer-only draft
+   `morgan/issue-126-paired-fatigue-report` @ `a560cec88bc835877620e808dd30d270d70b2722`, based on
+   `044ebd4b`. Opt-in comparator matches classic/fatigue by course, reaction
+   seed, settings, ramp and unchanged ideal control; emits only hashes,
+   labels and counts. Chromium on exact main: 18/18 seeded repeats and
+   fixed-tick playbacks, all 3 ideal controls equal, zero 500m threshold
+   flips. Steady/sim-01 had one ramp and one capped intent, eight added
+   delay frames. Mutated ideal RNG and Daily intake of untouched fatigue
+   fail closed; existing classic CLI/Daily outputs byte-identical.
+   91 focused tests, green local identity and 4,880 exact build files
+   unchanged. No raw evidence or scoring/player/physics changes.
+   Await independent exact-head review; no merge or preview.
+4. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
    #75/#100/#74 need trusted restoration or equivalent causal replay
    prefix; #243 and #224 are narrow milestones, not full restores.
