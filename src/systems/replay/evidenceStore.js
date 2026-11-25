@@ -91,6 +91,8 @@ export class EvidenceStore {
     // second write after another tab's explicit deletion.
     this._pendingFlush = null;
     this._openingPromise = null;
+    /** Serialize direct writes per digest through pending-state settlement. */
+    this._putChains = new Map();
     this.backend = 'memory';
     this.persisted = null;
     this.lastError = null;
@@ -311,6 +313,21 @@ export class EvidenceStore {
     if (validated && (validated.ok !== true || validated.bundleDigest !== res.bundleDigest))
       throw new EvidenceStoreError('validation-hint-mismatch', 'caller validation did not match actual canonical bytes');
     const digest = res.bundleDigest;
+    // Two same-digest direct puts must not both snapshot an old pending claim.
+    // Take the queue slot synchronously BEFORE awaiting the previous writer.
+    const priorWriter=this._putChains.get(digest) || Promise.resolve();
+    let release;
+    const gate=new Promise(resolve=>{release=resolve;});
+    this._putChains.set(digest,gate);
+    await priorWriter;
+    try { return await this._putValidatedBytes(digest,bytes,meta); }
+    finally {
+      if(this._putChains.get(digest)===gate)this._putChains.delete(digest);
+      release();
+    }
+  }
+
+  async _putValidatedBytes(digest,bytes,meta) {
     const prior = this.index.get(digest);
     if (meta.runId !== undefined && meta.runId !== null && !validRunId(meta.runId))
       throw protectionError('invalid-run-id', 'runId must be a bounded local opaque identifier');
@@ -323,7 +340,7 @@ export class EvidenceStore {
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.archiveOnly === true
       ? (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) || null : null)
-      : meta.runId || pendingClaim?.runId || (!this._db && !this._everDurable ? prior?.runId : null) || null;
+      : meta.runId || (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
