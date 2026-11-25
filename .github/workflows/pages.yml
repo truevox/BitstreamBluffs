@@ -50,7 +50,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js
+      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js tests/src/ghost-link-preview.test.js
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
@@ -67,6 +67,7 @@ jobs:
           for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:4173$BASE" >/dev/null && break; sleep 1; done
           node tools/hosting-browser-smoke.mjs "http://127.0.0.1:4173$BASE"
           node tools/test-ground-brake-browser.mjs dist "$BASE"
+          BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
       - name: Check installability and real offline gameplay
         if: steps.rollout.outputs.mode == 'pwa'
         env:
