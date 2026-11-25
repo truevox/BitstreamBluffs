@@ -816,6 +816,34 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
   });
 
+  test('P1: same-tab newer delete supersedes stale run and generation after failed re-import',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('old run cannot persist');
+    await expect(stale.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await other.put(target,{archiveOnly:true});await other.remove(digest);
+    idb.hooks.failPut=new Error('new re-import temporarily blocked');
+    await expect(stale.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('new-owner');
+    expect(stale._unsafePending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await stale.retryPending({digest});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest,{runId:'new-owner'})).toEqual({readable:true,durable:true,runBound:true});
+    await expect(fresh.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'run-id-conflict'});
+  });
+
+  test('P1: absent intervening delete does not permit a same-tab run claim replacement',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('first write failed');
+    await expect(s.put(bundle(),{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await expect(s.put(bundle(),{runId:'new-run'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(s.pendingMeta.get(bundleDigest(bundle())).runId).toBe('old-run');
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
