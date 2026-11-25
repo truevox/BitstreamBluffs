@@ -169,6 +169,39 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect(await store.persistedProtectedCount(digest())).toBe(1);
   });
 
+  test('blocked first IDB open cannot establish zero cross-tab pins on memory-only import',async()=>{
+    const idb={open(){throw new Error('blocked upgrade');}};
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    expect(store._everDurable).toBe(false);
+    const outcome=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest()});
+    expect(outcome).toMatchObject({ok:true,localDurable:null,protectionCount:null,alreadyProtected:null,newlyProtected:false});
+    expect(outcome.status).toContain('PIN STATUS UNKNOWN');
+  });
+
+  test('IDB closure after committed import cannot be called a definite memory-only save',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const old=store.isBundleDurable.bind(store);
+    store.isBundleDurable=async()=>{store._db.onclose();return false;};
+    const outcome=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest()});
+    expect(outcome).toMatchObject({ok:true,localDurable:null,protectionCount:null,alreadyProtected:null});
+    store.isBundleDurable=old;
+    const saved=await new EvidenceStore({idb,storage:null}).init();
+    expect(await saved.get(digest())).toEqual(bytes());
+  });
+
+  test('UI must provide original displayed generation to unpin, not a later cached role',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const d=await store.put(bundle(),{runId:'actor'});
+    const one=await store.protect(d,{runId:'actor',role:'pinned'});
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    await other.unprotect(one.key);
+    const two=await other.protect(d,{runId:'actor',role:'pinned'});
+    await store.persistedProtections(d);
+    const action=new LocalEvidenceActions(store);
+    await expect(action.unpin(one.key,{expectedGeneration:one.generation})).rejects.toMatchObject({code:'stale-protection'});
+    expect((await action.unpin(two.key,{expectedGeneration:two.generation})).ok).toBe(true);
+  });
+
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
     const memory=await new EvidenceStore({idb:null,storage:null}).init();
     const action=new LocalEvidenceActions(memory);
