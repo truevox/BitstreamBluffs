@@ -2845,6 +2845,8 @@ export class RunScene extends Phaser.Scene {
   /** Fail closed: a takeover that does not validate NEVER becomes an ordinary run. Back to TITLE with a visible reason. */
   _refuseTakeover(verdict) {
     this.sled = null; // update() is a no-op until the next create(): nothing was built
+    this.ghostRecorder = null; // no recorder, no tape driver: a refused takeover never records anything
+    this.tapePlayer = null;
     this.takeover = null;
     this.unrankedPractice = true;
     this._leaving = true;
