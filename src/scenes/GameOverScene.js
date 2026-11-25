@@ -44,7 +44,8 @@ import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
 import { CemeteryView } from '../ui/CemeteryView.js';
-import { CemeteryArchive } from '../systems/ghost/CemeteryArchive.js';
+import { CemeteryArchive,CEMETERY_CAPTURE_STATUS_KEY } from '../systems/ghost/CemeteryArchive.js';
+import {cemeteryKeepCount} from '../systems/ghost/CemeteryPolicy.js';
 import { ReplayEvidenceView } from '../ui/ReplayEvidenceView.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
@@ -220,11 +221,21 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   _archiveCemeteryPose() {
-    if (this.registry.get(REG.SETTINGS)?.cemeteryMontage !== true || this.rec?.cause !== 'crash') return;
+    const keep=cemeteryKeepCount(this.registry.get(REG.SETTINGS)?.cemeteryKeep);
+    if (keep===0 || this.rec?.cause !== 'crash') return;
     const tape=this.registry.get(REG.LAST_GHOST_TAPE);
     if (!tape || tape.runId !== this.rec?.id || !tape.trace) return;
-    // A failure/quota never interrupts the screen or claims durable retention.
-    new CemeteryArchive().add(tape).catch(()=>{});
+    // A failure/quota never interrupts Game Over or claims durable retention.
+    // Keep only a per-run presentation result (not gameplay data or evidence).
+    const reg=this.registry,runId=tape.runId;
+    reg.set(CEMETERY_CAPTURE_STATUS_KEY,{runId,pending:true});
+    new CemeteryArchive({perCourse:keep}).add(tape).then(result=>{
+      if(reg.get(CEMETERY_CAPTURE_STATUS_KEY)?.runId===runId)
+       reg.set(CEMETERY_CAPTURE_STATUS_KEY,{runId,...result});
+    }).catch(()=>{
+      if(reg.get(CEMETERY_CAPTURE_STATUS_KEY)?.runId===runId)
+       reg.set(CEMETERY_CAPTURE_STATUS_KEY,{runId,ok:false,code:'storage-unavailable'});
+    });
   }
 
   _emptyRecord() {
@@ -1001,7 +1012,7 @@ export class GameOverScene extends Phaser.Scene {
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape,
       onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView(),
-      onCemetery: this.registry.get(REG.SETTINGS)?.cemeteryMontage===true ? ()=>this._openCemeteryView() : null });
+      onCemetery:()=>this._openCemeteryView() });
   }
 
   /** Keep the existing dimmed Game Over screen; only swap the overlay panel. */
@@ -1015,10 +1026,10 @@ export class GameOverScene extends Phaser.Scene {
   /** Separate pose-only archive, strictly unranked and opt-in. */
   _openCemeteryView() {
     const tape=this.registry.get(REG.LAST_GHOST_TAPE);
-    if (!this.ghostView || !this.alive || this.leaving || !tape || tape.runId!==this.rec?.id ||
-      this.registry.get(REG.SETTINGS)?.cemeteryMontage!==true) return;
+    if (!this.ghostView || !this.alive || this.leaving || !tape || tape.runId!==this.rec?.id) return;
     this.ghostView.destroy();
-    this.ghostView=new CemeteryView(this,this.theme,{tape,onClose:()=>this._returnToGhosts()});
+    this.ghostView=new CemeteryView(this,this.theme,{tape,onClose:()=>this._returnToGhosts(),
+      archive:new CemeteryArchive({perCourse:cemeteryKeepCount(this.registry.get(REG.SETTINGS)?.cemeteryKeep)})});
   }
 
   _returnToGhosts() {
@@ -1027,7 +1038,7 @@ export class GameOverScene extends Phaser.Scene {
     this.ghostView.destroy();
     this.ghostView=new GhostFavoritesView(this,this.theme,{library,tape,
       onClose:()=>this._closeGhosts(),onEvidence:()=>this._openEvidenceView(),
-      onCemetery:this.registry.get(REG.SETTINGS)?.cemeteryMontage===true?()=>this._openCemeteryView():null});
+      onCemetery:()=>this._openCemeteryView()});
   }
 
   _closeGhosts() {

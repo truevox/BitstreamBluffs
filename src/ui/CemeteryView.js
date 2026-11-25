@@ -6,7 +6,8 @@ import {View} from './View.js';
 import {NeonText} from './Neon.js';
 import {Button} from './Button.js';
 import {isReducedMotion,onTick} from './Motion.js';
-import {cemeteryFrame,CemeteryArchive,CEMETERY_PER_COURSE} from '../systems/ghost/CemeteryArchive.js';
+import {cemeteryFrame,CemeteryArchive,CEMETERY_CAPTURE_STATUS_KEY} from '../systems/ghost/CemeteryArchive.js';
+import {CEMETERY_RENDER_LIMIT,CEMETERY_MAX_ATTEMPTS} from '../systems/ghost/CemeteryPolicy.js';
 import {decodeTrace} from '../systems/ghost/GhostTape.js';
 import {uiSfx} from './Sound.js';
 
@@ -33,7 +34,7 @@ export class CemeteryView extends View{
   this.gfx=scene.add.graphics();this.panel.add(this.gfx);
   const text=(x,y,value,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,value,{color,outline:'none'}));
   text(12,24,'PRIVATE POSE TRACES - NO INPUTS / UPLOAD','cyan');
-  text(12,35,'CURRENT COURSE ONLY. NEW ATTEMPTS WHILE ON.','text');
+  text(12,35,'CURRENT COURSE ONLY. 0 IN SETTINGS ERASES.', 'text');
   this.status=new NeonText(scene,theme,12,47,'READING THIS DEVICE...', {color:'lime',outline:'none'});
   this.panel.add(this.status);
   this.timeline=new NeonText(scene,theme,12,190,'', {color:'cyan',outline:'none'});
@@ -52,13 +53,19 @@ export class CemeteryView extends View{
   if(!this.alive)return;
   // Decode once per entry, never every rendered frame: dozens of long
   // traces should remain practical on Chromebook-class hardware.
-  this.entries=rows.map(row=>({...row,points:decodeTrace(row)}));
+  const winner=rows.reduce((best,row)=>!best||row.distanceM>best.distanceM?row:best,null);
+  const visible=rows.slice(0,CEMETERY_RENDER_LIMIT);
+  // Include the longest retained run even if it is older than the last twelve.
+  if(winner&&visible.length===CEMETERY_RENDER_LIMIT&&!visible.some(row=>row.key===winner.key))
+   visible[visible.length-1]=winner;
+  this.entries=visible.map(row=>({...row,points:decodeTrace(row)}));
   this._loaded=true;
-  this.maxTick=Math.max(0,...rows.map(r=>r.endTick));
-  this._winner=rows.reduce((best,row)=>!best||row.distanceM>best.distanceM?row:best,null);
+  this.maxTick=Math.max(0,...this.entries.map(r=>r.endTick));
+  this._winner=winner;
   if(!rows.length){this.playing=false;this.status.setText('NO SAVED POSE TRACES YET');
-   this.timeline.setText('ENABLE CEMETERY BEFORE YOUR NEXT RUN.');
-   this.playBtn.setDisabled(true);this.clearBtn.setDisabled(true);return;}
+   this.timeline.setText('SET PAST ATTEMPTS IN SETTINGS TO COLLECT.');
+   this.playBtn.setDisabled(true);this.clearBtn.setDisabled(true);
+   this._captureNotice();return;}
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   for(const row of this.entries){
    const points=row.points;
@@ -69,9 +76,21 @@ export class CemeteryView extends View{
   }
   this._bounds={minX,maxX,minY,maxY};
   if(isReducedMotion(this.scene)){this.playing=false;this.tick=this.maxTick;}
-  this.status.setText(`${rows.length}/${CEMETERY_PER_COURSE} ATTEMPTS - LOCAL, UNRANKED`);
+  this.status.setText(`${rows.length} STORED / ${CEMETERY_MAX_ATTEMPTS} MAX  ${this.entries.length} SHOWN - LOCAL`);
+  this._captureNotice();
   this.playBtn.setLabel(this.playing?'PAUSE':'PLAY');
   this._drawPaths();this._draw();
+ }
+ _captureNotice(){
+  const result=this.scene?.registry?.get?.(CEMETERY_CAPTURE_STATUS_KEY);
+  if(result?.runId!==this.tape?.runId)return;
+  if(result?.pending===true)this.status.setText('SAVING LATEST POSE LOCALLY...');
+  else if(result?.ok===false){
+   const message=result.code==='quota-exceeded'||result.code==='trace-exceeds-budget'
+    ?'LATEST POSE NOT SAVED: STORAGE LIMIT'
+    :'LATEST POSE NOT SAVED: STORAGE UNAVAILABLE';
+   this.status.setText(message);
+  }
  }
  _update(delta){
   if(!this.alive||!this._loaded||!this.entries.length||!this.playing)return;

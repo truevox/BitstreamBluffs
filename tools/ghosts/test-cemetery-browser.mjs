@@ -24,18 +24,18 @@ try{
   const save=registry.get(REG.SETTINGS)||{};
   window.__cemBaselineSettings=save;
   const archive=new CemeteryArchive(),course=()=>archive.list(tape.seed,tape.biomeMask);
-  registry.set(REG.SETTINGS,{...save,cemeteryMontage:false});
+  registry.set(REG.SETTINGS,{...save,cemeteryKeep:0});
   registry.set(REG.LAST_GHOST_TAPE,tape);
   // Actual GameOver capture policy, invoked on a non-scoring scene stub.
   GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId,cause:'crash'}});
-  return {offCount:(await course()).length,setting:registry.get(REG.SETTINGS).cemeteryMontage};
+  return {offCount:(await course()).length,setting:registry.get(REG.SETTINGS).cemeteryKeep};
  },fixture);
  assert.equal(before.offCount,0,'OFF must never retain an attempt');
  const capture=await page.evaluate(async tape=>{
   const [{GameOverScene},{CemeteryArchive,CEMETERY_PER_COURSE},{REG}]=await Promise.all([
    import('/src/scenes/GameOverScene.js'),import('/src/systems/ghost/CemeteryArchive.js'),import('/src/constants.js')]);
-  const scene=window.__bbGame.scene.getScenes()[0],registry=scene.registry,archive=new CemeteryArchive();
-  registry.set(REG.SETTINGS,{...registry.get(REG.SETTINGS),cemeteryMontage:true});
+  const scene=window.__bbGame.scene.getScenes()[0],registry=scene.registry,archive=new CemeteryArchive({perCourse:24});
+  registry.set(REG.SETTINGS,{...registry.get(REG.SETTINGS),cemeteryKeep:24});
   GameOverScene.prototype._archiveCemeteryPose.call({registry,rec:{id:tape.runId,cause:'crash'}});
   let first=[];
   for(let i=0;i<25;i++){
@@ -96,7 +96,7 @@ try{
   view.destroy();
   return {rows:n,atStart,scrubbed,reduced,afterReduced,disposed:!view.alive};
  });
- assert(playback.rows===24&&playback.scrubbed>playback.atStart&&
+ assert(playback.rows===12&&playback.scrubbed>playback.atStart&&
   playback.reduced.playing===false&&playback.reduced.label==='SCRUB'&&
   playback.afterReduced===playback.scrubbed&&playback.disposed,JSON.stringify(playback));
  const clearing=await page.evaluate(async()=>{
@@ -119,9 +119,80 @@ try{
  });
  assert(clearing.before===24&&clearing.armed==='CONFIRM?'&&clearing.after===0&&
   clearing.status.includes('CLEARED')&&clearing.controlsDisabled,JSON.stringify(clearing));
+ const settingsCheck=await page.evaluate(async()=>{
+  const [{SettingsView},{CemeteryArchive},{REG}]=await Promise.all([
+   import('/src/ui/Views.js'),import('/src/systems/ghost/CemeteryArchive.js'),import('/src/constants.js')]);
+  const {scene,tape}=window.__cemQA;
+  const archived=new CemeteryArchive({perCourse:24});
+  const seed='qa-settings-adjustment';
+  for(let i=0;i<8;i++){
+   const added=await archived.add({...tape,seed,runId:'change-'+i});
+   if(!added.ok)throw Error('Could not seed settings test '+JSON.stringify(added));
+  }
+  const view=new SettingsView(scene,scene.theme,{onClose:()=>{}}),item=view.menu.items.find(x=>x.label==='PAST ATTEMPTS');
+  if(!item)throw Error('Player numeric/stepper row is missing');
+  const initial=item.get(),choices=item.options.map(x=>x.value);
+  // Real Settings action callback: lower 24->5 trims this separate history.
+  item.set(5);
+  let five=[];
+  for(let i=0;i<60;i++){
+   five=await archived.list(seed,tape.biomeMask);
+   if(five.length===5)break;
+   await new Promise(resolve=>setTimeout(resolve,40));
+  }
+  const reducedTo=five.map(r=>r.runId).sort();
+  item.set(7); // raising the limit cannot restore evicted attempts
+  const raisedExisting=(await archived.list(seed,tape.biomeMask)).length;
+  const afterRaise=new CemeteryArchive({perCourse:7});
+  for(let i=8;i<10;i++)await afterRaise.add({...tape,seed,runId:'change-'+i});
+  const raisedSaved=(await afterRaise.list(seed,tape.biomeMask)).length;
+  item.set(0);
+  let zero=[];
+  for(let i=0;i<60;i++){
+   zero=await archived.list(seed,tape.biomeMask);
+   if(zero.length===0)break;
+   await new Promise(resolve=>setTimeout(resolve,40));
+  }
+  const disabled=await new CemeteryArchive({perCourse:0}).add({...tape,seed,runId:'disabled-new'});
+  const zeroLabel=item.options[0].label,finalValue=item.get();
+  view.destroy();
+  return {initial,choices:choices.length,min:choices[0],max:choices.at(-1),reducedTo,
+   raisedExisting,raisedSaved,zeroRemaining:zero.length,disabled,zeroLabel,finalValue};
+ });
+ assert(settingsCheck.initial===24&&settingsCheck.choices===25&&settingsCheck.min===0&&settingsCheck.max===24&&
+  settingsCheck.reducedTo.join(',')==='change-3,change-4,change-5,change-6,change-7'&&
+  settingsCheck.raisedExisting===5&&settingsCheck.raisedSaved===7&&settingsCheck.zeroRemaining===0&&
+  settingsCheck.disabled.code==='disabled'&&settingsCheck.zeroLabel.includes('ERASE')&&settingsCheck.finalValue===0,
+  JSON.stringify(settingsCheck));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});
+ const persisted=await page.evaluate(async()=>{
+  const [{REG},{CemeteryArchive}]=await Promise.all([
+   import('/src/constants.js'),import('/src/systems/ghost/CemeteryArchive.js')]);
+  const g=window.__bbGame,s=g.registry.get(REG.SETTINGS);
+  return {count:s.cemeteryKeep,traces:(await new CemeteryArchive().list('qa-settings-adjustment',7)).length};
+ });
+ assert.deepEqual(persisted,{count:0,traces:0});
+ const storageStatus=await page.evaluate(async tape=>{
+  const [{CemeteryView},{CEMETERY_CAPTURE_STATUS_KEY,CemeteryArchive}]=await Promise.all([
+   import('/src/ui/CemeteryView.js'),import('/src/systems/ghost/CemeteryArchive.js')]);
+  const scene=window.__bbGame.scene.getScenes()[0];
+  scene.registry.set(CEMETERY_CAPTURE_STATUS_KEY,{runId:tape.runId,ok:false,code:'quota-exceeded'});
+  const view=new CemeteryView(scene,scene.theme,{tape,archive:new CemeteryArchive(),onClose:()=>view.destroy()});
+  for(let i=0;i<50&&!view._loaded;i++)await new Promise(resolve=>setTimeout(resolve,25));
+  const quota=view.status.main.text;
+  view.destroy();
+  scene.registry.set(CEMETERY_CAPTURE_STATUS_KEY,{runId:tape.runId,ok:false,code:'storage-unavailable'});
+  const unavailable=new CemeteryView(scene,scene.theme,{tape,archive:new CemeteryArchive(),onClose:()=>unavailable.destroy()});
+  for(let i=0;i<50&&!unavailable._loaded;i++)await new Promise(resolve=>setTimeout(resolve,25));
+  const noStorage=unavailable.status.main.text;
+  unavailable.destroy();
+  return {quota,noStorage};
+ },fixture);
+ assert(storageStatus.quota.includes('STORAGE LIMIT')&&storageStatus.noStorage.includes('STORAGE UNAVAILABLE'),JSON.stringify(storageStatus));
  assert.deepEqual(errors,[]);
  assert.deepEqual(mutations,[]);
- console.log('PASS_CEMETERY_REAL_CHROMIUM',JSON.stringify({before,capture,opened,playback,clearing,
+ console.log('PASS_CEMETERY_REAL_CHROMIUM',JSON.stringify({before,capture,opened,playback,clearing,settingsCheck,persisted,storageStatus,
   errors,mutations,fixture:'historical taped poses copied with synthetic QA IDs; no human performance claim',
   noUpload:true,verifiedRanked:false}));
  await ctx.close();

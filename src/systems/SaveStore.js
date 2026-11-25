@@ -11,6 +11,7 @@
  *  - Everything read from storage or a sharecode is sanitised (known keys only, types checked, numbers clamped),
  *    so older/newer versions or hand-edited data can never break the game.
  */
+import {CEMETERY_DEFAULT_ATTEMPTS,cemeteryKeepCount} from './ghost/CemeteryPolicy.js';
 import { STORAGE } from '../constants.js';
 import { defaultSongSelection, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { xxHash32 } from './Rng.js';
@@ -78,7 +79,7 @@ const IDB_TIMEOUT_MS = 2500;
 export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
-    ghostBest: true, ghostLatest: true, cemeteryMontage: false, kodiakPacks: 'same',
+    ghostBest: true, ghostLatest: true, cemeteryKeep: CEMETERY_DEFAULT_ATTEMPTS, kodiakPacks: 'same',
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     offlineMusicQuality: 'high',
@@ -117,7 +118,7 @@ export function sanitizeSettings(raw) {
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
     ghostBest: typeof raw.ghostBest === 'boolean' ? raw.ghostBest : d.ghostBest,
     ghostLatest: typeof raw.ghostLatest === 'boolean' ? raw.ghostLatest : d.ghostLatest,
-    cemeteryMontage: raw.cemeteryMontage === true,
+    cemeteryKeep: cemeteryKeepCount(raw.cemeteryKeep),
     kodiakPacks: raw.kodiakPacks === 'mixed' ? 'mixed' : d.kodiakPacks,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     controlLayout: normalizeControlLayout(raw.controlLayout),

@@ -3,14 +3,17 @@
  * complete proof inputs, public ranking, account or network. Disable means NO new writes.
  */
 import {courseKey,decodeTrace,tracePose,TRACE_EVERY} from './GhostTape.js';
+import {CEMETERY_DEFAULT_ATTEMPTS,CEMETERY_MAX_ATTEMPTS,CEMETERY_RENDER_LIMIT,
+ CEMETERY_TOTAL_BYTE_BUDGET,CEMETERY_ENTRY_TRACE_CHARS,cemeteryKeepCount} from './CemeteryPolicy.js';
 
+export const CEMETERY_CAPTURE_STATUS_KEY='bb:cemetery-pose-capture';
 export const CEMETERY_DB='bitstream-cemetery-poses';
 export const CEMETERY_STORE='traces';
 export const CEMETERY_VERSION=1;
-export const CEMETERY_PER_COURSE=24;
+export const CEMETERY_PER_COURSE=CEMETERY_MAX_ATTEMPTS; // absolute safe upper bound, NOT the default
 export const CEMETERY_GLOBAL_LIMIT=128;
 export const CEMETERY_FORMAT='bb-local-pose-montage-v1';
-const MAX_TRACE_CHARACTERS=180000;
+const MAX_TRACE_CHARACTERS=CEMETERY_ENTRY_TRACE_CHARS;
 
 const errCode=e=>e?.name==='QuotaExceededError'?'quota-exceeded':'storage-unavailable';
 const req2p=req=>new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('IDB read failed'));});
@@ -35,11 +38,32 @@ export function cemeteryEntry(tape,now=Date.now()){
   distanceM:tape.distanceM,trace:tape.trace,recordedAt:now,format:CEMETERY_FORMAT};
 }
 
-const descending=(a,b)=>(b.recordedAt-a.recordedAt)||(a.key<b.key?-1:a.key>b.key?1:0);
+// `ordinal` is assigned inside an IndexedDB readwrite transaction, so
+// several tabs or timestamp ties still order attempts by actual committed
+// insertion, not lexical run ID or low-resolution wall clock.
+const descending=(a,b)=>(Number(b.ordinal||0)-Number(a.ordinal||0))||
+ (b.recordedAt-a.recordedAt)||(a.key<b.key?-1:a.key>b.key?1:0);
+/** Conservative UTF-16 IndexedDB footprint estimate including row metadata.
+ * Browser quotas are separate and can reject even a budget-compliant write.
+ */
+export const cemeteryEntryBytes=e=>2*e.trace.length+2*((e.seed||'').length+(e.runId||'').length)+512;
+
+function retainNewest(rows,perCourse,globalLimit,byteBudget){
+ const per=new Map(),kept=[];let bytes=0;
+ for(const row of rows){
+  if(!row||row.format!==CEMETERY_FORMAT||typeof row.key!=='string'||
+    typeof row.course!=='string'||typeof row.trace!=='string'||
+    row.trace.length>MAX_TRACE_CHARACTERS||!Number.isFinite(row.recordedAt))continue;
+  const count=per.get(row.course)||0,size=cemeteryEntryBytes(row);
+  if(count>=perCourse||kept.length>=globalLimit||bytes+size>byteBudget)continue;
+  kept.push(row);per.set(row.course,count+1);bytes+=size;
+ }
+ return {kept,bytes};
+}
 /** Pure frame descriptor for a noninteractive, non-colliding multi-attempt overlay. */
 export function cemeteryFrame(entries,tick){
  if(!Array.isArray(entries)||!Number.isFinite(tick)||tick<0)return [];
- return entries.slice(0,CEMETERY_PER_COURSE).flatMap((entry)=>{
+ return entries.slice(0,CEMETERY_RENDER_LIMIT).flatMap((entry)=>{
   if(!entry||entry.format!==CEMETERY_FORMAT)return [];
   // UI may supply a validated decode cache; pure callers need no cache.
   const trace=entry.points instanceof Float32Array?entry.points:decodeTrace(entry),lastSample=trace.length/3*TRACE_EVERY;
@@ -53,10 +77,12 @@ export function cemeteryFrame(entries,tick){
 }
 
 export class CemeteryArchive{
- constructor({idb=globalThis.indexedDB,perCourse=CEMETERY_PER_COURSE,globalLimit=CEMETERY_GLOBAL_LIMIT}={}){
+ constructor({idb=globalThis.indexedDB,perCourse=CEMETERY_DEFAULT_ATTEMPTS,
+   globalLimit=CEMETERY_GLOBAL_LIMIT,byteBudget=CEMETERY_TOTAL_BYTE_BUDGET}={}){
   this.idb=idb;
-  this.perCourse=Math.min(CEMETERY_PER_COURSE,Math.max(1,Math.floor(perCourse)));
-  this.globalLimit=Math.min(CEMETERY_GLOBAL_LIMIT,Math.max(this.perCourse,Math.floor(globalLimit)));
+  this.perCourse=cemeteryKeepCount(perCourse);
+  this.globalLimit=Math.min(CEMETERY_GLOBAL_LIMIT,Math.max(this.perCourse,Math.floor(globalLimit)||0));
+  this.byteBudget=Math.min(CEMETERY_TOTAL_BYTE_BUDGET,Math.max(1,Math.floor(byteBudget)||0));
  }
  async _open(){
   if(!this.idb)throw new Error('IndexedDB unavailable');
@@ -70,8 +96,10 @@ export class CemeteryArchive{
  }
  /** Atomic current-course/global retention trim; quota returns explicit failure. */
  async add(tape){
+  if(this.perCourse===0)return {ok:false,code:'disabled'};
   const entry=cemeteryEntry(tape);
   if(!entry)return {ok:false,code:'invalid-trace'};
+  if(cemeteryEntryBytes(entry)>this.byteBudget)return {ok:false,code:'trace-exceeds-budget'};
   let db;
   try{
    db=await this._open();
@@ -79,17 +107,14 @@ export class CemeteryArchive{
    const req=store.getAll();
    req.onsuccess=()=>{
     try{
-     const all=(req.result||[]).filter(r=>r&&r.key!==entry.key);
-     // The newly recorded run wins even if multiple writes share Date.now()'s
-     // millisecond. Never claim success while immediately evicting the new one.
+     const prior=req.result||[];
+     const all=prior.filter(r=>r&&r.key!==entry.key);
+     // Readwrite transactions serialize this computation across tabs.
+     // Existing versions without an ordinal remain ordered by timestamp.
+     entry.ordinal=Math.max(0,...prior.map(r=>Number.isSafeInteger(r?.ordinal)?r.ordinal:0))+1;
      const keep=[entry,...all.sort(descending)];
-     const per=new Map(),retained=[];
-     for(const row of keep){
-      const count=per.get(row.course)||0;
-      if(count>=this.perCourse||retained.length>=this.globalLimit)continue;
-      retained.push(row);per.set(row.course,count+1);
-     }
-     const accepted=new Set(retained.map(r=>r.key));
+     const {kept}=retainNewest(keep,this.perCourse,this.globalLimit,this.byteBudget);
+     const accepted=new Set(kept.map(r=>r.key));
      store.put(entry);
      for(const row of all)if(!accepted.has(row.key))store.delete(row.key);
      // If an injected custom limit excludes the new run, remove it too.
@@ -98,6 +123,30 @@ export class CemeteryArchive{
    };
    await complete;
    return {ok:true,recorded:true,course:entry.course};
+  }catch(e){return {ok:false,code:errCode(e)};}
+  finally{db?.close?.();}
+ }
+ /** Apply a LOWER Settings limit immediately; oldest pose-only history is
+  * evicted before newer history. Zero deletes this archive only, never favorite
+  * ghosts or replay evidence. Same readwrite IDB transaction is crash-atomic.
+  */
+ async trim(){
+  let db;
+  try{
+   db=await this._open();
+   const tx=db.transaction(CEMETERY_STORE,'readwrite'),store=tx.objectStore(CEMETERY_STORE),complete=done(tx);
+   let removed=0,retained=0;
+   const req=store.getAll();
+   req.onsuccess=()=>{
+    try{
+     const all=(req.result||[]).filter(r=>r&&typeof r.key==='string').sort(descending);
+     const {kept}=retainNewest(all,this.perCourse,this.globalLimit,this.byteBudget);
+     const keys=new Set(kept.map(r=>r.key));retained=kept.length;
+     for(const row of all)if(!keys.has(row.key)){store.delete(row.key);removed++;}
+    }catch{try{tx.abort();}catch{}}
+   };
+   await complete;
+   return {ok:true,removed,retained};
   }catch(e){return {ok:false,code:errCode(e)};}
   finally{db?.close?.();}
  }
@@ -132,7 +181,7 @@ export class CemeteryArchive{
    const [all]=await Promise.all([request,complete]);
    const course=courseKey(seed,biomeMask);
    return (all||[]).filter(row=>row?.course===course&&row.format===CEMETERY_FORMAT&&
-     cemeteryEntry(row,row.recordedAt)?.key===row.key).sort(descending).slice(0,this.perCourse);
+     cemeteryEntry(row,row.recordedAt)?.key===row.key).sort(descending).slice(0,CEMETERY_MAX_ATTEMPTS);
   }catch{return [];}finally{db?.close?.();}
  }
 }

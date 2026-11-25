@@ -39,6 +39,8 @@ import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
 import { validatePerformanceScore, validateExperimentalPerformanceScore,
   nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
+import {CEMETERY_KEEP_CHOICES,cemeteryKeepCount} from '../systems/ghost/CemeteryPolicy.js';
+import {CemeteryArchive} from '../systems/ghost/CemeteryArchive.js';
 import { View } from './View.js';
 import {OfflineMusicView,OFFLINE_MUSIC_CONTROLLER} from './OfflineMusicView.js';
 export { View, GhostLinkView };
@@ -193,11 +195,18 @@ export class SettingsView extends View {
         {value:'both',label:'BEST+LATEST'},{value:'best',label:'BEST'},{value:'latest',label:'LATEST'},{value:'off',label:'OFF'}],
         get:()=>{const st=settings(),b=st.ghostBest!==false,l=st.ghostLatest!==false;return b&&l?'both':b?'best':l?'latest':'off';},
         set:v=>{updateSetting(game,'ghostBest',v==='both'||v==='best');updateSetting(game,'ghostLatest',v==='both'||v==='latest');} },
-      // #68: explicit opt-in. OFF means no additional recording; separate
-      // pose-only local storage, not the five ghost roles or replay evidence.
-      { kind:'choice',label:'CEMETERY',options:[
-        {value:false,label:'OFF'},{value:true,label:'ON / LOCAL'}],
-        get:()=>settings().cemeteryMontage===true,set:v=>updateSetting(game,'cemeteryMontage',v===true) },
+      // #68 owner-approved numeric/arrow stepper: 5 saved attempts by default;
+      // 0 = OFF + ERASE in this separate local pose archive. Lower values evict
+      // oldest entries immediately, never the five GhostLibrary roles/proofs.
+      { kind:'choice',label:'PAST ATTEMPTS',options:CEMETERY_KEEP_CHOICES,
+        get:()=>cemeteryKeepCount(settings().cemeteryKeep),
+        set:v=>{
+          const old=cemeteryKeepCount(settings().cemeteryKeep);
+          updateSetting(game,'cemeteryKeep',v);
+          if(v<old)new CemeteryArchive({perCourse:v}).trim().then(result=>{
+            if(!result.ok)console.warn('[cemetery] unable to prune optional local poses:',result.code);
+          }).catch(()=>{});
+        } },
       // Issue #47 playtest: Kodiak packs of one type, or mixed types.
       { kind:'choice',label:'KODIAK PACKS',options:[
         {value:'same',label:'SAME TYPE'},{value:'mixed',label:'MIXED'}],

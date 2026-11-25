@@ -1,12 +1,13 @@
 # Changelog
 
-## v2.22.10 — #68 opt-in local Cemetery Montage candidate (2026-11-25)
+## v2.22.10 — #68 owner-approved configurable Cemetery history (2026-11-25)
 
-- Add a **separate** locally retained pose-trace archive (24 most recent per exact seed/biome course; max 128 across courses). Recording defaults **OFF** in Settings, and only completed ordinary run poses are eligible. No new Ghost Library roles, full input tapes, checkpoints, authoritative proof records, external service calls, or gameplay/physics changes.
-- Add Game Over → Course Ghosts → Cemetery, preserving Share Link and Local Evidence. Overlay visually renders earlier attempts as noncolliding ghost trails and a longest-archived-trace marker, provides keyboard/pointer playback/scrubbing, and stops automatic movement under reduced motion.
-- Add explicit **two-press course-only CLEAR** to delete locally retained pose traces, leaving the protected evidence archive and five cosmetic ghost roles untouched. Turning the setting OFF stops future Cemetery capture and hides its entry; existing local traces remain until the player explicitly clears them or clears site data.
-- Bound render work with one-time Float32 pose decoding and cached background paths; moving-marker updates are decimated. Add real Chromium UI, privacy, opt-in, course isolation, archive eviction, reduced-motion and deletion tests to the source-triggered QA workflow.
-- **Draft candidate:** user-facing physical Chromebook performance/playtest, independent exact-head review and release coordination remain. No public scoreboard trust or official replay verification is implied; #135 and #119 remain separate. This is an adjustable visual pilot rather than a decision on #56's repeatable course-library upgrade economics.
+- Store **five past attempts per exact seed+biome course by default**, configurable from **0 to 24** using the numeric "PAST ATTEMPTS" Settings stepper. Zero disables new capture and prunes pose-only history; lowering the value immediately evicts oldest poses first (never the five course ghost roles or protected replay evidence). Increasing the limit cannot resurrect evicted entries.
+- The separate local IndexedDB archive has an **8 MiB conservative estimated-byte ceiling** plus **128 global records**, an individual trace cap, and atomic multi-tab FIFO insertion ordinals. Completed non-guest crash-run poses only; no replay input tape, checkpoint, official score proof, account data or automatic network transfer.
+- Preserve Game Over → Course Ghosts **SHARE LINK**, **LOCAL EVIDENCE** and add **CEMETERY**, including an explicit two-press course-only CLEAR. The Cemetery panel remains accessible with the setting at zero so previously stored material can be inspected or cleared if a storage trim failed.
+- Draw at most **12 rider markers simultaneously** regardless of retained count, include the longest archived run, cache decoded Float32 poses and paths once, use bounded ~14 Hz presentation updates, support scrub and block autoplay under reduced motion.
+- Add real Chromium tests for exact-course history, the Settings 0–24 stepper, default five, FIFO/byte-budget eviction, 0/clear, persisted settings after reload, native GameOver capture, and noncollision/nonupload; retain source-triggered replay and strict Heavy Mode gates.
+- **Draft only**: Team B review, physical Chromebook frame-time/storage playtest, owner visual acceptance and coordinated release remain; no claims of verified public leaderboard or trusted replay entitlement. #56 course-library slot upgrade pricing is separate.
 
 ## v2.22.9 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
 
