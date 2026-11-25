@@ -44,7 +44,7 @@ import { openDim, closeDim, sceneTransition, isReducedMotion, tweenProgress, Eas
 import { artImage, hasArt, mixColor } from '../ui/MenuArt.js';
 // HowToPlayView before Views: it extends Views' View lazily, so either order works, but keep the natural one.
 import { HowToPlayView } from '../ui/HowToPlayView.js';
-import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView, DailyModesView, DailyDraftEditorView, DailyDraftLeaderboardView } from '../ui/Views.js';
+import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView, DailyModesView, DailyDraftEditorView, DailyDraftLeaderboardView, GhostLinkView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
@@ -245,7 +245,7 @@ export class TitleScene extends Phaser.Scene {
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
       { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 76), onSelect: () => this._openDailyModes() },
-      { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
+      { kind: 'action', label: 'ENTER SEED', color: 'cyan', sub: 'SEED / GHOST LINK', onSelect: () => this._openSeed() },
       {
         kind: 'action',
         label: 'PROFILE',
@@ -529,6 +529,17 @@ export class TitleScene extends Phaser.Scene {
     this._openView(new SeedView(this, this.theme, {
       onClose: () => this._closeView(),
       onSubmit: (seed) => this.startRun(seed || randomSeed()),
+      onGhostLink: () => this._openGhostLink(),
+    }));
+  }
+
+  /** #69: explicit, read-only paste/preview, never startup auto-import. */
+  _openGhostLink() {
+    // A direct Ghost-in-a-Link URL may be in the address bar, but it never
+    // parses or touches a stored ghost unless the player opens this preview.
+    const hasHash=typeof location!=='undefined'&&location.hash.startsWith('#bbghost=');
+    this._openView(new GhostLinkView(this,this.theme,{
+      initial:hasHash?location.href:'',onClose:()=>this._openSeed(),
     }));
   }
 

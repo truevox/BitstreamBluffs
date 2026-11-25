@@ -30,6 +30,7 @@ import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { StemMixerView } from './StemMixerView.js';
 import { HowToPlayView } from './HowToPlayView.js';
+import { GhostLinkView } from './GhostLinkView.js';
 import { freshLabLevels,applyLabStemLevels,LAB_STEMS } from '../systems/music/LabStemMix.js';
 import {DRAFT_BUDGET,DRAFT_RULES_VERSION,DRAFT_UPGRADES,draftCost,changeDraftRank,sanitizeDraftRanks} from '../systems/DailyDraft.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
@@ -40,7 +41,7 @@ import { validatePerformanceScore, validateExperimentalPerformanceScore,
 
 import { View } from './View.js';
 import {OfflineMusicView,OFFLINE_MUSIC_CONTROLLER} from './OfflineMusicView.js';
-export { View };
+export { View, GhostLinkView };
 
 /** Top-10 leaderboard from SaveStore. */
 export class LeaderboardView extends View {
@@ -1047,6 +1048,7 @@ export class SeedView extends View {
   constructor(scene, theme, o) {
     super(scene, theme, { w: 340, h: 118, title: 'ENTER SEED', color: 'lime', onClose: o.onClose, y: 70 });
     this.onSubmit = o.onSubmit;
+    this.onGhostLink = o.onGhostLink;
     const px = this.panel.x;
     const py = this.panel.y;
     // a lime halo around the DOM field (the field itself is an HTML element above the canvas)
@@ -1057,15 +1059,27 @@ export class SeedView extends View {
       glowRectPx(this.slot, 12, 40, 316, 20, pal.lime, 1.4);
       paintRule(this.slot, 12, this.w - 12, this.h - 30, pal.lime, 0.5);
     });
-    this.panel.add(new NeonText(scene, theme, 12, 24, 'SAME SEED = SAME TRACK. SHARE IT WITH FRIENDS.', { color: 'text', outline: 'none' }).setAlpha(0.7));
+    this.panel.add(new NeonText(scene, theme, 12, 24, (typeof location!=='undefined'&&location.hash.startsWith('#bbghost=')?'GHOST LINK DETECTED - OPEN TO PREVIEW.':'SHARE A SEED, OR OPEN A FRIENDS GHOST LINK.'), { color: 'text', outline: 'none' }).setAlpha(0.7));
     this.box = new DomTextBox(scene, theme, {
       x: px + 12, y: py + 40, w: 316, h: 20, value: o.initial || '', maxLength: 32, placeholder: 'TYPE A SEED (EMPTY = RANDOM)',
       color: 'lime', onSubmit: () => this.submit(), onCancel: () => this.close(),
+      onShortcut: (e) => {
+        if (e.key === 'Enter' && e.shiftKey && this.onGhostLink) {
+          this.onGhostLink();
+          return true;
+        }
+        return false;
+      },
     });
     this.panel.add(new Keycaps(scene, theme, { x: 12, y: 66, color: 'lime',
-      items: [{ keys: ['ENTER'], label: 'GO' }, { keys: ['ESC'], label: 'BACK' }] }));
+      items: [{ keys: ['ENTER'], label: 'GO' }, { keys: ['SHIFT+ENTER'], label: 'GHOST' }, { keys: ['ESC'], label: 'BACK' }] }));
     this.go = new Button(scene, theme, { x: 12, y: this.h - 22, w: 96, h: 16, label: 'GO!', color: 'lime', onClick: () => this.submit() });
     this.panel.add(this.go);
+    if(this.onGhostLink){
+      this.ghostLinkBtn=new Button(scene,theme,{x:125,y:this.h-22,w:132,h:16,
+        label:'OPEN GHOST LINK',color:'magenta',onClick:()=>this.onGhostLink()});
+      this.panel.add(this.ghostLinkBtn);
+    }
     scene.time.delayedCall(30, () => this.alive && this.box.focus());
   }
 
@@ -1076,6 +1090,7 @@ export class SeedView extends View {
   handleAction(action) {
     if (action === 'cancel') this.close();
     else if (action === 'confirm') this.submit();
+    else if (action === 'alt' && this.onGhostLink) this.onGhostLink();
     return true;
   }
 
