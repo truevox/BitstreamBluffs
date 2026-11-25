@@ -3,6 +3,8 @@
 import { BIOME_IDS, HOME_BIOME } from '../../src/systems/music/BiomeVoices.js';
 import { normalizeCatalog, normalizePack, resolveMusicAsset } from '../../src/systems/music/MusicPack.js';
 import { plannedTrackIds } from './music-download-plan.mjs';
+import {upcomingBiomePrefetch} from '../../src/systems/music/NextBiomePrefetch.js';
+export {upcomingBiomePrefetch};
 
 const MENU_BIOME = 'debutmont';
 const ALL_BIOMES = new Set(BIOME_IDS.filter(id => id !== HOME_BIOME));
@@ -23,18 +25,6 @@ export function currentlyNeededBiomes({ unlockedBiomeIds = [], enabledBiomeIds =
 /** Opportunistic lookahead: NEXT as-yet-locked biome, selected *before* unlock.
  * This is a bonus download, not a prerequisite to declare current music ready.
  * Caller enforces internet access, transfer consent, and idle/bandwidth budget. */
-export function upcomingBiomePrefetch({ currentLevel, biomeDefs, unlockedBiomeIds = [] }) {
-  if (!Number.isFinite(currentLevel) || currentLevel < 0 || !Array.isArray(biomeDefs)) {
-    throw new TypeError('Current level and biome table required');
-  }
-  const unlocked = validateBiomeIds(unlockedBiomeIds);
-  const candidates = biomeDefs
-    .filter(x => x && ALL_BIOMES.has(x.id) && x.id !== MENU_BIOME && !unlocked.has(x.id) &&
-      Number.isSafeInteger(x.unlockLevel) && x.unlockLevel > currentLevel)
-    .sort((a,b) => a.unlockLevel - b.unlockLevel || a.id.localeCompare(b.id));
-  return candidates.length ? [candidates[0].id] : [];
-}
-
 function entryPath(packUrl, relative) {
   const base = new URL(packUrl, 'https://offline.invalid/music/catalog.json');
   if (base.origin !== 'https://offline.invalid' || !/^\/music\/packs\/[^/]+\/pack\.json$/.test(base.pathname)) {

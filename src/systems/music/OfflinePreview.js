@@ -4,7 +4,7 @@ import {MelodyDownloadControls} from '../../../tools/pwa/melody-download-control
 import {REG} from '../../constants.js';
 import {earnedBiomeIds} from '../ProfileStore.js';
 import {levelForXp} from '../Progression.js';
-import {upcomingBiomePrefetch} from '../../../tools/pwa/music-groups.mjs';
+import {upcomingBiomePrefetch} from './NextBiomePrefetch.js';
 import {EVT} from '../../events.js';
 const expected=typeof __BB_OFFLINE_INDEX_SHA256__==='string'?__BB_OFFLINE_INDEX_SHA256__:null;
 /** Current authoritative settings and awarded profile, with one bounded
