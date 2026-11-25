@@ -1,5 +1,6 @@
 /** Read-only Game Over labels for the existing local ghost roles. */
 import { FAVORITE_SLOTS, tapeCompatible } from '../systems/ghost/GhostLibrary.js';
+import { courseKey } from '../systems/ghost/GhostTape.js';
 import { SIM_REVISION } from '../systems/replay/ruleset.js';
 import { fmtInt } from './Format.js';
 
@@ -30,13 +31,14 @@ export async function readGhostCourseRows(library, current, settings = {}) {
     const id = ids[i], tape = tapes.get(id);
     // Match RunScene's current-terrain display gate. Direct tape access and
     // historical replay compatibility are independent of this label.
-    const compatible = tapeCompatible(tape) && tape.simRevision === SIM_REVISION;
+    const matchingCourse = Boolean(tape && courseKey(tape.seed, tape.biomeMask) === courseKey(current.seed, current.biomeMask));
+    const compatible = matchingCourse && tapeCompatible(tape) && tape.simRevision === SIM_REVISION;
     const hasTrace = compatible && tape.trace.length > 0;
-    const currentRun = id !== null && id === current.runId;
+    const currentRun = matchingCourse && id !== null && id === current.runId;
     const shared = hasTrace && ids.some((other, j) => j !== i && id === other);
     const globalOff = globalKey !== undefined && settings[globalKey] === false;
     return {
-      info: !id ? 'EMPTY' : !tape ? 'TAPE MISSING' : !compatible ? 'INCOMPATIBLE' : !hasTrace ? 'NO TRACE' : currentRun ? 'THIS RUN' : savedRunLabel(tape),
+      info: !id ? 'EMPTY' : !tape ? 'TAPE MISSING' : !matchingCourse ? 'OTHER COURSE' : !compatible ? 'INCOMPATIBLE' : !hasTrace ? 'NO TRACE' : currentRun ? 'THIS RUN' : savedRunLabel(tape),
       shared,
       globalOff,
       on: course?.show?.[role] !== false,

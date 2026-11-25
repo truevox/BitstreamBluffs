@@ -18,6 +18,7 @@ export const GHOST_DB = 'bitstream-ghosts';
 export const GHOST_DB_VERSION = 1;
 export const FAVORITE_SLOTS = 3;
 export const MAX_GHOSTS_PER_COURSE = 2 + FAVORITE_SLOTS;
+export const GHOST_ROLES = Object.freeze(['best','latest','fav0','fav1','fav2']);
 const IDB_TIMEOUT_MS = 2500;
 
 const req2p = (req) => new Promise((resolve, reject) => {
@@ -95,6 +96,10 @@ export class GhostLibrary {
   async saveRun(tape) {
     if (!tape?.runId || tape.mode === 'gym') return null;
     const key = courseKey(tape.seed, tape.biomeMask);
+    // Stable run IDs are global tape identities. A same-ID import from another
+    // course must never overwrite a retained or favorite local recording.
+    const existing = await this.getTape(tape.runId);
+    if (existing && courseKey(existing.seed, existing.biomeMask) !== key) return null;
     const course = { ...(this.courses.get(key) || emptyCourse(key, tape)) };
     course.favorites = [...course.favorites];
     const before = new Set(courseGhostRuns(course).map((g) => g.runId));
@@ -130,8 +135,13 @@ export class GhostLibrary {
   async setFavorite(seed, biomeMask, slot, runId) {
     const key = courseKey(seed, biomeMask);
     const old = this.courses.get(key);
-    if (!old || slot < 0 || slot >= FAVORITE_SLOTS) return null;
-    if (runId && !(await this.getTape(runId))) return null;
+    if (!old || !Number.isInteger(slot) || slot < 0 || slot >= FAVORITE_SLOTS) return null;
+    if (runId) {
+      const tape = await this.getTape(runId);
+      // Nothing from a different seed or biome selection can occupy a local
+      // favorite role, even when the global tape ID exists and is compatible.
+      if (!tape || courseKey(tape.seed, tape.biomeMask) !== key) return null;
+    }
     const course = { ...old, favorites: [...old.favorites] };
     const dropped = course.favorites[slot];
     course.favorites[slot] = runId || null;
@@ -143,7 +153,7 @@ export class GhostLibrary {
   /** Per-course on/off switch for one ghost role (used for Favorites A/B/C). */
   async setShow(seed, biomeMask, role, on) {
     const old = this.courses.get(courseKey(seed, biomeMask));
-    if (!old) return null;
+    if (!old || !GHOST_ROLES.includes(role)) return null;
     const course = { ...old, show: { ...(old.show || {}), [role]: on !== false } };
     await this._putCourse(course);
     return course;
@@ -168,7 +178,8 @@ export class GhostLibrary {
       const tape = await this.getTape(g.runId);
       // No silent legacy->current simulation identity inference. Old or
       // unstamped trace poses can float/clip on the revised terrain.
-      if (tapeCompatible(tape) && (simRevision === undefined || tape.simRevision === simRevision)) {
+      if (tapeCompatible(tape) && courseKey(tape.seed, tape.biomeMask) === course.key &&
+          (simRevision === undefined || tape.simRevision === simRevision)) {
         out.push({ ...g, tape });
       }
     }
