@@ -177,9 +177,34 @@ try {
   }
  });
  assert(keepSourceWarning.status.includes('KEEP ORIGINAL FILE'));
- assert(keepSourceWarning.details.includes('IMPORT UNSAVED'));
+ assert(keepSourceWarning.details.includes('IMPORT UNCONFIRMED'));
  assert(keepSourceWarning.details.includes('PIN STATUS UNKNOWN'));
- record('failed import retains KEEP ORIGINAL FILE alongside reconciliation storage warning');
+ record('unconfirmed import retains KEEP ORIGINAL FILE alongside pin-index warning');
+
+ const exportAfterInterruptedImport=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const originalInspect=store.inspectBundle.bind(store);
+  let signal,release,intercepted=false;
+  const started=new Promise(resolve=>{signal=resolve;});
+  store.inspectBundle=(...args)=>{
+    if(intercepted)return Promise.resolve({readable:true,durable:false,runBound:false});
+    intercepted=true;signal();
+    return new Promise(resolve=>{release=async()=>resolve(await originalInspect(...args));});
+  };
+  try{
+    const refreshing=view._refresh();await started;
+    await view._run(async()=>view._show('KEEP ORIGINAL FILE','IMPORT STORAGE NOT CONFIRMED — DO NOT DELETE SOURCE'));
+    const result={status:view.status.main.text,detail:view.detail.main.text,
+      exportEnabled:!view.buttons[1].disabled};
+    await release();await refreshing;
+    return result;
+  }finally{store.inspectBundle=originalInspect;await view._refresh();}
+ });
+ assert(exportAfterInterruptedImport.status.includes('KEEP ORIGINAL FILE'));
+ assert(exportAfterInterruptedImport.detail.includes('IMPORT UNCONFIRMED'));
+ assert(exportAfterInterruptedImport.detail.includes('EXPORT RUN NOW'));
+ assert(exportAfterInterruptedImport.exportEnabled);
+ record('unconfirmed import preserves EXPORT RUN NOW when current-run proof is memory-only');
 
  const vanishedPin=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
