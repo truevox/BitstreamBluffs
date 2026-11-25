@@ -814,6 +814,51 @@ describe('protected local evidence references (#244)', () => {
     expect(await store.inspectBundle(digest,{withProtections:true})).toEqual({readable:false,durable:false,runBound:false,protectionCount:0});
   });
 
+  test('concurrent retries coalesce: a second queued retry cannot resurrect cross-tab deletion',async()=>{
+    const idb=fakeIdb(),a=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('quota');
+    await expect(a.put(bundle(),{runId:RUN})).rejects.toMatchObject({code:'write-failed'});
+    const digest=bundleDigest(bundle());
+    idb.hooks.failPut=null;
+    const b=await new EvidenceStore({idb,storage:null}).init();
+    const [first,second]=await Promise.all([
+      a.retryPending({digest}),
+      a.retryPending({digest}),
+      b.remove(digest),
+    ]).then(([one,two])=>[one,two]);
+    expect(first.attempted+second.attempted).toBe(1);
+    expect(a.pending.has(digest)).toBe(false);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('Refresh retries a small chosen digest before an older quota-failed bundle',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    const old={...bundle(),claims:{...bundle().claims,score:721}};
+    const young={...bundle(),claims:{...bundle().claims,score:722}};
+    const oldDigest=bundleDigest(old),youngDigest=bundleDigest(young);
+    idb.hooks.failPut=new Error('offline');
+    await expect(s.put(old,{runId:'older'})).rejects.toMatchObject({code:'write-failed'});
+    await expect(s.put(young,{runId:'current'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=v=>v?.digest===oldDigest?new Error('older too big for remaining quota'):null;
+    const receipt=await s.retryPending({digest:youngDigest});
+    expect(receipt).toMatchObject({recovered:1,remaining:1});
+    expect(await s.isBundleDurable(youngDigest,{runId:'current'})).toBe(true);
+    expect(s.pending.has(oldDigest)).toBe(true);
+    expect(s.pending.has(youngDigest)).toBe(false);
+  });
+
+  test('explicit retry reconnects blocked IDB and counts only writes actually attempted',async()=>{
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb:{open(){throw new Error('upgrade blocked');}},storage:null}).init();
+    const digest=await s.put(bundle(),{runId:RUN});
+    expect(s.pending.size).toBe(1);
+    expect(await s.retryPending({digest})).toMatchObject({attempted:0,recovered:0,remaining:1});
+    s._idb=idb;
+    expect(await s.retryPending({digest})).toMatchObject({attempted:1,recovered:1,remaining:0});
+    expect(s.backend).toBe('idb');
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(true);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

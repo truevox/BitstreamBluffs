@@ -82,6 +82,9 @@ export class EvidenceStore {
     this.pendingMeta = new Map();
     /** Explicit deletion wins over asynchronous retries for that digest. */
     this._removing = new Set();
+    // Serialize pending flushes per store. Concurrent retries cannot queue a
+    // second write after another tab's explicit deletion.
+    this._pendingFlush = null;
     this.backend = 'memory';
     this.persisted = null;
     this.lastError = null;
@@ -94,7 +97,7 @@ export class EvidenceStore {
   get durable() { return this._db !== null && this.pending.size === 0; }
 
   /** Open the database and load the index (not the bundles). Never rejects; check `backend`/`durable` afterwards. */
-  async init() {
+  async init({skipPendingFlush=false}={}) {
     const previousDb = this._db;
     let openedDb = null;
     try {
@@ -182,7 +185,7 @@ export class EvidenceStore {
         }
         // Captures made during a blocked upgrade were session-only. Once IDB
         // comes back, retry them immediately; keep any failures visible/pending.
-        await this._flushPending();
+        if (!skipPendingFlush) await this._flushPending();
       }
     } catch (e) {
       if (openedDb) { try { openedDb.close(); } catch { /* best effort */ } }
@@ -325,41 +328,66 @@ export class EvidenceStore {
     return digest;
   }
 
-  /** Retry bundles that are still memory-only. Failures stay pending and are not reported again. */
-  async _flushPending() {
-    if (!this._db) return;
-    for (const [digest, bytes] of [...this.pending]) {
-      // `remove()` tombstones the digest before queueing its transaction.
-      // If a retry was already queued, the later remove transaction wins.
-      if (this._removing.has(digest) || this.pending.get(digest) !== bytes) continue;
-      const record = this.pendingMeta.get(digest) || this.index.get(digest);
-      if (!record) continue;
-      try {
-        const committed = await this._writeDurable(record, bytes);
-        if (this.pending.get(digest) === bytes) {
-          this.index.set(digest, committed);
-          this.pending.delete(digest);
-          this.pendingMeta.delete(digest);
-        }
-      } catch (e) {
-        if (e?.code === 'run-id-conflict') {
-          // One unrecoverable pending run binding must not starve independent
-          // bundles. Keep its session-only bytes visible and fail durability.
-          this._report(e);
-          continue;
-        }
-        return;
-      }
+  /** Retry memory-only bundles in one serialized pass. A user-specified digest
+   * takes priority over older large bundles that may still exceed quota.
+   * No network actions; the browser's IDB remains the sole durable destination.
+   */
+  async _flushPending({digest:firstDigest=null}={}) {
+    if (!this._db || !this.pending.size) return 0;
+    if (this._pendingFlush) {
+      const running=this._pendingFlush;
+      const receipt=await running;
+      // Only start a second pass when the requested digest was NOT attempted
+      // by the first pass. Never schedule the same saved digest twice.
+      if (firstDigest && this.pending.has(firstDigest) &&
+          !receipt.digests.has(firstDigest) && this._db)
+        return this._flushPending({digest:firstDigest});
+      return 0;
     }
+    const receipt={count:0,digests:new Set()};
+    const run=async()=>{
+      const entries=[...this.pending];
+      if(firstDigest){
+        const idx=entries.findIndex(([key])=>key===firstDigest);
+        if(idx>0) entries.unshift(...entries.splice(idx,1));
+      }
+      for(const [digest,bytes] of entries){
+        if (!this._db || this._removing.has(digest) || this.pending.get(digest)!==bytes)continue;
+        const record=this.pendingMeta.get(digest) || this.index.get(digest);
+        if(!record)continue;
+        receipt.digests.add(digest);receipt.count++;
+        try{
+          const committed=await this._writeDurable(record,bytes);
+          if(this.pending.get(digest)===bytes){
+            this.index.set(digest,committed);
+            this.pending.delete(digest);
+            this.pendingMeta.delete(digest);
+          }
+        }catch(e){
+          if(e?.code==='run-id-conflict'){
+            // A failed binding must not prevent independent pending bundles.
+            this._report(e);continue;
+          }
+          // Quota/write failure: do not retry this digest concurrently or
+          // spin forever. Remaining entries stay session-only until requested.
+          return receipt;
+        }
+      }
+      return receipt;
+    };
+    this._pendingFlush=run();
+    try{return (await this._pendingFlush).count;}
+    finally{this._pendingFlush=null;}
   }
 
   has(digest) { return this.index.has(digest); }
 
-  /** Explicit, on-demand retry after quota/IDB recovery; no network action. */
-  async retryPending() {
+  /** Explicit retry after quota or a previously blocked IndexedDB upgrade. */
+  async retryPending({digest}={}) {
     const before=this.pending.size;
-    if (this._db && before) await this._flushPending();
-    return {attempted:before,recovered:before-this.pending.size,remaining:this.pending.size};
+    if(!this._db && this._idb) await this.init({skipPendingFlush:true});
+    const attempted=this._db && before ? await this._flushPending({digest}) : 0;
+    return {attempted,recovered:before-this.pending.size,remaining:this.pending.size};
   }
 
   /** One digest verification per Refresh, with an atomic persisted snapshot.
