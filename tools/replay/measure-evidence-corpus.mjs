@@ -4,6 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { legacyManifestFromTape, evidenceBundle, bundleBytes, validateEvidenceBundle } from '../../src/systems/replay/manifest.js';
 import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
@@ -25,7 +26,7 @@ export function measureEvidenceCorpus(root=process.cwd()) {
       const verdict=validateEvidenceBundle(bytes);
       if(!verdict.ok)throw Error(`${relative}: rejected ${verdict.code} ${verdict.pointer}`);
       rows.push({source:relative,simRevision:tape.simRevision??null,endTick:tape.endTick??null,
-        inputRows:Array.isArray(tape.inputs)?tape.inputs.length:0,sourceTapeBytes:raw.length,
+        inputRows:Array.isArray(tape.inputs)?tape.inputs.length:0,sourceTapeBytes:raw.length,sourceTapeSha256:createHash('sha256').update(raw).digest('hex'),
         canonicalEnvelopeBytes:bytes.length,gzipEnvelopeBytes:gzipSync(bytes,{level:6,mtime:0}).length,
         canonicalDigest:digestOfBytes(bytes)});
     }

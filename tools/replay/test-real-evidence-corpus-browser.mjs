@@ -22,10 +22,16 @@ try{
   const [{EvidenceStore,EVIDENCE_DB_VERSION},{legacyManifestFromTape,evidenceBundle,bundleBytes,validateEvidenceBundle},{digestOfBytes}]=await Promise.all([
    import('/src/systems/replay/evidenceStore.js'),import('/src/systems/replay/manifest.js'),import('/src/systems/replay/canonicalSha256.js')]);
   if(EVIDENCE_DB_VERSION!==3)throw Error('served evidence store schema is not v3');
-  const samples=await Promise.all(expectations.map(async({source,canonicalDigest,canonicalEnvelopeBytes})=>{
-   const response=await fetch('/'+source);
-   if(!response.ok)throw Error(`missing fixture ${source}: ${response.status}`);
-   const tape=await response.json(),bytes=bundleBytes(evidenceBundle({manifest:legacyManifestFromTape(tape),tape}));
+  const samples=await Promise.all(expectations.map(async({source,sourceTapeSha256,canonicalDigest,canonicalEnvelopeBytes})=>{
+   const expectedUrl=new URL('/'+source,location.origin).href;
+   const response=await fetch(expectedUrl,{redirect:'error',cache:'no-store'});
+   if(!response.ok||response.redirected||response.url!==expectedUrl)
+    throw Error(`wrong fixture response ${source}: ${response.status} ${response.url}`);
+   const raw=await response.arrayBuffer();
+   const hex=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),x=>x.toString(16).padStart(2,'0')).join('');
+   if(hex!==sourceTapeSha256)throw Error('raw recorded tape SHA-256 differs from committed checkout: '+source);
+   const tape=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+   const bytes=bundleBytes(evidenceBundle({manifest:legacyManifestFromTape(tape),tape}));
    if(!validateEvidenceBundle(bytes).ok)throw Error('invalid envelope '+source);
    const actual=digestOfBytes(bytes);
    if(actual!==canonicalDigest||bytes.length!==canonicalEnvelopeBytes)
@@ -65,7 +71,7 @@ try{
   return {backend:restarted.backend,schemaVersion:EVIDENCE_DB_VERSION,captured:digests.length,
    retained:digests.length-deleted.length,deleted:deleted.length,bytesBeforeDeletion:totalBytes,
    estimateBefore:before,estimateAfter:after,pinFailureCode};
- },expected.rows.map(r=>({source:r.source,canonicalDigest:r.canonicalDigest,
+ },expected.rows.map(r=>({source:r.source,sourceTapeSha256:r.sourceTapeSha256,canonicalDigest:r.canonicalDigest,
    canonicalEnvelopeBytes:r.canonicalEnvelopeBytes})));
  assert.equal(report.captured,expected.recordingCount);
  assert.equal(report.bytesBeforeDeletion,expected.canonicalEnvelope.sum);
