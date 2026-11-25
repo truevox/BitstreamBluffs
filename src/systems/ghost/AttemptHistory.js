@@ -310,13 +310,17 @@ export class AttemptHistory {
    */
   record(tape, keep) {
     return this._serial(async () => {
-      const k = sanitizeAttemptKeep(keep);
-      if (k === 0) return { ok: false, reason: 'disabled', evicted: [] };
+      // `keep` may be a function: it is read again INSIDE the write transaction, so a 0 saved by another tab a moment
+      // ago still wins (PR #378 review P1).
+      const keepNow = () => sanitizeAttemptKeep(typeof keep === 'function' ? keep() : keep);
+      if (keepNow() === 0) return { ok: false, reason: 'disabled', evicted: [] };
       const entry = attemptFromTape(tape);
       if (!entry) return { ok: false, reason: 'ineligible', evicted: [] };
       // `room`: on a full disk, also free the oldest half of THIS store's other rows (never any other database).
       const planWrite = (room) => (rows) => {
         if (rows.some((m) => m.id === entry.meta.id)) return { value: { duplicate: true } };
+        const k = keepNow();
+        if (k === 0) return { value: { disabled: true } };
         const meta = { ...entry.meta, seq: nextSeq(rows) };
         let deletes = planEviction([...rows, meta], k, this.maxBytes, meta.id);
         if (room) {
@@ -339,15 +343,17 @@ export class AttemptHistory {
       }
       if (res.status !== true) return { ok: false, reason: 'storage', evicted: [] };
       if (res.value?.duplicate) return { ok: false, reason: 'duplicate', evicted: [] };
+      if (res.value?.disabled) return { ok: false, reason: 'disabled', evicted: [] };
       return { ok: true, evicted: res.value.deletes, seq: res.value.seq };
     });
   }
 
-  /** Apply a (lowered) per-course limit now, to what is on disk. @returns {Promise<string[]>} evicted ids */
+  /** Apply a (lowered) per-course limit now, to what is on disk. `keep` may be a function read inside the transaction.
+   * @returns {Promise<string[]>} evicted ids */
   trim(keep) {
     return this._serial(async () => {
       const res = await this._mutate((rows) => {
-        const deletes = planEviction(rows, keep, this.maxBytes);
+        const deletes = planEviction(rows, typeof keep === 'function' ? keep() : keep, this.maxBytes);
         return { deletes, value: deletes };
       });
       return res.status === true ? res.value : [];

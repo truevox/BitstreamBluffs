@@ -13,6 +13,8 @@
  *  7. CORRUPT: a damaged pose row is skipped, the montage still opens.
  *  9. TWO TABS: two same-origin tabs race record() at keep 5 and keep 1; ordinals stay distinct and increasing, only
  *     the newest committed survives keep=1, a stale tab's trim/record/clear plans from disk, GhostLibrary untouched.
+ * 10. OPT-OUT ACROSS TABS: Tab A sets keep 0, Tab B (still showing 5) finishes a real run: nothing stored, B adopts 0,
+ *     empty after reload; 0 -> 5 re-enables, 5 -> 2 trims; GhostLibrary untouched.
  *  8. PERF: synthetic QA traces (ids `synthetic-qa-*`, derived from this device's real trace) at 0/5/10/20/40 kept
  *     attempts, swarm style, at real requestAnimationFrame pacing (optionally CPU-throttled): frame p50/p95, the
  *     montage's own update cost per frame, history write time and bytes.
@@ -215,6 +217,56 @@ try {
     report.steps.twoTabs = { race5: d1, race1: d2, late: d3 };
     console.log('CEMETERY_TWO_TABS_PASS', JSON.stringify(report.steps.twoTabs));
     await tab2.page.close();
+  }
+
+  // 10. OPT-OUT ACROSS TABS (PR #378 review P1, second): Tab A saves PAST ATTEMPTS TO KEEP = 0 through the real
+  //     settings path; Tab B, still showing 5, finishes a real run: nothing is stored, Tab B adopts 0 (an unrelated save
+  //     there cannot restore 5), and after a reload the history is still empty. Then 5 -> 2 trims in the other tab and
+  //     0 -> 5 re-enables recording. GhostLibrary untouched, no network writes.
+  {
+    const OPT = 'CEMETERY68-OPTOUT';
+    const tabA = p2.page;
+    await setSetting(tabA, 'attemptHistoryKeep', 5);
+    const { page: tabB, errors: tabBErrors } = await open();
+    const rows = () => tabA.evaluate(async (seed) => {
+      const db = await new Promise((r) => { const q = indexedDB.open('bitstream-attempt-history'); q.onsuccess = () => r(q.result); });
+      const all = await new Promise((r) => { const q = db.transaction('meta').objectStore('meta').getAll(); q.onsuccess = () => r(q.result); });
+      db.close();
+      return all.filter((m) => m.key.startsWith(seed + '|')).sort((a, b) => a.seq - b.seq).map((m) => m.id);
+    }, OPT);
+    const keepIn = (pg) => pg.evaluate(() => ({ live: window.__bbGame.registry.get('settings').attemptHistoryKeep,
+      persisted: JSON.parse(localStorage.getItem('bb.settings')).attemptHistoryKeep }));
+    const libBefore = await tabA.evaluate(() => JSON.stringify([...window.__bbGame.registry.get('ghostLibrary').courses]));
+    assert.deepEqual([await keepIn(tabA), await keepIn(tabB)].map((k) => k.live), [5, 5]);
+    await setSetting(tabA, 'attemptHistoryKeep', 0);
+    const bRun = await run(tabB, OPT, 1400);
+    await tabB.waitForTimeout(300);
+    assert.deepEqual(await rows(), [], `Tab B stored a run after Tab A chose 0: ${bRun}`);
+    assert.deepEqual(await keepIn(tabB), { live: 0, persisted: 0 }, 'Tab B adopted 0');
+    await setSetting(tabB, 'palette', 'colorblind'); // unrelated save in Tab B must not write 5 back
+    assert.equal((await keepIn(tabA)).persisted, 0, 'unrelated save restored the old keep value');
+    await setSetting(tabB, 'palette', 'default');
+    await tabB.reload({ waitUntil: 'domcontentloaded' });
+    await tabB.waitForFunction(() => window.__bbGame?.registry?.get('attemptHistory')?.ready, null, { timeout: 60000 });
+    assert.deepEqual(await rows(), [], 'still empty after reload');
+    assert.equal(await tabB.evaluate((seed) => [...window.__bbGame.registry.get('attemptHistory').metas.values()].filter((m) => m.key.startsWith(seed + '|')).length, OPT), 0, 'history view empty after reload');
+    // 0 -> 5 in Tab A re-enables recording for Tab B; then 5 -> 2 in Tab A trims what Tab B stored.
+    await setSetting(tabA, 'attemptHistoryKeep', 5);
+    await tabB.waitForTimeout(200);
+    const kept = [];
+    for (let i = 0; i < 4; i++) kept.push(await run(tabB, OPT, 900 + i * 100));
+    assert.deepEqual(await rows(), kept, 're-enabled after 0 -> 5');
+    await setSetting(tabA, 'attemptHistoryKeep', 2);
+    await tabB.waitForTimeout(300);
+    assert.deepEqual(await rows(), kept.slice(2), '5 -> 2 trimmed the oldest');
+    assert.equal((await keepIn(tabB)).live, 2, 'Tab B followed 2 via the storage event');
+    const libAfter = await tabA.evaluate(() => JSON.stringify([...window.__bbGame.registry.get('ghostLibrary').courses].filter(([k]) => !k.startsWith('CEMETERY68-OPTOUT|'))));
+    assert.equal(libAfter, JSON.stringify(JSON.parse(libBefore).filter(([k]) => !k.startsWith('CEMETERY68-OPTOUT|'))), 'other ghost-library courses untouched');
+    await setSetting(tabA, 'attemptHistoryKeep', 5);
+    assert.deepEqual(tabBErrors, []);
+    report.steps.optOut = { afterZero: [], reenabled: kept, afterTrim2: kept.slice(2) };
+    console.log('CEMETERY_OPTOUT_TWO_TABS_PASS', JSON.stringify(report.steps.optOut));
+    await tabB.close();
   }
 
   // 6. reduced motion via the OS preference under AUTO

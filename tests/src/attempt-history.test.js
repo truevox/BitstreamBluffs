@@ -388,3 +388,94 @@ describe('two tabs on one store: every change is planned from disk, not a tab ca
     expect(await lib.getTape(best.runId)).toBe(best);
   });
 });
+
+describe('settings follow other tabs: 0 = keep none is honoured everywhere (PR #378 review P1, second)', () => {
+  const SETTINGS_KEY = 'bb.settings';
+  const fakeTab = (store) => {
+    const listeners = new Set();
+    const win = {
+      localStorage: { getItem: (k) => (k in store ? store[k] : null) },
+      addEventListener: (t, f) => { if (t === 'storage') listeners.add(f); },
+      removeEventListener: (t, f) => { if (t === 'storage') listeners.delete(f); },
+    };
+    const handlers = {};
+    const live = { attemptHistoryKeep: 5, cemeteryMontage: 'montage', palette: 'default' };
+    const reg = new Map([[REG.SETTINGS, live]]);
+    const game = {
+      registry: { get: (k) => reg.get(k), set: (k, v) => reg.set(k, v) },
+      events: { on: (e, f) => { (handlers[e] ||= []).push(f); }, off: () => {}, emit: (e, p) => (handlers[e] || []).forEach((f) => f(p)) },
+    };
+    return { win, game, live, listeners, fireStorage: () => listeners.forEach((f) => f({ key: SETTINGS_KEY })) };
+  };
+  const save = (store, o) => { store[SETTINGS_KEY] = JSON.stringify({ attemptHistoryKeep: 5, cemeteryMontage: 'montage', ...o }); };
+  const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
+  const endRun = async (tab, tape) => {
+    tab.game.registry.set(REG.LAST_GHOST_TAPE, tape);
+    tab.game.events.emit(EVT.RUN_END, { record: { id: tape.runId } });
+    await flush();
+  };
+
+  test('another tab saved 0: this tab, still showing 5, records nothing and adopts 0', async () => {
+    const store = {};
+    save(store, { attemptHistoryKeep: 5 });
+    const backend = new MemoryAttemptBackend();
+    const h = await new AttemptHistory({ backend }).init();
+    const tabB = fakeTab(store);
+    installAttemptHistory(tabB.game, h, { win: tabB.win });
+    save(store, { attemptHistoryKeep: 0 }); // Tab A, no storage event delivered yet
+    await endRun(tabB, makeTape());
+    expect(await backend.loadMetas()).toEqual([]);
+    expect(tabB.live.attemptHistoryKeep).toBe(0); // a later unrelated save here can no longer write 5 back
+    expect(tabB.live.palette).toBe('default'); // only the owned settings are touched
+  });
+
+  test('storage events: 5 -> 2 trims at once, 0 -> 5 re-enables recording', async () => {
+    const store = {};
+    save(store, { attemptHistoryKeep: 5 });
+    const backend = new MemoryAttemptBackend();
+    const h = await new AttemptHistory({ backend }).init();
+    const tabB = fakeTab(store);
+    installAttemptHistory(tabB.game, h, { win: tabB.win });
+    for (let i = 0; i < 5; i++) await endRun(tabB, makeTape({ id: `r${i}` }));
+    expect((await backend.loadMetas()).length).toBe(5);
+    save(store, { attemptHistoryKeep: 2, cemeteryMontage: 'swarm' });
+    tabB.fireStorage();
+    await flush();
+    expect((await backend.loadMetas()).map((m) => m.id).sort()).toEqual(['r3', 'r4']);
+    expect(tabB.live).toMatchObject({ attemptHistoryKeep: 2, cemeteryMontage: 'swarm' });
+    save(store, { attemptHistoryKeep: 0 });
+    tabB.fireStorage();
+    await flush();
+    expect(await backend.loadMetas()).toEqual([]);
+    await endRun(tabB, makeTape({ id: 'while-off' }));
+    expect(await backend.loadMetas()).toEqual([]);
+    save(store, { attemptHistoryKeep: 5 });
+    tabB.fireStorage();
+    await flush();
+    expect(tabB.live.attemptHistoryKeep).toBe(5);
+    await endRun(tabB, makeTape({ id: 'after-reenable' }));
+    expect((await backend.loadMetas()).map((m) => m.id)).toEqual(['after-reenable']);
+  });
+
+  test('unreadable storage never turns a 0 back into 5: the live copy stands', async () => {
+    const backend = new MemoryAttemptBackend();
+    const h = await new AttemptHistory({ backend }).init();
+    const tab = fakeTab({});
+    tab.win.localStorage.getItem = () => { throw new Error('SecurityError'); };
+    tab.live.attemptHistoryKeep = 0;
+    installAttemptHistory(tab.game, h, { win: tab.win });
+    await endRun(tab, makeTape());
+    expect(await backend.loadMetas()).toEqual([]);
+    expect(tab.live.attemptHistoryKeep).toBe(0);
+  });
+
+  test('the keep value is read again inside the write transaction', async () => {
+    const backend = new MemoryAttemptBackend();
+    const h = await new AttemptHistory({ backend }).init();
+    let calls = 0;
+    // Allowed when record() starts, 0 by the time the transaction plans (another tab saved 0 in between).
+    const r = await h.record(makeTape(), () => (calls++ === 0 ? 5 : 0));
+    expect(r).toMatchObject({ ok: false, reason: 'disabled' });
+    expect(await backend.loadMetas()).toEqual([]);
+  });
+});
