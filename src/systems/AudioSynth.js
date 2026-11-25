@@ -660,7 +660,7 @@ export class AudioSynth {
           musicVocals: settings.musicVocals === true &&
             this.game?.registry?.get(REG.PROFILE)?.unlocked?.musicVocals === true,
           musicCaptions: settings.musicCaptions === true,
-          dynamicOrchestra: settings.dynamicOrchestra === true,
+          dynamicOrchestra: false, // Gameplay always uses original accompaniment.
           musicShuffle: settings.musicShuffle === true,
           musicCrossfade: settings.musicCrossfade !== false,
         };

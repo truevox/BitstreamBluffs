@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { StemMusicDirector } from '../../src/systems/music/StemMusicDirector.js';
 
-const remote='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json';
+const remote='https://bsb-audio.bearcave.win/releases/20261124-melody-only-748a0670/catalog.json';
 const doc={format:'bitstream-music-catalog-v1',tracks:[{id:'sample',title:'Sample',manifest:'packs/sample/pack.json'}]};
 afterEach(()=>{delete global.fetch;});
 test('uses the remote catalog as the base for its manifests',async()=>{
