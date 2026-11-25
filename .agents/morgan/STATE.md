@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 03:46 UTC. Main `3b843edc0e5ceea6cfe1b91156f5a6975b4c9e8a` (#348), v2.22.2/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45540909235) build and deploy succeeded; Gal's public-host Chromium receipt covers first-tab reopen and actual cold offline Lite audio/physics. #344 v2.22.0 integrated #335/#337, #346 v2.22.1 enabled cancel before confirmation, #348 adds click-only persistence, partial quota recovery and reopen hint. Physical devices and natural mid-crossfade promotion remain #172 follow-ups. #340 guard was verified separately on v2.21.2; no new pause workaround check.
+Last verified: 2026-11-25 04:46 UTC. Main `9e2f36a2a528c6aeea07c1b93153ed8495109f60` (#350), v2.22.3/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) build/deploy succeeded; Gal's public Chromium receipt verifies AIR/GND BRAKE help and separate compiled Matter A/B verifies existing behavior. #348 offline recovery and #340 guard remain shipped; no new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -222,6 +222,15 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
+- #350 closed #30: existing AirBrake doubles as ground brake; no binding,
+  physics, replay change. Tricks Right A, Tricks Left ←, Classic ↑ or S on
+  ground, gamepad X or B on ground, touch existing AirBrake. Public README
+  still presents generic S and air-only X; a Gal-lane docs cleanup could
+  label Classic, list the contextual brake, and point to How to Play. No
+  natural endurance/catch timing claim. No extra user notice.
+- #351 reduced-motion-aware unverified #69 ghost link and stacked #352
+  local Game Over #244 archive are drafts; neither permits public trust,
+  friend exchange, ranking or trusted mid-run restoration.
 - Gal/Home PWA #335/#337 integrated via #344 and updated through #348. Prior
   Chromium previews proved cold-offline committed ledger/ghost reopen after
   natural 166m SIM9 crash, visible same-course ghost, and a two-build upgrade
