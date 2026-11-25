@@ -13,6 +13,7 @@ import { isReducedMotion } from './Motion.js';
 import { parseGhostLink, GhostLinkError, GHOST_LINK_MAX_URL } from '../systems/ghost/GhostLink.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../systems/SimClock.js';
+import { REG, PIXELS_PER_METER } from '../constants.js';
 
 const PLOT={x:12,y:94,w:394,h:54};
 const MAX_PLOT_STEPS=300;
@@ -34,6 +35,13 @@ export function guestPreview(tape){
  }
  return {trace,count,minX,maxX,minY,maxY};
 }
+/** Visual distance gap only; never a trusted score or physical replay verdict. */
+export function visualGuestGapM(guest,local,tick){
+ if(!guest||!local)return null;
+ const g=tracePose(guest.trace,tick),l=tracePose(local.trace,tick);
+ if(!g||!l)return null;
+ return Math.round((g.x-l.x)/PIXELS_PER_METER);
+}
 function messageFor(e){
  if(!(e instanceof GhostLinkError))return 'INVALID OR UNSUPPORTED GHOST DATA';
  if(e.code==='url-too-long'||e.code==='oversize')return 'GHOST LINK TOO LARGE - NOT IMPORTED';
@@ -53,6 +61,8 @@ export class GhostLinkView extends View {
   super(scene,theme,{w:420,h:208,y:31,title:'GUEST GHOST // UNVERIFIED',color:'magenta',
    onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['CTRL+←/→'],label:'SCRUB'}]});
   this.preview=null;
+  this.localPreview=null;
+  this.localRole=null;
   this.tape=null;
   this.cursor=0;
   this.busy=false;
@@ -99,7 +109,7 @@ export class GhostLinkView extends View {
  async inspect(){
   if(!this.alive||this.busy)return;
   // A failed second link must not leave the prior good preview on screen.
-  this.preview=null;this.tape=null;this.cursor=0;
+  this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.cursor=0;
   this.playing=false;this.elapsedMs=0;this.playBtn.setLabel('WATCH');
   const token=++this.token;
   const raw=this.box.getValue().trim();
@@ -112,11 +122,32 @@ export class GhostLinkView extends View {
   try{
    const parsed=await parseGhostLink(raw);
    const model=guestPreview(parsed.tape);
+   // This is a READ of the player's existing locally saved GhostLibrary.
+   // A matching SIM9 course may have an authentic personal BEST/LATEST trace,
+   // but the shared tape must NEVER be written into that library.
+   let comparator=null;
+   try{
+    const library=this.scene.registry.get(REG.GHOSTS);
+    const all=await library?.ghostsFor(parsed.tape.seed,parsed.tape.biomeMask,{},{
+     simRevision:parsed.tape.simRevision,
+    });
+    const best=all?.find(g=>g.roles.includes('best'));
+    const latest=all?.find(g=>g.roles.includes('latest'));
+    const chosen=best||latest||all?.[0];
+    if(chosen)comparator={model:guestPreview(chosen.tape),
+     role:chosen.roles.includes('best')?'BEST':'LATEST'};
+   }catch{ /* optional local comparison never blocks guest viewing */ }
    if(!this.alive||token!==this.token)return;
    this.preview=model;
+   this.localPreview=comparator?.model||null;
+   this.localRole=comparator?.role||null;
    this.tape=parsed.tape;
-   this.status.setText('UNVERIFIED GUEST - READ-ONLY PREVIEW');
-   this.meta.setText(ellipsize(parsed.tape.seed.toUpperCase()+'  MASK '+parsed.tape.biomeMask+'  '+Math.floor(parsed.tape.distanceM)+'M',372));
+   this.status.setText(this.localPreview
+    ?'UNVERIFIED GUEST VS LOCAL '+this.localRole
+    :'UNVERIFIED GUEST - READ-ONLY PREVIEW');
+   this.meta.setText(ellipsize(parsed.tape.seed.toUpperCase()+' MASK '+parsed.tape.biomeMask+
+    '  '+Math.floor(parsed.tape.distanceM)+'M'+
+    (this.localPreview?'  GUEST MAGENTA / LOCAL CYAN':''),372));
    this.cursor=0;this.elapsedMs=0;
    this._draw();
   }catch(e){
@@ -177,20 +208,41 @@ export class GhostLinkView extends View {
   g.clear().fillStyle(this.theme.color('bg'),.85).fillRect(PLOT.x,PLOT.y,PLOT.w,PLOT.h);
   g.lineStyle(1,c,.55).strokeRect(PLOT.x,PLOT.y,PLOT.w,PLOT.h);
   if(!this.preview)return;
-  const v=this.preview,step=Math.max(1,Math.ceil(v.count/MAX_PLOT_STEPS));
-  const xscale=PLOT.w-14,yscale=PLOT.h-12;
-  const toPoint=i=>({
-   x:PLOT.x+7+(v.trace[i*3]-v.minX)/Math.max(1,v.maxX-v.minX)*xscale,
-   y:PLOT.y+6+(v.trace[i*3+1]-v.minY)/Math.max(1,v.maxY-v.minY)*yscale,
+  const v=this.preview,local=this.localPreview;
+  const minX=Math.min(v.minX,local?.minX??v.minX);
+  const minY=Math.min(v.minY,local?.minY??v.minY);
+  const maxX=Math.max(v.maxX,local?.maxX??v.maxX);
+  const maxY=Math.max(v.maxY,local?.maxY??v.maxY);
+  const toPoint=(model,i)=>({
+   x:PLOT.x+7+(model.trace[i*3]-minX)/Math.max(1,maxX-minX)*(PLOT.w-14),
+   y:PLOT.y+6+(model.trace[i*3+1]-minY)/Math.max(1,maxY-minY)*(PLOT.h-12),
   });
-  g.lineStyle(1,c,.9).beginPath();
-  for(let i=0;i<v.count;i+=step){const p=toPoint(i);if(i===0)g.moveTo(p.x,p.y);else g.lineTo(p.x,p.y);}
-  const last=toPoint(v.count-1);g.lineTo(last.x,last.y).strokePath();
-  const here=toPoint(this.cursor);
+  const line=(model,color,alpha)=>{
+   const stride=Math.max(1,Math.ceil(model.count/MAX_PLOT_STEPS));
+   g.lineStyle(1,color,alpha).beginPath();
+   let first=true;
+   for(let i=0;i<model.count;i+=stride){
+    const p=toPoint(model,i);
+    if(first){g.moveTo(p.x,p.y);first=false;}
+    else g.lineTo(p.x,p.y);
+   }
+   const last=toPoint(model,model.count-1);
+   g.lineTo(last.x,last.y).strokePath();
+  };
+  if(local)line(local,c,.7);
+  line(v,m,1);
+  const here=toPoint(v,this.cursor);
   g.fillStyle(m,1).fillCircle(here.x,here.y,2.5);
   const tick=(this.cursor+1)*TRACE_EVERY;
-  const pose=tracePose(v.trace,tick);
-  this.position.setText('GUEST '+Math.min(tick,this.tape.endTick)+'/'+this.tape.endTick+' TICKS  X '+Math.round(pose?.x||0)+'  UNRANKED');
+  let gap='';
+  const metres=visualGuestGapM(v,local,tick);
+  if(metres!==null){
+   gap='  GAP '+(metres>0?'+':'')+metres+'M';
+   const localHere=toPoint(local,Math.min(local.count-1,this.cursor));
+   g.fillStyle(c,1).fillCircle(localHere.x,localHere.y,2.5);
+  }
+  this.position.setText(ellipsize('GUEST '+Math.min(tick,this.tape.endTick)+'/'+this.tape.endTick+
+   ' TICKS'+gap+'  UNRANKED',380));
  }
  handleAction(action){
   if(action==='cancel'){this.close();return true;}
@@ -201,7 +253,7 @@ export class GhostLinkView extends View {
  }
  destroy(){
   ++this.token;
-  this.preview=null;this.tape=null;this.playing=false;
+  this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.playing=false;
   this.scene.events.off(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this.box?.destroy();this.box=null;
   super.destroy();

@@ -1,4 +1,4 @@
-import { guestPreview } from '../../src/ui/GhostLinkView.js';
+import { guestPreview,visualGuestGapM } from '../../src/ui/GhostLinkView.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../../src/systems/ghost/GhostTape.js';
 
 function tape(points) {
@@ -21,6 +21,18 @@ describe('Guest Ghost-in-a-Link trace preview is strictly read-only',()=>{
   expect(()=>guestPreview(tape([[1e15,0,0]]))).toThrow('Invalid ghost');
   expect(()=>guestPreview(tape([[0,0,Number.NaN]]))).toThrow('Invalid ghost');
  });
+ test('same-tick visual gap distinguishes forged guest path but grants no scoring',()=>{
+  const local=guestPreview(tape([[40,100,0],[60,110,0],[80,120,0]]));
+  const guest=guestPreview(tape([[140,100,0],[160,110,0],[180,120,0]]));
+  for(const tick of [TRACE_EVERY,TRACE_EVERY*2,TRACE_EVERY*3]){
+   expect(visualGuestGapM(guest,local,tick)).toBe(5);
+   expect(visualGuestGapM(local,guest,tick)).toBe(-5);
+  }
+  expect(visualGuestGapM(guest,null,TRACE_EVERY)).toBeNull();
+  expect(visualGuestGapM(guest,local,TRACE_EVERY*4)).toBeNull();
+  expect(guest).not.toHaveProperty('canCreditScore');
+ });
+
  test('does not create any persistent ghost or run records',()=>{
   const store=globalThis.localStorage;
   const read=()=>Object.fromEntries(Array.from({length:store.length},(_,i)=>{

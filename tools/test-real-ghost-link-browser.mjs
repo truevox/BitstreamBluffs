@@ -111,19 +111,19 @@ try{
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
  const previewed=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
-  return {loaded:!!v.tape,count:v.preview?.count,traceX:v.preview?.trace[0],status:v.status.main.text,
+  return {loaded:!!v.tape,count:v.preview?.count,localCount:v.localPreview?.count,localRole:v.localRole,traceX:v.preview?.trace[0],status:v.status.main.text,
    courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};
  });
- if(!previewed.count||!previewed.status.includes('UNVERIFIED')||previewed.courses!==beforehand.courses||
+ if(!previewed.count||!previewed.localCount||!previewed.status.includes('LOCAL BEST')||previewed.courses!==beforehand.courses||
     previewed.tapes!==beforehand.tapes||previewed.runs!==beforehand.runs)
   throw Error('Preview mutated normal records or failed '+JSON.stringify({beforehand,previewed}));
  const nextPoint=await clickPoint('nextBtn');
  await p.mouse.click(nextPoint.x,nextPoint.y);
  const scrub=await p.evaluate(()=>{
   const v=window.__bbGame.scene.getScene('TitleScene').view;
-  return {cursor:v.cursor,position:v.position.main.text};
+  return {cursor:v.cursor,position:v.position.main.text,localCount:v.localPreview?.count};
  });
- if(!(scrub.cursor>0)||!scrub.position.includes('UNRANKED'))throw Error('Trace scrub failed '+JSON.stringify(scrub));
+ if(!(scrub.cursor>0)||!scrub.position.includes('UNRANKED')||!scrub.position.includes('GAP'))throw Error('Guest/local comparison scrub failed '+JSON.stringify(scrub));
  // The paste textarea owns keyboard focus: Ctrl+Right/Left must still scrub,
  // and Ctrl+Shift+Enter must start/pause visual playback without a run.
  await p.locator('textarea').focus();
@@ -158,6 +158,28 @@ try{
  if(reduced.playing||!reduced.status.includes('REDUCED MOTION'))
   throw Error('Reduced motion allowed continuous ghost animation '+JSON.stringify(reduced));
  await p.evaluate(prev=>{window.__bbGame.registry.get('settings').reduceMotion=prev;},motion);
+ // Adversarial self-authored link: anyone can invent a high score and shift
+ // all input trace positions by +5 metres. The viewer MUST compare visually
+ // while never granting score, evidence or local-ghost identity.
+ const shiftedTrace=Buffer.from(original.trace,'base64');
+ for(let i=0;i<shiftedTrace.length;i+=12)
+  shiftedTrace.writeFloatLE(shiftedTrace.readFloatLE(i)+100,i);
+ const fake=await createGhostLink({...original,score:99999999,
+   trace:shiftedTrace.toString('base64')},origin);
+ const fakeCandidate=await parseGhostLink(fake);
+ if(fakeCandidate.canCreditScore||fakeCandidate.canCreditWallet||fakeCandidate.canSubmitOfficial)
+  throw Error('Forged URL unexpectedly gained entitlement');
+ await p.locator('textarea').fill(fake);
+ await p.keyboard.press('Control+Enter');
+ await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
+ const forged=await p.evaluate(()=>{
+  const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
+  return {status:v.status.main.text,position:v.position.main.text,localRole:v.localRole,
+   courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};
+ });
+ if(!forged.position.includes('GAP +5M')||!forged.status.includes('UNVERIFIED')||
+  forged.runs!==beforehand.runs||forged.tapes!==beforehand.tapes)
+  throw Error('Forged guest score affected local evidence or compare rendering '+JSON.stringify(forged));
  // A malformed replacement cannot leave the previously valid guest selected.
  await p.locator('textarea').fill('https://simulate.sledhead.ing/#bbghost=1.malformed');
  await p.mouse.click(previewPoint.x,previewPoint.y);
@@ -173,7 +195,8 @@ try{
  // A recipient can visit the shared URL directly. Arrival must NOT auto-parse,
  // persist, or start a guest run; only OPEN GHOST LINK offers the preview.
  const copiedUrl=await p.evaluate(()=>window.__ghostCopies[0]);
- const recipient=await ctx.newPage(),recipientErrors=[];
+ const recipientCtx=await browser.newContext(mobile?{viewport:{width:412,height:915},deviceScaleFactor:2,isMobile:true,hasTouch:true}:{viewport:{width:1000,height:540}});
+ const recipient=await recipientCtx.newPage(),recipientErrors=[];
  recipient.on('pageerror',e=>recipientErrors.push(e.message));
  await recipient.goto(copiedUrl,{waitUntil:'domcontentloaded'});
  await recipient.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});
@@ -200,14 +223,14 @@ try{
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
  const accepted=await recipient.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
-  return {status:v.status.main.text,points:v.preview?.count,unverified:!v.tape?.runId?.startsWith('private:'),
+  return {status:v.status.main.text,points:v.preview?.count,localCount:v.localPreview?.count||0,unverified:!v.tape?.runId?.startsWith('private:'),
    running:g.scene.isActive('RunScene')};
  });
- if(!accepted.points||!accepted.unverified||accepted.running||recipientErrors.length)
+ if(!accepted.points||accepted.localCount!==0||!accepted.unverified||accepted.running||recipientErrors.length)
   throw Error('Direct hash preview unexpectedly launched gameplay '+JSON.stringify({accepted,recipientErrors}));
- await recipient.close();
+ await recipient.close();await recipientCtx.close();
 
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,invalid,landed,direct,accepted,errors,recipientErrors}));
+ console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,forged,invalid,landed,direct,accepted,errors,recipientErrors}));
 }finally{if(browser)await browser.close();if(vite){if(typeof vite.close==='function')await vite.close();
 else if(vite.httpServer)await new Promise((r,j)=>vite.httpServer.close(e=>e?j(e):r()));}}
