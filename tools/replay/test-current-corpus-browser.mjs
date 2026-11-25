@@ -91,6 +91,6 @@ try{
  assert.equal(errors.length,0);
  assert.equal(mutating.length,0);
  console.log('FRESH_CURRENT_BROWSER_PASS',JSON.stringify({report,errors,mutating,
-  caveat:'Four runs naturally crashed; eight had a real fatal BSOD collision deliberately triggered by the QA harness. This is NOT general live-gameplay quota or physical-device proof.'}));
+  caveat:'Runs use automated inputs in native RunScene; natural and QA-induced terminal counts are in report. Injected quota is NOT measured physical-device storage exhaustion or human-play evidence.'}));
  await context.close();
 }finally{await browser.close();}
