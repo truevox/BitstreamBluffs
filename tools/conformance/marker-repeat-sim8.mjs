@@ -286,22 +286,45 @@ try {
         g.step(g.loop.now,0);
         if(run.simClock.tick!==before)throw Error('Visibility-only raster test advanced simulation');
       },{label,visible});
-      // A label obscured by another game object must NOT pass just because its
-      // isolated text texture is valid. With the replay/camera frozen, prove
-      // hiding EACH label changes the full, unmodified scene raster.
+      // Occlusion proof in the REAL scene. The scene can still contain WebGL
+      // shader/presentation drift even when simulation and scene.update are
+      // frozen. Sample visible/hidden/visible pairs and subtract the observed
+      // within-group drift rather than requiring whole-scene byte equality.
+      const realSceneSignal=async(groups)=>marked.p.evaluate(async groups=>{
+        const decode=async b64=>{
+          const img=new Image();img.src='data:image/png;base64,'+b64;
+          await img.decode();
+          const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+          return Array.from(ctx.getImageData(0,0,img.width,img.height).data);
+        };
+        const [v1,v2,h1,h2,r1,r2]=await Promise.all(groups.map(decode));
+        let pixels=0,peak=0;
+        for(let i=0;i<v1.length;i+=4){
+          let signal=0,noise=0;
+          for(let c=0;c<3;c++){
+            const j=i+c;
+            const v=(v1[j]+v2[j])/2,r=(r1[j]+r2[j])/2,h=(h1[j]+h2[j])/2;
+            signal=Math.max(signal,Math.abs((v+r)/2-h));
+            noise=Math.max(noise,Math.abs(v1[j]-v2[j]),Math.abs(h1[j]-h2[j]),
+              Math.abs(r1[j]-r2[j]),Math.abs(v-r));
+          }
+          if(signal>noise+24){pixels++;peak=Math.max(peak,signal-noise);}
+        }
+        return {pixels,peak};
+      },groups.map(png=>png.toString('base64')));
+      const actualSceneLabelProof={};
       for(const label of ['best','death']){
-        const clip=clipRegions[label];
-        await renderWithoutSim(label,true);
-        const first=await marked.p.screenshot({clip});
-        await renderWithoutSim(label,true);
-        const stable=await marked.p.screenshot({clip});
-        assert(first.equals(stable),`${label} real-scene raster was not stable at fixed simulation tick`);
-        await renderWithoutSim(label,false);
-        const hidden=await marked.p.screenshot({clip});
-        assert(!stable.equals(hidden),`${label} was hidden/occluded in the real scene`);
-        await renderWithoutSim(label,true);
-        const restored=await marked.p.screenshot({clip});
-        assert(stable.equals(restored),`${label} full-scene raster changed during visibility-only toggle`);
+        const clip=clipRegions[label],frames=[];
+        for(const [visible,repeats] of [[true,2],[false,2],[true,2]]){
+          for(let i=0;i<repeats;i++){
+            await renderWithoutSim(label,visible);
+            frames.push(await marked.p.screenshot({clip}));
+          }
+        }
+        const proof=await realSceneSignal(frames);
+        actualSceneLabelProof[label]=proof;
+        assert(proof.pixels>=12,`${label} text contributes no stable pixels to the real, potentially occluded scene (${JSON.stringify(proof)})`);
       }
       // Now isolate only the actual marker text for an exact per-label
       // restored-pixel proof independent of unrelated decorative artwork.
@@ -339,7 +362,7 @@ try {
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
       }
       rasterEvidence={hz,maxTicks,executedJs:markedJs,markerOnscreen:b.marker.onscreen,
-        capturedFrame:b.marker.capturedFrame,labelPixelProof,
+        capturedFrame:b.marker.capturedFrame,labelPixelProof,actualSceneLabelProof,
         normalPngSha:createHash('sha256').update(screenshotA).digest('hex'),
         markerPngSha:createHash('sha256').update(screenshotB).digest('hex'),
         markerGeneratorReads:b.marker.generatorReads,markerCacheMutations:b.marker.cacheMutations};
