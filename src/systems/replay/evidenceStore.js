@@ -229,7 +229,7 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null,priorPendingRunId=null,priorPendingGeneration=null}={}) {
+  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null,priorPendingRunId=null,priorPendingGeneration=null,priorPendingGenerationKnown=false}={}) {
     // A deletion tombstone and the bundle update share ONE IDB lock. Stale
     // tabs must not resurrect deliberately deleted bytes from pending RAM.
     const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX,EVIDENCE_DELETIONS], 'readwrite');
@@ -243,7 +243,8 @@ export class EvidenceStore {
       // A different run cannot overwrite an existing session-only run claim
       // unless an ACTUAL newer explicit delete is observed under this lock.
       if(!retry && priorPendingRunId && record.runId &&
-          priorPendingRunId!==record.runId && observed===priorPendingGeneration){
+          priorPendingRunId!==record.runId &&
+          (!priorPendingGenerationKnown || observed===priorPendingGeneration)){
         problem=protectionError('run-id-conflict','pending digest belongs to another run and was not deleted');
         tx.abort();return;
       }
@@ -313,14 +314,19 @@ export class EvidenceStore {
     if (validated && (validated.ok !== true || validated.bundleDigest !== res.bundleDigest))
       throw new EvidenceStoreError('validation-hint-mismatch', 'caller validation did not match actual canonical bytes');
     const digest = res.bundleDigest;
-    // Two same-digest direct puts must not both snapshot an old pending claim.
-    // Take the queue slot synchronously BEFORE awaiting the previous writer.
-    const priorWriter=this._putChains.get(digest) || Promise.resolve();
+    return this._withDigestMutation(digest,()=>this._putValidatedBytes(digest,bytes,meta));
+  }
+
+  /** Shared per-digest linearization point for explicit save AND delete.
+   * The slot is registered synchronously, before any await, so a later delete
+   * cannot overtake a previously invoked save in the same tab. */
+  async _withDigestMutation(digest,work) {
+    const prior=this._putChains.get(digest) || Promise.resolve();
     let release;
     const gate=new Promise(resolve=>{release=resolve;});
     this._putChains.set(digest,gate);
-    await priorWriter;
-    try { return await this._putValidatedBytes(digest,bytes,meta); }
+    await prior;
+    try {return await work();}
     finally {
       if(this._putChains.get(digest)===gate)this._putChains.delete(digest);
       release();
@@ -355,7 +361,8 @@ export class EvidenceStore {
     const writeReceipt = { classification:'unknown' };
     try {
       const committed = await this._writeDurable(record, bytes, writeReceipt,{
-        priorPendingRunId:pendingClaim?.runId || null,priorPendingGeneration});
+        priorPendingRunId:pendingClaim?.runId || null,priorPendingGeneration,
+        priorPendingGenerationKnown:this._pendingDeletionGeneration.has(digest)});
       this.index.set(digest, committed);
       const olderClaim = this.pendingMeta.get(digest);
       // A second overlapping unbound write may succeed while an earlier
@@ -740,6 +747,10 @@ export class EvidenceStore {
 
   /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
+    return this._withDigestMutation(digest,()=>this._removeUnlocked(digest));
+  }
+
+  async _removeUnlocked(digest) {
     if (this._removing.has(digest)) throw protectionError('delete-in-progress', 'deletion is already pending');
     // After versionchange, a previously durable bundle may still exist on
     // disk. Never claim deletion when only the tab's stale cache was changed.
