@@ -31,7 +31,8 @@ export class TakeoverPicker extends View {
     this.max = Math.max(1, (o.tape && o.tape.endTick | 0) - 1);
     this.tick = Math.max(1, this.max - 3 * SEC);
     this._shift = false;
-    const text = (x, y, value, color = 'text') => this.panel.add(new NeonText(scene, theme, x, y, value, { color, outline: 'none' }));
+    // Container.add returns the container, not the child: build, add, then return the NeonText itself.
+    const text = (x, y, value, color = 'text') => { const t = new NeonText(scene, theme, x, y, value, { color, outline: 'none' }); this.panel.add(t); return t; };
     text(12, 22, PICKER_BANNER, 'amber');
     this.elig = takeoverEligible(o.tape, 1, this.ctx);
     if (!this.elig.ok) {

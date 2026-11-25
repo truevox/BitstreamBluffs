@@ -287,7 +287,7 @@ function padSchedule(tape, from) {
   let i = 0, at = 0, bits = 0, tilt = 0, changeTick = -1;
   const rows = tape.inputs;
   let next = rows.length ? rows[0][0] : Infinity;
-  for (let tick = 1; tick <= tape.endTick; tick++) {
+  for (let tick = 1; tick <= tape.endTick + 1; tick++) { // +1: the crash happens on the tick AFTER the recorder's endTick (its last survived tick)
     while (i < rows.length && tick >= next) { bits = rows[i][1]; tilt = rows[i][2]; changeTick = next; i++; next = i < rows.length ? next + rows[i][0] : Infinity; }
     if (tick <= from) continue;
     const pad = decodePad(bits, tilt);
@@ -417,8 +417,9 @@ async function perNCase(kind, N, tape, rec, info) {
   await until(T.page, '(tk)=>tk.g.scene.isActive("RunScene")', 200);
   const phase2 = await seekToReady(T.page);
   const a2 = await T.page.evaluate(() => { const tk = window.__tk, r = tk.run(); return { tick: r.simClock.tick, fp: tk.fp(r), src: r.takeover.descriptor.source, digests: window.__ssGameKit.digests(r) }; });
-  const diff2 = Object.keys(a1.digests).filter((k) => JSON.stringify(a1.digests[k]) !== JSON.stringify(a2.digests[k]));
-  check(`(6) N=${N} ${kind}: RETRY from the end screen gives the SAME state-at-N fingerprint and EVERY kit digest as attempt 1 (independent attempt, source=retry)`, phase2 === 'ready' && a2.tick === N && a2.fp === a1.fp && diff2.length === 0 && a2.src === 'retry', { phase2, fp: [a1.fp, a2.fp], src: a2.src, diff2 });
+  // matter.ids hashes Matter's process-global monotonic id counter (Common._nextId), which a second run in the same page continues: not state.
+  const diff2 = Object.keys(a1.digests).filter((k) => k !== 'matter.ids' && JSON.stringify(a1.digests[k]) !== JSON.stringify(a2.digests[k]));
+  check(`(6) N=${N} ${kind}: RETRY from the end screen gives the SAME state-at-N fingerprint and every kit digest except Matter's global id counter as attempt 1 (independent attempt, source=retry)`, phase2 === 'ready' && a2.tick === N && a2.fp === a1.fp && diff2.length === 0 && a2.src === 'retry', { phase2, fp: [a1.fp, a2.fp], src: a2.src, diff2 });
 
   // ---- (c) divergence: different live input diverges and still ends unranked
   const c = await T.page.evaluate(async ({ N, fps, endTick }) => {
