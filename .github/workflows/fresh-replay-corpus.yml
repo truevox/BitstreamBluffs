@@ -3,13 +3,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/fresh-replay-corpus.yml'
-      - 'tests/replay/freshSim9Corpus.test.js'
-      - 'tests/replay/headlessRun.js'
-      - 'tools/replay/test-current-corpus-browser.mjs'
-      - 'src/scenes/RunScene.js'
-      - 'src/systems/replay/**'
-      - 'src/systems/ghost/GhostTape.js'
+      - 'package*.json'
+      - 'jest*.js'
+      - 'vite.config.*'
+      - 'tests/replay/**'
+      - 'tools/replay/**'
       - 'tools/ruleset/**'
+      - 'src/**'
   workflow_dispatch:
 permissions:
   contents: read
