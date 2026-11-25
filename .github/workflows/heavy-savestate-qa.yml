@@ -40,6 +40,6 @@ jobs:
       - name: Verify committed ruleset/build identity
         run: node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Verify focused diagnostic codec and CLI refusal tests
-        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-gate-cli.test.js tests/determinism/savestate-matter.test.js tests/determinism/savestate-recorder-prefix.test.js
+        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-gate-cli.test.js tests/determinism/savestate-matter.test.js tests/determinism/savestate-recorder-prefix.test.js tests/determinism/savestate-guest-admission.test.js
       - name: Run isolated production-build contact and hazard suffix gate
         run: npm run gate:heavy
