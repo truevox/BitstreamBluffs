@@ -98,8 +98,8 @@ export class ReplayEvidenceView extends View {
       const bytes=await control.store.get(capture.digest);
       if (!bytes) throw new Error('canonical evidence bytes not available');
       const persisted=await control.store.isBundleDurable(capture.digest);
-      const held=control.store.listProtections().some(r=>r.digest===capture.digest &&
-        r.runId===this.tape.runId && r.role==='pinned');
+      const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
+      const held=refs.some(r=>r.runId===this.tape.runId && r.role==='pinned');
       if (!this.alive || this._captureStatus()!==status) return;
       this.buttons[1].setDisabled(false); // exact bytes exist, including session-only
       this.pinReady=status.ok===true && persisted;
@@ -115,9 +115,13 @@ export class ReplayEvidenceView extends View {
   async _run(task) {
     if (this.busy || !this.alive) return;
     this.busy=true;
+    if(this._nativeInput)this._nativeInput.disabled=true;
     try{await task();}
     catch(e){this._show(`LOCAL ARCHIVE ERROR: ${statusText(e)}`);uiSfx(this.scene,'uiBack');}
-    finally{this.busy=false;}
+    finally{
+      this.busy=false;
+      if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
+    }
   }
 
   _keepOrUnpin() {return this._run(async()=>{
@@ -174,9 +178,12 @@ export class ReplayEvidenceView extends View {
     input.onfocus=()=>{if(this.alive){this.focus=2;this.buttons.forEach((b,i)=>b.setHover(i===2));}};
     input.onchange=()=>{
       const file=input.files?.[0];input.value='';
-      if (file) this._processImportFile(file);
+      this._restoreGameFocus();
+      if (!file) return;
+      if (this.busy) {this._show('ARCHIVE BUSY — FILE NOT IMPORTED','CHOOSE THE FILE AGAIN AFTER THIS ACTION');return;}
+      this._processImportFile(file);
     };
-    input.oncancel=()=>this._show('IMPORT CANCELLED');
+    input.oncancel=()=>{this._restoreGameFocus();this._show('IMPORT CANCELLED');};
     document.body.appendChild(input);
     this._nativeInput=input;
     this._positionNativeInput=()=>{
@@ -195,13 +202,16 @@ export class ReplayEvidenceView extends View {
     this.scene.scale?.on('resize',this._positionNativeInput);
   }
 
+  _restoreGameFocus() {
+    if(this._nativeInput && document.activeElement===this._nativeInput)this._nativeInput.blur();
+  }
+
   /** Gamepad/synthetic events have no browser file-picker privilege. Focus
    * the native control and give an actionable instruction instead of hanging.
    */
   _import() {
     if(this.busy || !this.alive)return;
     if(!this._nativeInput){this._show('BROWSER FILE PICKER NOT AVAILABLE');return;}
-    this._nativeInput.focus();
     if(navigator.userActivation?.isActive) this._nativeInput.click();
     else this._show('USE MOUSE/TOUCH OR TAB+ENTER','BROWSER REQUIRES ITS NATIVE FILE PICKER');
   }
