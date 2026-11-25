@@ -15,7 +15,7 @@ const EXTENSIONS = /\.(?:js|css|svg|png|jpe?g|webp|gif|ico|woff2?)$/i;
 
 export function shouldPrecache(relativePath) {
   const p = relativePath.replaceAll('\\', '/');
-  if (EXPLICIT.has(p)) return true;
+  if (EXPLICIT.has(p) || p === 'offline-melody-index.bin') return true;
   if (!EXTENSIONS.test(p)) return false;
   // Vite hashed bundles and first-party image assets only. Never cache raw
   // performance packs, third-party audio, music catalogs, docs or source maps.
