@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.22.5 — #56 exact-course ghost isolation (2026-11-25)
+
+- Refuse favorite assignments from other seed/biome-mask courses and reject foreign-course run-ID collisions before changing a local course's tape or role.
+- Serialize course/tape Save, Favorite and role visibility updates in a single IndexedDB transaction across tabs, including safe reference-aware cleanup; refresh displayed roles from authoritative storage.
+- Prevent corrupted cross-course role references from rendering as the current course's ghosts; display "OTHER COURSE" for repair in the read-only Game Over role panel.
+- Restrict per-course visibility toggles to Best, Latest and Favorite A/B/C; five-role dedup and local-only visual behavior remain unchanged.
+- No archive capacity rules, pricing, evictions, public sharing, scoring, authoritative replay/physics or SIM_REVISION change. #56 remains open pending owner-approved course-slot economics and broader acceptance.
+
+## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
+
+- Replace indirect Phaser `Math.Between` calls (which use unseeded `Math.random`) in HUD, Pause and Game Over with independent named seeded cosmetic streams, including `pause/glitch`.
+- Fix hidden Phaser RNG paths: trail spark lifespan/speed/angle now have seeded `onEmit` callbacks with an explicit `__BASE` texture frame; Game Over camera impact shake uses a bounded seeded cosmetic offset instead of Phaser's unseeded Shake.
+- Add static and real-Chromium regression coverage, including a throwing `Math.random` negative control that exercises real particles and shake. No change to the canonical physics RNG.
+- Presentation-only: SIM_REVISION 9, authoritative physics, scoring, saved records and replay protocol unchanged. Public verification and Heavy Mode savestates remain separate trust work.
+
+## Unreleased — #245 dual-proof contract v1 (2026-11-25)
+
+- Add pure, separately versioned public-eligibility policy (`bb-dual-proof` v1) with independent replay, trusted entitlement and explicit publication-consent decisions. Free peer and paid hosted routes produce the same canonical verdict; payment cannot change competitive eligibility or rewards.
+- Reject forged wallets, changed tapes/scores, missing authoritative receipts, changed course/lane consent, incomplete verifier provenance and stateful programmatic claim objects. Include adversarial tests and stable canonical vectors.
+- **Disabled by design:** no public verifier service, authenticated receipt adapter, user upload, wallet mutation, account infrastructure, leaderboard publication, or reward grants. Parent #135 remains OPEN; #244 evidence integration is separate. No simulation/physics or existing local board changes.
+
 ## v2.21.2 — readable World Dance (2026-11-24)
 
 - #212: owner-approved scenery motion across the six auditioned biome motifs. Stronger visual-only accents, individual motif motion and accessible neutral settings.

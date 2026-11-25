@@ -38,6 +38,15 @@ describe('Game Over local ghost roles', () => {
     expect((await readGhostCourseRows(library, { ...latest, biomeMask: 5 })).every((row) => row.info === 'EMPTY')).toBe(true);
   });
 
+  test('P1: corrupted foreign favorite is called OTHER COURSE, never shown as an eligible same-course tape',async()=>{
+    const {library,latest}=await courseFixture();
+    const foreign=library.course('S2',3).latest;
+    library.course('S1',3).favorites[0]=foreign; // simulate old/externally tampered roles
+    const rows=await readGhostCourseRows(library,latest);
+    expect(rows[2]).toMatchObject({info:'OTHER COURSE',shared:false,saveLabel:'REPLACE'});
+    expect((await library.ghostsFor('S1',3)).map(r=>r.runId)).not.toContain(foreign);
+  });
+
   test('shows per-course choices separately from the existing global ceiling', async () => {
     const { library, best, latest } = await courseFixture();
     await library.setShow('S1', 3, 'best', false);

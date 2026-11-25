@@ -7,6 +7,8 @@
  * Phaser 3.60+ particle emitter (`scene.add.particles(x, y, texture, config)`) for sparks. The spark texture is
  * generated at runtime (no image assets).
  */
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+
 const TEX_KEY = 'bb-spark';
 const MAX_POINTS = 30;
 
@@ -46,11 +48,17 @@ export class TrailParticles {
       g.generateTexture(TEX_KEY, 3, 3);
       g.destroy();
     }
+    // Fork without advancing the run's visualFx (or physics) state. Phaser's
+    // {min,max} particle configs secretly call unseeded Math.random on emit.
+    const sparkRng = scene.runRandom?.visualFx?.fork('trail/sparks') || cosmeticRandom('visual/trail');
     this.gfx = scene.add.graphics().setDepth(15);
     this.emitter = scene.add.particles(0, 0, TEX_KEY, {
-      lifespan: { min: 280, max: 620 },
-      speed: { min: 4, max: 46 },
-      angle: { min: 0, max: 360 },
+      // The generated texture has one frame; Phaser defaults to choosing
+      // a random index from an EMPTY frame list unless this is explicit.
+      frame: '__BASE',
+      lifespan: { onEmit: () => sparkRng.range(280, 620) },
+      speed: { onEmit: () => sparkRng.range(4, 46) },
+      angle: { onEmit: () => sparkRng.range(0, 360) },
       scale: { start: 1.4, end: 0 },
       alpha: { start: 0.95, end: 0 },
       blendMode: 'ADD',
