@@ -5,3 +5,20 @@ test('mode selection and status never transfer; High stages Lite before Full, an
 test('Full quota failure retains Lite; Space Saver and No Music never stage Full',async()=>{const f=fixture();f.allowFull(false);expect((await f.c.start({consent:true})).status).toBe('lite-ready');await f.c.apply();expect(f.calls.at(-1)).toBe('apply:lite');await f.c.setMode('space-saver');await f.c.start({consent:true});expect(f.calls.at(-1)).toBe('lite');await f.c.setMode('no-music');const n=f.calls.length;await f.c.start({consent:true});expect(f.calls.length).toBe(n);await f.c.apply();expect(f.calls.at(-1)).toBe('apply:null');});
 
 test('automatic playback-boundary promotion requires the transport barrier and never downloads',async()=>{const f=fixture();await f.c.start({consent:true});await f.c.apply();expect(f.c.quality).toBe('lite');const n=f.calls.length;expect((await f.c.beforePlayback()).reason).toBe('await-boundary');expect(f.calls.length).toBe(n);let held=false;f.c.withStoppedTransport=async fn=>{held=true;try{return await fn();}finally{held=false;}};f.c.activate=async(p,q)=>{expect(held).toBe(true);f.calls.push('apply:'+q);};f.setStopped(false);expect((await f.c.beforePlayback()).changed).toBe(false);f.setStopped(true);const a=f.c.beforePlayback(),b=f.c.beforePlayback();expect(a).toBe(b);expect(await a).toEqual({changed:true,quality:'full'});expect(f.calls.slice(n)).toEqual(['apply:full']);expect(held).toBe(false);});
+
+test('replan keeps verified downloads, replaces stale queues and never transfers by itself',async()=>{
+ const f=fixture();await f.c.start({consent:true});await f.c.apply();const n=f.calls.length;
+ const newPlan={...plan,groups:[...plan.groups,{id:'song-2:base:lite',quality:'lite',priority:'required'}],nextBiome:'micro-mountain'};
+ const stale=f.c.replan({...plan,nextBiome:'garbage-dump-glacier'}),latest=f.c.replan(newPlan);
+ await Promise.all([stale,latest]);expect(f.c.plan).toBe(newPlan);expect(f.c.quality).toBe('lite');expect(f.calls).toHaveLength(n);expect(f.c.state.planRevision).toBe(2);expect(f.c.state.nextBiome).toBe('micro-mountain');
+});
+
+test('lookahead is explicit, idle-only, data-saver-aware, budgeted Lite-first and cancellable',async()=>{
+ const groups=['a','b'].flatMap((song,i)=>['lite','full'].map((quality,q)=>({id:`${song}:lead:micro-mountain:${quality}`,originalId:`${song}:lead:micro-mountain`,songId:song,priority:'bonus',quality,bytes:q?22:10,entries:[{url:'https://example/'+quality+song,bytes:q?22:10,sha256:'0'.repeat(64)}]})));
+ const queues=[],seen=[];const c=new MelodyDownloadControls({plan:{...plan,nextBiome:'micro-mountain',groups},options:{connection:{saveData:false}},estimate:async()=>({quota:100,usage:0}),isStopped:()=>true,createQueue:({plan})=>{const q={plan,start:async()=>{seen.push('transfer');return {ready:true,status:'ready'};},cancel:()=>seen.push('cancel'),refresh:async()=>({ready:false,missingBytes:100,status:'download-required'})};queues.push(q);return q;}});
+ await expect(c.prefetch({idle:true})).rejects.toThrow(/consent/);await expect(c.prefetch({consent:true,idle:false})).rejects.toThrow(/idle/);expect(queues).toHaveLength(0);
+ c.options.connection.saveData=true;await expect(c.prefetch({consent:true,idle:true})).rejects.toThrow(/Save Data/);c.options.connection.saveData=false;
+ expect((await c.prefetch({consent:true,idle:true,maxBytes:21})).prefetchStatus).toBe('partial');expect(queues[0].plan.groups.map(g=>g.id)).toEqual(['a:lead:micro-mountain:lite','b:lead:micro-mountain:lite']);expect(queues[0].plan.groups.every(g=>g.priority==='required')).toBe(true);
+ expect((await c.prefetch({consent:true,idle:true,maxBytes:64})).prefetchStatus).toBe('ready');expect(queues[1].plan.groups).toHaveLength(4);expect(seen).toEqual(['transfer','transfer']);
+ c.mode='no-music';expect((await c.prefetch({consent:true,idle:true})).prefetchStatus).toBe('not-applicable');expect(seen).toHaveLength(2);
+});
