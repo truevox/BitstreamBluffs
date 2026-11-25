@@ -9,6 +9,7 @@ const url=process.env.GAME_URL||'http://127.0.0.1:18262/';
 const tape=JSON.parse(fs.readFileSync('tests/fixtures/replay/v1/legacy-tape.json','utf8'));
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const results=[];
+const record=s=>{results.push(s);console.log('QA_STEP',results.length,s);};
 try {
  const p=await browser.newPage({acceptDownloads:true});const errors=[];
  p.on('pageerror',e=>errors.push(String(e)));
@@ -30,7 +31,7 @@ try {
  },tape);
  assert(initial.alive && initial.initiallyDisabled && initial.depth>=500 && initial.labels.join(',')==='KEEP,EXPORT,IMPORT,REFRESH');
  assert(initial.message.includes('SAVED LOCALLY'));
- results.push('panel renders after Phaser theme-ready gate');
+ record('panel renders after Phaser theme-ready gate');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();
@@ -43,7 +44,7 @@ try {
   return {count:store.protectedCount(digest),label:view.buttons[0].label.main.text,message:view.status.main.text};
  });
  assert.equal(unpin.count,0);assert.equal(unpin.label,'KEEP');
- results.push('explicit Keep/Unpin changes durable IndexedDB reference');
+ record('explicit Keep/Unpin changes durable IndexedDB reference');
  const foreignPin=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   const {EvidenceStore}=await import('/src/systems/replay/evidenceStore.js');
@@ -59,7 +60,7 @@ try {
  assert.equal(foreignPin.cachedBefore,0);
  assert.equal(foreignPin.afterPin,'UNPIN');
  assert.equal(foreignPin.afterUnpin,'KEEP');
- results.push('Refresh follows persisted pin/unpin from another browser tab');
+ record('Refresh follows persisted pin/unpin from another browser tab');
  const oneHash=await p.evaluate(async()=>{
   const {view,store}=window.__qaEvidence;
   const get=store.get, oldDurable=store.isBundleDurable;
@@ -71,7 +72,7 @@ try {
   }finally{store.get=get;store.isBundleDurable=oldDurable;await view._refresh();}
  });
  assert(oneHash.exportEnabled && oneHash.keepEnabled);
- results.push('Refresh uses one atomic replay inspection instead of repeated full-bundle hashing');
+ record('Refresh uses one atomic replay inspection instead of repeated full-bundle hashing');
 
  const failedRefs=await p.evaluate(async()=>{
   const {view,store}=window.__qaEvidence;
@@ -85,24 +86,24 @@ try {
   } finally {store.persistedProtections=original;await view._refresh();}
  });
  assert(failedRefs.exportEnabled && failedRefs.keepDisabled && failedRefs.status.includes('EXPORT WORKS'));
- results.push('verified bundle remains exportable when pin index lookup fails');
+ record('verified bundle remains exportable when pin index lookup fails');
 
  const staleRefresh=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
-  const original=store.get.bind(store);
+  const original=store.inspectBundle.bind(store);
   let signal,release;
   const started=new Promise(resolve=>{signal=resolve;});
-  store.get=()=>{signal();return new Promise(resolve=>{release=async()=>resolve(await original(digest));});};
+  store.inspectBundle=(...args)=>{signal();return new Promise(resolve=>{release=async()=>resolve(await original(...args));});};
   try{
     const refreshing=view._refresh();
     await started;
     await view._run(async()=>{view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','RECENT USER ACTION');});
     await release();await refreshing;
     return {status:view.status.main.text,detail:view.detail.main.text};
-  }finally{store.get=original;await view._refresh();}
+  }finally{store.inspectBundle=original;await view._refresh();}
  });
  assert(staleRefresh.status.includes('IMPORTED LOCAL EVIDENCE'));
- results.push('late Refresh result cannot overwrite newer Import action feedback');
+ record('late Refresh result cannot overwrite newer Import action feedback');
 
 
  // Browser download must be triggered only when Export is explicitly clicked.
@@ -113,7 +114,7 @@ try {
  const exported=fs.readFileSync(downloadPath);
  assert.equal(download.suggestedFilename(),`${initial.digest.slice(7)}.bbreplay`);
  assert(exported.length>2000);
- results.push('explicit Export triggers digest-named local .bbreplay download');
+ record('explicit Export triggers digest-named local .bbreplay download');
  // A real native input overlays the Phaser button. Click its actual DOM
  // hit target, not a synthetic Phaser/gamepad event with no browser activation.
  const nativeFile=p.locator('input[data-role="replay-evidence-import"]');
@@ -126,17 +127,17 @@ try {
  const imported=await p.evaluate(()=>({msg:window.__qaEvidence.view.status.main.text,count:window.__qaEvidence.store.protectedCount(window.__qaEvidence.digest)}));
  const nativeFocus=await p.evaluate(()=>document.activeElement?.getAttribute('data-role'));
  assert.notEqual(nativeFocus,'replay-evidence-import');
- results.push('native picker returns keyboard focus to game after selecting a file');
+ record('native picker returns keyboard focus to game after selecting a file');
  assert(imported.msg.includes('UNVERIFIED'));
  assert.equal(imported.count,0);
- results.push('explicit file picker imports local-only data, stays unverified/unpinned');
+ record('explicit file picker imports local-only data, stays unverified/unpinned');
  const stale=await p.evaluate(()=>{
   const {scene,statusKey,view}=window.__qaEvidence;
   scene.registry.set(statusKey,{ok:true,runId:'some-prior-run',digest:'sha256:'+'f'.repeat(64)});
   return view._captureStatus();
  });
  assert.equal(stale,null);
- results.push('stale prior-run capture cannot be pinned as current run');
+ record('stale prior-run capture cannot be pinned as current run');
  const busyInput=await p.evaluate(async()=>{
   const {view}=window.__qaEvidence;
   let release;
@@ -146,7 +147,7 @@ try {
   return {blocked,reEnabled:view._nativeInput?.disabled===false};
  });
  assert(busyInput.blocked && busyInput.reEnabled);
- results.push('native picker is disabled during in-flight archive operations');
+ record('native picker is disabled during in-flight archive operations');
 
  const memory=await p.evaluate(async()=>{
   const {view,store,scene,statusKey}=window.__qaEvidence;
@@ -159,11 +160,13 @@ try {
   store._writeDurable=async()=>{throw Object.assign(new Error('test quota exceeded'),{name:'QuotaExceededError'});};
   let failed=false;
   try{await store.put(changed,{runId:'ui-smoke-run'});}catch(e){failed=e.code==='quota-exceeded';}
-  store._writeDurable=original;
   scene.registry.set(statusKey,{ok:false,runId:'ui-smoke-run',digest,code:'quota-exceeded',durable:false});
-  await view._refresh();
-  return {failed,digest,keepDisabled:view.buttons[0].disabled,exportDisabled:view.buttons[1].disabled,
-    message:view.status.main.text,pending:store.pending.has(digest)};
+  try {
+    await view._refresh(); // quota fault is STILL active; recovery must fail closed
+    return {failed,digest,keepDisabled:view.buttons[0].disabled,exportDisabled:view.buttons[1].disabled,
+      message:view.status.main.text,pending:store.pending.has(digest)};
+  } finally {store._writeDurable=original;}
+
  });
  assert(memory.failed && memory.pending && memory.keepDisabled && !memory.exportDisabled && memory.message.includes('EXPORT NOW'));
  const memoryDownloadWait=p.waitForEvent('download',{timeout:15000});
@@ -171,7 +174,7 @@ try {
  const memoryDownload=await memoryDownloadWait;
  assert.equal(memoryDownload.suggestedFilename(),`${memory.digest.slice(7)}.bbreplay`);
  assert(fs.readFileSync(await memoryDownload.path()).length>2000);
- results.push('quota-failed memory-only canonical input remains explicitly exportable but cannot be pinned');
+ record('quota-failed memory-only canonical input remains explicitly exportable but cannot be pinned');
  const recovered=await p.evaluate(async missingDigest=>{
   const {view,store}=window.__qaEvidence;
   await view._refresh(); // NO unrelated new run should be needed to retry quota bytes
@@ -189,7 +192,7 @@ try {
  assert(recovered.durable && recovered.enabled && recovered.message.includes('RECOVERED'));
  assert.equal(recovered.afterPin,1);
  assert.equal(recovered.afterUnpin,0);
- results.push('Refresh alone retries quota-failed bytes and enables run-bound Keep/Unpin');
+ record('Refresh alone retries quota-failed bytes and enables run-bound Keep/Unpin');
 
 
  const displayGeneration=await p.evaluate(async()=>{
@@ -217,7 +220,7 @@ try {
  assert.notEqual(displayGeneration.shownGeneration,displayGeneration.replacementGeneration);
  assert.equal(displayGeneration.stillProtected,1);
  assert(displayGeneration.denied.includes('stale-protection'));
- results.push('Unpin preserves displayed generation and refuses replacement pin after cache refresh');
+ record('Unpin preserves displayed generation and refuses replacement pin after cache refresh');
 
  const nativeKeys=await p.evaluate(()=>{
   const {view,scene}=window.__qaEvidence;
@@ -237,7 +240,7 @@ try {
   return {guardInstalled,restored,heard};
  });
  assert(nativeKeys.guardInstalled && nativeKeys.restored && nativeKeys.heard.length===0);
- results.push('native picker suppresses Space/Enter game shortcuts without disabling browser activation');
+ record('native picker suppresses Space/Enter game shortcuts without disabling browser activation');
 
  const importQuota=await p.evaluate(async()=>{
   const {view}=window.__qaEvidence;
@@ -251,7 +254,7 @@ try {
   }finally{actions.import=real;await view._refresh();}
  });
  assert(importQuota.message.includes('KEEP ORIGINAL FILE'));
- results.push('quota failure on imported file explicitly warns to keep original source');
+ record('quota failure on imported file explicitly warns to keep original source');
 
  const reconnected=await p.evaluate(async()=>{
   const {view,store}=window.__qaEvidence;
@@ -263,7 +266,7 @@ try {
  assert.equal(reconnected.before,'memory');
  assert.equal(reconnected.after,'idb');
  assert(reconnected.exportEnabled);
- results.push('Refresh automatically reopens previously closed IndexedDB and recovers local evidence');
+ record('Refresh automatically reopens previously closed IndexedDB and recovers local evidence');
 
  const navigation=await p.evaluate(async t=>{
   const [{GameOverScene},{GhostFavoritesView},{REG},{GhostLibrary}]=await Promise.all([
@@ -292,7 +295,7 @@ try {
     nativeInputsAfterClose:document.querySelectorAll('input[data-role="replay-evidence-import"]').length};
  },tape);
  assert(navigation.ghostOpen && navigation.archiveFocused && navigation.evidenceOpen && navigation.ghostReturned && navigation.closed && navigation.nativeInputsAfterClose===0);
- results.push('GameOver Ghost Favorites → Local Evidence → Ghost Favorites/close navigation');
+ record('GameOver Ghost Favorites → Local Evidence → Ghost Favorites/close navigation');
  await p.evaluate(async()=>{
   const {ReplayEvidenceView}=await import('/src/ui/ReplayEvidenceView.js');
   const {scene}=window.__qaEvidence;
@@ -306,7 +309,7 @@ try {
  const esc=await p.evaluate(()=>({alive:window.__qaEscapeView.alive,
    remaining:document.querySelectorAll('input[data-role="replay-evidence-import"]').length}));
  assert(!esc.alive && esc.remaining===0);
- results.push('Escape from focused native input closes panel and cleans up DOM');
+ record('Escape from focused native input closes panel and cleans up DOM');
 
  assert.deepEqual(errors,[]);
  await p.screenshot({path:'/tmp/bsb244-local-evidence-ui-browser.png'});
