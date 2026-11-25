@@ -104,3 +104,19 @@ The previously unqualified three live overlap cases were rerun sequentially on a
 Reproduction: build locally, copy the developer-only live capture worklet into the built assets at its expected URL, and serve dist on loopback using a static server. Invoke existing audit with QA_R2=1, QA_INDEX, QA_BIOME, GAME_URL and a unique REPORT_OUT for each case. The static server is for developer QA only, not publication.
 
 Experimental same-input crossfade guard replay was attempted twice for index 1, tapping live compressor output upstream of the production guard and planning native offline replay through both curves. Both attempts failed strict post-arm continuity with a repeated 128-frame quantum timestamp (expected 329344, got 329216; expected 334592, got 334464). No valid paired metrics exist, no cause established, and no retry of measured clipping occurred. The unqualified experimental code is retained as a private patch, not included in this PR. Established capture diagnostics now retain the actual discontinuity receipt. The five qualified same-input ending comparisons remain valid. Do not promote candidate until crossfade comparison, listening, device testing and review are satisfactory. All source and production DSP remain unchanged.
+
+## Source-bound offline crossfade headroom comparison
+
+Third live preguard attempt changed only the diagnostic environment: playback latency hint (actual base latency 23.22ms at 44.1kHz) and 32768-frame worklet message batches vs 1024. Strict continuity still rejected a repeated 128-frame quantum (expected 354688, actual 354560). Frequent PCM messages are not a sufficient explanation; no root cause or paired live verdict established. Report SHA-256 2b4f959f6eb94b121e471f80e46aadec105e1e2c8248629d104bade590a6db7c. No relaxation of capture rules.
+
+Complementary offline comparison uses exact R2 outgoing last 3.8s and incoming first 3.8s, including all intersecting segments (no synthetic padding), production planSongCrossfade/automateTransition (2.8s fallback, 32 envelope steps), shared native StemFXMixer and AudioSynth compressor, identical input to parallel native guard curves. Frozen outgoing vocal effects and room sends and fixed source gains; NOT a faithful dynamic transport reproduction or actual gameplay/SFX/physics capture. One second on either side of overlap measured, 4.8s per case. Independent catalog and manifest hashes and 84 decoded source hash checks against publication inventory, all coverage intervals verified.
+
+| Index | Biome | Baseline estimated dBTP | Candidate estimated dBTP |
+|---|---|---:|---:|
+| 1 | Vertigo | -.317 | -1.019 |
+| 4 | Candy | -.672 | -1.220 |
+| 25 | Garbage | -.569 | -1.242 |
+| 26 | Vertigo | -1.070 | -1.443 |
+| 31 | Vertigo | -.546 | -1.223 |
+
+5/5 offline overlap cases below -1dBTP with candidate, 24s measured, max absolute RMS change .020144dB, zero measured clips/overs in either arm. Worst candidate only .0186dB below preferred target; do not imply a robust calibrated safety margin. Private report SHA-256 1a5a35f77a0a861287818bac7b481e2047d31edc7f40918ebda302e41a8ab8b0. All five hot-ending comparisons reproduced after helper refactor; 81/81 focused tests pass. No source/production changes. Next: actual candidate live postguard comparison or different audio environment, independent review, human listening and device acceptance; do not claim exact same-input live crossfade comparison.

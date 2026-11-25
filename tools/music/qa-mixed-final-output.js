@@ -1,3 +1,4 @@
+import {planSongCrossfade,automateTransition} from '../../src/systems/music/SongCrossfade.js';
 /**
  * Source-bound final-master OFFLINE Chromium audio evidence.
  * Reuses *production* AudioSynth._buildGraph(), production AudioSynth
@@ -121,6 +122,83 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode,offsetFrames=0}){
 	}
 	return mixer;
 }
+function installPairedGuards(ctx,a){
+	const candidate=ctx.createWaveShaper();
+	const curve=new Float32Array(8193);
+	for(let i=0;i<curve.length;i++){
+		const v=2*i/(curve.length-1)-1,m=Math.abs(v),t=(m-.78)/.10;
+		curve[i]=m<=.78?v:Math.sign(v)*(.78+.10*(1-1/(1+t+t*t/2+t*t*t/6)));
+	}
+	candidate.curve=curve;candidate.oversample='2x';
+	a.nodes.comp.connect(candidate);
+	a.nodes.peakGuard.disconnect(ctx.destination);
+	const merge=ctx.createChannelMerger(4);
+	for(const [index,node] of [a.nodes.peakGuard,candidate].entries()){
+		const split=ctx.createChannelSplitter(2);
+		node.connect(split);split.connect(merge,0,index*2);split.connect(merge,1,index*2+1);
+	}
+	merge.connect(ctx.destination);
+}
+// Complementary source-backed offline overlap, not a live transport capture.
+async function renderPairedCrossfade({from,to,biome}){
+ const manifest=async track=>{
+  if(!/^packs\/[\w-]+\/pack\.json$/.test(track.manifest))throw Error('Invalid manifest');
+  const url=R2_RELEASE+track.manifest;
+  const response=await fetch(url);if(!response.ok)throw Error('Manifest HTTP '+response.status);
+  const m=await response.json();if(m.id!==track.id||m.sampleRate!==RATE)throw Error('Manifest identity or rate');
+  return {m,url,pack:track.manifest.split('/')[1]};
+ };
+ const [out,inc]=await Promise.all([manifest(from),manifest(to)]);
+ const plan=planSongCrossfade(out.m.frameCount/RATE,null,null);
+ const overlapFrames=Math.round(plan.duration*RATE),leadFrames=RATE,tailFrames=RATE;
+ const fadeStart=START+leadFrames/RATE,fadeEnd=fadeStart+overlapFrames/RATE;
+ const renderFrames=Math.round(START*RATE)+leadFrames+overlapFrames+tailFrames+12000;
+ const ctx=new OfflineAudioContext(4,renderFrames,RATE);
+ seedCosmeticRandom(QA_COSMETIC_SEED);
+ const a=actualAudioSynthGraph(ctx);installPairedGuards(ctx,a);
+ const mixer=new StemFXMixer(ctx,a.nodes.musicFilter,{roomQuality:'standard'});
+ mixer.selectBiome(biome);a._stemMusic.mixer=mixer;
+ const roles=[...ALL_ROLES,'voice:'+biome],inputs=new Map();
+ // Freeze the outgoing pack vocal FX/room sends across the overlap. Native
+ // shared mixer, production envelope knots; no live transport effect retarget.
+ for(const role of roles){
+  const effects=role==='vocals'?(out.m.effects?.[role]||[]):role.startsWith('voice:')?melodyPreset(biome):[...sourceOnlyExtras(biome,role),...orchestraPreset(biome,role)];
+  inputs.set(role,mixer.addSource(role,{gain:role.startsWith('voice:')?.18:1,effects}));
+  if(role==='vocals'||role.startsWith('voice:'))mixer.setRoomSend(role,out.m.roomSends?.[role]??null);
+ }
+ const receipts=[];
+ async function schedule(track,lo,hi,at,direction){
+  let cursor=lo;
+  for(const [i,segment] of track.m.segments.entries()){
+   const first=Math.max(lo,segment.startFrame),last=Math.min(hi,segment.startFrame+segment.frames);
+   if(last<=first)continue;
+   if(first!==cursor)throw Error('Segment coverage gap');cursor=last;
+   const decoded=await decodeOriginals(track.pack,i,biome,track.url);
+   const when=at+(first-lo)/RATE,duration=(last-first)/RATE,offset=(first-segment.startFrame)/RATE;
+   for(const role of roles){
+    const buffer=decoded.sources.get(role);
+    if(buffer.length!==segment.frames)throw Error('Decoded source frame count mismatch');
+    const src=ctx.createBufferSource();src.buffer=buffer;
+    const env=ctx.createGain();src.connect(env);env.connect(inputs.get(role));
+    automateTransition(env.gain,role,direction,fadeStart,fadeEnd,when);
+    src.start(when,offset,duration);
+   }
+   receipts.push({id:track.m.id,manifestUrl:track.url,segment:i,first,last,hashes:decoded.hashes});
+  }
+  if(cursor!==hi)throw Error('Missing segment coverage');
+ }
+ const outgoingStart=out.m.frameCount-overlapFrames-leadFrames;
+ const incomingEnd=overlapFrames+tailFrames;
+ if(outgoingStart<0||incomingEnd>inc.m.frameCount)throw Error('Song too short');
+ await schedule(out,outgoingStart,out.m.frameCount,START,'out');
+ await schedule(inc,0,incomingEnd,fadeStart,'in');
+ const pcm=await ctx.startRendering();
+ const bounds={startFrame:Math.round(START*RATE),endFrame:Math.round(fadeEnd*RATE)+tailFrames};
+ const metrics=offset=>measureFourTimesTruePeak({length:pcm.length,sampleRate:RATE,numberOfChannels:2,getChannelData:i=>pcm.getChannelData(offset+i)},bounds);
+ const baseline=metrics(0),candidate=metrics(2);
+ mixer.destroy();
+ return {from:out.m.id,to:inc.m.id,biome,plan,fadeStart,fadeEnd,receipts,baseline,candidate,deltaDb:candidate.estimatedTruePeakDbTp4x-baseline.estimatedTruePeakDbTp4x,rmsDeltaDb:20*Math.log10(candidate.rms/baseline.rms),limitations:'offline, frozen outgoing vocal FX/room sends, fixed source gains, no live transport or gameplay SFX'};
+}
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	profile='standard',manifestUrl=null,windowPosition='legacy',pairedHeadroom=false}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
@@ -140,25 +218,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
 	seedCosmeticRandom(QA_COSMETIC_SEED);
 	const a=actualAudioSynthGraph(ctx);
-	// Both guards receive the identical native compressor PCM in a single
-	// render. Preserve production curve and oversampling; candidate is QA-only.
-	if(pairedHeadroom){
-		const candidate=ctx.createWaveShaper();
-		const curve=new Float32Array(8193);
-		for(let i=0;i<curve.length;i++){
-			const v=2*i/(curve.length-1)-1,m=Math.abs(v),t=(m-.78)/.10;
-			curve[i]=m<=.78?v:Math.sign(v)*(.78+.10*(1-1/(1+t+t*t/2+t*t*t/6)));
-		}
-		candidate.curve=curve;candidate.oversample='2x';
-		a.nodes.comp.connect(candidate);
-		a.nodes.peakGuard.disconnect(ctx.destination);
-		const merge=ctx.createChannelMerger(4);
-		for(const [index,node] of [a.nodes.peakGuard,candidate].entries()){
-			const split=ctx.createChannelSplitter(2);
-			node.connect(split);split.connect(merge,0,index*2);split.connect(merge,1,index*2+1);
-		}
-		merge.connect(ctx.destination);
-	}
+	if(pairedHeadroom)installPairedGuards(ctx,a);
 	const mixer=scenario==='sfx-wind-only'?null:setOriginalSourceMix(ctx,a,original,
 		{biome,mode:scenario,offsetFrames});
 	let installedAudioSources=original.roles.length;
@@ -436,4 +496,4 @@ async function compareOriginalFatal(args={}){
 		countInVsRealOriginalNoCountIn:windows};
 }
 window.__mixedFinalAudioQA=Object.freeze({
-	render,renderOriginalFatal,compareOriginalFatal,measureFourTimesTruePeak,EVENTS,FXS,FATAL_EVENTS});
+	render,renderPairedCrossfade,renderOriginalFatal,compareOriginalFatal,measureFourTimesTruePeak,EVENTS,FXS,FATAL_EVENTS});
