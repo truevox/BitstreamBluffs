@@ -286,16 +286,30 @@ try {
       },{label,visible});
       for(const label of ['best','death']){
         const clip=clipRegions[label];
+        const markerState=()=>marked.p.evaluate(label=>{
+          const run=window.__bbGame.scene.getScene('RunScene');
+          const m=run[label==='best'?'bestMarker':'deathMarker'];
+          const cam=run.cameras.main,rect=m.label.getBounds();
+          return {tick:run.simClock.tick,passed:m.passed,text:m.label.text,
+            x:m.label.x,y:m.label.y,visible:m.label.visible,
+            scrollX:cam.scrollX,scrollY:cam.scrollY,shakeAmp:run.shakeAmp,
+            bounds:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
+        },label);
         // Establish the same zero-simulation-frame rendering baseline used
         // for the hidden and restored captures. The bounded replay's final
         // frame may precede Phaser camera/label presentation settlement.
         await renderWithoutSim(label,true);
+        const visibleModel=await markerState();
         const visiblePixels=await marked.p.screenshot({clip});
         await renderWithoutSim(label,false);
+        const hiddenModel=await markerState();
         const hiddenPixels=await marked.p.screenshot({clip});
         assert(!visiblePixels.equals(hiddenPixels),`${label} text pixels did not change when only that label was hidden`);
         await renderWithoutSim(label,true);
+        const restoredModel=await markerState();
         const restoredPixels=await marked.p.screenshot({clip});
+        if(!visiblePixels.equals(restoredPixels))
+          console.log('RASTER_MODEL_MISMATCH',label,JSON.stringify({visibleModel,hiddenModel,restoredModel}));
         // Developer diagnostic only: preserve the three crops when this strict
         // byte-equality gate fails, so a real mismatch can be inspected.
         if(!visiblePixels.equals(restoredPixels)){
