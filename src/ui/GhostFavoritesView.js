@@ -24,6 +24,7 @@ export class GhostFavoritesView extends View {
     super(scene, theme, { w: 352, h: 194, title: 'COURSE GHOSTS', color: 'magenta', onClose: o.onClose,
       hints: [{ keys: ['↑', '↓'], label: 'ROW' }, { keys: ['←', '→'], label: 'SHOW' }, { keys: ['ENTER'], label: 'SELECT' }] });
     this.library = o.library;
+    this.onEvidence = o.onEvidence || null;
     this.tape = o.tape;
     // Preserve the existing G, Enter shortcut for pinning Favorite A.
     this.focus = GHOST_COURSE_ROWS.findIndex(({ slot }) => slot === 0);
@@ -50,7 +51,11 @@ export class GhostFavoritesView extends View {
       return { mark, info, detail, save, show };
     });
     text(12, 149, 'SHARED: DRAWS ONCE IF ANY ROLE CAN SHOW.');
-    text(12, 160, 'SETTINGS CAN HIDE BEST / LATEST.');
+    if (this.onEvidence) {
+      const archive=new Button(scene,theme,{x:12,y:157,w:96,h:15,label:'LOCAL EVIDENCE',color:'cyan',onClick:()=>this.onEvidence()});
+      this.panel.add(archive);
+      text(115,160,'PRIVATE FILES — NO UPLOAD','cyan');
+    } else text(12, 160, 'SETTINGS CAN HIDE BEST / LATEST.');
     this.status = new NeonText(scene, theme, 12, this.h - 18, '', { color: 'lime', outline: 'none' });
     this.panel.add(this.status);
     this._markFocus();
