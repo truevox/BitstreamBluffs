@@ -74,6 +74,13 @@
         <input id="sample" type="range" min="1" step="1" aria-describedby="sample-units">
         <p id="pose" class="metric" role="status"></p>
         <p id="sample-units"><small>X/Y use game-world units, not distance or elevation. Timing is nominal simulation time; the recorded trace begins at tick 4.</small></p>
+        <form id="tick-form" class="actions" novalidate>
+          <label class="stack" for="jump-tick">Nominal tick<input id="jump-tick" type="number" step="1" required
+            aria-describedby="tick-hint tick-status"></label>
+          <button type="submit">Find stored pose</button>
+        </form>
+        <small id="tick-hint">Uses the nearest stored pose without interpolation. Halfway ties go to the earlier pose.</small>
+        <p id="tick-status" class="metric" role="status"></p>
         <div class="actions">
           <button type="button" id="zoom-in">Zoom in around sample</button>
           <button type="button" id="zoom-out">Zoom out around sample</button>

@@ -148,6 +148,18 @@ export function openDownhillRunTrace(json) {
       return { x: poses[POSE_WIDTH * index], y: poses[POSE_WIDTH * index + 1], tick,
         nominalSeconds: tick / TICKS_PER_SECOND };
     },
+    // Use the full trace, not its bounded preview vertices. No pose interpolation.
+    locateTick(requestedTick) {
+      const lastTick = count * TICKS_PER_SAMPLE;
+      if (!Number.isSafeInteger(requestedTick) || requestedTick < TICKS_PER_SAMPLE || requestedTick > lastTick) {
+        throw new RangeError(`Choose a whole tick from ${TICKS_PER_SAMPLE} to ${lastTick}`);
+      }
+      const segment = (requestedTick - TICKS_PER_SAMPLE) / TICKS_PER_SAMPLE;
+      const earlier = Math.floor(segment);
+      const index = earlier + Number(segment - earlier > 0.5);
+      const tick = (index + 1) * TICKS_PER_SAMPLE;
+      return { index, tick, exact: tick === requestedTick };
+    },
     render({ start = 0, end = count - 1, selected = null } = {}) {
       if (!valid(start) || !valid(end) || start >= end ||
           (selected !== null && (!valid(selected) || selected < start || selected > end))) {

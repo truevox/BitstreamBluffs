@@ -31,6 +31,28 @@ describe('Downhill Run Strip', () => {
     expect(trace.render()).not.toContain('crash');
   });
 
+  test('locates only recorded poses, prefers the earlier pose on ties, and ignores tape endpoints', () => {
+    const trace = openDownhillRunTrace(tape(points, { endTick: 209, cause: 'crash' }));
+    for (const [request, index, tick, exact] of [
+      [4, 0, 4, true], [5, 0, 4, false], [6, 0, 4, false], [7, 1, 8, false],
+      [8, 1, 8, true], [14, 2, 12, false], [16, 3, 16, true],
+    ]) expect(trace.locateTick(request)).toEqual({ index, tick, exact });
+    for (const request of ['', '8', NaN, Infinity, 3, 16.5, 17, 209]) {
+      expect(() => trace.locateTick(request)).toThrow('Choose a whole tick from 4 to 16');
+    }
+  });
+
+  test('can locate a pose that was omitted from the decimated default SVG', () => {
+    const rows = Array.from({ length: 1532 }, (_, i) => [i, 0, 0]);
+    rows[2][1] = 60; rows[3][1] = 40; rows[5][1] = -60;
+    const trace = openDownhillRunTrace(tape(rows));
+    const {index} = trace.locateTick(16);
+    const svg = trace.render();
+    expect(index).toBe(3);
+    expect(vertices(trace.render({ selected: index }))).toBe(vertices(svg) + 1);
+    expect(trace.render()).toBe(svg);
+  });
+
   test('keeps backward X motion, positive Y down and equal geometric scale', () => {
     const svg = openDownhillRunTrace(tape(points)).render();
     expect(path(svg)).toBe('M382 127 L672.67 272.33 L527.33 199.67 L818 345');
@@ -154,6 +176,11 @@ test('file changes clear artwork immediately; stale reads cannot replace the cur
   document.body.replaceChildren(...new DOMParser().parseFromString(html, 'text/html').body.childNodes);
   const image = document.getElementById('run-art'), frame = document.getElementById('run-art-frame');
   const input = document.getElementById('tape'), status = document.getElementById('load-status');
+  const tick = document.getElementById('jump-tick'), tickStatus = document.getElementById('tick-status');
+  const submitTick = (value) => {
+    tick.value = value;
+    document.getElementById('tick-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  };
   const methods = ['createObjectURL', 'revokeObjectURL'];
   const saved = methods.map((name) => Object.getOwnPropertyDescriptor(URL, name));
   let sequence = 0;
@@ -181,10 +208,25 @@ test('file changes clear artwork immediately; stale reads cannot replace the cur
     expect(createObjectURL.mock.calls.at(-1)[0].type).toBe('image/svg+xml');
     document.getElementById('zoom-in').click();
     expect(image.getAttribute('src')).toBe(first);
+    expect(tick.max).toBe('16');
+    submitTick('6');
+    expect(tickStatus.textContent).toBe('No stored pose at tick 6; showing the closest one at tick 4.');
+    submitTick('16');
+    expect(tickStatus.textContent).toBe('Showing stored pose at tick 16. Reopened the full trace.');
+    expect(document.getElementById('sample').value).toBe('4');
+    expect(document.getElementById('pose').textContent).toContain('X 400 · Y 470');
+    submitTick('17');
+    expect(tick.getAttribute('aria-invalid')).toBe('true');
+    expect(tickStatus.textContent).toBe('Choose a whole tick from 4 to 16');
+    expect(document.getElementById('sample').value).toBe('4');
+    expect(image.getAttribute('src')).toBe(first);
 
     let finishSlow;
     select({ size: 1, arrayBuffer: () => new Promise((resolve) => { finishSlow = resolve; }) });
     expect(frame.hidden).toBe(true);
+    expect(tick.value).toBe('');
+    expect(tickStatus.textContent).toBe('');
+    expect(tick.hasAttribute('aria-invalid')).toBe(false);
     expect(image.hasAttribute('src')).toBe(false);
     expect(revokeObjectURL).toHaveBeenCalledWith(first);
     select(file(tape(points.slice(0, 2))));
@@ -196,6 +238,7 @@ test('file changes clear artwork immediately; stale reads cannot replace the cur
     await settle();
     expect(image.getAttribute('src')).toBe(second);
     expect(status.textContent).toContain('Opened 2 recorded poses');
+    expect(tick.max).toBe('8');
 
     select(file('not valid JSON'));
     await settle();

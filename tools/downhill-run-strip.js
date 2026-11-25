@@ -6,6 +6,7 @@ const inspector = byId('inspector'), preview = byId('strip');
 const artFrame = byId('run-art-frame'), art = byId('run-art'), artUnavailable = byId('art-unavailable');
 const startField = byId('start'), endField = byId('end'), sampleField = byId('sample');
 const zoomIn = byId('zoom-in'), zoomOut = byId('zoom-out');
+const tickField = byId('jump-tick'), tickStatus = byId('tick-status');
 let trace = null, loadGeneration = 0;
 let start = 0, end = 1, selected = 0;
 let previewUrl, downloadUrl, artUrl;
@@ -24,10 +25,20 @@ function svgUrl(svg) {
 function clearInspector() {
   trace = null;
   inspector.hidden = true;
+  tickField.value = '';
+  tickField.removeAttribute('min');
+  tickField.removeAttribute('max');
+  clearTickStatus();
   preview.removeAttribute('src');
   art.removeAttribute('src');
   artFrame.hidden = artUnavailable.hidden = true;
   releaseUrls();
+}
+
+function clearTickStatus() {
+  tickField.removeAttribute('aria-invalid');
+  tickStatus.classList.remove('error');
+  tickStatus.textContent = '';
 }
 
 function showArt() {
@@ -56,6 +67,7 @@ function updateSample() {
 }
 
 function openSection(first, last) {
+  clearTickStatus();
   start = first;
   end = last;
   selected = Math.min(end, Math.max(start, selected));
@@ -110,6 +122,8 @@ tapeFile.addEventListener('change', async () => {
     selected = 0;
     startField.max = String(trace.count - 1);
     endField.max = String(trace.count);
+    tickField.min = String(trace.sample(0).tick);
+    tickField.max = String(trace.sample(trace.count - 1).tick);
     showSections();
     openSection(0, trace.count - 1);
     showArt();
@@ -137,9 +151,37 @@ byId('section-form').addEventListener('submit', (event) => {
 byId('all').addEventListener('click', () => { if (trace) openSection(0, trace.count - 1); });
 sampleField.addEventListener('input', () => {
   if (!trace) return;
+  clearTickStatus();
   selected = sampleField.valueAsNumber - 1;
   updateSample();
 });
+
+byId('tick-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!trace) return;
+  clearTickStatus();
+  const requested = tickField.valueAsNumber;
+  let located;
+  try { located = trace.locateTick(requested); }
+  catch (error) {
+    tickField.setAttribute('aria-invalid', 'true');
+    tickStatus.classList.add('error');
+    tickStatus.textContent = error.message;
+    return;
+  }
+  selected = located.index;
+  const reopen = selected < start || selected > end;
+  if (reopen) openSection(0, trace.count - 1);
+  else {
+    sampleField.value = String(selected + 1);
+    updateSample();
+  }
+  const label = located.exact ? `Showing stored pose at tick ${located.tick}.` :
+    `No stored pose at tick ${requested}; showing the closest one at tick ${located.tick}.`;
+  tickStatus.textContent = reopen ? label + ' Reopened the full trace.' : label;
+});
+
+tickField.addEventListener('input', clearTickStatus);
 
 function zoom(factor) {
   if (!trace) return;
