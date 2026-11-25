@@ -142,7 +142,7 @@ afterEach(() => jest.useRealTimers());
 
 describe('the live run produced evidence', () => {
   test('the hook saved a bundle: status ok, ghost still saved, tape unchanged in shape', () => {
-    expect(rec.status).toMatchObject({ ok: true, detail: 'combined', outcome: 'valid' });
+    expect(rec.status).toMatchObject({ ok: true, detail: 'combined', outcome: 'valid', runId: 'rec-1' });
     expect(rec.ghostSaved).toBe(rec.tape);
     expect(rec.tape.edgeRows).toBe('every-tick');
     expect(rec.tape.endTick).toBe(END);
