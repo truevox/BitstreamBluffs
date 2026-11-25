@@ -177,7 +177,8 @@ try {
   }
  });
  assert(keepSourceWarning.status.includes('KEEP ORIGINAL FILE'));
- assert(keepSourceWarning.details.includes('PIN STATUS UNAVAI'));
+ assert(keepSourceWarning.details.includes('IMPORT UNSAVED'));
+ assert(keepSourceWarning.details.includes('PIN STATUS UNKNOWN'));
  record('failed import retains KEEP ORIGINAL FILE alongside reconciliation storage warning');
 
  const vanishedPin=await p.evaluate(async()=>{
@@ -216,6 +217,24 @@ try {
  assert(actualStalePin.status.includes('PIN STATUS CHANGED'));
  assert.equal(actualStalePin.remaining,0);
  record('actual cross-tab stale Unpin reconciles KEEP label without a manual Refresh');
+
+ const foreignStalePin=await p.evaluate(async()=>{
+  const {view,store,digest}=window.__qaEvidence;
+  const {EvidenceStore}=await import('/src/systems/replay/evidenceStore.js');
+  await view._refresh();await view._keepOrUnpin();
+  const refs=await store.persistedProtections(digest);
+  const external=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+  for(const ref of refs)if(ref.role==='pinned')await external.unprotect(ref.key);
+  // This store still has its OLD cached generation. Its unprotect throws.
+  await view._keepOrUnpin();
+  const out={label:view.buttons[0].label.main.text,status:view.status.main.text,
+    remaining:await external.persistedProtectedCount(digest)};
+  await view._refresh();return out;
+ });
+ assert.equal(foreignStalePin.label,'KEEP');
+ assert(foreignStalePin.status.includes('PIN STATUS CHANGED'));
+ assert.equal(foreignStalePin.remaining,0);
+ record('thrown stale-protection from a second tab also reconciles Unpin immediately');
 
  // Browser download must be triggered only when Export is explicitly clicked.
  const downloadPromise=p.waitForEvent('download',{timeout:15000});
@@ -373,7 +392,7 @@ try {
  assert.equal(displayGeneration.shownGeneration,displayGeneration.firstGeneration);
  assert.notEqual(displayGeneration.shownGeneration,displayGeneration.replacementGeneration);
  assert.equal(displayGeneration.stillProtected,1);
- assert(displayGeneration.denied.includes('stale-protection'));
+ assert(displayGeneration.denied.includes('PIN STATUS CHANGED'));
  record('Unpin preserves displayed generation and refuses replacement pin after cache refresh');
 
  const nativeKeys=await p.evaluate(()=>{
