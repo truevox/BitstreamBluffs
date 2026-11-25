@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 02:44 UTC. Main `11614123519eb4f9f6557ff16b651405713446f0` (#340), v2.21.2/SIM9 unchanged version label. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45532826654) succeeded. Public `main-JieFBNnP.js` SHA-256 `3c0884e8e86acfdef433bf17cbe1ad644a9eb9070de5a4dc0a22de628ec7927b` matches reviewed build. #332 boundary diagnostics and #333/#334 33-song catalog remain shipped; no new pause verification.
+Last verified: 2026-11-25 03:11 UTC. Main `716679d4f9e46fcab9758ee19683bf62bdeab199` (#344), v2.22.0/SIM9 integrates #335/#337. The [exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45537959438) was still running; live endpoint last served v2.21.2 `main-JieFBNnP.js` during the transition, so check actual served build and worker before treating the PWA as live. Physical Chromebook/Android remain follow-ups. #340 v2 audio guard was verified shipped separately (same v2.21.2 label). No new pause/crossfade workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -112,7 +112,19 @@ means resume this queue, not take over another lane or merge a draft.
    91 focused tests, green local identity and 4,880 exact build files
    unchanged. No raw evidence or scoring/player/physics changes.
    Await independent exact-head review; no merge or preview.
-4. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
+4. **#79 / #345**: four-file open draft `morgan/issue-79-find-stored-tick`
+   @ `81786116d7fb41b54eb75a07eb8b80710c847288`. Local dev inspector locates actual stored
+   pose from a nominal tick, exact or nearest; ties earlier, refuses out of
+   trace even if tape header claims a later end, reopens full range if
+   outside section. No inference about crash events, terrain or provenance.
+   Keyboard and 360px Chromium exercised decimated pose, tie, section
+   reopen, rejection, file reset, exact SVG download/Run DNA byte parity,
+   zero external requests. 42 focused tests and same smoke passed on
+   original `116141235` and isolated exact `716679d4` overlay; v2.21.2 and
+   v2.22.0 production builds unchanged across 4,880 and 4,882 files
+   respectively; original local identity passed. Await exact-head review;
+   no merge, preview, release or issue closure.
+5. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
    #75/#100/#74 need trusted restoration or equivalent causal replay
    prefix; #243 and #224 are narrow milestones, not full restores.
