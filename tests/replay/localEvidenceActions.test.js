@@ -145,13 +145,13 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
   test('post-commit pin lookup failure cannot turn a successful import into an error',async()=>{
     const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
     const action=new LocalEvidenceActions(store);
-    const previous=store.persistedProtectedCount;
-    store.persistedProtectedCount=async()=>{throw new Error('browser closed between transactions');};
+    const previous=store.inspectBundle;
+    store.inspectBundle=async()=>{throw new Error('browser closed before status snapshot');};
     const result=await action.import(bytes(),{expectedDigest:digest()});
-    expect(result).toMatchObject({ok:true,digest:digest(),localDurable:true,
+    expect(result).toMatchObject({ok:true,digest:digest(),localDurable:null,
       protectionCount:null,alreadyProtected:null,newlyProtected:false,publicRankEligible:false});
     expect(result.status).toContain('PIN STATUS UNKNOWN');
-    store.persistedProtectedCount=previous;
+    store.inspectBundle=previous;
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest())).toBe(true);
   });
 
@@ -159,13 +159,13 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
     const preserved=await store.put(bundle(),{runId:'known-source'});
     await store.protect(preserved,{runId:'known-source',role:'pinned'});
-    const original=store.isBundleDurable;
-    store.isBundleDurable=async()=>false; // read errors are represented by false
+    const original=store.inspectBundle;
+    store.inspectBundle=async()=>({readable:true,durable:false,runBound:false,protectionCount:null}); // ambiguous IDB result
     const result=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest()});
     expect(result).toMatchObject({ok:true,digest:digest(),localDurable:null,
       protectionCount:null,alreadyProtected:null,newlyProtected:false,publicRankEligible:false});
     expect(result.status).toContain('PIN STATUS UNKNOWN');
-    store.isBundleDurable=original;
+    store.inspectBundle=original;
     expect(await store.persistedProtectedCount(digest())).toBe(1);
   });
 
@@ -180,11 +180,11 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
 
   test('IDB closure after committed import cannot be called a definite memory-only save',async()=>{
     const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
-    const old=store.isBundleDurable.bind(store);
-    store.isBundleDurable=async()=>{store._db.onclose();return false;};
+    const old=store.inspectBundle.bind(store);
+    store.inspectBundle=async()=>{store._db.onclose();return {readable:true,durable:false,runBound:false,protectionCount:null};};
     const outcome=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest()});
     expect(outcome).toMatchObject({ok:true,localDurable:null,protectionCount:null,alreadyProtected:null});
-    store.isBundleDurable=old;
+    store.inspectBundle=old;
     const saved=await new EvidenceStore({idb,storage:null}).init();
     expect(await saved.get(digest())).toEqual(bytes());
   });
@@ -208,6 +208,20 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     await expect(control.unpin(held.reference.key)).rejects.toMatchObject({code:'generation-required'});
     await expect(control.unpin(held.reference.key,{expectedGeneration:'bad'})).rejects.toMatchObject({code:'generation-required'});
     expect((await control.unpin(held.reference.key,{expectedGeneration:held.reference.generation})).ok).toBe(true);
+  });
+
+  test('import result reads exact bundle and pins from one IndexedDB transaction',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await store.put(bundle(),{runId:'known'});
+    const held=await store.protect(digest,{runId:'known',role:'pinned'});
+    const reads=[];idb.hooks.onTransaction=(names,mode)=>{if(mode==='readonly') reads.push(names);};
+    const result=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest});
+    idb.hooks.onTransaction=null;
+    expect(result).toMatchObject({ok:true,localDurable:true,protectionCount:1,alreadyProtected:true,newlyProtected:false});
+    expect(reads).toEqual([['index','bundles','protectedRefs']]);
+    await store.unprotect(held.key);
+    await store.remove(digest);
+    expect(await store.inspectBundle(digest,{withProtections:true})).toEqual({readable:false,durable:false,runBound:false,protectionCount:0});
   });
 
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{

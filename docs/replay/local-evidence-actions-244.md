@@ -27,3 +27,7 @@ After an archive import, a failed or blocked IDB connection cannot prove that no
 ## Required visible generation for release
 
 Independent review of the local-actions API found that allowing callers to omit `expectedGeneration` could silently release another tab's replacement pin after a cache refresh. The action now requires the exact 128-bit generation the player last saw, rejecting a missing or malformed token with `generation-required`. The lower-level `EvidenceStore.unprotect` remains usable for explicitly controlled migration/testing operations; the player-facing action is stricter. A negative test confirms both refusal and successful release with the matching generation.
+
+## Atomic archive-only import status
+
+A fresh review found that separate durability and protected-reference queries could observe two incompatible cross-tab states when another tab unpinned/deleted evidence between them. After importing a canonical local file, `LocalEvidenceActions.import` now uses **one** `EvidenceStore.inspectBundle(digest,{withProtections:true})` readonly transaction to validate the persisted bytes and count protected refs from exactly the same snapshot. A post-commit read failure still returns `ok:true` with `localDurable:null`/`protectionCount:null` rather than treating a committed import as failed or inventing zero pins. A dedicated transaction-scope test verifies the single index+bundle+protectedRefs read. All local imports remain unverified and are never auto-pinned or uploaded.
