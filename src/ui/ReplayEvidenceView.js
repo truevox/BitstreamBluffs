@@ -26,6 +26,7 @@ export class ReplayEvidenceView extends View {
     this.focus=0;
     this.actions=null;
     this.pinReady=false;
+    this.displayedPin=null; // immutable UI generation snapshot; never retarget Unpin from a newer cache
     this._operationVersion=0; // reject stale async refresh after a user action
     const text=(x,y,v,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,v,{color,outline:'none'}));
     text(12,24,'PRIVATE TO THIS DEVICE. NEVER UPLOADED.','cyan');
@@ -73,7 +74,15 @@ export class ReplayEvidenceView extends View {
   }
 
   async _getActions() {
-    if (this.actions) return this.actions;
+    if (this.actions) {
+      // A first open may have failed during an IndexedDB upgrade. Refresh is
+      // the explicit recovery gesture: reopen IDB and flush pending evidence.
+      if (this.actions.store.backend!=='idb') {
+        const recovered=await sharedEvidenceStore();
+        if (this.alive) this.actions.store=recovered;
+      }
+      return this.actions;
+    }
     const store=await sharedEvidenceStore();
     const rs=this.scene.registry.get(RULESET_KEY);
     const actions=new LocalEvidenceActions(store,{currentRulesetId:rs?.rulesetId || null});
@@ -86,6 +95,7 @@ export class ReplayEvidenceView extends View {
     const version=++this._operationVersion;
     const live=()=>this.alive && version===this._operationVersion;
     this.pinReady=false;
+    this.displayedPin=null;
     this.buttons[0].setDisabled(true);
     this.buttons[1].setDisabled(true);
     const status=this._captureStatus();
@@ -117,7 +127,9 @@ export class ReplayEvidenceView extends View {
       try {
         const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
         if (!live() || this._captureStatus()!==status) return;
-        held=refs.some(r=>r.runId===this.tape.runId && r.role==='pinned');
+        const pin=refs.find(r=>r.runId===this.tape.runId && r.role==='pinned');
+        this.displayedPin=pin ? Object.freeze({key:pin.key,generation:pin.generation}) : null;
+        held=Boolean(pin);
       } catch (e) {
         if (!live() || this._captureStatus()!==status) return;
         this._show('PIN STATUS UNAVAILABLE — EXPORT WORKS',statusText(e));
@@ -170,13 +182,14 @@ export class ReplayEvidenceView extends View {
     // KEEP label as permission to UNPIN a reference created in another tab.
     const wantsUnpin=this.buttons[0].label.main.text==='UNPIN';
     if (wantsUnpin){
-      const pinned=control.store.listProtections().find(r=>r.digest===capture.digest &&
-        r.runId===this.tape.runId && r.role==='pinned');
-      if (!pinned) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
-      await control.unpin(pinned.key);
+      const displayed=this.displayedPin;
+      if (!displayed?.generation) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
+      await control.unpin(displayed.key,{expectedGeneration:displayed.generation});
+      this.displayedPin=null;
       this._show('PIN REMOVED','THE EVIDENCE FILE HAS NOT BEEN DELETED');
     } else {
       const result=await control.keep({digest:capture.digest,runId:this.tape.runId,role:'pinned'});
+      this.displayedPin=Object.freeze({key:result.reference.key,generation:result.reference.generation});
       this._show('KEPT LOCALLY',result.browserPersistence===true?'BROWSER PERSISTENCE GRANTED':'BROWSER MAY STILL CLEAR SITE DATA');
     }
     if (this.alive) this.buttons[0].setLabel(wantsUnpin?'KEEP':'UNPIN');
@@ -212,7 +225,19 @@ export class ReplayEvidenceView extends View {
       position:'fixed',opacity:'0.002',zIndex:'10000',cursor:'pointer',
       padding:'0',border:'0',margin:'0',background:'transparent',
     });
-    input.onfocus=()=>{if(this.alive){this.focus=2;this.buttons.forEach((b,i)=>b.setHover(i===2));}};
+    input.onfocus=()=>{
+      if(!this.alive)return;
+      this.focus=2;this.buttons.forEach((b,i)=>b.setHover(i===2));
+      // Phaser's MenuInput has a second keyboard path beyond InputRouter.
+      // While a native picker is focused, make it ignore keyboard actions.
+      const menu=this.scene.input_;
+      if(menu && !this._nativeMenuGuard){
+        this._previousRawKeyHandler=menu.rawKeyHandler;
+        this._nativeMenuGuard=()=>true;
+        menu.rawKeyHandler=this._nativeMenuGuard;
+      }
+    };
+    input.onblur=()=>this._releaseNativeMenuGuard();
     input.onchange=()=>{
       const file=input.files?.[0];input.value='';
       this._restoreGameFocus();
@@ -222,14 +247,17 @@ export class ReplayEvidenceView extends View {
     };
     input.oncancel=()=>{this._restoreGameFocus();this._show('IMPORT CANCELLED');};
     input.onkeydown=e=>{
-      // InputRouter intentionally ignores keys aimed at DOM inputs. Escape
-      // must still back out of the menu when a keyboard user tabs to Import.
+      // Keep file-picker activation, Space and arrows out of the game's Retry
+      // hotkeys. Stop propagation WITHOUT blocking the browser's native
+      // Enter/Space activation. Escape returns to Ghost Favorites.
+      e.stopPropagation();
       if(e.key==='Escape'){
-        e.preventDefault();e.stopPropagation();
+        e.preventDefault();
         this._restoreGameFocus();
         if(this.alive)this.close();
       }
     };
+    input.onkeyup=e=>e.stopPropagation();
     document.body.appendChild(input);
     this._nativeInput=input;
     this._positionNativeInput=()=>{
@@ -248,8 +276,17 @@ export class ReplayEvidenceView extends View {
     this.scene.scale?.on('resize',this._positionNativeInput);
   }
 
+  _releaseNativeMenuGuard() {
+    const menu=this.scene.input_;
+    if (menu && this._nativeMenuGuard && menu.rawKeyHandler===this._nativeMenuGuard)
+      menu.rawKeyHandler=this._previousRawKeyHandler;
+    this._nativeMenuGuard=null;
+    this._previousRawKeyHandler=null;
+  }
+
   _restoreGameFocus() {
     if(this._nativeInput && document.activeElement===this._nativeInput)this._nativeInput.blur();
+    this._releaseNativeMenuGuard();
   }
 
   /** Gamepad/synthetic events have no browser file-picker privilege. Focus
@@ -269,13 +306,22 @@ export class ReplayEvidenceView extends View {
     if(file.size>MAX_OUTPUT_BYTES){this._show('FILE TOO LARGE','MAXIMUM 16 MIB CANONICAL EVIDENCE');return;}
     const bytes=new Uint8Array(await file.arrayBuffer());
     const control=await this._getActions();
-    const imported=await control.import(bytes,{expectedDigest});
+    let imported;
+    try { imported=await control.import(bytes,{expectedDigest}); }
+    catch(e) {
+      if(['quota-exceeded','write-failed','not-durable'].includes(e?.code)){
+        this._show('KEEP ORIGINAL FILE','IMPORT STORAGE NOT CONFIRMED — DO NOT DELETE SOURCE');
+        return;
+      }
+      throw e;
+    }
     this._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED',
-      imported.protectionCount===null?'PIN STATUS UNKNOWN — REFRESH LATER':
-        imported.localDurable?'SAVED ON DEVICE, NOT VERIFIED':'KEEP YOUR ORIGINAL FILE — IMPORT WAS NOT DURABLE');
+      imported.localDurable!==true?'KEEP ORIGINAL FILE — IMPORT NOT DURABLE':
+        imported.protectionCount===null?'PIN STATUS UNKNOWN — REFRESH LATER':'SAVED ON DEVICE, NOT VERIFIED');
   });}
 
   destroy() {
+    this._restoreGameFocus();
     if(this._nativeInput){this._nativeInput.remove();this._nativeInput=null;}
     if(this._positionNativeInput){
       window.removeEventListener('resize',this._positionNativeInput);
