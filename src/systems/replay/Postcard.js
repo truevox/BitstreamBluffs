@@ -490,3 +490,88 @@ export function postcardToTakeoverInput(pc) {
   return { tape, tick: pc.startTick, source: 'postcard', postcardDigest: pc.digest, expectedFingerprint: pc.fingerprintAtStart,
     windowTicks: pc.windowTicks, challenge: clone(pc.challenge), coverage: 'fingerprint-only' };
 }
+
+// --- outcome reply (bb-postcard-reply v1) -----------------------------------------------------------------------------
+
+/**
+ * The reply a recipient sends back: how their practice attempt at the postcard's window ended. UNRANKED by construction:
+ * the `unranked:true` marker is mandatory (a reply without it is refused), and there is no field that could carry a score,
+ * name, initials, profile, run id or timestamp. It is bound to its postcard by `postcardDigest`.
+ * `suffix` is the recipient's input rows for the window, in the same `[dt, bits, tilt127]` encoding, with ticks counted from
+ * the handoff (dt of the first row = ticks after N). `crashOffsetTicks` counts from N as well.
+ */
+function replyProblem(r, windowTicks) {
+  if (r.outcome !== 'survived' && r.outcome !== 'crashed') return 'outcome';
+  if (r.outcome === 'survived' && r.crashOffsetTicks !== null) return 'crashOffsetTicks must be null when survived';
+  if (r.outcome === 'crashed' && !(isInt(r.crashOffsetTicks) && r.crashOffsetTicks >= 1 && r.crashOffsetTicks <= windowTicks)) return 'crashOffsetTicks';
+  if (typeof r.postcardDigest !== 'string' || !SHA_ID.test(r.postcardDigest)) return 'postcardDigest';
+  if (!Array.isArray(r.suffix) || r.suffix.length > windowTicks) return 'suffix';
+  try { validateInputRows(r.suffix, windowTicks - 1, '/suffix'); } catch (e) { return `suffix (${e && e.message})`; }
+  if (r.outcome === 'crashed') {
+    const last = r.suffix.reduce((s, row) => s + row[0], 0);
+    if (last > r.crashOffsetTicks) return 'suffix runs past the crash';
+  }
+  return null;
+}
+
+/** The exact object whose canonical bytes are encoded, with the digest in place. */
+export function replyWire(r) {
+  return { kind: r.kind, v: r.v, unranked: r.unranked, postcardDigest: r.postcardDigest, outcome: r.outcome, crashOffsetTicks: r.crashOffsetTicks,
+    suffix: r.suffix.map((row) => [...row]), digest: r.digest };
+}
+
+/**
+ * @param {{postcard:object, outcome:'survived'|'crashed', crashOffsetTicks:number|null, suffix:number[][]}} p
+ * @returns {{ok:true, reply:object}|{ok:false, reason:string, message:string}}
+ */
+export function createReply({ postcard, outcome, crashOffsetTicks, suffix } = {}) {
+  try {
+    if (!isObj(postcard) || typeof postcard.digest !== 'string' || !SHA_ID.test(postcard.digest) || !isInt(postcard.windowTicks)
+      || postcard.windowTicks < MIN_WINDOW_TICKS || postcard.windowTicks > MAX_WINDOW_TICKS) return refuse('invalid-field', 'postcard');
+    if (digestOfWire(postcardWire(postcard)) !== postcard.digest) return refuse('digest-mismatch', 'postcard');
+    if (outcome !== 'survived' && outcome !== 'crashed') return refuse('outcome');
+    const reply = { kind: REPLY_KIND, v: REPLY_VERSION, unranked: true, postcardDigest: postcard.digest, outcome, crashOffsetTicks: crashOffsetTicks === undefined ? null : crashOffsetTicks,
+      suffix: Array.isArray(suffix) ? suffix.map((row) => (Array.isArray(row) ? [row[0], row[1], row[2] === 0 ? 0 : row[2]] : row)) : suffix, digest: '' };
+    const p = replyProblem(reply, postcard.windowTicks);
+    if (p) return refuse('invalid-field', p);
+    reply.digest = digestOfWire(replyWire(reply));
+    return { ok: true, reply };
+  } catch (e) {
+    return refuse('invalid-field', e && e.message);
+  }
+}
+
+/** @returns {Promise<string>} `BBPR1.<base64url(deflate-raw(canonical JSON))>` */
+export async function encodeReply(reply, opts = {}) {
+  return encodeWire(REPLY_PREFIX, replyWire(reply), MAX_ENCODED_REPLY_CHARS, opts);
+}
+
+/**
+ * Decode and validate a reply. Never throws. With `opts.postcard`, it must be the reply's own postcard (digest equal) and the
+ * crash offset / suffix must fit that postcard's window.
+ * @returns {Promise<{ok:true, reply:object}|{ok:false, reason:string, message:string}>}
+ */
+export async function decodeReply(str, opts = {}) {
+  try {
+    const opened = await openWire(str, REPLY_PREFIX, MAX_ENCODED_REPLY_CHARS, MAX_INFLATED_REPLY_BYTES, opts);
+    if (!opened.ok) return opened;
+    const w = opened.wire;
+    if (w.kind !== REPLY_KIND) return refuse('kind');
+    if (w.v !== REPLY_VERSION) return refuse('version');
+    if (w.unranked !== true) return refuse('unranked');
+    if (!exactKeys(w, REPLY_FIELDS) || !REPLY_FIELDS.every((k) => hasOwn(w, k))) return refuse('unknown-field', 'top level');
+    let windowTicks = MAX_WINDOW_TICKS;
+    if (opts.postcard) {
+      if (!isObj(opts.postcard) || opts.postcard.digest !== w.postcardDigest) return refuse('mismatch');
+      windowTicks = opts.postcard.windowTicks;
+    }
+    const p = replyProblem(w, windowTicks);
+    if (p) return refuse('invalid-field', p);
+    if (typeof w.digest !== 'string' || !SHA_ID.test(w.digest)) return refuse('invalid-field', 'digest');
+    if (digestOfWire(w) !== w.digest) return refuse('digest-mismatch');
+    return { ok: true, reply: { kind: w.kind, v: w.v, unranked: true, postcardDigest: w.postcardDigest, outcome: w.outcome,
+      crashOffsetTicks: w.crashOffsetTicks, suffix: w.suffix.map((row) => [...row]), digest: w.digest } };
+  } catch (e) {
+    return refuse('bad-json', e && e.message);
+  }
+}

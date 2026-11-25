@@ -15,6 +15,8 @@ import {
   POSTCARD_KIND, POSTCARD_VERSION, POSTCARD_PREFIX, HEADER_FIELDS,
   MIN_WINDOW_TICKS, MAX_WINDOW_TICKS, MAX_ENCODED_POSTCARD_CHARS,
   MAX_PREFIX_ROWS, MAX_INFLATED_POSTCARD_BYTES, MAX_START_TICK,
+  REPLY_KIND, REPLY_VERSION, REPLY_PREFIX, MAX_ENCODED_REPLY_CHARS,
+  createReply, encodeReply, decodeReply, replyWire,
   createPostcard, encodePostcard, decodePostcard, postcardWire, postcardCompatible, postcardToTakeoverInput,
 } from '../../src/systems/replay/Postcard.js';
 
@@ -497,5 +499,146 @@ describe('postcardToTakeoverInput: the tape-shaped object #72 consumes', () => {
   test('a postcard that decoded from a code converts exactly like the original', async () => {
     const dec = await decodePostcard(await encodePostcard(pc, OPTS), OPTS);
     expect(postcardToTakeoverInput(dec.postcard)).toEqual(postcardToTakeoverInput(pc));
+  });
+});
+
+
+// --- stage 3: the outcome reply ---------------------------------------------------------------------------------------
+
+describe('bb-postcard-reply', () => {
+  const pc = must(createPostcard(baseArgs(makeTape({ header: { initials: 'ZZZ', profile: { name: 'Ada' } } }))));
+  const suffix = [[10, 7, 0], [30, 39, 64], [5, 7, -127]]; // offsets from tick N: 10, 40, 45
+  const survived = { postcard: pc, outcome: 'survived', crashOffsetTicks: null, suffix };
+  const crashed = { postcard: pc, outcome: 'crashed', crashOffsetTicks: 300, suffix };
+  const mustReply = (r) => { expect(r).toMatchObject({ ok: true }); return r.reply; };
+  const replyForge = async (reply, mutate, { redigest = true } = {}) => {
+    const wire = replyWire(reply);
+    mutate(wire);
+    if (redigest) { const { digest, ...rest } = wire; wire.digest = digestOf(rest); }
+    return REPLY_PREFIX + b64u(await zlibCodec.deflate(canonicalBytes(wire)));
+  };
+
+  test('shape: kind, version, the explicit unranked marker, a postcard binding, and nothing else', () => {
+    const r = mustReply(createReply(survived));
+    expect(Object.keys(r).sort()).toEqual(['crashOffsetTicks', 'digest', 'kind', 'outcome', 'postcardDigest', 'suffix', 'unranked', 'v']);
+    expect(r).toMatchObject({ kind: REPLY_KIND, v: REPLY_VERSION, unranked: true, postcardDigest: pc.digest, outcome: 'survived', crashOffsetTicks: null, suffix });
+    expect(REPLY_PREFIX).toBe('BBPR1.');
+    expect(r.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  test('round trip survived and crashed; deterministic; prefix BBPR1.', async () => {
+    for (const args of [survived, crashed, { ...survived, suffix: [] }]) {
+      const r = mustReply(createReply(args));
+      const s = await encodeReply(r, OPTS);
+      expect(s.startsWith('BBPR1.')).toBe(true);
+      expect(s).toBe(await encodeReply(mustReply(createReply(args)), OPTS));
+      expect(await decodeReply(s, OPTS)).toEqual({ ok: true, reply: r });
+      expect(await decodeReply(s, { ...OPTS, postcard: pc })).toEqual({ ok: true, reply: r });
+    }
+  });
+
+  test('the reply holds no PII: nothing of the postcard header, tape or profile is in the code or its inflated JSON', async () => {
+    const s = await encodeReply(mustReply(createReply(crashed)), OPTS);
+    const inflated = Buffer.from(zlib.inflateRawSync(Buffer.from(s.slice(6), 'base64url'))).toString('utf8');
+    for (const n of ['startedAt', 'ZZZ', 'Ada', 'profile', 'initials', 'POSTCARD-SEED', 'seed', 'run-PRIVATE', 'runId', 'startPose', 'header', 'prefix', 'score', 'wallet']) {
+      expect(inflated).not.toContain(n); expect(s).not.toContain(n);
+    }
+    expect(inflated).toContain('"unranked":true'); // negative control: the grep sees real content
+  });
+
+  test('create validates the outcome, the crash offset and the suffix against the postcard', () => {
+    const bad = [
+      { ...survived, outcome: 'won' }, { ...survived, outcome: undefined },
+      { ...survived, crashOffsetTicks: 5 }, // survived must carry null
+      { ...crashed, crashOffsetTicks: null }, { ...crashed, crashOffsetTicks: 0 }, { ...crashed, crashOffsetTicks: pc.windowTicks + 1 }, { ...crashed, crashOffsetTicks: 1.5 },
+      { ...survived, suffix: [[0, 0, 0]] }, { ...survived, suffix: [[1, 0x100000, 0]] }, { ...survived, suffix: [[1, 0, 200]] }, { ...survived, suffix: [[pc.windowTicks + 1, 0, 0]] },
+      { ...survived, suffix: 'nope' }, { ...survived, suffix: undefined },
+      { ...crashed, crashOffsetTicks: 20, suffix }, // an input row after the crash tick
+      { postcard: { ...pc, digest: 'nope' }, outcome: 'survived', crashOffsetTicks: null, suffix: [] },
+      { postcard: null, outcome: 'survived', crashOffsetTicks: null, suffix: [] },
+    ];
+    for (const [i, a] of bad.entries()) expect({ i, ok: createReply(a).ok }).toEqual({ i, ok: false });
+    expect(createReply({ ...survived, suffix: [[pc.windowTicks, 0, 0]] }).ok).toBe(true); // the last tick of the window is fine
+  });
+
+  test('tamper: a flipped suffix row (stale digest) is a digest mismatch; any single-character flip is refused', async () => {
+    const r = mustReply(createReply(crashed));
+    expect(await decodeReply(await replyForge(r, (w) => { w.suffix[1][2] += 1; }, { redigest: false }), OPTS)).toMatchObject({ ok: false, reason: 'digest-mismatch' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.postcardDigest = `sha256:${'ab'.repeat(32)}`; }, { redigest: false }), OPTS)).toMatchObject({ ok: false, reason: 'digest-mismatch' });
+    const good = await encodeReply(r, OPTS);
+    for (let i = REPLY_PREFIX.length; i < good.length; i++) {
+      const bad = good.slice(0, i) + (good[i] === 'A' ? 'B' : 'A') + good.slice(i + 1);
+      const d = await decodeReply(bad, OPTS);
+      expect(d.ok).toBe(false);
+    }
+  });
+
+  test('unranked:true is REQUIRED: absent, false or any other value is refused, even when re-signed', async () => {
+    const r = mustReply(createReply(survived));
+    expect(await decodeReply(await replyForge(r, (w) => { delete w.unranked; }), OPTS)).toMatchObject({ ok: false, reason: 'unranked' });
+    for (const v of [false, 'true', 1, null]) expect(await decodeReply(await replyForge(r, (w) => { w.unranked = v; }), OPTS)).toMatchObject({ ok: false, reason: 'unranked' });
+    expect((await decodeReply(await replyForge(r, () => {}), OPTS)).ok).toBe(true); // control: the forge helper itself is sound
+  });
+
+  test('wrong kind or version, unknown fields, and cross-format mixups are refused', async () => {
+    const r = mustReply(createReply(survived));
+    expect(await decodeReply(await replyForge(r, (w) => { w.kind = 'bb-postcard'; }), OPTS)).toMatchObject({ ok: false, reason: 'kind' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.v = 2; }), OPTS)).toMatchObject({ ok: false, reason: 'version' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.initials = 'ZZZ'; }), OPTS)).toMatchObject({ ok: false, reason: 'unknown-field' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.score = 5; }), OPTS)).toMatchObject({ ok: false, reason: 'unknown-field' });
+    const postcardCode = await encodePostcard(pc, OPTS);
+    expect(await decodeReply(postcardCode, OPTS)).toMatchObject({ ok: false, reason: 'bad-prefix' });
+    expect(await decodePostcard(await encodeReply(r, OPTS), OPTS)).toMatchObject({ ok: false, reason: 'bad-prefix' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.postcardDigest = 'x'; }), OPTS)).toMatchObject({ ok: false, reason: 'invalid-field' });
+    expect(await decodeReply(await replyForge(r, (w) => { w.outcome = 'crashed'; }), OPTS)).toMatchObject({ ok: false, reason: 'invalid-field' }); // crashed needs an offset
+    expect(await decodeReply(await replyForge(r, (w) => { w.crashOffsetTicks = 5; }), OPTS)).toMatchObject({ ok: false, reason: 'invalid-field' });
+  });
+
+  test('bound to its postcard: a reply for another postcard, or one outside this postcard window, is refused when the postcard is supplied', async () => {
+    const other = must(createPostcard(baseArgs(makeTape(), { startTick: 1300 })));
+    const s = await encodeReply(mustReply(createReply(crashed)), OPTS);
+    expect(await decodeReply(s, { ...OPTS, postcard: other })).toMatchObject({ ok: false, reason: 'mismatch' });
+    const long = must(createPostcard(baseArgs(makeTape(), { windowSec: 10 })));
+    const longCrash = mustReply(createReply({ postcard: long, outcome: 'crashed', crashOffsetTicks: 1100, suffix: [[1100, 0, 0]] }));
+    const short = must(createPostcard(baseArgs(makeTape(), { windowSec: 5 })));
+    const forged = await replyForge(longCrash, (w) => { w.postcardDigest = short.digest; });
+    expect(await decodeReply(forged, { ...OPTS, postcard: short })).toMatchObject({ ok: false, reason: 'invalid-field' });
+  });
+
+  test('size cap: an over-long reply is refused before parsing; an inflate bomb is refused', async () => {
+    expect(await decodeReply(REPLY_PREFIX + 'A'.repeat(MAX_ENCODED_REPLY_CHARS), OPTS)).toMatchObject({ ok: false, reason: 'too-large' });
+    const bomb = REPLY_PREFIX + b64u(await zlibCodec.deflate(Buffer.alloc(2 * 1024 * 1024, 0x20)));
+    expect(await decodeReply(bomb, OPTS)).toMatchObject({ ok: false, reason: 'too-large' });
+    const biggest = mustReply(createReply({ ...survived, suffix: Array.from({ length: pc.windowTicks }, (_, i) => [1, i % 2 ? 7 : 39, ((i * 53) % 255) - 127]) }));
+    expect((await encodeReply(biggest, OPTS)).length).toBeLessThan(MAX_ENCODED_REPLY_CHARS);
+  });
+});
+
+// --- the browser path: CompressionStream('deflate-raw') ---------------------------------------------------------------
+
+describe('CompressionStream codec (the browser path), simulated with node:stream/web', () => {
+  const saved = {};
+  const names = ['CompressionStream', 'DecompressionStream', 'ReadableStream'];
+  beforeAll(async () => {
+    const web = await import('node:stream/web');
+    for (const n of names) { saved[n] = globalThis[n]; globalThis[n] = web[n]; }
+  });
+  afterAll(() => { for (const n of names) { if (saved[n] === undefined) delete globalThis[n]; else globalThis[n] = saved[n]; } });
+
+  test('the default codec round-trips with no injected codec, and interoperates with the zlib codec both ways', async () => {
+    const pc = must(createPostcard(baseArgs(makeTape())));
+    const viaStream = await encodePostcard(pc); // no opts: uses CompressionStream
+    expect((await decodePostcard(viaStream)).postcard).toEqual(pc);
+    expect((await decodePostcard(viaStream, OPTS)).postcard).toEqual(pc); // browser-made code opens under node zlib
+    const viaZlib = await encodePostcard(pc, OPTS);
+    expect((await decodePostcard(viaZlib)).postcard).toEqual(pc); // and the other way round
+    // the digest is over canonical JSON, so identity does not depend on which deflater ran
+    expect((await decodePostcard(viaStream)).postcard.digest).toBe((await decodePostcard(viaZlib)).postcard.digest);
+  });
+
+  test('the default codec refuses a bomb and corrupt data without throwing', async () => {
+    const bomb = POSTCARD_PREFIX + b64u(await zlibCodec.deflate(Buffer.alloc(5 * 1024 * 1024, 0x20)));
+    expect(await decodePostcard(bomb)).toMatchObject({ ok: false, reason: 'too-large' });
+    expect(await decodePostcard(POSTCARD_PREFIX + b64u(Buffer.from('definitely not deflate data 0123456789')))).toMatchObject({ ok: false, reason: 'bad-compression' });
   });
 });
