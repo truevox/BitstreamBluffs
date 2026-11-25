@@ -275,6 +275,10 @@ try {
       },{label,visible});
       for(const label of ['best','death']){
         const clip=clipRegions[label];
+        // Establish the same zero-simulation-frame rendering baseline used
+        // for the hidden and restored captures. The bounded replay's final
+        // frame may precede Phaser camera/label presentation settlement.
+        await renderWithoutSim(label,true);
         const visiblePixels=await marked.p.screenshot({clip});
         await renderWithoutSim(label,false);
         const hiddenPixels=await marked.p.screenshot({clip});
