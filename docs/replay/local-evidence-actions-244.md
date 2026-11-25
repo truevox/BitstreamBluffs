@@ -23,3 +23,7 @@ A false result from an IndexedDB post-import durability probe is ambiguous: it m
 ## Review: blocked IndexedDB must not imply zero pins
 
 After an archive import, a failed or blocked IDB connection cannot prove that no other tab has saved a protected reference. If a browser exposes IndexedDB but the durability lookup is unavailable, return `localDurable:null`, `protectionCount:null`, and `alreadyProtected:null`. Only a truly unsupported IDB environment can establish a memory-only outcome for this local session. A `UNPIN` request can include `expectedGeneration`, representing the exact reference the player saw at their last explicit Refresh; a later cache refresh is never authorization to release a replacement pin. Negative tests cover both cases.
+
+## Required visible generation for release
+
+Independent review of the local-actions API found that allowing callers to omit `expectedGeneration` could silently release another tab's replacement pin after a cache refresh. The action now requires the exact 128-bit generation the player last saw, rejecting a missing or malformed token with `generation-required`. The lower-level `EvidenceStore.unprotect` remains usable for explicitly controlled migration/testing operations; the player-facing action is stricter. A negative test confirms both refusal and successful release with the matching generation.
