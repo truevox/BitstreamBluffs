@@ -9,8 +9,8 @@ export function digestFromLocalReplayFilename(filename) {
 }
 
 /** A run-end status is usable only for the *exact* current local run. */
-export function currentRunEvidence(status,runId) {
+export function currentRunEvidence(status,runId,{allowFailed=false}={}) {
   if(!status || typeof runId!=='string' || !runId || status.runId!==runId ||
-    status.ok!==true || !DIGEST.test(status.digest))return null;
+    (status.ok!==true && !allowFailed) || !DIGEST.test(status.digest))return null;
   return Object.freeze({runId,digest:status.digest,durable:status.durable===true});
 }

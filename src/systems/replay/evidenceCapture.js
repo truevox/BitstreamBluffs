@@ -89,17 +89,23 @@ export async function saveRunEvidence(tape, recorder, opts) {
     try { if (reg && typeof reg.set === 'function') reg.set(EVIDENCE_STATUS_KEY, tagged); } catch { /* signal is optional */ }
     return tagged;
   };
+  let validatedDigest = null;
   try {
     const { bundle, rulesetId, ruleset, detail } = buildRunEvidence({ tape, recorder, ruleset: opts.ruleset, gameVersion: opts.gameVersion });
     const bytes = bundleBytes(bundle);
     const v = validateEvidenceBundle(bytes, (id) => (id === rulesetId ? ruleset : null)); // the only validation pass
     if (!v.ok) return report({ ok: false, code: v.code, message: `${v.pointer}${v.detail ? ` (${v.detail})` : ''}` });
+    validatedDigest = v.bundleDigest;
     const store = opts.store || (reg && reg.get && reg.get(EVIDENCE_STORE_KEY)) || await sharedEvidenceStore();
     store.rulesetResolver = (id) => (id === rulesetId ? ruleset : null);
     const digest = await store.put(bytes, { runId: tape.runId }, v);
     return report({ ok: true, digest, durable: store.durable, detail, outcome: v.outcome, reasons: v.reasons.map((r) => r.reason) });
   } catch (e) {
-    return report({ ok: false, code: (e && e.code) || 'error', message: String((e && e.message) || e) });
+    // The original exact digest remains useful after a QUOTA failure, since
+    // EvidenceStore retained the bytes in session memory for explicit export.
+    // It is NOT proof the bytes are saved; the UI must retrieve/rehash them.
+    return report({ ok: false, ...(validatedDigest ? {digest:validatedDigest} : {}),
+      code: (e && e.code) || 'error', message: String((e && e.message) || e) });
   }
 }
 

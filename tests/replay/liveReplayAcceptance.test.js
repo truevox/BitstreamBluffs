@@ -231,7 +231,10 @@ describe('the live run produced evidence', () => {
     warn.mockClear();
     expect(() => scene._saveGhostTape({ id: 'x', distanceM: 1, score: 1, endedAt: 1 })).not.toThrow();
     expect(saved).toHaveLength(1);
-    expect(await waitFor(() => scene.registry.get(EVIDENCE_STATUS_KEY))).toMatchObject({ ok: false, code: 'quota-exceeded' });
+    expect(await waitFor(() => scene.registry.get(EVIDENCE_STATUS_KEY))).toMatchObject({
+      ok: false, code: 'quota-exceeded', runId: 'x',
+      digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+    });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('quota-exceeded'));
     // a build with no ruleset at all: still no throw
     const s2 = liveScene();
