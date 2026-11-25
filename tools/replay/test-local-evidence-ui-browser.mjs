@@ -184,6 +184,79 @@ try {
  results.push('once quota-failed capture becomes durable under exact run ID, Refresh enables Keep/Unpin');
 
 
+ const displayGeneration=await p.evaluate(async()=>{
+  const {view,store,digest,scene,statusKey}=window.__qaEvidence;
+  const {EvidenceStore}=await import('/src/systems/replay/evidenceStore.js');
+  // The current run returns to a successful capture for this interaction.
+  scene.registry.set(statusKey,{ok:true,runId:'ui-smoke-run',digest,durable:true});
+  await view._refresh();
+  const other=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+  const first=await other.protect(digest,{runId:'ui-smoke-run',role:'pinned'});
+  await view._refresh();
+  const shown=view.displayedPin;
+  await other.unprotect(first.key);
+  const replacement=await other.protect(digest,{runId:'ui-smoke-run',role:'pinned'});
+  await store.persistedProtections(digest); // cache takes NEW generation
+  await view._keepOrUnpin(); // must refuse without touching the replacement
+  const denied=view.status.main.text;
+  const stillProtected=await other.persistedProtectedCount(digest);
+  await other.unprotect(replacement.key);
+  await view._refresh();
+  return {shownGeneration:shown?.generation,firstGeneration:first.generation,
+    replacementGeneration:replacement.generation,denied,stillProtected};
+ });
+ assert.equal(displayGeneration.shownGeneration,displayGeneration.firstGeneration);
+ assert.notEqual(displayGeneration.shownGeneration,displayGeneration.replacementGeneration);
+ assert.equal(displayGeneration.stillProtected,1);
+ assert(displayGeneration.denied.includes('stale-protection'));
+ results.push('Unpin preserves displayed generation and refuses replacement pin after cache refresh');
+
+ const nativeKeys=await p.evaluate(()=>{
+  const {view,scene}=window.__qaEvidence;
+  const prevMenu=scene.input_;
+  const stub={rawKeyHandler:null};scene.input_=stub;
+  const input=view._nativeInput;
+  const heard=[];
+  const listener=e=>heard.push(e.key);
+  window.addEventListener('keydown',listener);
+  input.focus();
+  const guardInstalled=typeof stub.rawKeyHandler==='function';
+  for(const key of [' ','Enter'])input.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
+  input.blur();
+  const restored=stub.rawKeyHandler===null;
+  window.removeEventListener('keydown',listener);
+  scene.input_=prevMenu;
+  return {guardInstalled,restored,heard};
+ });
+ assert(nativeKeys.guardInstalled && nativeKeys.restored && nativeKeys.heard.length===0);
+ results.push('native picker suppresses Space/Enter game shortcuts without disabling browser activation');
+
+ const importQuota=await p.evaluate(async()=>{
+  const {view}=window.__qaEvidence;
+  const actions=await view._getActions();
+  const real=actions.import;
+  actions.import=async()=>{throw Object.assign(new Error('test quota'),{code:'quota-exceeded'});};
+  try{
+    const file=new File(['quota-stub'],'a'.repeat(64)+'.bbreplay',{type:'application/octet-stream'});
+    await view._processImportFile(file);
+    return {message:view.status.main.text,detail:view.detail.main.text};
+  }finally{actions.import=real;await view._refresh();}
+ });
+ assert(importQuota.message.includes('KEEP ORIGINAL FILE'));
+ results.push('quota failure on imported file explicitly warns to keep original source');
+
+ const reconnected=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  store._db.onclose(); // site-data change forced the connection closed
+  const before=store.backend;
+  await view._refresh(); // explicit recovery gesture
+  return {before,after:store.backend,exportEnabled:!view.buttons[1].disabled};
+ });
+ assert.equal(reconnected.before,'memory');
+ assert.equal(reconnected.after,'idb');
+ assert(reconnected.exportEnabled);
+ results.push('Refresh automatically reopens previously closed IndexedDB and recovers local evidence');
+
  const navigation=await p.evaluate(async t=>{
   const [{GameOverScene},{GhostFavoritesView},{REG},{GhostLibrary}]=await Promise.all([
     import('/src/scenes/GameOverScene.js'),import('/src/ui/GhostFavoritesView.js'),import('/src/constants.js'),
