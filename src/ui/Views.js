@@ -383,7 +383,8 @@ export class SoundManagerView extends View {
     const menuItems=[
       {kind:'action',label:'SELECT TRACKS ('+installedSongChoices(game.registry.get('audioSynth')?._stemMusic?.catalog).length+')',color:'cyan',
         sub:'ON / OFF PER SONG',onSelect:()=>this._openLibrary()},
-      ...(game.registry.get(OFFLINE_MUSIC_CONTROLLER)?[{kind:'action',label:'OFFLINE MUSIC',color:'cyan',sub:'DOWNLOAD / REPAIR',onSelect:()=>this._openOfflineMusic()}]:[]),
+      ...(game.registry.get(OFFLINE_MUSIC_CONTROLLER)?[{kind:'action',label:'OFFLINE MUSIC',color:'cyan',sub:'DOWNLOAD / REPAIR',onSelect:()=>this._openOfflineMusic()}]:
+       game.registry.get('offlineMusicNeedsReopen')?[{kind:'static',label:'OFFLINE: REOPEN APP TO ENABLE',color:'amber'}]:[]),
       {kind:'choice',label:'SHUFFLE SONGS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicShuffle===true,

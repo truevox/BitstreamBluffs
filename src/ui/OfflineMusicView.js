@@ -26,17 +26,18 @@ export function downloadStatusText(state={}){
 }
 export class OfflineMusicView extends View {
  constructor(scene,theme,{controller,onClose}){
-  super(scene,theme,{w:448,h:238,title:'OFFLINE MUSIC',color:'cyan',onClose,y:15});
-  this.controller=controller;this.armed=false;this.armedPrefetch=false;this.pending=false;this.localError=false;this.tiered=typeof controller.setMode==='function'&&typeof controller.apply==='function';
+  super(scene,theme,{w:448,h:258,title:'OFFLINE MUSIC',color:'cyan',onClose,y:6});
+  this.controller=controller;this.armed=false;this.armedPrefetch=false;this.pending=false;this.localError=false;this.localNotice=null;this.tiered=typeof controller.setMode==='function'&&typeof controller.apply==='function';
   this.status=new NeonText(scene,theme,14,28,'',{color:'text',outline:'none'});this.panel.add(this.status);
   this.note=new NeonText(scene,theme,14,49,'ORIGINAL QUALITY PREVIEW - NO AUTO DOWNLOAD',{color:'amber',outline:'none'});this.panel.add(this.note);
-  this.menu=new MenuList(scene,theme,{x:10,y:72,w:428,rowH:this.tiered?19:23,parent:this.panel,items:[
+  this.menu=new MenuList(scene,theme,{x:10,y:67,w:428,rowH:this.tiered?18:23,parent:this.panel,items:[
    ...(this.tiered?[{kind:'choice',label:'MUSIC QUALITY',options:[{value:'high',label:'HIGH'},{value:'space-saver',label:'SPACE SAVER'},{value:'no-music',label:'NO MUSIC'}],get:()=>this.controller.mode,set:v=>this._mode(v)}]:[]),
    {kind:'action',label:'DOWNLOAD / REPAIR',color:'cyan',onSelect:()=>this._arm()},
    {kind:'action',label:'CONFIRM DOWNLOAD',color:'lime',disabled:true,onSelect:()=>this._start()},
    ...(this.tiered?[{kind:'action',label:'PRELOAD NEXT BIOME',color:'cyan',onSelect:()=>this._armPrefetch()},{kind:'action',label:'CONFIRM PREFETCH',color:'lime',disabled:true,onSelect:()=>this._startPrefetch()}]:[]),
    {kind:'action',label:'CANCEL DOWNLOAD',color:'amber',disabled:true,onSelect:()=>this._cancel()},
    {kind:'action',label:'CHECK OFFLINE STATUS',color:'cyan',onSelect:()=>this._refresh()},
+   ...(this.tiered?[{kind:'action',label:'PROTECT OFFLINE FILES',color:'cyan',sub:'LOWER EVICTION RISK',onSelect:()=>this._protect()}]:[]),
    ...(this.tiered?[{kind:'action',label:'APPLY QUALITY (MUSIC STOPPED)',color:'lime',onSelect:()=>this._apply()}]:[]),
   ]});
   this._onFrame=()=>this._paint();scene.events?.on('update',this._onFrame);this._refresh();
@@ -48,19 +49,32 @@ export class OfflineMusicView extends View {
  _paint(){if(!this.alive)return;
   if((this.armed&&!this._ticketCurrent(this._downloadTicket))||(this.armedPrefetch&&!this._ticketCurrent(this._prefetchTicket))){this.armed=false;this.armedPrefetch=false;this.localError='DOWNLOAD PLAN CHANGED - CONFIRM AGAIN';}
   const s=this.controller.state||{},busy=this.pending||!!this.controller.running||s.status==='checking'||s.status==='downloading'||s.prefetchStatus==='checking'||s.prefetchStatus==='downloading';
-  const key=JSON.stringify([s.status,s.missingBytes,s.completedBytes,s.totalBytes,s.availableBytes,s.mode,s.quality,s.liteReady,s.fullReady,s.upgradeStatus,s.upgradeMissingBytes,s.prefetchStatus,s.prefetchBytes,s.nextBiome,this.armed,this.armedPrefetch,busy,this.localError]);if(key===this._lastPaint)return;this._lastPaint=key;
-  this.status.setText(this.localError?(typeof this.localError==='string'?this.localError:'STATUS CHECK FAILED - RETRY'):downloadStatusText(s));
+  const key=JSON.stringify([s.status,s.missingBytes,s.completedBytes,s.totalBytes,s.availableBytes,s.mode,s.quality,s.liteReady,s.fullReady,s.upgradeStatus,s.upgradeMissingBytes,s.prefetchStatus,s.prefetchBytes,s.nextBiome,s.storageProtection,this.armed,this.armedPrefetch,busy,this.localError,this.localNotice]);if(key===this._lastPaint)return;this._lastPaint=key;
+  this.status.setText(this.localError?(typeof this.localError==='string'?this.localError:'STATUS CHECK FAILED - RETRY'):this.localNotice||downloadStatusText(s));
   this.note.setText(this.armedPrefetch?'CONFIRM OPTIONAL PREFETCH / MAX 32 MB':this.armed?'CONFIRM TO DOWNLOAD '+mb(s.missingBytes)+' OF MUSIC':this.tiered?(s.prefetchStatus==='ready'||s.prefetchStatus==='partial'?'NEXT BIOME '+s.prefetchStatus.toUpperCase()+' '+s.prefetchGroups+'/'+s.prefetchTotalGroups:'ACTIVE: '+(s.quality?.toUpperCase()||'NONE')+' / NO AUTO DOWNLOAD'):'ORIGINAL QUALITY PREVIEW - NO AUTO DOWNLOAD');
-  const items=this.menu.items;const arm=items.find(i=>i.label==='DOWNLOAD / REPAIR'),confirm=items.find(i=>i.label==='CONFIRM DOWNLOAD'),cancel=items.find(i=>i.label==='CANCEL DOWNLOAD'),refresh=items.find(i=>i.label==='CHECK OFFLINE STATUS'),armPrefetch=items.find(i=>i.label==='PRELOAD NEXT BIOME'),confirmPrefetch=items.find(i=>i.label==='CONFIRM PREFETCH');if(this.tiered){items[0].disabled=busy;items.at(-1).disabled=busy||!(s.liteReady||s.ready||s.mode==='no-music');armPrefetch.disabled=busy||!this.controller.plan.nextBiome||s.mode==='no-music';confirmPrefetch.disabled=busy||!this.armedPrefetch;}arm.disabled=busy||s.status==='no-music'||s.ready===true;confirm.disabled=busy||!this.armed;cancel.disabled=!(busy||this.armed||this.armedPrefetch);refresh.disabled=busy;this.menu.refresh();
+  const items=this.menu.items,protect=items.find(i=>i.label==='PROTECT OFFLINE FILES');const arm=items.find(i=>i.label==='DOWNLOAD / REPAIR'),confirm=items.find(i=>i.label==='CONFIRM DOWNLOAD'),cancel=items.find(i=>i.label==='CANCEL DOWNLOAD'),refresh=items.find(i=>i.label==='CHECK OFFLINE STATUS'),armPrefetch=items.find(i=>i.label==='PRELOAD NEXT BIOME'),confirmPrefetch=items.find(i=>i.label==='CONFIRM PREFETCH');if(this.tiered){items[0].disabled=busy;items.at(-1).disabled=busy||!(s.liteReady||s.ready||s.mode==='no-music');armPrefetch.disabled=busy||!this.controller.plan.nextBiome||s.mode==='no-music';confirmPrefetch.disabled=busy||!this.armedPrefetch;}arm.disabled=busy||s.status==='no-music'||s.ready===true;confirm.disabled=busy||!this.armed;cancel.disabled=!(busy||this.armed||this.armedPrefetch);refresh.disabled=busy;if(protect)protect.disabled=busy||s.storageProtection==='granted'||s.storageProtection==='unsupported';this.menu.refresh();
  }
- async _mode(mode){if(this.pending||this.controller.running)return;this.armed=false;this.armedPrefetch=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.setMode(mode);updateSetting(this.scene.game,'offlineMusicQuality',mode);}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
- async _apply(){if(this.pending||this.controller.running)return;this.pending=true;this.armed=false;this.localError=false;this._paint();try{await this.controller.apply();}catch(e){this.localError=String(e.message||e).includes('Stop music')?'STOP MUSIC BEFORE APPLYING QUALITY':'QUALITY NOT READY - CHECK DOWNLOAD';}finally{this.pending=false;this._paint();}}
- _arm(){this.armedPrefetch=false;if(this.pending||this.controller.running||this.controller.state?.ready||this.controller.state?.status==='no-music')return;this.armed=true;this._downloadTicket=this._planTicket();this._paint();}
- _armPrefetch(){if(!this.tiered||this.pending||this.controller.running||!this.controller.plan.nextBiome||this.controller.mode==='no-music')return;this.armed=false;this.armedPrefetch=true;this._prefetchTicket=this._planTicket();this._paint();}
- async _startPrefetch(){if(!this.armedPrefetch||this.pending)return;if(!this._ticketCurrent(this._prefetchTicket)){this._staleConfirmation();return;}this.armedPrefetch=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.prefetch({consent:true,idle:!this.scene.game.scene.isActive('RunScene')});}catch(e){this.localError='PREFETCH UNAVAILABLE - TRY IN MENU';}finally{this.pending=false;this._paint();}}
- async _start(){if(!this.armed||this.pending)return;if(!this._ticketCurrent(this._downloadTicket)){this._staleConfirmation();return;}this.armed=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.start({consent:true});}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
- _cancel(){this.armed=false;this.armedPrefetch=false;this.controller.cancel();this._paint();}
- async _refresh(){if(this.pending||this.controller.running)return;this.armed=false;this.armedPrefetch=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.refresh();}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
+ async _mode(mode){if(this.pending||this.controller.running)return;this.armed=false;this.armedPrefetch=false;this.pending=true;this.localError=false;this.localNotice=null;this._paint();try{await this.controller.setMode(mode);updateSetting(this.scene.game,'offlineMusicQuality',mode);}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
+ /** This call must begin synchronously in the actual menu activation gesture.
+  * Never downloads files or claims persistence is a backup. */
+ async _protect(){
+  if(this.pending||this.controller.running||!this.tiered)return;
+  this.localError=false;this.localNotice=null;this.pending=true;this._paint();
+  try{
+   const result=await this.controller.protectStorage({consent:true});
+   this.localNotice=result==='granted'?'STORAGE PROTECTED - NOT A BACKUP':result==='denied'
+    ?'BROWSER DID NOT GRANT PROTECTION':result==='unsupported'
+    ?'BROWSER CANNOT PROTECT OFFLINE FILES':'STORAGE PROTECTION UNAVAILABLE';
+  }catch{this.localNotice='STORAGE PROTECTION UNAVAILABLE';}
+  finally{this.pending=false;this._paint();}
+ }
+ async _apply(){if(this.pending||this.controller.running)return;this.pending=true;this.armed=false;this.localError=false;this.localNotice=null;this._paint();try{await this.controller.apply();}catch(e){this.localError=String(e.message||e).includes('Stop music')?'STOP MUSIC BEFORE APPLYING QUALITY':'QUALITY NOT READY - CHECK DOWNLOAD';}finally{this.pending=false;this._paint();}}
+ _arm(){this.armedPrefetch=false;if(this.pending||this.controller.running||this.controller.state?.ready||this.controller.state?.status==='no-music')return;this.armed=true;this.localNotice=null;this._downloadTicket=this._planTicket();this._paint();}
+ _armPrefetch(){if(!this.tiered||this.pending||this.controller.running||!this.controller.plan.nextBiome||this.controller.mode==='no-music')return;this.armed=false;this.armedPrefetch=true;this.localNotice=null;this._prefetchTicket=this._planTicket();this._paint();}
+ async _startPrefetch(){if(!this.armedPrefetch||this.pending)return;if(!this._ticketCurrent(this._prefetchTicket)){this._staleConfirmation();return;}this.armedPrefetch=false;this.pending=true;this.localError=false;this.localNotice=null;this._paint();try{await this.controller.prefetch({consent:true,idle:!this.scene.game.scene.isActive('RunScene')});}catch(e){this.localError='PREFETCH UNAVAILABLE - TRY IN MENU';}finally{this.pending=false;this._paint();}}
+ async _start(){if(!this.armed||this.pending)return;if(!this._ticketCurrent(this._downloadTicket)){this._staleConfirmation();return;}this.armed=false;this.pending=true;this.localError=false;this.localNotice=null;this._paint();try{await this.controller.start({consent:true});}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
+ _cancel(){this.armed=false;this.armedPrefetch=false;this.localNotice=null;this.controller.cancel();this._paint();}
+ async _refresh(){if(this.pending||this.controller.running)return;this.armed=false;this.armedPrefetch=false;this.pending=true;this.localError=false;this.localNotice=null;this._paint();try{await Promise.all([this.controller.refresh(),this.controller.checkStorageProtection?.()]);}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
  handleAction(action){if(action==='cancel'){this.close();return true;}return this.menu.handleAction(action);}
  destroy(){this.scene.events?.off('update',this._onFrame);this.armed=false;this.armedPrefetch=false;super.destroy();}
 }

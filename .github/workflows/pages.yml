@@ -74,6 +74,14 @@ jobs:
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/pwa/test-installability-persistent-browser.mjs dist "$BASE"
           node tools/pwa/test-real-offline-run-browser.mjs dist tools/pwa/releases/melody-only-748a0670/offline-melody-index.bin "$BASE"
+      - name: Verify first install, reopen hint, and opt-in storage protection
+        if: steps.rollout.outputs.mode == 'pwa'
+        env:
+          BASE: ${{ steps.base.outputs.path }}
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/pwa/test-first-install-reopen-browser.mjs dist "$BASE"
+          node tools/pwa/test-storage-protection-browser.mjs dist "$BASE"
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:

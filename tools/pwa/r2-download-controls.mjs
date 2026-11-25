@@ -1,6 +1,7 @@
 /** Consent-first original-quality download controller. UI/transport integration is separate.
  * Never starts on construction, preference selection, or readiness inspection. */
 import {downloadR2Group,inspectR2Group,inspectR2GroupFast,catalogCacheGroup} from './r2-cache.mjs';
+const isQuotaExceeded=e=>e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22;
 export class R2DownloadControls {
  constructor({plan,storage,origin,scope,subtle,fetcher,estimate,onState=()=>{},download=downloadR2Group,inspect=inspectR2Group}){
   if(plan?.format!=='bb-published-music-plan-v1'||!Array.isArray(plan.groups)||!plan.catalog||typeof estimate!=='function')throw Error('Expected published recording plan and quota estimator');
@@ -43,7 +44,21 @@ export class R2DownloadControls {
    this._set({status:'downloading',missingBytes:all.missingBytes,totalBytes:total});let done=0;
    for(const g of groups){checkAbort();await this.download(g,{...this.opts,consent:true,signal:ac.signal,onProgress:p=>{if(!ac.signal.aborted)this._set({completedBytes:done+p.bytes});}});checkAbort();done+=g.entries.reduce((a,e)=>a+e.bytes,0);this._set({completedBytes:done});}
    const verified=await this._check(required);checkAbort();this._set({...verified,status:verified.ready?'ready':'download-required'});
-  }catch(e){this._set({status:ac.signal.aborted?'cancelled':'failed',ready:false,error:ac.signal.aborted?null:String(e.message||e)});}finally{this.abort=null;this.running=null;}return this.state;})();return this.running;
+  }catch(e){
+    if(ac.signal.aborted)this._set({status:'cancelled',ready:false,error:null});
+    else if(isQuotaExceeded(e)){
+     // CacheStorage.put may exhaust the device after an optimistic estimate.
+     // Keep already-verified objects; do not delete any cache or retry without
+     // another explicit confirmation after the player frees space.
+     const remaining=await this._check(await this._groups()).catch(()=>null);
+     const space=await Promise.resolve().then(()=>this.estimate()).catch(()=>null);
+     this._set({status:'insufficient-storage',ready:false,
+      missingBytes:remaining?.missingBytes??this.state.missingBytes,
+      availableBytes:Number.isFinite(space?.quota)&&Number.isFinite(space?.usage)
+       ?Math.max(0,space.quota-space.usage):null,
+      error:'Storage quota reached; verified recordings retained. Free space and retry.'});
+    }else this._set({status:'failed',ready:false,error:String(e.message||e)});
+   }finally{this.abort=null;this.running=null;}return this.state;})();return this.running;
  }
  cancel(){this.abort?.abort();}
 }

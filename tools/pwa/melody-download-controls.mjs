@@ -2,13 +2,16 @@
 import {R2DownloadControls} from './r2-download-controls.mjs';
 import {activatePublishedMelody,appendVerifiedMelodyGroups} from './melody-tier-cache.mjs';
 import {selectR2Tier} from './r2-tier-selection.mjs';
+import {storageProtectionStatus,requestStorageProtection} from './storage-persistence.mjs';
 const modes=['high','space-saver','no-music'];
 export class MelodyDownloadControls {
  constructor({plan,options,estimate,isStopped,activate=activatePublishedMelody,createQueue=o=>new R2DownloadControls(o),append=appendVerifiedMelodyGroups,mode='high',withStoppedTransport=null}){
   if(plan?.format!=='bb-melody-candidate-plan-v1'||!Array.isArray(plan.groups)||typeof isStopped!=='function'||!modes.includes(mode))throw Error('Invalid melody controller');
-  this.plan=plan;this.append=append;this._appliedGroupIds=new Set();this._planRevision=0;this._contextRefreshTicket=null;this.replanning=null;this.options=options;this.withStoppedTransport=withStoppedTransport;this.boundaryWork=null;this.estimate=estimate;this.isStopped=isStopped;this.activate=activate;this.createQueue=createQueue;this.mode=mode;this.quality=null;this.running=null;this.queue=null;this.cancelled=false;this.queues={};this.state={status:'idle',mode,quality:null,ready:false,missingBytes:null,nextBiome:plan.nextBiome||null};
+  this.plan=plan;this.append=append;this._appliedGroupIds=new Set();this._planRevision=0;this._contextRefreshTicket=null;this.replanning=null;this.options=options;this.withStoppedTransport=withStoppedTransport;this.boundaryWork=null;this.estimate=estimate;this.isStopped=isStopped;this.activate=activate;this.createQueue=createQueue;this.mode=mode;this.quality=null;this.running=null;this.queue=null;this.cancelled=false;this.queues={};this.state={status:'idle',mode,quality:null,ready:false,missingBytes:null,nextBiome:plan.nextBiome||null,storageProtection:'unknown'};
  }
  _set(x){this.state={...this.state,...x,mode:this.mode,quality:this.quality};return this.state;}
+ async checkStorageProtection(){const status=await storageProtectionStatus(this.options?.storageManager);this._set({storageProtection:status});return status;}
+ protectStorage({consent=false}={}){return requestStorageProtection(this.options?.storageManager,{consent}).then(status=>{this._set({storageProtection:status});return status;});}
  _queue(q){if(!this.queues[q])this.queues[q]=this.createQueue({plan:{format:'bb-published-music-plan-v1',catalog:this.plan.catalog,groups:this.plan.groups.filter(g=>g.quality===q)},...this.options,estimate:this.estimate,onState:s=>{if(this.queue===this.queues[q])this._set({...s,qualityPhase:q});}});return this.queues[q];}
  async setMode(mode){if(this.running||this.replanning)throw Error('Download in progress');if(!modes.includes(mode))throw Error('Invalid music quality mode');this.mode=mode;return this.refresh();}
  /** Plan changes never download and never erase a verified recording cache.
