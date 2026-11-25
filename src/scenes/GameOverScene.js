@@ -43,6 +43,7 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
+import { ReplayEvidenceView } from '../ui/ReplayEvidenceView.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
@@ -985,7 +986,22 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
-    this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts() });
+    this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
+  }
+
+  /** Keep the existing dimmed Game Over screen; only swap the overlay panel. */
+  _openEvidenceView() {
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!this.ghostView || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id) return;
+    this.ghostView.destroy();
+    this.ghostView=new ReplayEvidenceView(this,this.theme,{tape,onClose:()=>this._returnToGhosts()});
+  }
+
+  _returnToGhosts() {
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE),library=this.registry.get(REG.GHOSTS);
+    if (!this.ghostView || !this.alive || this.leaving || !tape || !library) { this._closeGhosts(); return; }
+    this.ghostView.destroy();
+    this.ghostView=new GhostFavoritesView(this,this.theme,{library,tape,onClose:()=>this._closeGhosts(),onEvidence:()=>this._openEvidenceView()});
   }
 
   _closeGhosts() {

@@ -1,65 +1,106 @@
-// Test-only IndexedDB stand-in (not a test file).
-/** Structured-clone stand-in (jsdom has no structuredClone): copies typed arrays, plain objects and arrays. */
-const structuredClone = (v) => (ArrayBuffer.isView(v) ? Uint8Array.from(v) : Array.isArray(v) ? v.map(structuredClone)
-  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, structuredClone(x)])) : v);
+// Test-only transactional IndexedDB stand-in. No browser network/storage.
+const clone = v => (ArrayBuffer.isView(v) ? Uint8Array.from(v) : Array.isArray(v) ? v.map(clone)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k,x]) => [k,clone(x)])) : v);
 
-/** Minimal in-memory IndexedDB: enough for open/upgrade, put/get/getAll/delete, with failure injection. */
+/** Small IDB mock supporting version upgrades, readwrite transaction rollback, and fault injection. */
 export function fakeIdb() {
-  const dbs = new Map(); // name -> { stores: Map<name, {keyPath, rows: Map}> }
-  const hooks = { failPut: null };
-  const later = (fn) => Promise.resolve().then(fn);
-  const request = (run) => {
-    const req = {};
-    later(() => { try { req.result = run(); req.onsuccess && req.onsuccess(); } catch (e) { req.error = e; req.onerror && req.onerror(); } });
-    return req;
+  const dbs = new Map();
+  const hooks = { failPut: null, failDelete: null, failGetAll: null, failGet: null, closeCount: 0, onTransaction: null };
+  const later = fn => Promise.resolve().then(fn);
+  // Serialize ALL transactions for this test mock, a conservative subset of
+  // browser IDB's overlapping-store readwrite lock guarantees. Queued txs
+  // snapshot when they become active, never when created.
+  const pump = db => {
+    if (db.active || !db.queue.length) return;
+    db.active = true;
+    const next = db.queue.shift();
+    next();
   };
-  // One transaction over one or more stores: oncomplete fires after every request finished OK; any failure aborts it.
   const makeTx = (db, names, mode) => {
+    hooks.onTransaction?.(names,mode);
     const tx = { error: null };
-    let pending = 0;
-    let failed = false;
-    const settle = () => later(() => { if (!failed && pending === 0 && tx.oncomplete) { tx.oncomplete(); tx.oncomplete = null; } });
-    const track = (run) => {
+    let pending = 0, closed = false, failed = false, active = false;
+    let staged = null;
+    const ops = [];
+    const finish = () => {
+      if (closed) return;
+      closed = true; db.active = false;
+      Promise.resolve().then(() => pump(db));
+    };
+    const settle = () => later(() => {
+      if (!active || failed || closed || pending !== 0) return;
+      if (mode === 'readwrite') for (const n of names) db.stores.get(n).rows = staged.get(n);
+      tx.oncomplete?.(); finish();
+    });
+    const abort = error => {
+      if (failed || closed) return;
+      failed = true; tx.error = error || new Error('transaction aborted');
+      tx.onabort?.();
+      if (active) finish();
+    };
+    tx.abort = () => abort(new Error('explicit transaction abort'));
+    const run = (req, fn) => later(() => {
+      if (failed || closed) return;
+      try { req.result = fn(); pending--; req.onsuccess?.(); settle(); }
+      catch (e) { pending--; req.error = e; req.onerror?.(); abort(e); }
+    });
+    const track = fn => {
+      if (failed || closed) throw new Error('TransactionInactiveError');
       pending++;
       const req = {};
-      later(() => {
-        try { req.result = run(); pending--; req.onsuccess && req.onsuccess(); settle(); } catch (e) {
-          pending--; failed = true; req.error = e; tx.error = e; req.onerror && req.onerror(); tx.onabort && tx.onabort();
-        }
-      });
+      if (active) run(req,fn); else ops.push([req,fn]);
       return req;
     };
-    const store = (s) => ({
-      put: (v) => track(() => { if (mode === 'readwrite' && hooks.failPut) throw hooks.failPut; s.rows.set(v[s.keyPath], structuredClone(v)); return v[s.keyPath]; }),
-      get: (k) => track(() => (s.rows.has(k) ? structuredClone(s.rows.get(k)) : undefined)),
-      getAll: () => track(() => [...s.rows.values()].map((v) => structuredClone(v))),
-      delete: (k) => track(() => { s.rows.delete(k); }),
+    tx.objectStore = n => {
+      if (!names.includes(n)) throw new Error(`store ${n} not in transaction`);
+      const model = db.stores.get(n);
+      const rows = () => staged.get(n);
+      return {
+        put: v => track(() => { const failure = typeof hooks.failPut === 'function' ? hooks.failPut(v) : hooks.failPut;
+          if (mode === 'readwrite' && failure) throw failure;
+          rows().set(v[model.keyPath],clone(v)); return v[model.keyPath]; }),
+        get: k => track(() => { if(hooks.failGet)throw hooks.failGet; return rows().has(k) ? clone(rows().get(k)) : undefined; }),
+        getAll: () => track(() => { if (hooks.failGetAll) throw hooks.failGetAll; return [...rows().values()].map(clone); }),
+        delete: k => track(() => { if (mode === 'readwrite' && hooks.failDelete) throw hooks.failDelete; rows().delete(k); }),
+      };
+    };
+    db.queue.push(() => {
+      if (failed) { db.active=false; later(()=>pump(db)); return; }
+      active = true;
+      staged = new Map(names.map(n => [n, new Map([...db.stores.get(n).rows].map(([k,v]) => [k,clone(v)]))]));
+      for (const [req,fn] of ops) run(req,fn);
+      ops.length = 0;
+      settle();
     });
-    tx.objectStore = (n) => { if (!names.includes(n)) throw new Error(`store ${n} not in transaction`); return store(db.stores.get(n)); };
-    settle();
+    later(() => pump(db));
     return tx;
   };
-  const idb = {
-    hooks,
-    names: () => [...dbs.keys()],
-    open(name) {
+
+  return {
+    hooks, names: () => [...dbs.keys()],
+    // Expose no privileged direct database manipulation; upgrade using real IDB calls.
+    open(name, version = 1) {
       const req = {};
       later(() => {
-        let db = dbs.get(name);
-        const fresh = !db;
-        if (fresh) { db = { stores: new Map() }; dbs.set(name, db); }
-        const handle = {
-          objectStoreNames: { contains: (n) => db.stores.has(n) },
-          createObjectStore: (n, { keyPath }) => { db.stores.set(n, { keyPath, rows: new Map() }); },
-          transaction: (n, mode) => makeTx(db, [].concat(n), mode),
-        };
-        req.result = handle;
-        if (fresh && req.onupgradeneeded) req.onupgradeneeded();
-        req.onsuccess && req.onsuccess();
+        try {
+          let db = dbs.get(name);
+          if (!db) { db = { version: 0, stores: new Map(), queue: [], active: false }; dbs.set(name,db); }
+          if (version < db.version) throw new Error('VersionError');
+          const handle = {
+            objectStoreNames: { contains: n => db.stores.has(n) },
+            createObjectStore: (n,{keyPath}) => {
+              if (db.stores.has(n)) throw new Error('ConstraintError');
+              db.stores.set(n,{keyPath,rows:new Map()});
+            },
+            transaction: (n,mode) => makeTx(db,[].concat(n),mode),
+            close: () => {hooks.closeCount++;},
+          };
+          req.result = handle;
+          if (version > db.version) { req.oldVersion = db.version; req.newVersion = version; req.onupgradeneeded?.(); db.version = version; }
+          req.onsuccess?.();
+        } catch (e) { req.error=e; req.onerror?.(); }
       });
       return req;
     },
   };
-  return idb;
 }
-
