@@ -30,19 +30,19 @@ export function fakeIdb() {
     const settle = () => later(() => {
       if (!active || failed || closed || pending !== 0) return;
       if (mode === 'readwrite') for (const n of names) db.stores.get(n).rows = staged.get(n);
-      tx.oncomplete?.(); finish();
+      tx.oncomplete?.({target:tx}); finish();
     });
     const abort = error => {
       if (failed || closed) return;
       failed = true; tx.error = error || new Error('transaction aborted');
-      tx.onabort?.();
+      tx.onabort?.({target:tx});
       if (active) finish();
     };
     tx.abort = () => abort(new Error('explicit transaction abort'));
     const run = (req, fn) => later(() => {
       if (failed || closed) return;
-      try { req.result = fn(); pending--; req.onsuccess?.(); settle(); }
-      catch (e) { pending--; req.error = e; req.onerror?.(); abort(e); }
+      try { req.result = fn(); pending--; req.onsuccess?.({target:req}); settle(); }
+      catch (e) { pending--; req.error = e; req.onerror?.({target:req}); abort(e); }
     });
     const track = fn => {
       if (failed || closed) throw new Error('TransactionInactiveError');
@@ -96,9 +96,9 @@ export function fakeIdb() {
             close: () => {hooks.closeCount++;},
           };
           req.result = handle;
-          if (version > db.version) { req.oldVersion = db.version; req.newVersion = version; req.onupgradeneeded?.(); db.version = version; }
-          req.onsuccess?.();
-        } catch (e) { req.error=e; req.onerror?.(); }
+          if (version > db.version) { req.oldVersion = db.version; req.newVersion = version; req.onupgradeneeded?.({target:req,oldVersion:req.oldVersion,newVersion:version}); db.version = version; }
+          req.onsuccess?.({target:req});
+        } catch (e) { req.error=e; req.onerror?.({target:req}); }
       });
       return req;
     },
