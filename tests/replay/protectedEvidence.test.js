@@ -866,6 +866,33 @@ describe('protected local evidence references (#244)', () => {
     await expect(fresh.put(target,{runId:'second-new-owner'})).rejects.toMatchObject({code:'run-id-conflict'});
   });
 
+  test('P1: same-tab delete ordered after invoked direct put cannot be overtaken',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await store.put(target,{runId:'owner-A'});
+    const writing=store.put(target,{runId:'owner-A'});
+    const deleting=store.remove(digest);
+    await Promise.all([writing,deleting]);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
+  test('P1: unknown failed tombstone lookup cannot authorize replacing a pending run',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failGet=new Error('deletion generation unreadable');
+    await expect(stale.put(target,{runId:'owner-A'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+    idb.hooks.failGet=null;
+    await expect(stale.put(target,{runId:'owner-B'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
