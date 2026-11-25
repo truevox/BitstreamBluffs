@@ -153,6 +153,64 @@ describe('canonical dual-proof decision contract (#245)', () => {
     expect(v.competitiveness.status).toBe('invalid');expect(v.publication).toBe('none');NO_RANK(v);
   });
 
+  test('bad manifest or ruleset rejection is invalid, while verifier unavailability remains inconclusive', () => {
+    const r={...request(),intent:'provisional-public'};
+    for(const reason of ['malformed-manifest','ruleset-field-mismatch','malformed-ruleset-id','null-ruleset-not-legacy','other-rejected']){
+      const v=adjudicateDualProof({...good(r),allowProvisional:true,simulation:{...simulation(r),record:{
+        outcome:'refused',verifiedUnder:null,verifierId:null,manifestDigest:r.manifestDigest,
+        tapeDigest:r.tapeDigest,reason}}});
+      expect(v.proof.reason).toBe('verifier-rejected-evidence');
+      expect(v.publication).toBe('none');NO_RANK(v);
+    }
+    for(const reason of ['unknown-ruleset','historical-verifier-required']){
+      const v=adjudicateDualProof({...good(r),allowProvisional:true,simulation:{...simulation(r),record:{
+        outcome:'refused',verifiedUnder:null,verifierId:null,manifestDigest:r.manifestDigest,
+        tapeDigest:r.tapeDigest,reason}}});
+      expect(v.proof).toMatchObject({status:'inconclusive',reason:'verifier-unavailable'});
+      expect(v.publication).toBe('provisional-unverified');NO_RANK(v);
+    }
+  });
+
+  test('known assisted or mismatched course cannot claim provisional on a legacy replay', () => {
+    const r={...request(),intent:'provisional-public'};
+    const s={...simulation(r),assistanceObserved:'tool-assisted',record:{...simulation(r).record,outcome:'consistent-with'}};
+    const v=adjudicateDualProof({...good(r),simulation:s,allowProvisional:true});
+    expect(v.proof.reason).toBe('assistance-misrepresented');NO_RANK(v);
+    const s2={...simulation(r),verifiedCourse:{...simulation(r).verifiedCourse,loadoutDigest:d('f')},
+      record:{...simulation(r).record,outcome:'consistent-with'}};
+    const v2=adjudicateDualProof({...good(r),simulation:s2,allowProvisional:true});
+    expect(v2.proof.reason).toBe('replayed-course-or-loadout-mismatch');NO_RANK(v2);
+  });
+
+  test('known missing tape, changed score, and claimed ruleset mismatch block unavailable-verifier fallback', () => {
+    const r={...request(),intent:'provisional-public'};
+    const base={...simulation(r),record:{outcome:'refused',verifiedUnder:null,verifierId:null,
+      manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,reason:'unknown-ruleset'}};
+    for(const bad of [
+      {...base,tapeComplete:false},
+      {...base,score:r.score+1},
+      {...base,endTick:r.endTick+1},
+      {...base,record:{...base.record,claimedRulesetId:d('f')}}
+    ]){
+      const v=adjudicateDualProof({...good(r),simulation:bad,allowProvisional:true});
+      expect(v.proof.status).toBe('invalid');
+      expect(v.publication).toBe('none');NO_RANK(v);
+    }
+  });
+
+  test('legitimate Unicode free-text seeds, spaces and emoji survive exact cross-source matching', () => {
+    for(const seed of ['Snow Day','🌨️ Snow Hill','électricité','東京 山','double  gap']){
+      const r={...request(),seed};
+      const v=adjudicateDualProof(good(r));
+      expect(v.publication).toBe('verified-eligible');
+      const mismatch=good(r);mismatch.authorization.seed=seed+' ';
+      NO_RANK(adjudicateDualProof(mismatch));
+    }
+    for(const seed of ['\u0000', 'newline\nseed', '\ud800', '\u2028', '']){
+      NO_RANK(adjudicateDualProof(good({...request(),seed})));
+    }
+  });
+
   test('client edits cannot fabricate a signed entitlement or bypass a trusted challenge', () => {
     for(const [field,mut] of [
       ['runId','another-run'],['buildId','stale-build'],['rulesetId',d('f')],

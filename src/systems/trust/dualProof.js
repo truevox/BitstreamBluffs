@@ -29,7 +29,13 @@ const keys = (o, req, optional = []) => {
 const isDigest = s => typeof s === 'string' && DIGEST.test(s);
 const bounded = (s, n = 120) => typeof s === 'string' && s.length > 0 && s.length <= n &&
   /^[\w.\-:@/]+$/.test(s);
+// SeedView accepts ordinary free text; do not impose identifier syntax on
+// real terrain seeds. Preserve exact Unicode bytes but reject control chars,
+// unpaired UTF-16 surrogates and line separators before canonical hashing.
+const seedText = s => typeof s === 'string' && s.length > 0 && s.length <= 120 &&
+  !/[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]/u.test(s);
 const integer = n => Number.isSafeInteger(n) && n >= 0;
+const UNAVAILABLE_VERIFIER = Object.freeze(['unknown-ruleset', 'historical-verifier-required']);
 const value = (status, reason) => Object.freeze({status, reason});
 const TRUST = Object.freeze({
   malformed: value('invalid', 'malformed-input'),
@@ -42,7 +48,7 @@ function validRequest(r) {
   return keys(r, req) && r.format === DUAL_PROOF_FORMAT && r.version === DUAL_PROOF_VERSION &&
     bounded(r.runId) && bounded(r.buildId) && isDigest(r.rulesetId) &&
     isDigest(r.manifestDigest) && isDigest(r.tapeDigest) && isDigest(r.loadoutDigest) &&
-    bounded(r.seed) && integer(r.biomeMask) && r.biomeMask <= 0xffffffff &&
+    seedText(r.seed) && integer(r.biomeMask) && r.biomeMask <= 0xffffffff &&
     integer(r.score) && integer(r.endTick) && LANES.includes(r.lane) &&
     ASSISTANCE.includes(r.assistance) && INTENTS.includes(r.intent) &&
     (r.challengeId === null || bounded(r.challengeId));
@@ -63,26 +69,32 @@ function simulationVerdict(request, s) {
     return value('invalid', 'simulation-identity-mismatch');
   if (s.record.outcome !== 'refused' && s.record.verifiedUnder !== request.rulesetId)
     return value('invalid', 'simulation-ruleset-mismatch');
-  if (s.record.outcome === 'refused') return value('inconclusive', 'verifier-refused');
-  if (s.record.outcome === 'consistent-with' || s.record.outcome === 'inconclusive-legacy')
-    return value('inconclusive', 'legacy-not-independent-proof');
-  if (s.record.outcome === 'diverged') return value('invalid', 'simulation-diverged');
-  // This is verified-manifest data from the replay executor, not the
-  // request's separately claimed course or loadout. An authorizer cannot
-  // approve arbitrary claimed gear for a replayed different manifest.
+  if (s.record.outcome === 'refused' && s.record.claimedRulesetId !== undefined &&
+      s.record.claimedRulesetId !== request.rulesetId)
+    return value('invalid', 'simulation-ruleset-mismatch');
+  // Independently observed assistance and parsed course identity are known
+  // facts even when a verifier CANNOT run. Inconclusive ≠ permission to
+  // publish a known misrepresented human or loadout claim.
   if (!keys(s.verifiedCourse, ['seed','biomeMask','lane','loadoutDigest']) ||
-      !bounded(s.verifiedCourse.seed) || !integer(s.verifiedCourse.biomeMask) ||
+      !seedText(s.verifiedCourse.seed) || !integer(s.verifiedCourse.biomeMask) ||
       !LANES.includes(s.verifiedCourse.lane) || !isDigest(s.verifiedCourse.loadoutDigest))
     return TRUST.malformed;
   for (const field of ['seed','biomeMask','lane','loadoutDigest'])
     if (s.verifiedCourse[field] !== request[field])
       return value('invalid', 'replayed-course-or-loadout-mismatch');
-  if (!s.tapeComplete) return value('invalid', 'missing-complete-input-tape');
-  if (s.score !== request.score || s.endTick !== request.endTick)
-    return value('invalid', 'outcome-claim-mismatch');
   if (s.assistanceObserved !== request.assistance)
     return value('invalid', 'assistance-misrepresented');
   if (s.assistanceObserved !== 'human') return value('invalid', 'nonhuman-on-human-board');
+  if (!s.tapeComplete) return value('invalid', 'missing-complete-input-tape');
+  if (s.score !== request.score || s.endTick !== request.endTick)
+    return value('invalid', 'outcome-claim-mismatch');
+  if (s.record.outcome === 'refused')
+    return UNAVAILABLE_VERIFIER.includes(s.record.reason)
+      ? value('inconclusive', 'verifier-unavailable')
+      : value('invalid', 'verifier-rejected-evidence');
+  if (s.record.outcome === 'consistent-with' || s.record.outcome === 'inconclusive-legacy')
+    return value('inconclusive', 'legacy-not-independent-proof');
+  if (s.record.outcome === 'diverged') return value('invalid', 'simulation-diverged');
   return value('valid', 'independent-replay-match');
 }
 
@@ -92,7 +104,7 @@ function eligibilityVerdict(request, a) {
     'loadoutDigest', 'manifestDigest', 'challengeId', 'challengeStatus', 'economyStatus', 'equipmentStatus', 'modeStatus', 'pinnedVerifierBuildId'];
   if (!keys(a, req) || a.kind !== 'trusted-eligibility-receipt' ||
       !['authorized', 'denied', 'pending'].includes(a.status) ||
-      !bounded(a.runId) || !bounded(a.buildId) || !isDigest(a.rulesetId) || !bounded(a.seed) ||
+      !bounded(a.runId) || !bounded(a.buildId) || !isDigest(a.rulesetId) || !seedText(a.seed) ||
       !integer(a.biomeMask) || !LANES.includes(a.lane) || !isDigest(a.loadoutDigest) || !isDigest(a.manifestDigest) ||
       !(a.challengeId === null || bounded(a.challengeId)) ||
       !['fresh', 'expired', 'reused', 'missing'].includes(a.challengeStatus) ||
