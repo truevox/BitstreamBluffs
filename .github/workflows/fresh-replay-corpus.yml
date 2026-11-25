@@ -1,0 +1,49 @@
+name: Fresh Replay Evidence Corpus QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fresh-replay-corpus.yml'
+      - 'tests/replay/freshSim9Corpus.test.js'
+      - 'tests/replay/headlessRun.js'
+      - 'tools/replay/test-current-corpus-browser.mjs'
+      - 'src/scenes/RunScene.js'
+      - 'src/systems/replay/**'
+      - 'src/systems/ghost/GhostTape.js'
+      - 'tools/ruleset/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fresh-current-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Check deterministic build identity
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Capture native fatal terminal evidence
+        env:
+          BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/fresh-sim9-replay-corpus.json
+        run: npm test -- --runInBand tests/replay/freshSim9Corpus.test.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test fresh evidence in real Chromium IndexedDB
+        env:
+          BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/fresh-sim9-replay-corpus.json
+        run: |
+          npm exec vite -- --host 127.0.0.1 --port 18371 --strictPort > /tmp/fresh-replay-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18371/ >/dev/null && break; sleep 1; done
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-current-corpus-browser.mjs

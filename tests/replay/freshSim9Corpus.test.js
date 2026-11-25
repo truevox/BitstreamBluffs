@@ -15,6 +15,7 @@ const CURRENT=JSON.parse(fs.readFileSync('tools/ruleset/current.json','utf8'));
 const RULESET={rulesetId:CURRENT.rulesetId,doc:JSON.parse(fs.readFileSync(CURRENT.archivePath,'utf8'))};
 const casePlan=Array.from({length:12},(_,i)=>({
  seed:`FRESH244-${String(i+1).padStart(2,'0')}`,ticks:[600,1200,1800][i%3],level:i%2?8:1,
+ upgraded:i%2===1,
  pattern:i%4,
 }));
 const padAt=(t,pattern)=>({
@@ -30,10 +31,15 @@ const padAt=(t,pattern)=>({
 test('fresh SIM9 live-run corpus creates valid complete current-build envelopes without capture omissions',()=>{
  const output=[];
  for(const item of casePlan){
-  const scene=createRun(RunScene,REG,{seed:item.seed,level:item.level,settings:{kodiakPacks:'mixed'}});
+  const scene=createRun(RunScene,REG,{seed:item.seed,level:item.level,settings:{kodiakPacks:'mixed'},
+   profile:item.upgraded?{upgradesEnabled:true,upgrades:{speed:1,hop:1,canopy:1}}:{}});
   scene.registry.set('currentRuleset',RULESET);
   const recorder=scene.ghostRecorder;
   expect(recorder).toBeTruthy();
+  expect(scene.upgradeRun.enabled).toBe(item.upgraded);
+  let terminalCause=null;
+  const nativeDoCrash=scene.doCrash.bind(scene);
+  scene.doCrash=(cause,...rest)=>{terminalCause=cause.cause;return nativeDoCrash(cause,...rest);};
   stepRun(scene,item.ticks,t=>padAt(t,item.pattern));
   const wasNaturalCrash=!!scene.crashed;
   if(!wasNaturalCrash){
@@ -44,6 +50,8 @@ test('fresh SIM9 live-run corpus creates valid complete current-build envelopes 
     stepRun(scene,12,t=>padAt(t,item.pattern));
   }
   expect(scene.crashed).toBe(true);
+  expect(terminalCause).toBeTruthy();
+  if(!wasNaturalCrash)expect(terminalCause).toBe('bsod');
   const ticks=recorder.lastTick;
   expect(ticks).toBeGreaterThanOrEqual(120);
   // Consume the ACTUAL production doCrash -> _saveGhostTape -> GhostRecorder.finish,
@@ -56,6 +64,7 @@ test('fresh SIM9 live-run corpus creates valid complete current-build envelopes 
   const runId=tape.runId;
   expect(runId).toBe(record.id);
   expect(tape.endTick).toBe(ticks);
+  expect(tape.upgradeRanks).toEqual(item.upgraded?{speed:1,hop:1,canopy:1}:null);
   const built=buildRunEvidence({tape,recorder,ruleset:RULESET});
   const bytes=bundleBytes(built.bundle);
   const check=validateEvidenceBundle(bytes,id=>id===RULESET.rulesetId?RULESET.doc:null);
@@ -63,10 +72,11 @@ test('fresh SIM9 live-run corpus creates valid complete current-build envelopes 
   expect({ok:check.ok,outcome:check.outcome,detail:built.detail,errorCount:built.errorCount})
     .toEqual({ok:true,outcome:'valid',detail:'combined',errorCount:0});
   expect(tape.endTick).toBe(ticks);
+  expect(built.bundle.manifest.causal.loadout.upgradeRanks).toEqual(item.upgraded?{speed:1,hop:1,canopy:1}:{});
   expect(built.bundle.checkpoints.length).toBe(recorder.fingerprints.length);
   expect(bytes.length).toBeGreaterThan(2000);
   output.push({seed:item.seed,runId,ticks,targetTicks:item.ticks,crashed:!!scene.crashed,
-    level:item.level,pattern:item.pattern,naturalCrash:wasNaturalCrash,inputRows:tape.inputs.length,checkpoints:tape.checkpoints.length,
+    level:item.level,pattern:item.pattern,upgraded:item.upgraded,terminalCause,naturalCrash:wasNaturalCrash,inputRows:tape.inputs.length,checkpoints:tape.checkpoints.length,
     bytes:bytes.length,digest:bundleDigest(bytes),base64:Buffer.from(bytes).toString('base64')});
  }
  expect(new Set(output.map(r=>r.digest)).size).toBe(casePlan.length);
@@ -74,7 +84,7 @@ test('fresh SIM9 live-run corpus creates valid complete current-build envelopes 
  console.log('FRESH_SIM9_CORPUS',JSON.stringify({count:output.length,ticks:output.map(r=>r.ticks),
   uniqueDigests:new Set(output.map(r=>r.digest)).size,totalBytes:lengths.reduce((a,b)=>a+b,0),
   minBytes:lengths[0],medianBytes:lengths[Math.floor(lengths.length/2)],maxBytes:lengths.at(-1),
-  crashed:output.filter(r=>r.crashed).length,naturalCrashCount:output.filter(r=>r.naturalCrash).length,inputRows:output.map(r=>r.inputRows)}));
+  crashed:output.filter(r=>r.crashed).length,upgraded:output.filter(r=>r.upgraded).length,naturalCrashCount:output.filter(r=>r.naturalCrash).length,inputRows:output.map(r=>r.inputRows)}));
  if(process.env.BSB244_FRESH_CORPUS_OUT){
   fs.writeFileSync(process.env.BSB244_FRESH_CORPUS_OUT,JSON.stringify({
     format:'bb-qa-fresh-current-corpus',rulesetId:RULESET.rulesetId,rows:output}));

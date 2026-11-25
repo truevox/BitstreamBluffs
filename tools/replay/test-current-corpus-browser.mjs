@@ -58,7 +58,11 @@ try{
   }
   const protectedRefs=[];
   for(let i=0;i<2;i++)protectedRefs.push(await store.protect(last[i],{runId:rows[i].runId,role:'pinned'}));
+  // Close the original connection: this must prove a genuinely fresh open,
+  // not merely a second live handle reading the same running database.
+  const firstDb=store._db;firstDb.close();
   const resumed=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+  if(resumed._db===firstDb)throw Error('IDB was not reopened from a closed handle');
   for(let i=0;i<rows.length;i++){
    const saved=await resumed.get(last[i]),source=bytesOf(rows[i].base64);
    if(!saved||saved.length!==source.length||!saved.every((b,k)=>b===source[k]))
@@ -68,17 +72,20 @@ try{
   try{await resumed.remove(last[0]);}catch(e){blockedCode=e.code;}
   if(blockedCode!=='protected-evidence')throw Error('protected delete permitted '+blockedCode);
   for(let i=2;i<6;i++)await resumed.remove(last[i]);
+  const secondDb=resumed._db;secondDb.close();
   const reopened=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+  if(reopened._db===secondDb)throw Error('second reopen used prior closed handle');
   for(let i=0;i<rows.length;i++){
    const saved=await reopened.get(last[i]);
    if((i>=2&&i<6)===Boolean(saved))throw Error('retention mismatch '+rows[i].seed);
   }
-  if(!quotaCode||!wasPending||!notDurable||exportBytes.bytes.length!==bytes.length||
+  if(quotaCode!=='quota-exceeded'||!wasPending||!notDurable||exportBytes.bytes.length!==bytes.length||
      retry.remaining!==0||!nowDurable)throw Error('quota fault did not fail closed/recover '+JSON.stringify({quotaCode,wasPending,notDurable,retry,nowDurable}));
   return {freshCurrentCaptureCount:rows.length,totalCanonicalBytes:rows.reduce((n,r)=>n+r.bytes,0),
    rulesetId,protectedCount:protectedRefs.length,blockedCode,removed:4,
    retainedBeforeFault:rows.length-4,quotaSimulation:{quotaCode,wasPending,notDurable,recovered:nowDurable},
-   observedEndTicks:rows.map(r=>r.ticks),naturalCrashes:rows.filter(r=>r.naturalCrash).length,forcedBsodTerminals:rows.filter(r=>!r.naturalCrash).length};
+   observedEndTicks:rows.map(r=>r.ticks),upgraded:rows.filter(r=>r.upgraded).length,
+   bsodForced:rows.filter(r=>!r.naturalCrash&&r.terminalCause==='bsod').length,naturalCrashes:rows.filter(r=>r.naturalCrash).length,forcedBsodTerminals:rows.filter(r=>!r.naturalCrash).length};
  },{rows,rulesetId});
  assert.equal(report.freshCurrentCaptureCount,12);
  assert.equal(errors.length,0);
