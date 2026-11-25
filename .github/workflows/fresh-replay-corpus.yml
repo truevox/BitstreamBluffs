@@ -35,6 +35,15 @@ jobs:
         env:
           BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/fresh-sim9-replay-corpus.json
         run: npm test -- --runInBand tests/replay/freshSim9Corpus.test.js
+      - name: Capture high-input-density native terminal evidence
+        env:
+          BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/dense-sim9-replay-corpus.json
+        run: npm test -- --runInBand tests/replay/denseSim9Corpus.test.js
+      - name: Capture real high-volume native quota corpus
+        env:
+          BSB244_DENSE_CASE_COUNT: '32'
+          BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/native-quota-sim9-replay-corpus.json
+        run: npm test -- --runInBand tests/replay/denseSim9Corpus.test.js
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Test fresh evidence in real Chromium IndexedDB
@@ -47,3 +56,5 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18371/ >/dev/null && break; sleep 1; done
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-current-corpus-browser.mjs
+          BSB244_FRESH_CORPUS_OUT=${{ runner.temp }}/dense-sim9-replay-corpus.json GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-current-corpus-browser.mjs
+          BSB244_FRESH_CORPUS_OUT=${{ runner.temp }}/native-quota-sim9-replay-corpus.json GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-native-quota-browser.mjs
