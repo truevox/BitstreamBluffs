@@ -564,6 +564,51 @@ describe('protected local evidence references (#244)', () => {
     expect(await store.persistedProtectedCount(digest)).toBe(1);
   });
 
+  test('unexpected IDB close invalidates durability and allows reopening without page reload',async()=>{
+    const {store,digest,idb}=await seededStore();
+    expect(store.durable).toBe(true);
+    store._db.onclose(); // simulates force-closed browser storage connection
+    expect(store.backend).toBe('memory');
+    expect(store.durable).toBe(false);
+    await store.init();
+    expect(store.backend).toBe('idb');
+    expect(store.durable).toBe(true);
+    expect(await store.get(digest)).toEqual(bundleBytes(bundle()));
+  });
+
+  test('local protection accepts a canonical older-ruleset bundle without certifying gameplay',async()=>{
+    const idb=fakeIdb();
+    const { liveTape,liveManifest,ruleset,rulesetOf }=await import('./manifestFixtures.js');
+    const store=await new EvidenceStore({idb,storage:null,rulesetResolver:rulesetOf(ruleset())}).init();
+    const tape=liveTape(),manifest=liveManifest({tape,checkpoints:{algo:null,detail:'none',schemas:null}});
+    const payload=evidenceBundle({manifest,tape});
+    // Tape was recorded and indexed under an earlier executable/ruleset.
+    const digest=await store.put(bundleBytes(payload),{runId:'historical-local'});
+    store.rulesetResolver=()=>null; // the newer game no longer knows that ruleset
+    const held=await store.protect(digest,{runId:'historical-local',role:'pinned'});
+    expect(held).toMatchObject({count:1,durable:true,runId:'historical-local'});
+  });
+
+  test('duplicate archive import in memory mode preserves prior bound original run ID',async()=>{
+    const store=await new EvidenceStore({idb:null,storage:null}).init();
+    const digest=await store.put(bundle(),{runId:'original'});
+    await store.importBundle(bundleBytes(bundle()),{expectedDigest:digest});
+    expect(store.index.get(digest).runId).toBe('original');
+    expect(store.pendingMeta.get(digest).runId).toBe('original');
+    expect(store.list()[0].runId).toBe('original');
+  });
+
+  test('reinitialization closes prior opened connection instead of accumulating handles',async()=>{
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    const db=store._db;
+    const before=idb.hooks.closeCount;
+    await store.init();
+    expect(store._db).not.toBe(db);
+    expect(idb.hooks.closeCount).toBe(before+1);
+    expect(store.backend).toBe('idb');
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

@@ -88,6 +88,7 @@ export class EvidenceStore {
 
   /** Open the database and load the index (not the bundles). Never rejects; check `backend`/`durable` afterwards. */
   async init() {
+    const previousDb = this._db;
     let openedDb = null;
     try {
       if (this._idb) {
@@ -116,15 +117,21 @@ export class EvidenceStore {
         });
         openedDb = db;
         let connectionClosed = false;
-        db.onversionchange = () => {
+        const invalidate = (why) => {
+          if (connectionClosed) return;
           connectionClosed = true;
-          db.close(); // do not block upgrades and do not advertise a dead handle
           if (this._db === db) {
             this._db = null;
             this.backend = 'memory';
-            this._report(new EvidenceStoreError('read-failed', 'IndexedDB version changed; reopen evidence archive before protecting'));
+            this._report(new EvidenceStoreError('read-failed', `IndexedDB ${why}; reopen evidence archive before protecting`));
           }
         };
+        db.onversionchange = () => {
+          invalidate('version changed');
+          db.close(); // do not block upgrades
+        };
+        // Browser site-data clear can force-close without onversionchange.
+        db.onclose = () => invalidate('connection closed');
         // One readonly transaction is a consistent snapshot of evidence AND
         // protection indexes. Separate transactions could observe different tabs.
         const readTx = db.transaction([EVIDENCE_INDEX,EVIDENCE_REFS], 'readonly');
@@ -163,9 +170,15 @@ export class EvidenceStore {
         this._db = db;
         this._everDurable = true;
         this.backend = 'idb';
+        if (previousDb && previousDb !== db) {
+          try { previousDb.close(); } catch { /* obsolete connection */ }
+        }
       }
     } catch (e) {
       if (openedDb) { try { openedDb.close(); } catch { /* best effort */ } }
+      if (previousDb && previousDb !== openedDb) {
+        try { previousDb.close(); } catch { /* best effort */ }
+      }
       this._db = null;
       this.backend = 'memory';
       this._report(new EvidenceStoreError('read-failed', 'IndexedDB unavailable; evidence is memory-only', e));
@@ -235,8 +248,9 @@ export class EvidenceStore {
     const pendingClaim = this.pendingMeta.get(digest);
     if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
-    const requestedRunId = meta.archiveOnly === true ? null : meta.runId || pendingClaim?.runId ||
-      (!this._db ? prior?.runId : null) || null;
+    const requestedRunId = meta.archiveOnly === true
+      ? (!this._db ? prior?.runId || pendingClaim?.runId || null : null)
+      : meta.runId || pendingClaim?.runId || (!this._db ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
@@ -402,7 +416,9 @@ export class EvidenceStore {
       throw protectionError('run-id-mismatch', 'runId must match the saved evidence index');
     // `get` re-hashes stored bytes before a protection role can reference them.
     const bytes = await this.get(digest);
-    const checked = validateEvidenceBundle(bytes, this.rulesetResolver);
+    // Local preservation is independent of the currently executing ruleset.
+    // Structural SHA/manifest checks are not replay or entitlement verification.
+    const checked = validateEvidenceBundle(bytes, null);
     if (!checked.ok) throw protectionError('invalid-bundle', `${checked.code} at ${checked.pointer}`);
     const course = checked.manifest.causal.course;
     const { seed, biomeMask } = course;
