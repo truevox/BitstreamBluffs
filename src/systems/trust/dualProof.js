@@ -23,6 +23,8 @@ const isObj = o => o !== null && typeof o === 'object' && !Array.isArray(o) &&
 const keys = (o, req, optional = []) => {
   if (!isObj(o)) return false;
   const actual = Object.keys(o);
+  const descriptors = Object.getOwnPropertyDescriptors(o);
+  if (actual.some(k => !OWN(descriptors[k], 'value'))) return false;
   return actual.length >= req.length && actual.length <= req.length + optional.length &&
     req.every(k => OWN(o, k)) && actual.every(k => req.includes(k) || optional.includes(k));
 };
@@ -64,6 +66,10 @@ function simulationVerdict(request, s) {
       !(isDigest(s.verifierBuildId) || s.verifierBuildId === null) || !integer(s.score) || !integer(s.endTick) || typeof s.tapeComplete !== 'boolean' ||
       !ASSISTANCE.includes(s.assistanceObserved)) return TRUST.malformed;
   try { validateOutcomeRecord(s.record); } catch { return TRUST.malformed; }
+  // For historical pinned bundles, the verifier ID IS the publisher bundle
+  // content digest. A different executable hash is contradictory provenance.
+  if (isDigest(s.record.verifierId) && s.record.verifierId !== s.verifierBuildId)
+    return value('invalid', 'verifier-bundle-digest-mismatch');
   // A verifier that does not exist has no executable build digest. This is
   // legitimate ONLY for a refusal explicitly naming verifier unavailability.
   if (s.verifierBuildId === null &&
@@ -156,7 +162,7 @@ function privacyVerdict(request, c) {
  * cannot authenticate their origin. Never call it with user-created receipts.
  * `allowProvisional` is TRUSTED server policy (default false), not client input.
  */
-export function adjudicateDualProof(input = {}) {
+function adjudicateDualProofCore(input = {}) {
   const {request, simulation = null, authorization = null, consent = null, allowProvisional = false} = isObj(input) ? input : {};
   const requestOk = validRequest(request);
   // Even an invalid or hostile claim produces one stable bounded verdict.
@@ -201,4 +207,22 @@ export function adjudicateDualProof(input = {}) {
     publicRewardEligible: publication === 'verified-eligible',
     provisionalLabel: publication === 'provisional-unverified' ? 'UNVERIFIED' : null,
   });
+}
+
+/** Fail closed even when a programmatic caller supplies hostile objects,
+ * proxies, throwing accessors or exotic prototypes instead of parsed JSON.
+ * Unexpected property failures do not authorize a score and do not escape.
+ */
+export function adjudicateDualProof(input = {}) {
+  try { return adjudicateDualProofCore(input); }
+  catch {
+    return Object.freeze({
+      format: DUAL_PROOF_FORMAT, version: DUAL_PROOF_VERSION,
+      proof: TRUST.malformed, eligibility: TRUST.malformed,
+      competitiveness: TRUST.malformed, privacy: TRUST.malformed,
+      provenance: Object.freeze({simulationVerifierId:null,pinnedVerifierBuildId:null,verifiedUnder:null,consentScope:null}),
+      publication:'none', verifiedRankEligible:false, publicRewardEligible:false,
+      provisionalLabel:null,
+    });
+  }
 }

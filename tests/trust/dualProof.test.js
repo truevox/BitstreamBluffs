@@ -351,6 +351,40 @@ describe('canonical dual-proof decision contract (#245)', () => {
     NO_RANK(run({simulation:invalidRecord}));
   });
 
+  test('historical outcome bundle digest must equal pinned executable build, not just eligibility pin', () => {
+    const historic={...simulation(),record:{...simulation().record,verifierId:d('f')}};
+    const invalid=adjudicateDualProof({...good(),simulation:historic});
+    expect(invalid.proof).toEqual({status:'invalid',reason:'verifier-bundle-digest-mismatch'});NO_RANK(invalid);
+    const matched={...historic,verifierBuildId:d('f')};
+    const authorized={...authorization(),pinnedVerifierBuildId:d('f')};
+    const valid=adjudicateDualProof({...good(),simulation:matched,authorization:authorized});
+    expect(valid.publication).toBe('verified-eligible');
+    expect(valid.provenance.simulationVerifierId).toBe(d('f'));
+  });
+
+  test('hostile getters and throwing Proxies fail closed without exceptions or publication', () => {
+    const requestGetter={...request()};
+    Object.defineProperty(requestGetter,'score',{enumerable:true,get(){throw Error('hostile getter')}});
+    const simGetter={...simulation()};
+    Object.defineProperty(simGetter,'record',{enumerable:true,get(){throw Error('hostile record')}});
+    const consentGetter={...consent()};
+    Object.defineProperty(consentGetter,'status',{enumerable:true,get(){throw Error('hostile consent')}});
+    const hostileProxy=new Proxy(request(),{getPrototypeOf(){throw Error('hostile proxy')}});
+    const hostileOuter=new Proxy(good(),{get(){throw Error('hostile envelope')}});
+    for(const input of [
+      {...good(),request:requestGetter},
+      {...good(),simulation:simGetter},
+      {...good(),consent:consentGetter},
+      {...good(),request:hostileProxy},
+      hostileOuter
+    ]){
+      let verdict;
+      expect(()=>{verdict=adjudicateDualProof(input);}).not.toThrow();
+      expect(verdict.publication).toBe('none');NO_RANK(verdict);
+      expect(['proof','eligibility','privacy'].some(k=>verdict[k].status==='invalid')).toBe(true);
+    }
+  });
+
   test('free peer and paid hosted routes use identical pure decision bytes, with zero payment leverage', () => {
     const source=good();
     const peer=adjudicateDualProof({...clone(source),route:'peer-free',fee:0});
