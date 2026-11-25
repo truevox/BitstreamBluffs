@@ -27,3 +27,19 @@ The browser consumer independently checks the actual native source-built ruleset
 - Real Chromium: **12/12** exact canonical bundles durable/reopened; two protected pins survive; deletion of pinned evidence refused; four unpinned deletions persisted after second reopen; explicit simulated quota failure correctly reported non-durable before retry, recovered on retry; **zero browser page errors, zero mutating HTTP requests**.
 
 CI now runs both native corpus variants against the same tested source revision. **Still open:** actual long-form human/controller samples, physical Chromebook/storage pressure, cross-engine device behavior, public score authenticity/eligibility (#135), and parent #244 integration. This test does not close #244 or enable public submissions.
+
+## Native-only, REAL Chromium quota pressure (Nov 25 follow-up)
+
+This **new** test removes the synthetic 120,000-input envelope from quota pressure entirely. Generate 32 separate **actual** current-source `RunScene`/Matter terminal recordings (each with production deferred saver status and full canonical digest) by using the configurable bounded run count:
+
+```sh
+export BSB244_FRESH_CORPUS_OUT=/path/to/local/native-quota-sim9.json
+BSB244_DENSE_CASE_COUNT=32 npm test -- --runInBand tests/replay/denseSim9Corpus.test.js
+GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-native-quota-browser.mjs
+```
+
+The browser test launches an ephemeral context and sets an **actual Chromium CDP `Storage.overrideQuotaForOrigin` limit of 300,000 bytes before opening IndexedDB**. It first validates every real produced envelope against the served current ruleset, then performs ordinary production `EvidenceStore.put` calls until Chromium *actually* throws `QuotaExceededError` (no fake throw or mock). It verifies the failure remains exportable but explicitly non-durable in a fresh store instance, all earlier writes stay intact, recovery happens only on explicit `retryPending` after removing the quota override, and a new page/reopened IDB retains exact SHA-256 digests and run IDs. It rejects any browser errors or mutating HTTP requests. Neither test changes production gameplay code or uploads evidence.
+
+**Observed local result:** 32 native captures, 596,457 B of canonical envelopes, **17,238 real Matter collision-start pairs**, 18 natural fatalities; **10** genuine native envelopes saved before the next **25,184-byte** native tape encountered real Chromium `quota-exceeded` under the 300,000-byte quota. At failure, 167,560 B of canonical bundles had been stored, plus database metadata/overhead. The failed tape was exportable and non-durable; **10 prior writes retained**. After override removal, explicit retry recovered 1/1, queue cleared, and **11 native exact-digest/run-ID-bound records survived a fresh page**. Zero page exceptions and HTTP mutations. This complements the older structurally synthetic CDP quota test instead of relabeling it.
+
+The environment is *still* desktop/headless Chromium with an imposed origin quota, not a physical Chromebook, unconstrained natural storage exhaustion, real human controller traces, or public score acceptance. Those remain separate gates.

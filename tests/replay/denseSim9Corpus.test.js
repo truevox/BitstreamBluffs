@@ -32,7 +32,10 @@ const waitStatus=async(registry,runId)=>{
  }
  throw new Error(`native evidence status for ${runId} never published`);
 };
-const casePlan=Array.from({length:12},(_,i)=>({
+const DENSE_CASE_COUNT=Number(process.env.BSB244_DENSE_CASE_COUNT || 12);
+if(!Number.isSafeInteger(DENSE_CASE_COUNT)||DENSE_CASE_COUNT<12||DENSE_CASE_COUNT>40)
+ throw Error('BSB244_DENSE_CASE_COUNT must be between 12 and 40');
+const casePlan=Array.from({length:DENSE_CASE_COUNT},(_,i)=>({
  seed:`DENSE244-${String(i+1).padStart(2,'0')}`,ticks:[1200,2400,3600][i%3],level:i%2?8:1,
  upgraded:i%2===1,
  pattern:i%4,
