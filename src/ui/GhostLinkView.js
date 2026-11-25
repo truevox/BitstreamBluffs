@@ -149,13 +149,14 @@ export class GhostLinkView extends View {
    // This is a READ of the player's existing locally saved GhostLibrary.
    // A matching SIM9 course may have an authentic personal BEST/LATEST trace,
    // but the shared tape must NEVER be written into that library.
-   let comparator=null;
+   let comparator=null,localRulesDiffer=false;
    try{
     const library=this.scene.registry.get(REG.GHOSTS);
     const all=await library?.ghostsFor(parsed.tape.seed,parsed.tape.biomeMask,{},{
      simRevision:parsed.tape.simRevision,
     });
     const sameCourse=all?.filter(g=>sameGuestCourse(parsed.tape,g.tape));
+    localRulesDiffer=Boolean(all?.length&&!sameCourse?.length);
     const best=sameCourse?.find(g=>g.roles.includes('best'));
     const latest=sameCourse?.find(g=>g.roles.includes('latest'));
     const chosen=best||latest||sameCourse?.[0];
@@ -169,6 +170,7 @@ export class GhostLinkView extends View {
    this.tape=parsed.tape;
    this.status.setText(this.localPreview
     ?'UNVERIFIED GUEST VS LOCAL '+this.localRole
+    :localRulesDiffer?'UNVERIFIED GUEST - LOCAL RULES DIFFER'
     :'UNVERIFIED GUEST - READ-ONLY PREVIEW');
    this.meta.setText(ellipsize(parsed.tape.seed.toUpperCase()+' MASK '+parsed.tape.biomeMask+
     '  '+Math.floor(parsed.tape.distanceM)+'M'+

@@ -158,6 +158,22 @@ try{
  if(reduced.playing||!reduced.status.includes('REDUCED MOTION'))
   throw Error('Reduced motion allowed continuous ghost animation '+JSON.stringify(reduced));
  await p.evaluate(prev=>{window.__bbGame.registry.get('settings').reduceMotion=prev;},motion);
+ // Same seed + mask is insufficient: Normal vs Daily cannot show a fake
+ // local head-to-head. Guest preview remains available, unverified and read-only.
+ const wrongMode=await createGhostLink({...original,mode:'daily',dailyRuleId:'other-day',
+  dailyRuleSource:'rotation'},origin);
+ await p.locator('textarea').fill(wrongMode);
+ await p.keyboard.press('Control+Enter');
+ await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
+ const incompatible=await p.evaluate(()=>{
+  const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
+  return {status:v.status.main.text,local:!!v.localPreview,guest:!!v.preview,
+   courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};
+ });
+ if(!incompatible.guest||incompatible.local||!incompatible.status.includes('LOCAL RULES DIFFER')||
+    incompatible.courses!==beforehand.courses||incompatible.tapes!==beforehand.tapes||
+    incompatible.runs!==beforehand.runs)
+  throw Error('Incompatible local course falsely compared or modified saves '+JSON.stringify(incompatible));
  // Adversarial self-authored link: anyone can invent a high score and shift
  // all input trace positions by +5 metres. The viewer MUST compare visually
  // while never granting score, evidence or local-ghost identity.
@@ -266,6 +282,6 @@ try{
  await recipient.close();await recipientCtx.close();
 
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,forged,edited,pendingEdit,stale,invalid,landed,direct,accepted,errors,recipientErrors}));
+ console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,incompatible,forged,edited,pendingEdit,stale,invalid,landed,direct,accepted,errors,recipientErrors}));
 }finally{if(browser)await browser.close();if(vite){if(typeof vite.close==='function')await vite.close();
 else if(vite.httpServer)await new Promise((r,j)=>vite.httpServer.close(e=>e?j(e):r()));}}
