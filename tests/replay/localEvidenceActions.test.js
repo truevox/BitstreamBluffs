@@ -96,6 +96,21 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect(result.publicRankEligible).toBe(false);
   });
 
+  test('reimport status reads persisted protection across two tabs, not stale cached counts',async()=>{
+    const idb=fakeIdb();
+    const source=await new EvidenceStore({idb,storage:null}).init();
+    const d=await source.put(bundle(),{runId:'shared'});
+    const importing=await new EvidenceStore({idb,storage:null}).init(); // stale from now on
+    const held=await source.protect(d,{runId:'shared',role:'pinned'});
+    expect(importing.protectedCount(d)).toBe(0);
+    const control=new LocalEvidenceActions(importing);
+    const one=await control.import(bytes(),{expectedDigest:d});
+    expect(one).toMatchObject({protectionCount:1,alreadyProtected:true,newlyProtected:false});
+    await source.unprotect(held.key);
+    const two=await control.import(bytes(),{expectedDigest:d});
+    expect(two).toMatchObject({protectionCount:0,alreadyProtected:false,newlyProtected:false});
+  });
+
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
     const memory=await new EvidenceStore({idb:null,storage:null}).init();
     const action=new LocalEvidenceActions(memory);
