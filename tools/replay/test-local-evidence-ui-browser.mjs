@@ -153,6 +153,33 @@ try {
  assert(failedReconcile.keepDisabled && failedReconcile.exportEnabled);
  record('reconciliation failure keeps storage warning visible rather than restoring stale success');
 
+ const keepSourceWarning=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const originalInspect=store.inspectBundle.bind(store);
+  const originalRefs=store.persistedProtections.bind(store);
+  let signal,release,intercepted=false;
+  const started=new Promise(resolve=>{signal=resolve;});
+  store.inspectBundle=(...args)=>{
+    if(intercepted)return originalInspect(...args);
+    intercepted=true;signal();
+    return new Promise(resolve=>{release=async()=>resolve(await originalInspect(...args));});
+  };
+  try{
+    const refreshing=view._refresh();await started;
+    store.persistedProtections=async()=>{throw new Error('injected archive index failure');};
+    await view._run(async()=>view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','KEEP ORIGINAL FILE — IMPORT NOT DURABLE'));
+    const out={status:view.status.main.text,details:view.detail.main.text};
+    await release();await refreshing;
+    return out;
+  }finally{
+    store.inspectBundle=originalInspect;store.persistedProtections=originalRefs;
+    await view._refresh();
+  }
+ });
+ assert(keepSourceWarning.status.includes('KEEP ORIGINAL FILE'));
+ assert(keepSourceWarning.details.includes('PIN STATUS UNAVAI'));
+ record('failed import retains KEEP ORIGINAL FILE alongside reconciliation storage warning');
+
  const vanishedPin=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._refresh();
@@ -174,6 +201,21 @@ try {
  assert.equal(vanishedPin.button,'UNPIN');
  record('Unpin false receipt refuses to report deletion or flip button label');
 
+ const actualStalePin=await p.evaluate(async()=>{
+  const {view,store,digest}=window.__qaEvidence;
+  await view._refresh();await view._keepOrUnpin();
+  const pinned=await store.persistedProtections(digest);
+  for(const ref of pinned)if(ref.role==='pinned')await store.unprotect(ref.key);
+  // Deliberately do NOT refresh before clicking the stale Unpin button.
+  await view._keepOrUnpin();
+  const out={label:view.buttons[0].label.main.text,status:view.status.main.text,
+    remaining:await store.persistedProtectedCount(digest)};
+  await view._refresh();return out;
+ });
+ assert.equal(actualStalePin.label,'KEEP');
+ assert(actualStalePin.status.includes('PIN STATUS CHANGED'));
+ assert.equal(actualStalePin.remaining,0);
+ record('actual cross-tab stale Unpin reconciles KEEP label without a manual Refresh');
 
  // Browser download must be triggered only when Export is explicitly clicked.
  const downloadPromise=p.waitForEvent('download',{timeout:15000});
