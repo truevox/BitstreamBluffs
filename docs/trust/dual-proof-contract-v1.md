@@ -1,4 +1,4 @@
-# Dual-proof public eligibility contract — draft v1 (#245)
+# Dual-proof public eligibility contract — pure v1 policy (#245)
 
 **Not yet active or wired to public leaderboards.** This module is a pure, transport-independent decision library. It has no keys, server, wallet API, persistence, network or public publication. Offline/local modes remain playable and local ranking is untouched.
 
