@@ -33,3 +33,7 @@ Do not copy the generated local test corpus into `public/`, commit it to git, or
 ## Automated PR gate
 
 `.github/workflows/fresh-replay-corpus.yml` runs this exact Jest native terminal-capture probe, deterministic build identity and real Chromium/IndexedDB probe on relevant pull-request changes, including edits confined to these two QA files. The local output is generated into the GitHub runner's temporary filesystem and is **not uploaded** as an artifact or sent to a service. It is not a Chromebook hardware test.
+
+## 2026-11-25 exact-stack reviewer hardening
+
+The independent review after rebasing #362 onto the final #347/#349/#352 stack identified three QA false-positive paths. We now **pin the UTC run-rule date to 2026-11-25 at noon** while leaving deferred timers and runtime scheduling unfaked; record and assert every 120-tick checkpoint from tick 120 through the *actual* terminal recorder end tick (not just comparing two mutually incomplete arrays); and require the native `doCrash → scheduleRunEvidence → saveRunEvidence` deferred path to publish a valid combined-fingerprint digest under the correct run ID into the production evidence status registry. The manually constructed bundle must match the production saver result. This separates proof that a developer test can construct good evidence from proof that an actual crashed RunScene *really schedules and publishes it*. Current Jest 12/12 and Chromium/IndexedDB 12/12 local QA pass with the hardening, no upload or score authentication.
