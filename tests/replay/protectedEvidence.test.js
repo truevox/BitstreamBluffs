@@ -859,6 +859,37 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(true);
   });
 
+  test('an uncertain IndexedDB read keeps bytes exportable but never auto-resurrects after deletion',async()=>{
+    const idb=fakeIdb(),a=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await a.put(bundle(),{runId:RUN});
+    const b=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failGet=new Error('unexpected IDB read failure');
+    await expect(a.put(bundle(),{runId:RUN})).rejects.toMatchObject({code:'write-failed'});
+    expect(a.pending.has(digest)).toBe(true); // can still export this session
+    expect(a._unsafePending.has(digest)).toBe(true); // cannot auto-retry
+    idb.hooks.failGet=null;
+    await b.remove(digest);
+    expect(await a.retryPending({digest})).toMatchObject({attempted:0,recovered:0,remaining:1});
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+    expect((await a.exportBundle(digest)).bytes).toEqual(bundleBytes(bundle()));
+    await a.init();
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('concurrent initializations share one IDB open and close superseded handles',async()=>{
+    const idb=fakeIdb();let opens=0;
+    const factory={open(...args){opens++;return idb.open(...args);}};
+    const s=new EvidenceStore({idb:factory,storage:null});
+    await Promise.all([s.init(),s.init(),s.init()]);
+    expect(opens).toBe(1);
+    expect(s.backend).toBe('idb');
+    const old=s._db;
+    await s.init();
+    expect(opens).toBe(2);
+    expect(s._db).not.toBe(old);
+    expect(idb.hooks.closeCount).toBe(1);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

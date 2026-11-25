@@ -80,11 +80,14 @@ export class EvidenceStore {
     this.pending = new Map();
     /** Failed-write run claims are NOT the persisted index. Keep them separate. */
     this.pendingMeta = new Map();
+    /** Uncertain IDB reads: retain bytes for export, never auto-retry. */
+    this._unsafePending = new Set();
     /** Explicit deletion wins over asynchronous retries for that digest. */
     this._removing = new Set();
     // Serialize pending flushes per store. Concurrent retries cannot queue a
     // second write after another tab's explicit deletion.
     this._pendingFlush = null;
+    this._openingPromise = null;
     this.backend = 'memory';
     this.persisted = null;
     this.lastError = null;
@@ -97,7 +100,15 @@ export class EvidenceStore {
   get durable() { return this._db !== null && this.pending.size === 0; }
 
   /** Open the database and load the index (not the bundles). Never rejects; check `backend`/`durable` afterwards. */
-  async init({skipPendingFlush=false}={}) {
+  async init(options={}) {
+    if (this._openingPromise) return this._openingPromise;
+    const opening=this._initOnce(options);
+    this._openingPromise=opening;
+    try { return await opening; }
+    finally { if (this._openingPromise===opening) this._openingPromise=null; }
+  }
+
+  async _initOnce({skipPendingFlush=false}={}) {
     const previousDb = this._db;
     let openedDb = null;
     try {
@@ -231,7 +242,10 @@ export class EvidenceStore {
         tx.objectStore(EVIDENCE_STORE).put({ digest: record.digest, bytes });
         tx.objectStore(EVIDENCE_INDEX).put(actual);
       };
-      if (!receipt || !previous) { write(); return; }
+      if (!receipt || !previous) {
+        if (receipt) receipt.classification='new'; // successful index lookup, no prior row
+        write(); return;
+      }
       // In the SAME transaction as the attempted write, classify whether
       // these exact canonical bytes/binding ALREADY existed. A stale tab may
       // have no `prior` cache; failed duplicates must not later resurrect a
@@ -239,10 +253,14 @@ export class EvidenceStore {
       const old = tx.objectStore(EVIDENCE_STORE).get(record.digest);
       old.onsuccess = () => {
         try {
-          receipt.previouslyDurable = Boolean(old.result?.bytes &&
-            (!record.runId || previous.runId === record.runId) &&
-            digestOfBytes(old.result.bytes) === record.digest);
-        } catch { receipt.previouslyDurable = false; }
+          if (!old.result?.bytes || digestOfBytes(old.result.bytes)!==record.digest)
+            receipt.classification='unknown';
+          else if (!record.runId || previous.runId===record.runId)
+            receipt.classification='duplicate';
+          else if (!previous.runId && record.runId)
+            receipt.classification='new'; // verified new binding, not duplicate
+          else receipt.classification='unknown';
+        } catch { receipt.classification='unknown'; }
         write();
       };
     };
@@ -292,7 +310,7 @@ export class EvidenceStore {
     }
     // Receipt is set by the SAME atomic transaction that tries to write;
     // a cross-tab saved row might be absent from this tab's stale index.
-    const writeReceipt = { previouslyDurable:false };
+    const writeReceipt = { classification:'unknown' };
     try {
       const committed = await this._writeDurable(record, bytes, writeReceipt);
       this.index.set(digest, committed);
@@ -303,6 +321,7 @@ export class EvidenceStore {
       if (!olderClaim?.runId || committed.runId === olderClaim.runId) {
         this.pending.delete(digest);
         this.pendingMeta.delete(digest);
+        this._unsafePending.delete(digest);
       }
     } catch (e) {
       // We did not change the cache before the transaction. Another concurrent
@@ -311,10 +330,13 @@ export class EvidenceStore {
       // A failed duplicate write must not erase an already durable run binding
       // (or a concurrent same-instance write that committed in the meantime).
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
-      if (!writeReceipt.previouslyDurable) {
+      if (writeReceipt.classification!=='duplicate') {
         this.pending.set(digest, bytes);
-        // Preserve explicit pending run claims. Never overwrite a stronger
-        // prior claim with a failed overlapping unbound write.
+        // An IDB lookup error cannot distinguish a novel failed write from
+        // an already-durable duplicate. Keep its bytes exportable but never
+        // automatically resurrect them after another tab deletes the digest.
+        if (writeReceipt.classification==='unknown') this._unsafePending.add(digest);
+        else this._unsafePending.delete(digest);
         const established = this.pendingMeta.get(digest);
         this.pendingMeta.set(digest, established?.runId ? established : record);
       }
@@ -352,7 +374,8 @@ export class EvidenceStore {
         if(idx>0) entries.unshift(...entries.splice(idx,1));
       }
       for(const [digest,bytes] of entries){
-        if (!this._db || this._removing.has(digest) || this.pending.get(digest)!==bytes)continue;
+        if (!this._db || this._removing.has(digest) ||
+            this._unsafePending.has(digest) || this.pending.get(digest)!==bytes)continue;
         const record=this.pendingMeta.get(digest) || this.index.get(digest);
         if(!record)continue;
         receipt.digests.add(digest);receipt.count++;
@@ -362,6 +385,7 @@ export class EvidenceStore {
             this.index.set(digest,committed);
             this.pending.delete(digest);
             this.pendingMeta.delete(digest);
+            this._unsafePending.delete(digest);
           }
         }catch(e){
           if(e?.code==='run-id-conflict'){
@@ -690,6 +714,7 @@ export class EvidenceStore {
       this.index.delete(digest);
       this.pending.delete(digest);
       this.pendingMeta.delete(digest);
+      this._unsafePending.delete(digest);
       // Another tab may have released a role while our local cache was stale.
       // The persisted transaction proved there were no remaining protections.
       for (const [key,ref] of this.protections) {
