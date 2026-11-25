@@ -281,6 +281,12 @@ try {
         assert(!visiblePixels.equals(hiddenPixels),`${label} text pixels did not change when only that label was hidden`);
         await renderWithoutSim(label,true);
         const restoredPixels=await marked.p.screenshot({clip});
+        // Developer diagnostic only: preserve the three crops when this strict
+        // byte-equality gate fails, so a real mismatch can be inspected.
+        if(!visiblePixels.equals(restoredPixels)){
+          for(const [stage,png] of [['visible',visiblePixels],['hidden',hiddenPixels],['restored',restoredPixels]])
+            fs.writeFileSync(`/tmp/bsb253-${label}-${stage}.png`,png);
+        }
         assert(visiblePixels.equals(restoredPixels),`${label} pixel crop not restored after zero-tick rerender`);
         const bytesSha=(buf)=>createHash('sha256').update(buf).digest('hex');
         labelPixelProof[label]={clip,visibleSha:bytesSha(visiblePixels),hiddenSha:bytesSha(hiddenPixels),restored:true};
