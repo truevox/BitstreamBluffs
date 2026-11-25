@@ -1,13 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 02:22 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
+Last verified: 2026-11-25 02:44 UTC. Main `11614123519eb4f9f6557ff16b651405713446f0` (#340), v2.21.2/SIM9 unchanged version label. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45532826654) succeeded. Public `main-JieFBNnP.js` SHA-256 `3c0884e8e86acfdef433bf17cbe1ad644a9eb9070de5a4dc0a22de628ec7927b` matches reviewed build. #332 boundary diagnostics and #333/#334 33-song catalog remain shipped; no new pause verification.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **Requested #339/#340 reviews completed (Gal/Home audio lane, no merge):**
+- **Requested #339/#340 reviews completed (Gal/Home audio lane):**
   #339 `43d4daf467133e40c50daafe07e49d57f27f53a7`: hold QA-only merge for two
   reproduced P2 false passes. Candidate linear 0.95 (−0.446 dBTP) with
   stored −2 dBTP passes both mixed/window verifiers; the mixed gate also
@@ -21,8 +21,13 @@ means resume this queue, not take over another lane or merge a draft.
   `3c0884e8e86acfdef433bf17cbe1ad644a9eb9070de5a4dc0a22de628ec7927b`.
   Two independent index-1 headless post-guard taps using public R2 source
   bytes rejected repeated 128-frame timestamps; no qualified independent
-  live peak or audio-glitch conclusion. Keep draft pending corrected QA,
-  owner blind listening and physical device acceptance. No PR mutation.
+  live peak or audio-glitch conclusion. Marvin narrowly preferred v2 after
+  blind A/B and asked Gal to ship, superseding the earlier hold. Gal merged
+  exact heads via #339 `9e699444` and #340 `116141235`; public bundle verified
+  and user informed. #342 is deferred P3 for hardware/full-song/chronology,
+  but both verifier bugs remain in merged QA and are not explicitly listed
+  there. Preserve as a separate QA-only follow-up, not a guard rollback or
+  certification. No PR writes or production action by Morgan.
 
 
 - **Requested #325 review completed and shipped:** reviewed v2.21.2 head
@@ -205,6 +210,10 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
+- Gal/Home PWA #335 remains preview-only: natural offline SIM9 crash at 166m,
+  committed ledger and ghost survived a cold offline reopen, same-course
+  visible ghost, and a two-build/two-tab upgrade retained actual Lite audio.
+  These do not authorize production activation or certify physical devices.
 - Gal/Home audio lane: #328 merged the #322 music code as v2.21.0,
   main `69a6fb4674335d2496a801ddd7dcaabcb0a4a8bd`; #322 closed superseded.
   [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45461734705)
