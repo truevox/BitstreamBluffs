@@ -17,4 +17,10 @@ describe('Game Over archive local-only UI policy (#244)',()=>{
       {...status,ok:false},{...status,digest:'sha256:???'}])
       expect(currentRunEvidence(invalid,'actual-run')).toBeNull();
   });
+  test('a validated digest from failed durable storage is exportable only when explicitly permitted',()=>{
+    const failed={runId:'actual-run',ok:false,code:'quota-exceeded',digest:d,durable:false};
+    expect(currentRunEvidence(failed,'actual-run')).toBeNull();
+    expect(currentRunEvidence(failed,'actual-run',{allowFailed:true})).toEqual({runId:'actual-run',digest:d,durable:false});
+    expect(currentRunEvidence({...failed,runId:'prior'},'actual-run',{allowFailed:true})).toBeNull();
+  });
 });

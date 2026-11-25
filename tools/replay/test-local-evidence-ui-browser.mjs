@@ -22,12 +22,13 @@ try {
   const scene=window.__bbGame.scene.getScenes()[0],store=await sharedEvidenceStore();
   const digest=await store.put(evidenceBundle({manifest:legacyManifestFromTape(t),tape:t}),{runId:'ui-smoke-run'});
   const view=new ReplayEvidenceView(scene,scene.theme,{tape:{runId:'ui-smoke-run'},onClose:()=>view.destroy()});
-  window.__qaEvidence={view,store,digest,scene,statusKey:EVIDENCE_STATUS_KEY};
+  window.__qaEvidence={view,store,digest,scene,statusKey:EVIDENCE_STATUS_KEY,legacyTape:t,initiallyDisabled:view.buttons[0].disabled};
   scene.registry.set(EVIDENCE_STATUS_KEY,{ok:true,runId:'ui-smoke-run',digest,durable:true});
   await view._refresh();
-  return {alive:view.alive,digest,labels:view.buttons.map(b=>b.label.main.text),message:view.status.main.text,depth:view.panel.depth};
+  window.__qaEvidence.store=view.actions?.store || store; // Vite HMR can duplicate module singleton instances
+  return {alive:view.alive,digest,labels:view.buttons.map(b=>b.label.main.text),message:view.status.main.text,depth:view.panel.depth,initiallyDisabled:window.__qaEvidence.initiallyDisabled};
  },tape);
- assert(initial.alive && initial.depth>=500 && initial.labels.join(',')==='KEEP,EXPORT,IMPORT,REFRESH');
+ assert(initial.alive && initial.initiallyDisabled && initial.depth>=500 && initial.labels.join(',')==='KEEP,EXPORT,IMPORT,REFRESH');
  assert(initial.message.includes('SAVED LOCALLY'));
  results.push('panel renders after Phaser theme-ready gate');
  const keep=await p.evaluate(async()=>{
@@ -52,12 +53,15 @@ try {
  assert.equal(download.suggestedFilename(),`${initial.digest.slice(7)}.bbreplay`);
  assert(exported.length>2000);
  results.push('explicit Export triggers digest-named local .bbreplay download');
- // Input must open synchronously in the click action, before awaiting file bytes.
+ // A real native input overlays the Phaser button. Click its actual DOM
+ // hit target, not a synthetic Phaser/gamepad event with no browser activation.
+ const nativeFile=p.locator('input[data-role="replay-evidence-import"]');
+ assert.equal(await nativeFile.count(),1);
  const fileChooserPromise=p.waitForEvent('filechooser',{timeout:15000});
- const importer=p.evaluate(()=>window.__qaEvidence.view._import());
+ await nativeFile.click({force:true});
  const chooser=await fileChooserPromise;
  await chooser.setFiles({name:download.suggestedFilename(),mimeType:'application/octet-stream',buffer:exported});
- await importer;
+ await p.waitForFunction(()=>window.__qaEvidence.view.status.main.text.includes('UNVERIFIED'),{timeout:15000});
  const imported=await p.evaluate(()=>({msg:window.__qaEvidence.view.status.main.text,count:window.__qaEvidence.store.protectedCount(window.__qaEvidence.digest)}));
  assert(imported.msg.includes('UNVERIFIED'));
  assert.equal(imported.count,0);
@@ -69,27 +73,58 @@ try {
  });
  assert.equal(stale,null);
  results.push('stale prior-run capture cannot be pinned as current run');
+ const memory=await p.evaluate(async()=>{
+  const {view,store,scene,statusKey}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape,bundleDigest}=await import('/src/systems/replay/manifest.js');
+  const tape=window.__qaEvidence.legacyTape;
+  const current=evidenceBundle({manifest:legacyManifestFromTape(tape),tape});
+  const changed={...current,claims:{...current.claims,score:current.claims.score+5}};
+  const digest=bundleDigest(changed);
+  const original=store._writeDurable;
+  store._writeDurable=async()=>{throw Object.assign(new Error('test quota exceeded'),{name:'QuotaExceededError'});};
+  let failed=false;
+  try{await store.put(changed,{runId:'ui-smoke-run'});}catch(e){failed=e.code==='quota-exceeded';}
+  store._writeDurable=original;
+  scene.registry.set(statusKey,{ok:false,runId:'ui-smoke-run',digest,code:'quota-exceeded',durable:false});
+  await view._refresh();
+  return {failed,digest,keepDisabled:view.buttons[0].disabled,exportDisabled:view.buttons[1].disabled,
+    message:view.status.main.text,pending:store.pending.has(digest)};
+ });
+ assert(memory.failed && memory.pending && memory.keepDisabled && !memory.exportDisabled && memory.message.includes('EXPORT NOW'));
+ const memoryDownloadWait=p.waitForEvent('download',{timeout:15000});
+ await p.evaluate(()=>window.__qaEvidence.view._export());
+ const memoryDownload=await memoryDownloadWait;
+ assert.equal(memoryDownload.suggestedFilename(),`${memory.digest.slice(7)}.bbreplay`);
+ assert(fs.readFileSync(await memoryDownload.path()).length>2000);
+ results.push('quota-failed memory-only canonical input remains explicitly exportable but cannot be pinned');
+
  const navigation=await p.evaluate(async t=>{
-  const [{GameOverScene},{GhostFavoritesView},{REG}]=await Promise.all([
-    import('/src/scenes/GameOverScene.js'),import('/src/ui/GhostFavoritesView.js'),import('/src/constants.js')]);
+  const [{GameOverScene},{GhostFavoritesView},{REG},{GhostLibrary}]=await Promise.all([
+    import('/src/scenes/GameOverScene.js'),import('/src/ui/GhostFavoritesView.js'),import('/src/constants.js'),
+    import('/src/systems/ghost/GhostLibrary.js')]);
   const {scene,view}=window.__qaEvidence;
   view.destroy();
   const tape={...t,runId:'ui-smoke-run',distanceM:1200};
   scene.registry.set(REG.LAST_GHOST_TAPE,tape);
+  if(!scene.registry.get(REG.GHOSTS)){const lib=new GhostLibrary();await lib.init();scene.registry.set(REG.GHOSTS,lib);}
   scene.rec={id:'ui-smoke-run'};scene.alive=true;scene.leaving=false;
   for(const method of ['_openEvidenceView','_returnToGhosts','_closeGhosts'])
     scene[method]=GameOverScene.prototype[method].bind(scene);
   scene.ghostView=new GhostFavoritesView(scene,scene.theme,{library:scene.registry.get(REG.GHOSTS),tape,
     onClose:()=>scene._closeGhosts(),onEvidence:()=>scene._openEvidenceView()});
   const ghostOpen=scene.ghostView instanceof GhostFavoritesView;
-  scene._openEvidenceView();
+  scene.ghostView.focus=scene.ghostView.rows.length-1;
+  scene.ghostView.handleAction('down'); // real keyboard/gamepad path
+  const archiveFocused=scene.ghostView.focus===scene.ghostView.rows.length;
+  scene.ghostView.handleAction('confirm');
   const evidenceOpen=!!scene.ghostView?._captureStatus;
   scene._returnToGhosts();
-  const ghostReturned=scene.ghostView instanceof GhostFavoritesView;
+  const ghostReturned=scene.ghostView?.constructor?.name==='GhostFavoritesView';
   scene._closeGhosts();
-  return {ghostOpen,evidenceOpen,ghostReturned,closed:!scene.ghostView};
+  return {ghostOpen,archiveFocused,evidenceOpen,ghostReturned,closed:!scene.ghostView,
+    nativeInputsAfterClose:document.querySelectorAll('input[data-role="replay-evidence-import"]').length};
  },tape);
- assert(navigation.ghostOpen && navigation.evidenceOpen && navigation.ghostReturned && navigation.closed);
+ assert(navigation.ghostOpen && navigation.archiveFocused && navigation.evidenceOpen && navigation.ghostReturned && navigation.closed && navigation.nativeInputsAfterClose===0);
  results.push('GameOver Ghost Favorites → Local Evidence → Ghost Favorites/close navigation');
  assert.deepEqual(errors,[]);
  await p.screenshot({path:'/tmp/bsb244-local-evidence-ui-browser.png'});
