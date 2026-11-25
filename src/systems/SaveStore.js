@@ -30,9 +30,10 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} windEnabled  false mutes wind audio but not wind forces.
  * @property {'tricksRight'|'tricksLeft'|'classic'} controlLayout
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
+ * @property {'high'|'space-saver'|'no-music'} offlineMusicQuality  Desired offline tier; never download consent.
  * @property {boolean} musicShuffle     Shuffle following tracks without repeats; first launch track remains One More Run.
  * @property {boolean} musicCrossfade  Default ON; false preserves exact-boundary song handoffs.
- * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
+ * @property {boolean} dynamicOrchestra  Retired gameplay setting; always false.
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
  * @property {boolean} ghostLatest       show the Latest ghost on its course (issue #56).
@@ -80,6 +81,7 @@ export function defaultSettings() {
     ghostBest: true, ghostLatest: true, kodiakPacks: 'same',
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
+    offlineMusicQuality: 'high',
     musicShuffle: false,
     musicCrossfade: true,
     dynamicOrchestra: false,
@@ -122,9 +124,10 @@ export function sanitizeSettings(raw) {
     touchRotate90: typeof raw.touchRotate90 === 'boolean' ? raw.touchRotate90 : d.touchRotate90,
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
+    offlineMusicQuality: ['high','space-saver','no-music'].includes(raw.offlineMusicQuality) ? raw.offlineMusicQuality : d.offlineMusicQuality,
     musicShuffle: typeof raw.musicShuffle === 'boolean' ? raw.musicShuffle : d.musicShuffle,
     musicCrossfade: typeof raw.musicCrossfade === 'boolean' ? raw.musicCrossfade : d.musicCrossfade,
-    dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
+    dynamicOrchestra: false,
     reduceMotion: ['auto', 'on', 'off'].includes(raw.reduceMotion) ? raw.reduceMotion : d.reduceMotion,
     worldDance: typeof raw.worldDance === 'boolean' ? raw.worldDance : d.worldDance,
     musicVocals: raw.musicVocals === true,

@@ -39,6 +39,7 @@ import { validatePerformanceScore, validateExperimentalPerformanceScore,
   nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
 import { View } from './View.js';
+import {OfflineMusicView,OFFLINE_MUSIC_CONTROLLER} from './OfflineMusicView.js';
 export { View };
 
 /** Top-10 leaderboard from SaveStore. */
@@ -368,6 +369,7 @@ export class SoundManagerView extends View {
       hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'CHANGE'}]});
     this.labView=null;
     this.libraryView=null;
+    this.offlineView=null;
     this._build();
   }
   _profile(){return this.scene.registry.get(REG.PROGRESSION)?.store?.profile||
@@ -381,6 +383,7 @@ export class SoundManagerView extends View {
     const menuItems=[
       {kind:'action',label:'SELECT TRACKS ('+installedSongChoices(game.registry.get('audioSynth')?._stemMusic?.catalog).length+')',color:'cyan',
         sub:'ON / OFF PER SONG',onSelect:()=>this._openLibrary()},
+      ...(game.registry.get(OFFLINE_MUSIC_CONTROLLER)?[{kind:'action',label:'OFFLINE MUSIC',color:'cyan',sub:'DOWNLOAD / REPAIR',onSelect:()=>this._openOfflineMusic()}]:[]),
       {kind:'choice',label:'SHUFFLE SONGS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicShuffle===true,
@@ -389,11 +392,6 @@ export class SoundManagerView extends View {
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicCrossfade!==false,
         set:v=>updateSetting(game,'musicCrossfade',v)},
-      {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
-        badgeColor:'magenta',options:[
-          {value:false,label:'OFF'},{value:true,label:'ON'}],
-        get:()=>settings().dynamicOrchestra===true,
-        set:v=>updateSetting(game,'dynamicOrchestra',v)},
       ...(unlocked ? [
         {kind:'choice',label:'ORIGINAL VOCALS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
@@ -424,7 +422,7 @@ export class SoundManagerView extends View {
     if(!this._revealed){this._revealed=true;staggerMenuRows(this.scene,this.menu);}
     if(!this.note){
       this.note=new NeonText(this.scene,this.theme,12,this.h-39,
-        'DYNAMIC ORCHESTRA OFF = SOURCE STEMS + ALL GAME DSP',{
+        'ORIGINAL STEMS + BIOME MELODY + ALL GAME DSP',{
           color:'text',outline:'none',
         });
       this.note.setAlpha(.6);
@@ -442,6 +440,12 @@ export class SoundManagerView extends View {
         this._build();
       },
     });
+  }
+  _openOfflineMusic(){
+    const controller=this.scene.game.registry.get(OFFLINE_MUSIC_CONTROLLER);
+    if(!controller||this.offlineView)return;
+    this.panel.setVisible(false);
+    this.offlineView=new OfflineMusicView(this.scene,this.theme,{controller,onClose:()=>{this.offlineView?.destroy();this.offlineView=null;this.panel.setVisible(true);this._build();}});
   }
   _changeVocals(enabled){
     updateSetting(this.scene.game,'musicVocals',enabled===true);
@@ -485,12 +489,14 @@ export class SoundManagerView extends View {
     });
   }
   handleAction(action){
+    if(this.offlineView)return this.offlineView.handleAction(action);
     if(this.libraryView)return this.libraryView.handleAction(action);
     if(this.labView)return this.labView.handleAction(action);
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
   destroy(){
+    this.offlineView?.destroy();this.offlineView=null;
     this.libraryView?.destroy();this.libraryView=null;
     this.labView?.destroy();this.labView=null;
     super.destroy();

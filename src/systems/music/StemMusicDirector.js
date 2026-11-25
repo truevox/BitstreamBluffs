@@ -21,7 +21,9 @@ import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 import {normalizeTransitionGrids,planSongCrossfade,automateTransition,retargetEnvelope} from './SongCrossfade.js';
 
-const REMOTE_CATALOG = 'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json';
+const REMOTE_CATALOG = typeof __BB_MELODY_CATALOG_URL__ === 'string'
+	? __BB_MELODY_CATALOG_URL__
+	: 'https://bsb-audio.bearcave.win/releases/20261124-melody-only-748a0670/catalog.json';
 const LOCAL_CATALOG = 'music/catalog.json';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -1035,11 +1037,48 @@ export class StemMusicDirector {
 		if (this.started) this._ensureRunning();
 	}
 
+	/** Optional offline-tier hook. Only the cold-start path can hold this
+	 * barrier; never run it during a live track, seek, or crossfade. */
+	setPlaybackBoundary(hook) {
+		if (hook !== null && typeof hook !== 'function') throw new TypeError('Invalid playback boundary');
+		this._playbackBoundary = hook;
+	}
+
+	isPlaybackBoundary() {
+		return !!this._boundaryFlight && !this.pack && !this._loading &&
+			!this.cache.size && !this.activeNodes.size;
+	}
+
+	withPlaybackBoundary(fn) {
+		if (!this.isPlaybackBoundary()) throw Error('No held playback boundary');
+		return fn();
+	}
+
+	_holdPlaybackBoundary() {
+		if (this._boundaryFlight) return true;
+		if (!this._playbackBoundary || this._boundaryDone || this.pack ||
+			this._loading || this.cache.size || this.activeNodes.size) return false;
+		const generation = this._token;
+		// Assign the flight before invoking any callback, even a sync callback.
+		const flight = Promise.resolve().then(() => this._playbackBoundary?.());
+		this._boundaryFlight = flight;
+		flight.catch(() => null).finally(() => {
+			if (this._boundaryFlight !== flight) return;
+			this._boundaryFlight = null;
+			if (this._token === generation) this._boundaryDone = true;
+			// stop()/pause()/skip can invalidate the old intent while verification
+			// is in flight. Only the current start intent can resume loading.
+			if (this.started && !this.disposed && !this.transportPaused) this._ensureRunning();
+		});
+		return true;
+	}
+
 	_ensureRunning() {
 		if (!this.started || !this.ctx || this.ctx.state !== 'running') return;
 		const next = this._nextEnabledIndex(-1);
 		if (next < 0) { this.stop(); return; }
 		if (!this.pack && !this._loading) {
+			if (this._holdPlaybackBoundary()) return;
 			const index = this.songEnabled[this.catalog[this.trackIndex]?.id] !== false
 				? this.trackIndex : next;
 			const offset=this._resumeOffset;
@@ -1516,6 +1555,7 @@ export class StemMusicDirector {
 	}
 
 	stop() {
+		this._boundaryDone = false;
 		this.scrapCowbell?.dispose();
 		this.scrapCowbell=null;
 		this.started = false;
