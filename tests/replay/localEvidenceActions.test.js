@@ -1,7 +1,7 @@
 import { LocalEvidenceActions, inspectLocalEvidenceImport } from '../../src/systems/replay/localEvidenceActions.js';
 import { EvidenceStore } from '../../src/systems/replay/evidenceStore.js';
 import { evidenceBundle,legacyManifestFromTape,bundleBytes,bundleDigest } from '../../src/systems/replay/manifest.js';
-import { legacyTape } from './manifestFixtures.js';
+import { legacyTape, liveTape, liveManifest } from './manifestFixtures.js';
 import { fakeIdb } from './fakeIdb.js';
 import { MAX_OUTPUT_BYTES } from '../../src/systems/replay/canonicalJson.js';
 
@@ -48,7 +48,7 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect(store.protectedCount(d)).toBe(1);
     await expect(control.keep({digest:d,runId:'foreign-run'})).rejects.toMatchObject({code:'run-id-mismatch'});
     const unpinned=await control.unpin(held.reference.key);
-    expect(unpinned).toEqual({ok:true,retainedBytes:true,publicRankEligible:false});
+    expect(unpinned).toEqual({ok:true,publicRankEligible:false});
     expect(await store.get(d)).not.toBeNull();
   });
   test('export prepares local canonical bytes; import uses caller-known digest and does not pin or claim an original run',async()=>{
@@ -109,6 +109,37 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     await source.unprotect(held.key);
     const two=await control.import(bytes(),{expectedDigest:d});
     expect(two).toMatchObject({protectionCount:0,alreadyProtected:false,newlyProtected:false});
+  });
+
+  test('missing unpin never claims that evidence bytes remain stored',async()=>{
+    const {control}=await ready();
+    expect(await control.unpin('not-found')).toEqual({ok:false,publicRankEligible:false});
+  });
+
+  test('archive-only import ignores a conflicting session run binding, preserving both claims',async()=>{
+    const idb=fakeIdb();const first=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('offline');
+    await expect(first.put(bundle(),{runId:'pending-first'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    const second=await new EvidenceStore({idb,storage:null}).init();
+    await second.put(bundle(),{runId:'persisted-other'});
+    const imported=await new LocalEvidenceActions(first).import(bytes(),{expectedDigest:digest()});
+    expect(imported).toMatchObject({ok:true,localDurable:true,protected:false});
+    expect(imported.publicRankEligible).toBe(false);
+    expect(first.pendingMeta.get(digest()).runId).toBe('pending-first');
+  });
+
+  test('archive-only import may preserve an unknown but canonical historical ruleset',async()=>{
+    const tape=liveTape();
+    const manifest=liveManifest({tape,checkpoints:{algo:null,detail:'none',schemas:null}});
+    const live=evidenceBundle({manifest,tape});
+    const data=bundleBytes(live),knownDigest=bundleDigest(live);
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null,rulesetResolver:()=>null}).init();
+    const control=new LocalEvidenceActions(store,{currentRulesetId:'sha256:'+'f'.repeat(64)});
+    const result=await control.import(data,{expectedDigest:knownDigest});
+    expect(result).toMatchObject({ok:true,localDurable:true,newlyProtected:false,publicRankEligible:false});
+    expect(result.inspection.rulesetRelation).toBe('different-or-unknown-ruleset');
+    expect(result.inspection.replayVerified).toBe(false);
   });
 
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
