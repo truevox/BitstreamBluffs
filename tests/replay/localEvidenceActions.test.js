@@ -3,6 +3,7 @@ import { EvidenceStore } from '../../src/systems/replay/evidenceStore.js';
 import { evidenceBundle,legacyManifestFromTape,bundleBytes,bundleDigest } from '../../src/systems/replay/manifest.js';
 import { legacyTape } from './manifestFixtures.js';
 import { fakeIdb } from './fakeIdb.js';
+import { MAX_OUTPUT_BYTES } from '../../src/systems/replay/canonicalJson.js';
 
 const bundle = () => evidenceBundle({manifest:legacyManifestFromTape(legacyTape()),tape:legacyTape()});
 const bytes=()=>bundleBytes(bundle());
@@ -57,19 +58,50 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     const other=await new EvidenceStore({idb:fakeIdb(),storage:null}).init();
     const receiver=new LocalEvidenceActions(other);
     const imported=await receiver.import(exported.bytes,{expectedDigest:d});
-    expect(imported).toMatchObject({ok:true,digest:d,localDurable:true,protected:false,publicRankEligible:false});
+    expect(imported).toMatchObject({ok:true,digest:d,localDurable:true,newlyProtected:false,protectionCount:0,alreadyProtected:false,publicRankEligible:false});
     expect(imported.inspection.status).toContain('UNVERIFIED');
     expect(other.listProtections()).toEqual([]);
     expect(other.index.get(d).runId).toBeNull();
     expect(await other.get(d)).toEqual(exported.bytes);
     expect(store.protectedCount(d)).toBe(0);
   });
+  test('oversized file refuses BEFORE hashing and unsupported typed-array views return stable errors',()=>{
+    const oversized=new Uint8Array(MAX_OUTPUT_BYTES+1);
+    expect(inspectLocalEvidenceImport(oversized,{expectedDigest:digest()})).toEqual({ok:false,code:'too-large'});
+    for(const typed of [new Int8Array(bytes()),new Uint8ClampedArray(bytes()),new DataView(bytes().buffer)])
+      expect(inspectLocalEvidenceImport(typed,{expectedDigest:digest()})).toEqual({ok:false,code:'invalid-bytes'});
+  });
+
+  test('re-importing a pinned digest does NOT misreport the existing retained reference',async()=>{
+    const {control,d,store}=await ready();
+    await control.keep({digest:d,runId:'intentional-local-run'});
+    const rec=await control.import(bytes(),{expectedDigest:d});
+    expect(rec).toMatchObject({newlyProtected:false,alreadyProtected:true,protectionCount:1,publicRankEligible:false});
+    expect(store.protectedCount(d)).toBe(1);
+  });
+
+  test('a durable import remains durable despite another unrelated memory-only pending bundle',async()=>{
+    const idb=fakeIdb();const store=await new EvidenceStore({idb,storage:null}).init();
+    const action=new LocalEvidenceActions(store);
+    const other={...bundle(),claims:{...bundle().claims,score:930}};
+    idb.hooks.failPut=new Error('quota');
+    await expect(store.put(other,{runId:'failed'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    // Force a persisted run-ID conflict for pending other: it cannot flush.
+    const separate=await new EvidenceStore({idb,storage:null}).init();
+    await separate.put(other,{runId:'foreign'});
+    const result=await action.import(bytes(),{expectedDigest:digest()});
+    expect(result.localDurable).toBe(true);
+    expect(store.durable).toBe(false);
+    expect(result.publicRankEligible).toBe(false);
+  });
+
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
     const memory=await new EvidenceStore({idb:null,storage:null}).init();
     const action=new LocalEvidenceActions(memory);
     const imported=await action.import(bytes(),{expectedDigest:digest()});
     expect(imported.localDurable).toBe(false);
-    expect(imported.protected).toBe(false);
+    expect(imported.newlyProtected).toBe(false);
     expect(memory.listProtections()).toEqual([]);
   });
 });
