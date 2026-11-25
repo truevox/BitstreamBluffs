@@ -10,10 +10,10 @@ import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
 import { ellipsize } from './PixelFont.js';
 import { isReducedMotion } from './Motion.js';
-import { parseGhostLink, GhostLinkError, GHOST_LINK_MAX_URL } from '../systems/ghost/GhostLink.js';
+import { parseGhostLink, parseGhostFile, GhostLinkError, GHOST_LINK_MAX_URL, GHOST_FILE_MAX_BYTES } from '../systems/ghost/GhostLink.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../systems/SimClock.js';
-import { REG, PIXELS_PER_METER } from '../constants.js';
+import { REG, PIXELS_PER_METER, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import {guestPracticeEligible} from '../systems/ghost/GuestPractice.js';
 
 const PLOT={x:12,y:94,w:394,h:54};
@@ -67,8 +67,8 @@ function messageFor(e){
  if(e.code==='url-too-long'||e.code==='oversize')return 'GHOST LINK TOO LARGE - NOT IMPORTED';
  if(e.code==='unsupported-ruleset'||e.code==='unsupported-tape'||e.code==='unsupported-link')
   return 'INCOMPATIBLE GHOST OR GAME VERSION';
- if(e.code==='corrupt-link'||e.code==='bad-gzip'||e.code==='invalid-json')
-  return 'GHOST LINK DAMAGED - NOT IMPORTED';
+ if(e.code==='corrupt-link'||e.code==='corrupt-file'||e.code==='bad-gzip'||e.code==='invalid-json')
+  return 'GHOST DATA DAMAGED - NOT IMPORTED';
  return 'INVALID GHOST LINK - NOTHING IMPORTED';
 }
 /**
@@ -78,7 +78,7 @@ function messageFor(e){
  */
 export class GhostLinkView extends View {
  constructor(scene,theme,o){
-  super(scene,theme,{w:420,h:208,y:31,title:'GUEST GHOST // UNVERIFIED',color:'magenta',
+  super(scene,theme,{w:420,h:232,y:18,title:'GUEST GHOST // UNVERIFIED',color:'magenta',
    onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['CTRL+ALT+ENTER','PAD LB'],label:'RACE'}]});
   this.preview=null;
   this.localPreview=null;
@@ -129,8 +129,12 @@ export class GhostLinkView extends View {
    label:'RACE GUEST',color:'amber',onClick:()=>this.startGuestPractice()});
   this.practiceBtn.setDisabled(true);
   this.panel.add(this.practiceBtn);
-  this._onUpdate=(_,delta)=>this._tickPlayback(delta);
+  this.fileBtn=new Button(scene,theme,{x:12,y:207,w:116,h:16,
+   label:'OPEN .BBGHOST',color:'cyan',onClick:()=>this.fileInput?.click()});
+  this.panel.add(this.fileBtn);
+  this._onUpdate=(_,delta)=>{this._tickPlayback(delta);this._positionFileInput();};
   scene.events.on(Phaser.Scenes.Events.UPDATE,this._onUpdate);
+  this._installFileInput();
   this._draw();
   scene.time.delayedCall(30,()=>this.alive&&this.box.focus());
  }
@@ -144,29 +148,17 @@ export class GhostLinkView extends View {
   this.practiceArmed=false;
   this.practiceBtn?.setLabel('RACE GUEST');this.practiceBtn?.setDisabled(true);
   this.previewBtn?.setDisabled(false);
+  if(this.fileInput)this.fileInput.disabled=false;
   this.playBtn?.setLabel('WATCH');
   this.meta?.setText('NO GHOST LOADED');
   this.position?.setText('PREVIEW ONLY. NOTHING WRITTEN.');
   this.status?.setText('LINK CHANGED - PRESS PREVIEW');
   this._draw();
  }
- async inspect(){
-  if(!this.alive||this.busy)return;
-  // A failed second link must not leave the prior good preview on screen.
-  this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.cursor=0;
-  this.playing=false;this.elapsedMs=0;this.playBtn.setLabel('WATCH');
-  this.practiceArmed=false;this.practiceBtn.setLabel('RACE GUEST');this.practiceBtn.setDisabled(true);
-  const token=++this.token;
-  const raw=this.box.getValue().trim();
-  this.status.setText('CHECKING UNTRUSTED GHOST LINK...');
-  this.meta.setText('NO GHOST LOADED');
-  this.position.setText('PREVIEW ONLY. NOTHING WRITTEN.');
-  this._draw();
-  if(raw.length>GHOST_LINK_MAX_URL){this.status.setText('GHOST LINK TOO LARGE - NOT IMPORTED');return;}
-  this.busy=true;this.previewBtn.setDisabled(true);
-  try{
-   const parsed=await parseGhostLink(raw);
-   const model=guestPreview(parsed.tape);
+ /** All sources enter the SAME unverified visual/practice-only preview.
+  * A file can never bypass the URL's strict tape allowlist or ruleset gate. */
+ async _showCandidate(parsed,token){
+  const model=guestPreview(parsed.tape);
    // This is a READ of the player's existing locally saved GhostLibrary.
    // A matching SIM9 course may have an authentic personal BEST/LATEST trace,
    // but the shared tape must NEVER be written into that library.
@@ -195,13 +187,89 @@ export class GhostLinkView extends View {
     (this.localPreview?'  GUEST MAGENTA / LOCAL CYAN':''),372));
    this.cursor=0;this.elapsedMs=0;
    this._draw();
-  }catch(e){
-   if(!this.alive||token!==this.token)return;
-   this.status.setText(messageFor(e));
-   this._draw();
-  }finally{
-   if(token===this.token){this.busy=false;if(this.alive)this.previewBtn.setDisabled(false);}
+ }
+ _beginInspect(message){
+  // No stale valid guest may survive a failed second file/link selection.
+  this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.cursor=0;
+  this.playing=false;this.elapsedMs=0;this.playBtn.setLabel('WATCH');
+  this.practiceArmed=false;this.practiceBtn.setLabel('RACE GUEST');this.practiceBtn.setDisabled(true);
+  const token=++this.token;
+  this.status.setText(message);
+  this.meta.setText('NO GHOST LOADED');
+  this.position.setText('PREVIEW ONLY. NOTHING WRITTEN.');
+  this._draw();
+  this.busy=true;this.previewBtn.setDisabled(true);
+  if(this.fileInput)this.fileInput.disabled=true;
+  return token;
+ }
+ _finishInspect(token){
+  if(token===this.token){
+   this.busy=false;
+   if(this.alive){this.previewBtn.setDisabled(false);if(this.fileInput)this.fileInput.disabled=false;}
   }
+ }
+ async inspect(){
+  if(!this.alive||this.busy)return;
+  const raw=this.box.getValue().trim();
+  const token=this._beginInspect('CHECKING UNTRUSTED GHOST LINK...');
+  try{
+   if(raw.length>GHOST_LINK_MAX_URL)throw new GhostLinkError('url-too-long');
+   await this._showCandidate(await parseGhostLink(raw),token);
+  }catch(e){
+   if(this.alive&&token===this.token){this.status.setText(messageFor(e));this._draw();}
+  }finally{this._finishInspect(token);}
+ }
+ /** Triggered ONLY by explicit native input selection. No URL fetch or save. */
+ async _inspectFile(file){
+  if(!this.alive||this.busy||!file)return;
+  const token=this._beginInspect('CHECKING SELECTED LOCAL GHOST FILE...');
+  try{
+   if(file.size>GHOST_FILE_MAX_BYTES||file.size<=0)
+    throw new GhostLinkError('oversize','Ghost file outside supported bounds');
+   const raw=await file.arrayBuffer();
+   if(raw.byteLength>GHOST_FILE_MAX_BYTES)throw new GhostLinkError('oversize');
+   await this._showCandidate(await parseGhostFile(new Uint8Array(raw)),token);
+  }catch(e){
+   if(this.alive&&token===this.token){this.status.setText(messageFor(e));this._draw();}
+  }finally{this._finishInspect(token);}
+ }
+ /** Native file chooser is keyboard/touch accessible, and its real browser
+  * activation is not simulated by canvas key events or fake input change. */
+ _installFileInput(){
+  if(typeof document==='undefined')return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='.bbghost';
+  input.setAttribute('data-role','ghost-file-import');
+  input.setAttribute('aria-label','Open local ghost file - unverified preview only');
+  Object.assign(input.style,{position:'fixed',opacity:'0.003',zIndex:'60',cursor:'pointer',
+   margin:'0',padding:'0',border:'0'});
+  input.addEventListener('keydown',e=>{
+   e.stopPropagation();
+   // Keyboard users must be able to leave a focused native file input.
+   if(e.key==='Escape'){e.preventDefault();if(this.alive)this.close();}
+  });
+  input.addEventListener('keyup',e=>e.stopPropagation());
+  input.addEventListener('keypress',e=>e.stopPropagation());
+  input.addEventListener('change',()=>{
+   const file=input.files?.[0];input.value='';
+   if(file)this._inspectFile(file);
+  });
+  input.addEventListener('cancel',()=>{
+   if(this.alive)this.status.setText('FILE SELECTION CANCELLED - NOTHING IMPORTED');
+  });
+  document.body.appendChild(input);
+  this.fileInput=input;
+  this._positionFileInput();
+ }
+ _positionFileInput(){
+  const input=this.fileInput,canvas=this.scene?.game?.canvas;
+  if(!this.alive||!input||!canvas||!this.panel)return;
+  const r=canvas.getBoundingClientRect();
+  const sx=r.width/GAME_WIDTH,sy=r.height/GAME_HEIGHT;
+  input.style.left=`${r.left+(this.panel.x+12)*sx}px`;
+  input.style.top=`${r.top+(this.panel.y+207)*sy}px`;
+  input.style.width=`${116*sx}px`;
+  input.style.height=`${16*sy}px`;
  }
  /** One initial click discloses the unranked consequences; the next click
   * starts a NEW live player-controlled practice run. Never writes the guest. */
@@ -325,6 +393,7 @@ export class GhostLinkView extends View {
   this.practiceArmed=false;
   this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.playing=false;
   this.scene.events.off(Phaser.Scenes.Events.UPDATE,this._onUpdate);
+  this.fileInput?.remove();this.fileInput=null;
   this.box?.destroy();this.box=null;
   super.destroy();
  }

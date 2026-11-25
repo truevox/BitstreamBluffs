@@ -28,3 +28,30 @@ is claimed.
 
 This unversioned draft is based on v2.22.7. Version bump/merge is blocked on
 coordinating with pending #244 v2.22.8, #242 v2.22.9, and Team B #68 work.
+
+## Exact-source QA (development draft)
+
+- 13/13 link + file serialization and version/fuzz tests; 64/64 focused
+  GhostLink, guest-practice, course-boundary, title/preview and portable file
+  tests on unchanged v2.22.7 SIM9 base.
+- A real normal SIM9 run was captured, then **its trace was deliberately
+  lengthened with synthetic finite 30Hz poses solely for transport testing**.
+  This is not a claimed natural 6,000-tick authoritative game outcome. The
+  14.9 KiB compressed package cannot be represented by the 8,192-character
+  URL and remains under the 20 KiB decompression-input limit.
+- In real Chromium desktop and 412x915 mobile emulation, a genuine download
+  event occurred only after the first disclosure then second SAVE FILE click.
+  Navigating away cancelled the first authorization. The browser's actual
+  filechooser opened from a native file input (real pointer and Space-key
+  activation); its selected file produced one
+  unverified 1,200-point trace. Corrupt replacement cleared the preview and
+  disabled RACE; explicit two-stage guest practice started without a recorder
+  or any change to full profile JSON, saved run list, course or tape counts.
+  No JavaScript exceptions; zero attempted cross-origin writes. The game's
+  existing remote audio GET may still be attempted and is blocked in QA.
+- The same full round-trip passed from the compiled `/BitstreamBluffs/` Pages
+  subpath on desktop and mobile emulation; source ruleset identity unchanged.
+- Source and CI still require exact-head review before merge, then a version
+  coordinated after the pending v2.22.8/9 stack and #68. Real physical
+  Chromebook/Android and optional user-controlled hosted fallback are **not**
+  covered by this local-file fallback.
