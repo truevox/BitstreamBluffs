@@ -14,6 +14,14 @@ import { MAX_OUTPUT_BYTES } from '../systems/replay/canonicalJson.js';
 import { digestFromLocalReplayFilename, currentRunEvidence } from '../systems/replay/archiveUiPolicy.js';
 
 const statusText = err => err?.code || err?.message || String(err || 'UNKNOWN');
+const shortArchiveWarning = warning => {
+  const unbound=warning.includes('RUN ID') || warning.includes('RUN BINDING') || warning.includes('RECOVERED BYTES');
+  return unbound?'RUN UNBOUND; EXPORT ONLY':
+    warning.includes('EXPORT NOW')?'EXPORT RUN NOW':
+    warning.includes('EXPORT ONLY')?'EXPORT ONLY; UNVERIFIED':
+    warning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
+    warning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':'ARCHIVE STATUS UNKNOWN';
+};
 
 export class ReplayEvidenceView extends View {
   /** @param {Phaser.Scene} scene @param {object} theme
@@ -57,7 +65,7 @@ export class ReplayEvidenceView extends View {
     text(12,144,'IMPORTS REMAIN LOCAL AND UNVERIFIED.','amber');
     text(12,156,'KEEP DOES NOT PREVENT CLEARING SITE DATA.','text');
     this._installNativeImportInput();
-    this._refresh();
+    this._refresh({retryPending:false}); // opening the panel is NOT an explicit retry request
   }
 
   _show(message,details='') {
@@ -75,17 +83,17 @@ export class ReplayEvidenceView extends View {
     return s;
   }
 
-  async _getActions() {
+  async _getActions({reconnect=true}={}) {
     if (this.actions) {
       // A first open may have failed during an IndexedDB upgrade. Refresh is
       // the explicit recovery gesture: reopen IDB and flush pending evidence.
       if (this.actions.store.backend!=='idb') {
-        const recovered=await sharedEvidenceStore();
+        const recovered=reconnect?await sharedEvidenceStore():this.actions.store;
         if (this.alive) this.actions.store=recovered;
       }
       return this.actions;
     }
-    const store=await sharedEvidenceStore();
+    const store=await sharedEvidenceStore({retryPending:reconnect});
     const rs=this.scene.registry.get(RULESET_KEY);
     const actions=new LocalEvidenceActions(store,{currentRulesetId:rs?.rulesetId || null});
     if (this.alive) this.actions=actions;
@@ -116,7 +124,7 @@ export class ReplayEvidenceView extends View {
     try {
       // Action-triggered reconciliation must never reopen IndexedDB or flush
       // pending bytes. Only an explicitly selected Refresh may do that.
-      const control=retryPending ? await this._getActions() : this.actions;
+      const control=await this._getActions({reconnect:retryPending});
       if(!control){this._show('ARCHIVE STATUS UNAVAILABLE','SELECT REFRESH TO RECONNECT STORAGE');return false;}
       if (!live() || this._captureStatus()!==status) return;
       // An IDB backend can retain a quota-failed bundle in session RAM even
@@ -201,19 +209,16 @@ export class ReplayEvidenceView extends View {
             // Preserving a selected file is more urgent than the current-run
             // archive read, but show BOTH warnings, not stale success.
             const archiveWarning=this.status.main.text;
-            // The screen's detail line is pixel-width limited: concise and
-            // lead with both safety facts rather than truncating the error.
-            const unboundRun=archiveWarning.includes('RUN ID') || archiveWarning.includes('RUN BINDING') ||
-              archiveWarning.includes('RECOVERED BYTES');
-            const shortWarning=unboundRun?'RUN UNBOUND; EXPORT ONLY':
-              archiveWarning.includes('EXPORT NOW')?'EXPORT RUN NOW':
-              archiveWarning.includes('EXPORT ONLY')?'EXPORT ONLY; UNVERIFIED':
-              archiveWarning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
-              archiveWarning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':
-              'ARCHIVE STATUS UNKNOWN';
             // The import may have committed before its confirmation read
             // failed: never claim either durable success or definite loss.
-            this._show('KEEP ORIGINAL FILE',`IMPORT UNCONFIRMED; ${shortWarning}`);
+            this._show('KEEP ORIGINAL FILE',`IMPORT UNCONFIRMED; ${shortArchiveWarning(archiveWarning)}`);
+          }else if(String(message).includes('IMPORTED LOCAL EVIDENCE')){
+            // Current-run storage may be unhealthy independently of the
+            // selected import. Keep the import result alongside that warning.
+            const archiveWarning=this.status.main.text;
+            const importState=String(details).includes('SAVED ON DEVICE')?'IMPORT SAVED':
+              String(details).includes('PIN STATUS UNKNOWN')?'IMPORT PIN UNKNOWN':'IMPORT UNVERIFIED';
+            this._show('IMPORTED — UNVERIFIED',`${shortArchiveWarning(archiveWarning)}; ${importState}`);
           }
         }
       }
@@ -224,7 +229,7 @@ export class ReplayEvidenceView extends View {
     if (!this.pinReady) {this._show('KEEP/UNPIN NOT READY','REFRESH ARCHIVE STATUS FIRST');return;}
     const capture=currentRunEvidence(this._captureStatus(),this.tape.runId,{allowFailed:true});
     if (!capture) {this._show('EVIDENCE NOT SAVED YET','REFRESH AFTER THE RUN FINISHES');return;}
-    const control=await this._getActions();
+    const control=await this._getActions({reconnect:false});
     if (!(await control.store.isBundleDurable(capture.digest,{runId:this.tape.runId}))) {
       this.pinReady=false;this.buttons[0].setDisabled(true);
       this._show('RUN BINDING NOT CONFIRMED — EXPORT','REFRESH AFTER DURABLE STORAGE RECOVERS');
@@ -252,7 +257,7 @@ export class ReplayEvidenceView extends View {
         return;
       }
       this.displayedPin=null;
-      this._show('PIN REMOVED','THE EVIDENCE FILE HAS NOT BEEN DELETED');
+      this._show('PIN RELEASED','BUNDLE MAY BE REMOVED OR CLEARED');
     } else {
       const result=await control.keep({digest:capture.digest,runId:this.tape.runId,role:'pinned'});
       this.displayedPin=Object.freeze({key:result.reference.key,generation:result.reference.generation});
@@ -264,7 +269,7 @@ export class ReplayEvidenceView extends View {
   _export() {return this._run(async()=>{
     const capture=currentRunEvidence(this._captureStatus(),this.tape.runId,{allowFailed:true});
     if(!capture){this._show('NO CURRENT RUN EVIDENCE TO EXPORT');return;}
-    const control=await this._getActions();
+    const control=await this._getActions({reconnect:false});
     const result=await control.export(capture.digest);
     if(!this.alive)return;
     const blob=new Blob([result.bytes],{type:'application/octet-stream'});
@@ -371,7 +376,7 @@ export class ReplayEvidenceView extends View {
     if(!expectedDigest){this._show('INVALID FILENAME','EXPECTED 64-HEX-DIGEST.BBREPLAY');return;}
     if(file.size>MAX_OUTPUT_BYTES){this._show('FILE TOO LARGE','MAXIMUM 16 MIB CANONICAL EVIDENCE');return;}
     const bytes=new Uint8Array(await file.arrayBuffer());
-    const control=await this._getActions();
+    const control=await this._getActions({reconnect:false});
     let imported;
     try { imported=await control.import(bytes,{expectedDigest}); }
     catch(e) {

@@ -30,11 +30,11 @@ let sharedRetry = null;
  * the next live capture or explicit local archive action retries opening IDB.
  * Coalesce simultaneous retries instead of spawning competing open requests.
  */
-export function sharedEvidenceStore() {
-  if (!shared) return (shared = new EvidenceStore().init());
+export function sharedEvidenceStore({retryPending=true}={}) {
+  if (!shared) return (shared = new EvidenceStore().init({skipPendingFlush:!retryPending}));
   return shared.then(store => {
     if (store.backend === 'idb' || !store._idb) return store;
-    if (!sharedRetry) sharedRetry = store.init().finally(() => { sharedRetry = null; });
+    if (!sharedRetry) sharedRetry = store.init({skipPendingFlush:!retryPending}).finally(() => { sharedRetry = null; });
     return sharedRetry;
   });
 }

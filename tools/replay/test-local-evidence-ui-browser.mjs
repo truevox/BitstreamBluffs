@@ -32,6 +32,27 @@ try {
  assert(initial.alive && initial.initiallyDisabled && initial.depth>=500 && initial.labels.join(',')==='KEEP,EXPORT,IMPORT,REFRESH');
  assert(initial.message.includes('SAVED LOCALLY'));
  record('panel renders after Phaser theme-ready gate');
+ const noImplicitRetry=await p.evaluate(async()=>{
+  const {view,store,scene}=window.__qaEvidence;
+  const {ReplayEvidenceView}=await import('/src/ui/ReplayEvidenceView.js');
+  const originalHas=store.pending.has, originalRetry=store.retryPending;
+  let attempted=0;
+  store.pending.has=()=>true;
+  store.retryPending=async()=>{attempted++;throw new Error('unexpected automatic retry');};
+  let extra;
+  try{
+    extra=new ReplayEvidenceView(scene,scene.theme,{tape:{runId:'ui-smoke-run'},onClose:()=>{}});
+    await new Promise(resolve=>setTimeout(resolve,100));
+    await view._export(); // downloading or opening must not flush session-only bytes
+    return {attempted,viewAlive:extra.alive};
+  }finally{
+    extra?.destroy();store.pending.has=originalHas;store.retryPending=originalRetry;
+    await view._refresh({retryPending:false});
+  }
+ });
+ assert.equal(noImplicitRetry.attempted,0);
+ assert(noImplicitRetry.viewAlive);
+ record('opening local archive and exporting never implicitly retry pending evidence');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();
@@ -139,7 +160,7 @@ try {
     await started;
     store.persistedProtections=async()=>{throw new Error('injected reference read failure');};
     await view._run(async()=>view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','NEWER ACTION'));
-    const result={status:view.status.main.text,keepDisabled:view.buttons[0].disabled,
+    const result={status:view.status.main.text,detail:view.detail.main.text,keepDisabled:view.buttons[0].disabled,
       exportEnabled:!view.buttons[1].disabled};
     await release();await refreshing;
     return result;
@@ -149,9 +170,10 @@ try {
     await view._refresh();
   }
  });
- assert(failedReconcile.status.includes('PIN STATUS UNAVAILABLE'));
+ assert(failedReconcile.status.includes('IMPORTED'));
+ assert(failedReconcile.detail.includes('PIN STATUS UNKNOWN'));
  assert(failedReconcile.keepDisabled && failedReconcile.exportEnabled);
- record('reconciliation failure keeps storage warning visible rather than restoring stale success');
+ record('reconciliation failure preserves Import success alongside current-run storage warning');
 
  const keepSourceWarning=await p.evaluate(async()=>{
   const {view,store}=window.__qaEvidence;
