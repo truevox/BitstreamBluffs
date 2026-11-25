@@ -82,7 +82,7 @@ function validate(t){
  if(decoded.length/12 > Math.ceil(t.endTick/4)+1)reject('invalid-trace');
  if(!Array.isArray(t.boosts)||t.boosts.length>32||!t.boosts.every(x=>typeof x==='string'&&textOkay(x))||
    !(t.upgradeRanks===null||plain(t.upgradeRanks))||typeof t.magnetsDrop!=='boolean'||
-   typeof t.kodiaksOn!=='boolean')reject('invalid-loadout');
+   typeof t.kodiaksOn!=='boolean'||!['same','mixed'].includes(t.kodiakPackMode))reject('invalid-loadout');
  if(JSON.stringify(t).length>GHOST_LINK_MAX_JSON)reject('oversize','Ghost input is too large');
  return t;
 }
@@ -99,8 +99,11 @@ function selected(tape){
   accelerationPxS2:t.bsod.initial.accelerationPxS2,
  }};
  if(t.upgradeRanks!==null){
-  const ranks={};for(const [key,val] of Object.entries(t.upgradeRanks)){
-   if(Object.keys(t.upgradeRanks).length>60||!/^[a-zA-Z][a-zA-Z0-9_-]{0,40}$/.test(key)||!uint(val,1000))reject('invalid-loadout');
+  const ranks=Object.create(null), entries=Object.entries(t.upgradeRanks);
+  if(entries.length>60)reject('invalid-loadout');
+  for(const [key,val] of entries){
+   if(!/^[a-zA-Z][a-zA-Z0-9_-]{0,40}$/.test(key)||
+     ['__proto__','constructor','prototype'].includes(key)||!uint(val,1000))reject('invalid-loadout');
    ranks[key]=val;
   }
   t.upgradeRanks=ranks;
@@ -155,14 +158,15 @@ export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL
  if(target.username||target.password||!(['https:','http:'].includes(target.protocol))||
    (target.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(target.hostname)))reject('invalid-url');
  target.username='';target.password='';target.search='';target.hash=`${GHOST_LINK_PARAMETER}=${encoded}`;
- if(target.href.length>maxLength)reject('url-too-long','Ghost exceeds portable link length; no automatic hosting or upload');
+ if(target.href.length>Math.min(GHOST_LINK_MAX_URL,maxLength))reject('url-too-long','Ghost exceeds portable link length; no automatic hosting or upload');
  return target.href;
 }
 
 /** Parse as untrusted local practice; NEVER directly save/import or confer a wallet/replay verdict. */
 export async function parseGhostLink(url,{maxLength=GHOST_LINK_MAX_URL}={}){
  let target;try{target=new URL(url);}catch{reject('invalid-url');}
- if(target.href.length>maxLength||target.hash.length>maxLength)reject('url-too-long');
+ if(target.href.length>Math.min(GHOST_LINK_MAX_URL,maxLength)||
+   target.hash.length>GHOST_LINK_MAX_URL)reject('url-too-long');
  if(target.username||target.password||!(['https:','http:'].includes(target.protocol))||
     (target.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(target.hostname)))reject('invalid-url');
  const fragment=target.hash.slice(1),prefix=`${GHOST_LINK_PARAMETER}=`;

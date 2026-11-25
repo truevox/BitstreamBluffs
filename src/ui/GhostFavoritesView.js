@@ -8,6 +8,8 @@ import { Button } from './Button.js';
 import { uiSfx } from './Sound.js';
 import { fmtInt } from './Format.js';
 import { ellipsize } from './PixelFont.js';
+import { copyText } from './Clipboard.js';
+import { createGhostLink, GHOST_LINK_RECOMMENDED_URL, GhostLinkError } from '../systems/ghost/GhostLink.js';
 import { GHOST_COURSE_ROWS, readGhostCourseRows } from './ghost-course-rows.js';
 
 const ROW_Y = 49;
@@ -29,6 +31,10 @@ export class GhostFavoritesView extends View {
     this.focus = GHOST_COURSE_ROWS.findIndex(({ slot }) => slot === 0);
     this._refreshId = 0;
     this._busy = false;
+    this._shareBusy = false;
+    this._shareArmed = false;
+    this._shareLink = null;
+    this._shareEpoch = 0;
     const text = (x, y, value, color = 'text') => this.panel.add(
       new NeonText(scene, theme, x, y, value, { color, outline: 'none' }));
     text(12, 22, `THIS RUN  ${fmtInt(this.tape.distanceM || 0)} M`);
@@ -50,7 +56,14 @@ export class GhostFavoritesView extends View {
       return { mark, info, detail, save, show };
     });
     text(12, 149, 'SHARED: DRAWS ONCE IF ANY ROLE CAN SHOW.');
-    text(12, 160, 'SETTINGS CAN HIDE BEST / LATEST.');
+    text(12, 160, 'LINK SHARES INPUTS + LOADOUT + SCORE.');
+    this.shareBtn = new Button(scene, theme, {
+      x: 249, y: 157, w: 92, h: 15, label: 'SHARE LINK', color: 'cyan',
+      onClick: () => { this.focus = this.rows.length; this._markFocus(); this._shareGhost(); },
+    });
+    this.panel.add(this.shareBtn);
+    this.shareArrow = new NeonText(scene, theme, 240, 160, '>', { color: 'cyan', outline: 'none' });
+    this.panel.add(this.shareArrow);
     this.status = new NeonText(scene, theme, 12, this.h - 18, '', { color: 'lime', outline: 'none' });
     this.panel.add(this.status);
     this._markFocus();
@@ -61,12 +74,69 @@ export class GhostFavoritesView extends View {
 
   _markFocus() {
     this.rows.forEach(({ mark }, i) => mark.setVisible(i === this.focus));
+    this.shareArrow?.setVisible(this.focus === this.rows.length);
   }
 
   _select(i, save) {
+    this._disarmShare();
     this.focus = i;
     this._markFocus();
     return save ? this._save(i) : this._toggle(i);
+  }
+
+  /** An explicit two-press copy action: no auto-uploads, no official credit.
+   * First press only PREPARES and discloses the URL data; second press copies.
+   * The URL contains the player's input actions, equipment and score.
+   */
+  _disarmShare() {
+    this._shareEpoch++;
+    this._shareArmed = false;
+    this._shareLink = null;
+    this.shareBtn?.setLabel('SHARE LINK');
+  }
+
+  async _shareGhost() {
+    if (this._busy || this._shareBusy || !this.alive) return;
+    if (!this._shareArmed) {
+      this._shareBusy = true;
+      const epoch = ++this._shareEpoch;
+      this.shareBtn.setDisabled(true);
+      this.status.setText('PREPARING PRIVATE GHOST LINK');
+      try {
+        const link = await createGhostLink(this.tape, location.href);
+        if (!this.alive || epoch !== this._shareEpoch) return;
+        this._shareArmed = true;
+        this._shareLink = link;
+        this.shareBtn.setLabel('COPY LINK');
+        this.status.setText('SHARES INPUTS + SCORE. SELECT AGAIN.');
+      } catch (e) {
+        if (!this.alive || epoch !== this._shareEpoch) return;
+        this._disarmShare();
+        this.status.setText(e instanceof GhostLinkError && e.code === 'url-too-long'
+          ? 'LINK TOO LONG: NO UPLOAD PERFORMED' : 'CANNOT SHARE THIS GHOST');
+      } finally {
+        this._shareBusy = false;
+        if (this.alive) this.shareBtn.setDisabled(false);
+      }
+      return;
+    }
+    // Clipboard permission is gesture-sensitive: initiate writing directly
+    // in the second user click, before any awaiting or other interaction.
+    const link = this._shareLink;
+    this._disarmShare();
+    this._shareBusy = true;
+    this.shareBtn.setDisabled(true);
+    try {
+      const copied = await copyText(link);
+      if (!this.alive) return;
+      this.status.setText(!copied ? 'CLIPBOARD BLOCKED: NO LINK COPIED'
+        : link.length > GHOST_LINK_RECOMMENDED_URL
+          ? 'LONG LINK COPIED: SOME APPS TRUNCATE' : 'UNVERIFIED PRACTICE LINK COPIED');
+      uiSfx(this.scene, copied ? 'uiSelect' : 'uiBack');
+    } finally {
+      this._shareBusy = false;
+      if (this.alive) this.shareBtn.setDisabled(false);
+    }
   }
 
   async _refresh() {
@@ -114,11 +184,14 @@ export class GhostFavoritesView extends View {
   handleAction(action) {
     if (action === 'cancel' || action === 'ghost') { this.close(); return true; }
     if (action === 'up' || action === 'down') {
-      this.focus = (this.focus + (action === 'up' ? -1 : 1) + this.rows.length) % this.rows.length;
+      this._disarmShare();
+      this.focus = (this.focus + (action === 'up' ? -1 : 1) + this.rows.length + 1) % (this.rows.length + 1);
       uiSfx(this.scene, 'uiMove');
       this._markFocus();
-    } else if (action === 'confirm') this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
-    else if (action === 'left' || action === 'right') this._toggle(this.focus);
+    } else if (action === 'confirm') {
+      if (this.focus === this.rows.length) this._shareGhost();
+      else this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
+    } else if ((action === 'left' || action === 'right') && this.focus < this.rows.length) this._toggle(this.focus);
     return true;
   }
 }

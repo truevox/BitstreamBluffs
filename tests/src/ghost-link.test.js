@@ -60,6 +60,9 @@ test('rejects future versions, incompatible physics, malformed start and invalid
   [{inputs:[[241,0,0]]},'invalid-input'],[{inputs:[[1,0,0],[0,1,0]]},'invalid-input'],
   [{trace:'not base64!'},'invalid-trace'],[{trace:floatTrace([[0,0,Infinity]])},'invalid-trace'],
   [{checkpoints:[[0,1,2,3,4,5,6,7]]},'invalid-checkpoint'],
+  [{kodiakPackMode:'sensitive-untrusted-string'},'invalid-loadout'],
+  [{upgradeRanks:JSON.parse('{"__proto__":1}')},'invalid-loadout'],
+  [{upgradeRanks:{constructor:100}},'invalid-loadout'],
  ])await mustReject(createGhostLink({...valid(),...patch},URL),want);
 });
 
@@ -68,6 +71,7 @@ test('does not accept wrong protocol, URL length, modified payload or hash, or u
  await mustReject(createGhostLink(t,'http://example.com/'),'invalid-url');
  await mustReject(createGhostLink(t,'https://user:pass@simulate.sledhead.ing/'),'invalid-url');
  await mustReject(createGhostLink(t,URL,{maxLength:20}),'url-too-long');
+ await mustReject(createGhostLink(t,URL,{maxLength:Infinity}).then(x=>x+'x'.repeat(9000)).then(x=>parseGhostLink(x,{maxLength:Infinity})),'url-too-long');
  const pos=link.lastIndexOf('.')+1;const altered=link.slice(0,pos)+(link[pos]==='A'?'B':'A')+link.slice(pos+1);await mustReject(parseGhostLink(altered),'corrupt-link');
  await mustReject(parseGhostLink(link.replace('bbghost=1.','bbghost=9.')),'unsupported-link');
  await mustReject(parseGhostLink(link+'&x=1'),'invalid-fragment');

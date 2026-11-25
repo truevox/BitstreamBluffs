@@ -50,7 +50,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js
+      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
