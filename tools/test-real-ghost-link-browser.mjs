@@ -304,19 +304,28 @@ try{
   const allowed=await recipient.evaluate(()=>({disabled:window.__bbGame.scene.getScene('TitleScene').view.practiceBtn.disabled}));
   if(allowed.disabled)throw Error('Eligible NORMAL guest was refused by practice policy');
   let armAttempts=0,armedRace=null;
+  const raceState=()=>recipient.evaluate(()=>{
+   const g=window.__bbGame,v=g.scene.getScene('TitleScene')?.view;
+   return {armed:v?.practiceArmed===true,
+    text:v?.status?.main?.text||null,label:v?.practiceBtn?.label?.main?.text||null,
+    view:!!v,running:g.scene.isActive('RunScene'),starting:g.scene.getScene('TitleScene')?.starting===true};
+  });
   for(;armAttempts<5;armAttempts++){
-   await recipient.waitForTimeout(220);
    const point=await practicePoint();
    if(!point)throw Error('Race Guest hitzone disappeared before consent');
    await recipient.mouse.move(point.x,point.y);
    await recipient.mouse.click(point.x,point.y);
-   armedRace=await recipient.evaluate(()=>{
-    const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
-    return {armed:v.practiceArmed,text:v.status.main.text,label:v.practiceBtn.label.main.text,running:g.scene.isActive('RunScene')};
-   });
+   // Phaser pointerdown can be dispatched on the NEXT rendering frame. Wait
+   // for that input before deciding the click missed; otherwise a retry may
+   // be a SECOND consent and race ahead of the state assertion.
+   await recipient.waitForTimeout(500);
+   armedRace=await raceState();
+   if(armedRace.running||armedRace.starting)
+    throw Error('Guest launched before an OBSERVED first consent '+JSON.stringify({armedRace,armAttempts}));
    if(armedRace.armed)break;
+   if(!armedRace.view)throw Error('Practice preview disappeared without consent '+JSON.stringify(armedRace));
   }
-  if(!armedRace?.armed||armedRace.running||!armedRace.text.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
+  if(!armedRace?.armed||armedRace.running||!armedRace.text?.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
    throw Error('Unranked double-consent gate failed after stable pointer attempts '+JSON.stringify({armedRace,armAttempts}));
   // Reacquire the same real hitzone after arming; the first click must NEVER
   // launch gameplay and must not be repeated after practiceArmed becomes true.
