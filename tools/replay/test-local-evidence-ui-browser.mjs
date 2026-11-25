@@ -131,6 +131,16 @@ try {
  assert(imported.msg.includes('UNVERIFIED'));
  assert.equal(imported.count,0);
  record('explicit file picker imports local-only data, stays unverified/unpinned');
+ const renamed=await p.evaluate(async({name,bytes})=>{
+  const {view}=window.__qaEvidence;
+  const digest=name.replace(/\.bbreplay$/i,' (1).bbreplay');
+  const file=new File([new Uint8Array(bytes)],digest,{type:'application/octet-stream'});
+  await view._processImportFile(file);
+  return {name:file.name,status:view.status.main.text};
+ },{name:download.suggestedFilename(),bytes:[...exported]});
+ assert(renamed.name.endsWith(' (1).bbreplay') && renamed.status.includes('UNVERIFIED'));
+ record('browser collision-suffixed copy of exported replay imports after SHA verification');
+
  const stale=await p.evaluate(()=>{
   const {scene,statusKey,view}=window.__qaEvidence;
   scene.registry.set(statusKey,{ok:true,runId:'some-prior-run',digest:'sha256:'+'f'.repeat(64)});
@@ -193,6 +203,39 @@ try {
  assert.equal(recovered.afterPin,1);
  assert.equal(recovered.afterUnpin,0);
  record('Refresh alone retries quota-failed bytes and enables run-bound Keep/Unpin');
+ const priority=await p.evaluate(async()=>{
+  const {view,store,scene,statusKey,legacyTape}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape,bundleDigest}=await import('/src/systems/replay/manifest.js');
+  const base=evidenceBundle({manifest:legacyManifestFromTape(legacyTape),tape:legacyTape});
+  const older={...base,claims:{...base.claims,score:base.claims.score+401}};
+  const current={...base,claims:{...base.claims,score:base.claims.score+402}};
+  const oldDigest=bundleDigest(older),currentDigest=bundleDigest(current);
+  const priorStatus=scene.registry.get(statusKey),originalWrite=store._writeDurable;
+  store._writeDurable=async()=>{throw new Error('temporary simulated quota');};
+  try{
+    await store.put(older,{runId:'older-pending'}).catch(()=>{});
+    await store.put(current,{runId:'ui-smoke-run'}).catch(()=>{});
+  }finally{
+    // The older source remains quota-blocked, but the current smaller source
+    // can now fit. This tests prioritized retry ordering, not quota sizes.
+    store._writeDurable=(record,...rest)=>record.digest===oldDigest
+      ?Promise.reject(new Error('older source still quota blocked'))
+      :originalWrite.call(store,record,...rest);
+  }
+  try{
+    scene.registry.set(statusKey,{ok:false,runId:'ui-smoke-run',digest:currentDigest,code:'quota-exceeded',durable:false});
+    await view._refresh();
+    return {currentDurable:await store.isBundleDurable(currentDigest,{runId:'ui-smoke-run'}),
+      olderPending:store.pending.has(oldDigest),currentPending:store.pending.has(currentDigest),
+      keepEnabled:view.buttons[0].disabled===false,message:view.status.main.text};
+  }finally{
+    store._writeDurable=originalWrite;scene.registry.set(statusKey,priorStatus);
+    await view._refresh();
+  }
+ });
+ assert(priority.currentDurable && priority.olderPending && !priority.currentPending && priority.keepEnabled);
+ record('Refresh prioritizes current run over older still-quota-blocked pending evidence');
+
 
 
  const displayGeneration=await p.evaluate(async()=>{
