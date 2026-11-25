@@ -446,6 +446,8 @@ export async function decodePostcard(str, opts = {}) {
     if (pp) return refuse('invalid-field', `prefix: ${pp}`);
     if (typeof w.digest !== 'string' || !SHA_ID.test(w.digest)) return refuse('invalid-field', 'digest');
 
+    if (digestOfWire(w) !== w.digest) return refuse('digest-mismatch');
+
     const postcard = { kind: w.kind, v: w.v, gameVersion: w.gameVersion, simRevision: w.simRevision, rulesetId: w.rulesetId, buildId: w.buildId,
       header, prefix: w.prefix.map((r) => [...r]), startTick: w.startTick, windowTicks: w.windowTicks, fingerprintAtStart: w.fingerprintAtStart,
       challenge, digest: w.digest };
@@ -453,4 +455,38 @@ export async function decodePostcard(str, opts = {}) {
   } catch (e) {
     return refuse('bad-json', e && e.message);
   }
+}
+
+// --- compatibility and the takeover adapter ---------------------------------------------------------------------------
+
+/**
+ * Same strictness as #72's takeoverEligible: the EXACT simRevision, rulesetId and buildId (no "close enough"). `gameVersion`
+ * is informational only. Fails closed: an incomplete current identity matches nothing.
+ * @param {object} pc a postcard
+ * @param {{simRevision:number, rulesetId:string, buildId:string}} identity the RUNNING build
+ * @returns {{ok:true}|{ok:false, reason:'other-build'|'identity', message:string}}
+ */
+export function postcardCompatible(pc, identity) {
+  const id = identity;
+  if (!isObj(id) || !isInt(id.simRevision) || typeof id.rulesetId !== 'string' || !SHA_ID.test(id.rulesetId) || typeof id.buildId !== 'string' || !SHA_ID.test(id.buildId)) return refuse('identity');
+  if (!isObj(pc) || pc.simRevision !== id.simRevision || pc.rulesetId !== id.rulesetId || pc.buildId !== id.buildId) return refuse('other-build');
+  return { ok: true };
+}
+
+/**
+ * Rebuild the tape-shaped object Replay Takeover (#72) consumes: `buildTakeoverDescriptor({tape, tick, source})` takes
+ * `tape`, `tick`, `source` from this and ignores the rest; RunScene's stage reads the extras to verify the re-simulation.
+ *
+ * The tape holds only the prefix rows (`endTick` = N + window so that #72's `tick <= endTick - 1` holds) and has NO per-second
+ * checkpoints and NO trace: a postcard proves its start by `expectedFingerprint` at tick N alone. #72's takeoverEligible
+ * requires both for N >= 120 (`prefix-uncovered`), so `coverage:'fingerprint-only'` tells the wiring stage to relax that one
+ * check for postcards (and to compare the live fingerprint at N), or to extend the format. Not done here: no #72 import.
+ * @param {object} pc a postcard (decoded and compatible)
+ */
+export function postcardToTakeoverInput(pc) {
+  const h = clone(pc.header);
+  const tape = { ...h, runId: `postcard:${pc.digest.slice(7, 23)}`, endTick: pc.startTick + pc.windowTicks,
+    inputs: pc.prefix.map((r) => [...r]), checkpoints: [], trace: '' };
+  return { tape, tick: pc.startTick, source: 'postcard', postcardDigest: pc.digest, expectedFingerprint: pc.fingerprintAtStart,
+    windowTicks: pc.windowTicks, challenge: clone(pc.challenge), coverage: 'fingerprint-only' };
 }
