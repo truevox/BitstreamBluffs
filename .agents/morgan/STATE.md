@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 13:39 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
+Last verified: 2026-11-25 13:45 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -75,7 +75,13 @@ means resume this queue, not take over another lane or merge a draft.
    branch `morgan/issue-78-crash-brief-chain-smoke`, based on `044ebd4b`.
    Normal production asset matches v2.21.2. Two fresh strict playbacks
    of natural terrain fatal tick937 checked 7/7 checkpoints; a complete
-   shaped nonfatal cutoff is refused with exit 1 and empty stdout.
+   shaped cutoff is refused with exit 1 and empty stdout. Review gap:
+   missing-fatal gate precedes checkpoint assertion, so desynced nonfatal
+   gives the same error as a clean cutoff (exact gate mock reproduced).
+   PR description now distinguishes refusal from diagnostic proof. On
+   browser availability use strict `--airtime-build` on the same cutoff
+   through tick464 (3/3 checks, no drops/desync/save), retain CLI refusal,
+   and separately observe no fatal at 465 if needed. Keep exact build pin.
    Unchanged comparator returned 0 vs itself and 2 vs historical Packet
    Spike brief. 102 focused tests, identity and closed-loop browser smoke
    passed. A longer experimental hazard playback hit the existing 60s
