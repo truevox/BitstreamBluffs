@@ -26,7 +26,7 @@ export const EXEMPT_MARK = 'pmath-exempt: draw-only';
 export const PRESENTATION_FILES = [
   'src/entities/AirTelegraph.js', 'src/entities/Background.js', 'src/entities/BestMarker.js', 'src/entities/Fx.js', 'src/entities/GhostRider.js',
   'src/entities/GroundTelegraph.js', 'src/entities/KodiakRider.js', 'src/entities/LastDeathMarker.js', 'src/entities/PowerUp.js', 'src/entities/Shard.js',
-  'src/entities/SongBillboard.js', 'src/scenes/GameOverScene.js', 'src/scenes/PauseScene.js', 'src/scenes/TitleScene.js', 'src/scenes/UIScene.js',
+  'src/entities/SongBillboard.js', 'src/scenes/GameOverScene.js', 'src/scenes/TitleScene.js', 'src/scenes/UIScene.js',
   'src/shaders/GlitchPipeline.js', 'src/systems/AudioSynth.js', 'src/systems/MicroBees.js', 'src/systems/WorldDance.js',
   'src/systems/music/AdaptiveBiomeRouter.js', 'src/systems/music/BsodThreatProcessor.js', 'src/systems/music/ImpulseBank.js', 'src/systems/music/MusicFXGraph.js',
   // Original-stem notes, pressure ambience and event-gated cowbell are
@@ -225,8 +225,12 @@ describe('every src file is on the allowlist, except explicit presentation files
     expect(both.sort()).toEqual(['src/entities/PowerUp.js', 'src/entities/Shard.js']); // changing this list means re-reading why they are causal
     for (const f of both) expect(read(f)).toContain(EXEMPT_MARK);
   });
-  test('presentation files really still use native Math (no stale exemptions)', () => {
+  test('presentation allowlist contains no files that have become strict-math safe', () => {
     for (const f of PRESENTATION_FILES) expect(mathViolations(read(f)).length).toBeGreaterThan(0);
+    // Replacing Phaser's Math.Between in Pause removed its last exception;
+    // keeping it exempt would silently weaken #121's math-boundary protection.
+    expect(PRESENTATION_FILES).not.toContain('src/scenes/PauseScene.js');
+    expect(scanned).toContain('src/scenes/PauseScene.js');
   });
 });
 
