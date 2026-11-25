@@ -1147,7 +1147,12 @@ export class GameOverScene extends Phaser.Scene {
       this._flash();
       this._shockwave();
       const st = this.registry.get(REG.SETTINGS) || {};
-      if (st.screenShake !== false && this.cameras && this.cameras.main && typeof this.cameras.main.shake === 'function') this.cameras.main.shake(220, 0.006);
+      // Phaser camera Shake internally samples Math.random every render.
+      // Use a named cosmetic stream, not the authoritative run RNG.
+      const cam = this.cameras?.main;
+      if (st.screenShake !== false && cam && !isReducedMotion(this)) {
+        this._seededShake = { remaining: 220, x: cam.scrollX, y: cam.scrollY };
+      }
     });
     // 260: rule + crash line, 330/470: panels unfold, 700: buttons + footer
     this._fadeIn(this.rule, 200, 260);
@@ -1446,6 +1451,21 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    const shake = this._seededShake;
+    if (shake) {
+      const cam = this.cameras?.main;
+      shake.remaining = Math.max(0, shake.remaining - Math.max(0, delta));
+      if (cam) {
+        if (!shake.remaining || isReducedMotion(this)) {
+          cam.setScroll(shake.x, shake.y);
+          this._seededShake = null;
+        } else {
+          const rng = cosmeticRandom('gameover/shake');
+          cam.setScroll(shake.x + (rng.next() * 2 - 1) * cam.width * 0.006,
+            shake.y + (rng.next() * 2 - 1) * cam.height * 0.006);
+        }
+      } else this._seededShake = null;
+    }
     this.backdrop.update(time);
     if (this.board && this.board.visible) this.board.tick(delta);
     // glitchy header (held still while the slam plays, and under reduced motion)

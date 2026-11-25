@@ -73,6 +73,15 @@ describe('issue #59: indirect Phaser random helpers are forbidden in live UI',()
     const offenders=walk('src').filter(f=>/Phaser\.Math\.(Between|FloatBetween|RND)/.test(fs.readFileSync(f,'utf8')));
     expect(offenders).toEqual([]);
   });
+  test('particle ranges and Game Over camera never delegate randomness to Phaser internals',()=>{
+    const trail=fs.readFileSync('src/entities/TrailParticles.js','utf8');
+    const gameover=fs.readFileSync('src/scenes/GameOverScene.js','utf8');
+    expect(trail).not.toMatch(/(?:lifespan|speed|angle):\s*\{\s*min:/);
+    expect(trail).toMatch(/visualFx\?\.fork\('trail\/sparks'\)/);
+    expect(trail).toMatch(/frame:\s*'__BASE'/); // Phaser otherwise calls GetRandom on empty frame list
+    expect(gameover).not.toMatch(/\.cameras\.main\.shake\(/);
+    expect(gameover).toMatch(/cosmeticRandom\('gameover\/shake'\)/);
+  });
   test('pause glitch jitter is inclusive and reproducible from a named seeded cosmetic stream',()=>{
     seedCosmeticRandom(0x12345678);
     const first=Array.from({length:20},()=>cosmeticRandom('pause/glitch').int(-2,4));

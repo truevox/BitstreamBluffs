@@ -2,9 +2,10 @@
 
 ## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
 
-- Replace Phaser `Math.Between` calls (which hide unseeded `Math.random`) in HUD, Pause and Game Over with seeded, named cosmetic streams, including `pause/glitch`.
-- Add static guard for Phaser RNG helpers and seeded integer jitter regression tests.
-- Presentation-only: SIM_REVISION 9, authoritative physics, scoring, saved records and replay protocol unchanged. Public verifier and heavy savestates remain separate trust work.
+- Replace indirect Phaser `Math.Between` calls (which use unseeded `Math.random`) in HUD, Pause and Game Over with independent named seeded cosmetic streams, including `pause/glitch`.
+- Fix hidden Phaser RNG paths: trail spark lifespan/speed/angle now have seeded `onEmit` callbacks with an explicit `__BASE` texture frame; Game Over camera impact shake uses a bounded seeded cosmetic offset instead of Phaser's unseeded Shake.
+- Add static and real-Chromium regression coverage, including a throwing `Math.random` negative control that exercises real particles and shake. No change to the canonical physics RNG.
+- Presentation-only: SIM_REVISION 9, authoritative physics, scoring, saved records and replay protocol unchanged. Public verification and Heavy Mode savestates remain separate trust work.
 
 ## Unreleased — #245 dual-proof contract v1 (2026-11-25)
 
