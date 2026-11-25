@@ -22,6 +22,19 @@ test('reject same-course ID collision without touching pinned Favorite, Latest o
  }
 });
 
+test('JSON serialization cannot turn distinct tape identities into accepted retries',async()=>{
+ const lib=new GhostLibrary(),original=tape();await lib.saveRun(original);
+ for(const changed of [
+  {...tape(),optionalField:undefined},
+  {...tape(),distanceM:100,extras:()=>{}},
+  {...tape(),distanceM:100,metadata:{present:undefined}},
+ ])expect(await lib.saveRun(changed)).toBeNull();
+ const zero=new GhostLibrary();await zero.saveRun(tape('zero',{distanceM:0}));
+ expect(await zero.saveRun(tape('zero',{distanceM:-0}))).toBeNull();
+ const special=new GhostLibrary();await special.saveRun(tape('special',{score:null}));
+ expect(await special.saveRun(tape('special',{score:NaN}))).toBeNull();
+});
+
 test('identical retry is a true no-op after newer Latest; does not repromote stale tape',async()=>{
  const lib=new GhostLibrary(),original=tape(),latest=tape('newer',{distanceM:9,endedAt:2000});
  await lib.saveRun(original);await lib.setFavorite(original.seed,original.biomeMask,1,original.runId);

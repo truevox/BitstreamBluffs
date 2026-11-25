@@ -26,15 +26,32 @@ const req2p = (req) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error || new Error('idb request failed'));
 });
 
-// Stored run IDs identify immutable recorded data. Comparing JSON structure
-// conservatively refuses even harmless key-order differences rather than ever
-// replacing an existing tape's checkpoints/score/trace under a pinned ID.
-// Undefined/non-JSON/circular data are not valid idempotent replay identities.
+// Stored run IDs identify immutable recorded data, not just matching JSON
+// strings: JSON.stringify loses undefined, -0, NaN and object property order.
+// Only strict plain object/array graphs with equal own data properties may be
+// retried idempotently. Cycles, accessors and exotic objects fail closed.
 function sameRecording(a,b){
-  try{
-    const first=JSON.stringify(a);
-    return typeof first==='string'&&first===JSON.stringify(b);
-  }catch{return false;}
+  const leftSeen=new WeakSet(),rightSeen=new WeakSet();
+  const equal=(x,y)=>{
+    if(x===null||y===null||typeof x!=='object'||typeof y!=='object')return Object.is(x,y);
+    if(Array.isArray(x)!==Array.isArray(y))return false;
+    if(!Array.isArray(x)){
+      const xp=Object.getPrototypeOf(x),yp=Object.getPrototypeOf(y);
+      if((xp!==Object.prototype&&xp!==null)||(yp!==Object.prototype&&yp!==null))return false;
+    }
+    if(leftSeen.has(x)||rightSeen.has(y))return false;
+    leftSeen.add(x);rightSeen.add(y);
+    const keys=Reflect.ownKeys(x),other=Reflect.ownKeys(y);
+    if(keys.length!==other.length)return false;
+    for(const key of keys){
+      if(typeof key!=='string'||!Object.prototype.hasOwnProperty.call(y,key))return false;
+      const d=Object.getOwnPropertyDescriptor(x,key),e=Object.getOwnPropertyDescriptor(y,key);
+      if(!d||!e||!Object.prototype.hasOwnProperty.call(d,'value')||
+         !Object.prototype.hasOwnProperty.call(e,'value')||!equal(d.value,e.value))return false;
+    }
+    return true;
+  };
+  try{return equal(a,b);}catch{return false;}
 }
 const copyRecording=t=>typeof structuredClone==='function'
   ?structuredClone(t):JSON.parse(JSON.stringify(t));
