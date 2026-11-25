@@ -18,7 +18,8 @@ const { fingerprintState, compareRuns } = await import('../../src/systems/replay
 const { FP_PREFIX } = await import('../../src/systems/replay/canonicalBinary.js');
 const { EvidenceStore } = await import('../../src/systems/replay/evidenceStore.js');
 const { GhostLibrary } = await import('../../src/systems/ghost/GhostLibrary.js');
-const { EVIDENCE_STATUS_KEY, EVIDENCE_STORE_KEY, RULESET_KEY, buildRunEvidence } = await import('../../src/systems/replay/evidenceCapture.js');
+const { EVIDENCE_STATUS_KEY, EVIDENCE_STATUS_BY_RUN_KEY, EVIDENCE_ACTIVE_RUN_KEY,
+  EVIDENCE_STORE_KEY, RULESET_KEY, buildRunEvidence, saveRunEvidence } = await import('../../src/systems/replay/evidenceCapture.js');
 const { FP_SCHEMAS, FP_SUBSYSTEMS } = await import('../../src/systems/replay/fingerprintSchemas.js');
 const { validateEvidenceBundle, bundleDigest, resolveReplaySetup } = await import('../../src/systems/replay/manifest.js');
 const { TapePlayer } = await import('../../src/systems/ghost/GhostTape.js');
@@ -451,5 +452,32 @@ describe('S2: a tape from before the magnet gate (magnets always dropped) replay
     const r = replayDesync(t, 8);
     expect(r.desync).not.toBeNull();
     expect(r.desync.tick).toBe(480);
+  });
+});
+
+
+describe('overlapping async evidence capture: current run status is not clobbered',()=>{
+  test('an older delayed save completing last cannot replace the latest run status',async()=>{
+    const registry=new Map();
+    registry.set(EVIDENCE_ACTIVE_RUN_KEY,'newer-run');
+    let releaseOlder;
+    const olderStore={durable:true,put:()=>new Promise(resolve=>{releaseOlder=resolve;})};
+    const newerStore={durable:true,put:async(_bytes,_meta,verified)=>verified.bundleDigest};
+    const olderTape={...rec.tape,runId:'older-run'};
+    const newerTape={...rec.tape,runId:'newer-run'};
+    const options=store=>({registry,ruleset:RULESET,store});
+    const pending=saveRunEvidence(olderTape,rec.recorder,options(olderStore));
+    // The newer run finishes writing BEFORE the older recording completes.
+    const newer=await saveRunEvidence(newerTape,rec.recorder,options(newerStore));
+    expect(newer).toMatchObject({ok:true,runId:'newer-run'});
+    expect(registry.get(EVIDENCE_STATUS_KEY)?.runId).toBe('newer-run');
+    releaseOlder(newer.digest);
+    const older=await pending;
+    expect(older).toMatchObject({ok:true,runId:'older-run'});
+    expect(registry.get(EVIDENCE_STATUS_KEY)?.runId).toBe('newer-run');
+    const byRun=registry.get(EVIDENCE_STATUS_BY_RUN_KEY);
+    expect(byRun).toBeInstanceOf(Map);
+    expect(byRun.get('older-run').runId).toBe('older-run');
+    expect(byRun.get('newer-run').runId).toBe('newer-run');
   });
 });
