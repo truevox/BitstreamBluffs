@@ -126,13 +126,11 @@ export class EvidenceStore {
         // One readonly transaction is a consistent snapshot of evidence AND
         // protection indexes. Separate transactions could observe different tabs.
         const readTx = db.transaction([EVIDENCE_INDEX,EVIDENCE_REFS], 'readonly');
-        const doneRead = txDone(readTx);
-        const reads = Promise.all([
+        const [all,refs] = await Promise.all([
           req2p(readTx.objectStore(EVIDENCE_INDEX).getAll()),
           req2p(readTx.objectStore(EVIDENCE_REFS).getAll()),
+          txDone(readTx),
         ]);
-        const [all, refs] = await reads;
-        await doneRead;
         if (connectionClosed) throw new Error('IndexedDB closed during initialization');
         // Reopening is a REPLACEMENT of the persisted snapshot, not a merge.
         // Browser storage may have been cleared while the old tab remained open.
@@ -369,6 +367,19 @@ export class EvidenceStore {
   /** Number of distinct local roles holding this exact canonical evidence bundle. */
   protectedCount(digest) { return [...this.protections.values()].filter(r => r.digest === digest).length; }
 
+  /** Authoritative persisted reference count; never trust another tab's cached list. */
+  async persistedProtectedCount(digest) {
+    if (!this._db) throw protectionError('not-durable', 'cannot verify retained roles in memory-only storage');
+    try {
+      const tx=this._db.transaction(EVIDENCE_REFS,'readonly');
+      const [refs]=await Promise.all([
+        req2p(tx.objectStore(EVIDENCE_REFS).getAll()),
+        txDone(tx),
+      ]);
+      return refs.filter(ref=>ref.digest===digest).length;
+    } catch(e) { throw new EvidenceStoreError('read-failed','could not read persisted protected roles',e); }
+  }
+
   /**
    * Protect one ALREADY DURABLE canonical evidence bundle under a local role.
    * No server submission occurs: `submitted` is strictly a local lifecycle label.
@@ -415,7 +426,7 @@ export class EvidenceStore {
       this._report(err); throw err;
     }
     this.protections.set(key, ref);
-    return { ...ref, durable: true, count: this.protectedCount(digest) };
+    return { ...ref, durable: true, count: await this.persistedProtectedCount(digest) };
   }
 
   /** Explicit release of one role; the canonical bytes remain archived until a separate explicit remove. */

@@ -493,6 +493,35 @@ describe('protected local evidence references (#244)', () => {
     expect(await store.isBundleDurable(persisted)).toBe(false);
   });
 
+  test('cross-tab protect counts the real persisted roles, not the stale local snapshot',async()=>{
+    const idb=fakeIdb();
+    const one=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await one.put(bundle(),{runId:RUN});
+    const two=await new EvidenceStore({idb,storage:null}).init();
+    const candidate=await one.protect(digest,{runId:RUN,role:'candidate'});
+    expect(candidate.count).toBe(1);
+    const pinned=await two.protect(digest,{runId:RUN,role:'pinned'});
+    expect(pinned.count).toBe(2);
+    expect(two.protectedCount(digest)).toBe(1); // demonstrably stale
+    expect(await two.persistedProtectedCount(digest)).toBe(2);
+    await one.unprotect(candidate.key);
+    expect(await two.persistedProtectedCount(digest)).toBe(1);
+  });
+
+  test('request+transaction read failures fall back without claiming a durable archive',async()=>{
+    const idb=fakeIdb();
+    idb.hooks.failGetAll=new Error('IDB read denied');
+    const errors=[];
+    const store=await new EvidenceStore({idb,storage:null,onError:e=>errors.push(e.code)}).init();
+    expect(store.backend).toBe('memory');
+    expect(store.durable).toBe(false);
+    expect(store.lastError.code).toBe('read-failed');
+    expect(errors).toEqual(['read-failed']);
+    idb.hooks.failGetAll=null;
+    await store.init();
+    expect(store.backend).toBe('idb');
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

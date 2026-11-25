@@ -21,10 +21,18 @@ export const EVIDENCE_STORE_KEY = 'evidenceStore';
 export const RULESET_KEY = 'currentRuleset';
 
 let shared = null;
-/** Shared lazily-opened store (IndexedDB `bitstream-replay-evidence`, memory fallback). */
+let sharedRetry = null;
+/** Shared store. A blocked v1→v2 upgrade may initially fall back to memory;
+ * the next live capture or explicit local archive action retries opening IDB.
+ * Coalesce simultaneous retries instead of spawning competing open requests.
+ */
 export function sharedEvidenceStore() {
-  if (!shared) shared = new EvidenceStore().init();
-  return shared;
+  if (!shared) return (shared = new EvidenceStore().init());
+  return shared.then(store => {
+    if (store.backend === 'idb' || !store._idb) return store;
+    if (!sharedRetry) sharedRetry = store.init().finally(() => { sharedRetry = null; });
+    return sharedRetry;
+  });
 }
 
 const bare = (fp) => (typeof fp === 'string' && fp.startsWith(FP_PREFIX) ? fp.slice(FP_PREFIX.length) : fp);
