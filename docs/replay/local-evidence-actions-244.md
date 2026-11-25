@@ -19,3 +19,7 @@ Once `importBundle()` commits canonical bytes successfully, a later IndexedDB fa
 
 
 A false result from an IndexedDB post-import durability probe is ambiguous: it may mean missing bytes **or** a failed read. After a successful IDB commit, the action conservatively returns `localDurable:null` and `alreadyProtected:null`/`protectionCount:null`, never falsely announcing zero pins. A verified memory-only backend reports `localDurable:false`; when the tab previously had durable storage, its pin count still remains unknown until reconnected. Regression tests inject the ambiguous read after an existing pin.
+
+## Review: blocked IndexedDB must not imply zero pins
+
+After an archive import, a failed or blocked IDB connection cannot prove that no other tab has saved a protected reference. If a browser exposes IndexedDB but the durability lookup is unavailable, return `localDurable:null`, `protectionCount:null`, and `alreadyProtected:null`. Only a truly unsupported IDB environment can establish a memory-only outcome for this local session. A `UNPIN` request can include `expectedGeneration`, representing the exact reference the player saw at their last explicit Refresh; a later cache refresh is never authorization to release a replacement pin. Negative tests cover both cases.
