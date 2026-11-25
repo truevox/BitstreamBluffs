@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.22.5 — #56 exact-course ghost isolation (2026-11-25)
+
+- Refuse favorite assignments from other seed/biome-mask courses and reject foreign-course run-ID collisions before changing a local course's tape or role.
+- Serialize course/tape Save, Favorite and role visibility updates in a single IndexedDB transaction across tabs, including safe reference-aware cleanup; refresh displayed roles from authoritative storage.
+- Prevent corrupted cross-course role references from rendering as the current course's ghosts; display "OTHER COURSE" for repair in the read-only Game Over role panel.
+- Restrict per-course visibility toggles to Best, Latest and Favorite A/B/C; five-role dedup and local-only visual behavior remain unchanged.
+- No archive capacity rules, pricing, evictions, public sharing, scoring, authoritative replay/physics or SIM_REVISION change. #56 remains open pending owner-approved course-slot economics and broader acceptance.
+
 ## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
 
 - Replace indirect Phaser `Math.Between` calls (which use unseeded `Math.random`) in HUD, Pause and Game Over with independent named seeded cosmetic streams, including `pause/glitch`.

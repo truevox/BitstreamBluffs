@@ -1,0 +1,23 @@
+# #56 course-isolation hardening — implementation and QA plan
+
+The owner-established five simultaneous local roles (Best, Latest, Favorites A/B/C) are keyed to the **exact seed and selected biome mask**, not an arbitrary tape run ID. Current `GhostLibrary.setFavorite` accepts any existing run ID including one from another course; loaded/stale course metadata can also point to another course and currently pass through the visible ghost and Game Over row reader. A separate `saveRun` reusing a run ID can overwrite a tape belonging to another course.
+
+This patch will enforce exact `courseKey(tape.seed,tape.biomeMask)` equality for explicit favorite selection, loaded display candidates and Game Over labels; refuse cross-course run-ID overwrite in `saveRun`; and prove honest same-course Latest/Best/Favorite behavior and no physics/ranking writes remain unchanged. No database schema change, user role migration, archive-slot cap, pricing, eviction, Bazaar upload, or replay verifier is added here. Incompatible/corrupted foreign favorites stay safely visible as **OTHER COURSE** in the read-only role panel for explicit user repair, not secretly drawn as a sixth or foreign ghost.
+
+The full #56 economic/retention P0 stays OPEN pending owner decisions about initial included course-library count, slot price curve and explicit eviction policy. This patch only closes the concrete cross-course integrity hole.
+
+## Implemented source/QA evidence
+
+The library now validates the exact `courseKey(seed,biomeMask)` when pinning any Favorite, before accepting a duplicate global run ID, and again when selecting stored role tapes for the renderer. The Game Over role labels use the same course check and show a clearly repairable `OTHER COURSE` state for corrupted foreign references. Only five existing role identifiers are mutable. No foreign role pointer or rejected input changes the saved course. Recorded tape output and authoritative physics are untouched.
+
+Adversarial regressions originally failed on unmodified main: cross-seed and cross-mask favorite injection; persisted foreign role display; duplicate global run ID replacing another course's tape; unauthorized sixth role; Game Over foreign label. After hardening, ghost-tape, ghost-course-row and live replay acceptance suites passed 51/51. The source still needs independent exact-head review and final CI/browser acceptance before merge. Course archive-slot counts, purchase pricing and eviction/user-replacement remain unapproved and are **not** implemented.
+
+## Concurrent-tab P1 found and corrected (same day)
+
+Source review of the first implementation reproduced **two separate durable integrity failures** against existing IndexedDB: (1) two tabs saving the same run ID to different seed/mask courses both accepted the ID, and the last writer replaced the first tape; (2) a fresh Favorite pin from one tab was erased by another tab's stale Latest write, which could also garbage-collect the only tape backing the newly pinned role. Unit tests originally did not cover concurrent independent library instances.
+
+Updated implementation uses a **single IndexedDB `readwrite` transaction spanning `courses` and `tapes`** for every save, Favorite and role-toggle mutation. The transaction re-reads authoritative course/tape records, checks global run ID and exact course identity, updates the role, and atomically checks all course references before collecting displaced tapes. Any abort (including quota) returns `null` and does not falsely claim durable success; the memory-only backend retains existing semantics. The renderer and Game Over role panel refresh course metadata from IDB rather than trusting stale tab snapshots, and direct tape reads check IDB rather than stale local cache. No new schema, direct upload, score, physics, or archive pricing.
+
+Real Chromium IDB regression across **two independently initialized tabs** covers duplicate same-ID cross-course saves (exactly one allowed), simultaneous Favorite versus Latest (both survive, pinned tape retained), simultaneous visibility toggle versus another Favorite (both survive), and stale Game Over panel refresh. Existing foreign-course/corrupt-role behavior is also checked after actual database reopen. No mutating HTTP and zero page errors.
+
+Temporary replay-test file creation exhausted `/tmp` **inodes** despite free bytes; tests passed when `TMPDIR` was redirected to disk-backed workspace scratch. No unrelated files were deleted. Independent paid Codex review intentionally not used; remaining source review is performed directly and through standard CI. This patch still does not complete #56's undetermined course-library capacity and pricing acceptance.

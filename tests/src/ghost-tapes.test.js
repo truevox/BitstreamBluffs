@@ -99,6 +99,50 @@ describe('ghost library', () => {
     expect(await lib.getTape('run-1')).not.toBeNull(); // pinned favorites are never collected
   });
 
+  test('P1: favorite selector refuses foreign seed and biome course tapes',async()=>{
+    const lib=new GhostLibrary();
+    const local=recordTape(80,()=>pad(),{id:'native',seed:'S1',biomeMask:0});
+    const wrongSeed=recordTape(80,()=>pad(),{id:'other-seed',seed:'S2',biomeMask:0});
+    const wrongMask=recordTape(80,()=>pad(),{id:'other-mask',seed:'S1',biomeMask:7});
+    for(const tape of [local,wrongSeed,wrongMask])await lib.saveRun(tape);
+    expect(await lib.setFavorite('S1',0,0,wrongSeed.runId)).toBeNull();
+    expect(await lib.setFavorite('S1',0,1,wrongMask.runId)).toBeNull();
+    expect(lib.course('S1',0).favorites).toEqual([null,null,null]);
+    expect(await lib.setFavorite('S1',0,2,local.runId)).not.toBeNull();
+    expect((await lib.ghostsFor('S1',0)).map(x=>x.runId)).toEqual([local.runId]);
+  });
+
+  test('P1: stored corrupted foreign course references never draw in original course',async()=>{
+    const lib=new GhostLibrary();
+    const local=recordTape(80,()=>pad(),{id:'native',seed:'S1',biomeMask:0});
+    const foreign=recordTape(80,()=>pad(),{id:'foreign',seed:'S2',biomeMask:0});
+    await lib.saveRun(local);await lib.saveRun(foreign);
+    lib.course('S1',0).favorites[1]=foreign.runId; // simulated stale/corrupt IDB role
+    expect((await lib.ghostsFor('S1',0)).map(x=>x.runId)).toEqual([local.runId]);
+    expect((await lib.ghostsFor('S1',0,{}, {simRevision:local.simRevision})).map(x=>x.runId))
+      .toEqual([local.runId]);
+  });
+
+  test('P1: a duplicate run ID from another course cannot overwrite the first saved tape',async()=>{
+    const lib=new GhostLibrary();
+    const original=recordTape(80,()=>pad(),{id:'same',seed:'S1',biomeMask:0,distanceM:100});
+    const foreign=recordTape(80,()=>pad(),{id:'same',seed:'S2',biomeMask:1,distanceM:9999});
+    await lib.saveRun(original);
+    expect(await lib.saveRun(foreign)).toBeNull();
+    expect(lib.course('S2',1)).toBeNull();
+    expect(await lib.getTape(original.runId)).toEqual(original);
+    expect((await lib.ghostsFor('S1',0)).map(x=>x.runId)).toEqual([original.runId]);
+  });
+
+  test('P2: only the five known role switches can mutate course preferences',async()=>{
+    const lib=new GhostLibrary();
+    await lib.saveRun(recordTape(80,()=>pad(),{id:'same'}));
+    expect(await lib.setShow('S1',0,'fav3',false)).toBeNull();
+    expect(await lib.setShow('S1',0,'__proto__',false)).toBeNull();
+    expect(lib.course('S1',0).show).toBeUndefined();
+    expect(await lib.setShow('S1',0,'fav2',false)).not.toBeNull();
+  });
+
   test('different seeds or biome masks are different courses; Gym runs are never stored', async () => {
     const lib = new GhostLibrary();
     await lib.saveRun(recordTape(80, () => pad(), { id: 1, biomeMask: 3 }));
