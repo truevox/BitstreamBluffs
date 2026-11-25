@@ -16,3 +16,6 @@ The import inspector rejects files above the canonical 16 MiB limit **before has
 ## Post-commit protection-status failure
 
 Once `importBundle()` commits canonical bytes successfully, a later IndexedDB failure while checking cross-tab protection count must **not** report the import itself as failed. The action returns `ok:true`, `protectionCount:null`, `alreadyProtected:null` and the explicit `PIN STATUS UNKNOWN` warning. It never silently substitutes cached counts. A negative test injects failure only in that post-commit lookup and verifies the imported bytes remain persisted and independently retrievable. All imports remain local and unverified.
+
+
+A false result from an IndexedDB post-import durability probe is ambiguous: it may mean missing bytes **or** a failed read. After a successful IDB commit, the action conservatively returns `localDurable:null` and `alreadyProtected:null`/`protectionCount:null`, never falsely announcing zero pins. A verified memory-only backend reports `localDurable:false`; when the tab previously had durable storage, its pin count still remains unknown until reconnected. Regression tests inject the ambiguous read after an existing pin.

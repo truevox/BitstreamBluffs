@@ -155,6 +155,20 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest())).toBe(true);
   });
 
+  test('failed durability probe after successful import reports unknown pin status',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const preserved=await store.put(bundle(),{runId:'known-source'});
+    await store.protect(preserved,{runId:'known-source',role:'pinned'});
+    const original=store.isBundleDurable;
+    store.isBundleDurable=async()=>false; // read errors are represented by false
+    const result=await new LocalEvidenceActions(store).import(bytes(),{expectedDigest:digest()});
+    expect(result).toMatchObject({ok:true,digest:digest(),localDurable:null,
+      protectionCount:null,alreadyProtected:null,newlyProtected:false,publicRankEligible:false});
+    expect(result.status).toContain('PIN STATUS UNKNOWN');
+    store.isBundleDurable=original;
+    expect(await store.persistedProtectedCount(digest())).toBe(1);
+  });
+
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
     const memory=await new EvidenceStore({idb:null,storage:null}).init();
     const action=new LocalEvidenceActions(memory);

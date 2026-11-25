@@ -81,13 +81,21 @@ export class LocalEvidenceActions {
     const inspection=this.inspectImport(bytes,{expectedDigest});
     if (!inspection.ok) throw new EvidenceStoreError(inspection.code,inspection.location);
     const digest=await this.store.importBundle(bytes,{expectedDigest}); // no forged original run ID
-    const localDurable = await this.store.isBundleDurable(digest);
-    // A second browser tab may have pinned/unpinned after this Store was
-    // opened. The persisted references, not the cached Map, are authoritative.
-    let protectionCount = localDurable ? null : 0;
-    if (localDurable) {
+    // IndexedDB may have committed but closed before the following read.
+    // `isBundleDurable` returns false for both a missing row AND a failed
+    // read. Never convert that ambiguity into "zero existing pins".
+    let durabilityProbe = null;
+    try { durabilityProbe=await this.store.isBundleDurable(digest); }
+    catch { /* committed import stays successful; state needs recheck */ }
+    const localDurable = durabilityProbe === true ? true
+      : this.store.backend === 'idb' ? null : false;
+    // A second browser tab may have pinned/unpinned after this Store opened.
+    // An unavailable/closed database cannot establish a zero pin count.
+    let protectionCount = localDurable === true ? null
+      : this.store.backend === 'memory' && !this.store._everDurable ? 0 : null;
+    if (localDurable === true) {
       try { protectionCount=await this.store.persistedProtectedCount(digest); }
-      catch { /* archive bytes committed; optional pin lookup cannot undo import */ }
+      catch { /* optional status lookup cannot undo a completed import */ }
     }
     return freeze({ok:true,digest,inspection,localDurable,
       newlyProtected:false,protectionCount,
