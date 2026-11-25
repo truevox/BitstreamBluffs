@@ -148,6 +148,24 @@ try {
  assert(rejectionDuringReconcile.details.includes('EXPORT RUN NOW'));
  assert(rejectionDuringReconcile.exportEnabled && rejectionDuringReconcile.keepDisabled);
  record('failed Import reconciliation retains the selected-file rejection and run storage warning');
+ const rejectionWhileSaving=await p.evaluate(async()=>{
+  const {view}=window.__qaEvidence;
+  const originalCapture=view._captureStatus.bind(view);
+  view._captureStatus=()=>null;
+  try{
+    await view._run(async()=>{
+      view._reconcileRequested=true;
+      throw Object.assign(new Error('file checksum differs'),{code:'digest-mismatch'});
+    });
+    return {status:view.status.main.text,details:view.detail.main.text,
+      keepDisabled:view.buttons[0].disabled,exportDisabled:view.buttons[1].disabled};
+  }finally{view._captureStatus=originalCapture;await view._refresh({retryPending:false});}
+ });
+ assert(rejectionWhileSaving.status.includes('LOCAL ARCHIVE ERROR'));
+ assert(rejectionWhileSaving.details.includes('digest-mismatch'));
+ assert(rejectionWhileSaving.details.includes('REFRESH AFTER SAVE'));
+ assert(rejectionWhileSaving.keepDisabled && rejectionWhileSaving.exportDisabled);
+ record('rejected import while run still saving preserves Refresh-after-save guidance');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();

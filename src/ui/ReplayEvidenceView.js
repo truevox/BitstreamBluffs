@@ -16,7 +16,8 @@ import { digestFromLocalReplayFilename, currentRunEvidence } from '../systems/re
 const statusText = err => err?.code || err?.message || String(err || 'UNKNOWN');
 const shortArchiveWarning = warning => {
   const unbound=warning.includes('RUN ID') || warning.includes('RUN BINDING') || warning.includes('RECOVERED BYTES');
-  return unbound?'RUN UNBOUND; EXPORT ONLY':
+  return warning.includes('NOT READY') || warning.includes('SELECT REFRESH')?'REFRESH AFTER SAVE':
+    unbound?'RUN UNBOUND; EXPORT ONLY':
     warning.includes('EXPORT NOW')?'EXPORT RUN NOW':
     warning.includes('EXPORT ONLY')?'EXPORT ONLY; UNVERIFIED':
     warning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
@@ -220,7 +221,7 @@ export class ReplayEvidenceView extends View {
           }else if(actionError){
             // The selected file may have failed digest/grammar admission.
             // Never overwrite that rejection with a separate run's warning.
-            this._show('LOCAL ARCHIVE ERROR',`${actionError}; ${shortArchiveWarning(this.status.main.text)}`);
+            this._show('LOCAL ARCHIVE ERROR',`${actionError}; ${shortArchiveWarning(`${this.status.main.text} ${this.detail.main.text}`)}`);
           }else if(keepOriginal){
             // Preserving a selected file is more urgent than the current-run
             // archive read, but show BOTH warnings, not stale success.
