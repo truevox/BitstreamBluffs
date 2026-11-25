@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 21:07 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
+Last verified: 2026-11-25 22:46 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -68,9 +68,8 @@ means resume this queue, not take over another lane or merge a draft.
    identity `45429825825` green; only old-head review observed. Exact-head source review now nonblocking in scope; release gate unchanged.
    Independent exact test blob overlay on shipped v2.20.2 again passed
    159/159 across the same five suites; #320 has no test-file overlap.
-2. #168: all 17 remaining issues rechecked on v2.22.3; four of the
-   original 21 closed. All four Morgan draft heads have green checks but
-   no release approval. Exact-head review outcomes above. Keep checking source for actual dependency movement.
+2. #168: all 21 original issues rechecked Nov 25 on v2.22.7; four closed,
+   17 open. No Morgan draft holds release approval. Keep checking source for actual dependency movement.
    [#338](https://github.com/truevox/BitstreamBluffs/pull/338) / #78 is now
    an open two-file developer-only draft at `0accd2786ef7971346ec311285021bd8a56e288a`,
    branch `morgan/issue-78-crash-brief-chain-smoke`, pinned to `044ebd4b`.
@@ -81,28 +80,16 @@ means resume this queue, not take over another lane or merge a draft.
    0/2, identity, build and 81 focused Jest tests passed. [Updated Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/338#issuecomment-7174428665).
    Exact-head [identity CI](https://github.com/truevox/BitstreamBluffs/actions/runs/45699867541) green;
    still waiting for fresh review. No player data or runtime change.
-   #79 replay annotation QA (independent prior slice):
-   Exact public normal v2.20.2 entry and shipped SIM9 identity: four
-   fresh Chromium contexts, positive record+replay and cutoff record+replay.
-   Existing opt-in conformance helper, CE120-BUMP3/reckless/hopEvery400,
-   rngSeed9, 120 Hz. Natural matching non-negated terrain fatal tick937
-   (153m); all 7 checks and 234 f32 pose triplets match, last pose tick936
-   2.592px from fatal XY. Cutoff tick464 has a crash header but no fatal
-   on either capture or replay through 465 (3 checks, 116 f32 poses match).
-   Positive tape SHA-256 `fb1732519d3642b869a346a4d0360b0ddbaa9054d301cdc8452572d37db29b6f`;
-   cutoff `1d0b806d064d6c37119bba12884ca1dffa06d6dde3b4f6ae6c8f2bde6d06ddbe`.
-   Scratch-only UI A/B now shows separate terrain detail at tick937,
-   X3121.909/Y1054.085, only for the independently replayed exact tape.
-   +8px first-pose mutation still passes all 7 causal checkpoints and hits
-   the same fatal, but fails exact Float32 comparison and receives no note.
-   Header-only cutoff, copied receipt, wrong entry URL/index/module,
-   clearing and delayed file hash after replacement all fail closed.
-   Byte-identical strip preview, SVG download and Run DNA art for each
-   accepted input; local inspector had zero outbound requests or errors.
-   This is a scripted fixture-only QA bridge, not provenance for player
-   files, an importable receipt, or product code. If review-ready proof
-   is needed, package a pinned developer-QA recipe without runtime claims;
-   otherwise move to the next unblocked slice rather than repeating this.
+   **#79 / [#381](https://github.com/truevox/BitstreamBluffs/pull/381)** independent
+   developer-only terrain-marker witness draft, `morgan/issue-79-fatal-event-witness`
+   @ `630e040e258da45bc3e2a3611d38604890558039` on v2.22.7. Pinned HTML/module
+   in five fresh Chromium contexts, scripted fixture: fatal tick 937, final
+   recorded pose 936 (gap 2.592px), 234 Float32 pose triples and 7 checkpoints
+   match. Pose-only edit leaves replay/event equal yet refuses marker;
+   header-only cutoff stays nonfatal through tick465 and matches 3 checks.
+   Wrong build refused before output; 40 tests, identity and 4,882 byte-identical
+   production files. [Gal exact-head review requested](https://github.com/truevox/BitstreamBluffs/pull/381#issuecomment-7176756268).
+   Separate from #345 and #338. No inspector change, player artifacts or release.
 3. **#126 / #341**: open five-file developer-only draft
    `morgan/issue-126-paired-fatigue-report` @ `a560cec88bc835877620e808dd30d270d70b2722`, based on
    `044ebd4b`. Opt-in comparator matches classic/fatigue by course, reaction
@@ -241,7 +228,8 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   sampled sim/score fixed. Wrong build refused before output; 17 tests,
   identity and all 4,882 production files byte-identical. Synthetic risk
   and counterfactual, not actual Pulp or a general fallback fix. Await
-  exact-head review. Future framing/look-ahead/Chromebook gates open.
+  exact-head review; CI identity 45701269653 and lifecycle 45701269468 green.
+  Future framing/look-ahead/Chromebook gates open.
 - #350 closed #30: existing AirBrake doubles as ground brake; no binding,
   physics, replay change. Tricks Right A, Tricks Left ←, Classic ↑ or S on
   ground, gamepad X or B on ground, touch existing AirBrake. Public README
