@@ -522,6 +522,48 @@ describe('protected local evidence references (#244)', () => {
     expect(store.backend).toBe('idb');
   });
 
+  test('archive-only import succeeds when a pending run claim conflicts with another tab',async()=>{
+    const idb=fakeIdb();
+    const first=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('disk offline');
+    await expect(first.put(bundle(),{runId:'pending-run-A'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await other.put(bundle(),{runId:'persisted-run-B'});
+    const imported=await first.importBundle(bundleBytes(bundle()),{expectedDigest:digest});
+    expect(imported).toBe(digest);
+    expect(await first.isBundleDurable(digest)).toBe(true);
+    expect(first.pendingMeta.get(digest).runId).toBe('pending-run-A');
+    expect((await new EvidenceStore({idb,storage:null}).init()).index.get(digest).runId).toBe('persisted-run-B');
+  });
+
+  test('durability read errors are caught and failed init closes the opened connection',async()=>{
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await store.put(bundle(),{runId:RUN});
+    idb.hooks.failGet=new Error('read request denied');
+    expect(await store.isBundleDurable(digest)).toBe(false);
+    idb.hooks.failGet=null;
+    idb.hooks.failGetAll=new Error('initial snapshot broken');
+    const next=await new EvidenceStore({idb,storage:null}).init();
+    expect(next.backend).toBe('memory');
+    expect(idb.hooks.closeCount).toBeGreaterThan(0);
+  });
+
+  test('persisted count is part of the committing protection transaction',async()=>{
+    const {store,digest,idb}=await seededStore();
+    const before=await store.persistedProtectedCount(digest);
+    expect(before).toBe(0);
+    const held=await store.protect(digest,{runId:RUN,role:'pinned'});
+    expect(held.count).toBe(1);
+    idb.hooks.failGetAll=new Error('subsequent reads denied');
+    // The committed role was already reported; a later failed count read
+    // cannot retroactively report the successful pin as a failed operation.
+    expect(held.durable).toBe(true);
+    idb.hooks.failGetAll=null;
+    expect(await store.persistedProtectedCount(digest)).toBe(1);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

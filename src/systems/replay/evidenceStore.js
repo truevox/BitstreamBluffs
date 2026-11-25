@@ -88,6 +88,7 @@ export class EvidenceStore {
 
   /** Open the database and load the index (not the bundles). Never rejects; check `backend`/`durable` afterwards. */
   async init() {
+    let openedDb = null;
     try {
       if (this._idb) {
         const db = await new Promise((resolve, reject) => {
@@ -113,6 +114,7 @@ export class EvidenceStore {
           req.onerror = () => refuse(req.error);
           req.onblocked = () => refuse(new Error('idb blocked'));
         });
+        openedDb = db;
         let connectionClosed = false;
         db.onversionchange = () => {
           connectionClosed = true;
@@ -163,6 +165,7 @@ export class EvidenceStore {
         this.backend = 'idb';
       }
     } catch (e) {
+      if (openedDb) { try { openedDb.close(); } catch { /* best effort */ } }
       this._db = null;
       this.backend = 'memory';
       this._report(new EvidenceStoreError('read-failed', 'IndexedDB unavailable; evidence is memory-only', e));
@@ -218,7 +221,7 @@ export class EvidenceStore {
     let digest;
     if (validated && validated.ok === true && typeof validated.bundleDigest === 'string') digest = validated.bundleDigest;
     else {
-      const res = validateEvidenceBundle(bytes, this.rulesetResolver);
+      const res = validateEvidenceBundle(bytes, meta.archiveOnly === true ? null : this.rulesetResolver);
       if (!res.ok) throw new EvidenceStoreError('invalid-bundle', `${res.code} at ${res.pointer}`, res);
       digest = res.bundleDigest;
     }
@@ -232,14 +235,14 @@ export class EvidenceStore {
     const pendingClaim = this.pendingMeta.get(digest);
     if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
-    const requestedRunId = meta.runId || pendingClaim?.runId ||
+    const requestedRunId = meta.archiveOnly === true ? null : meta.runId || pendingClaim?.runId ||
       (!this._db ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
       this.index.set(digest, record);
       this.pending.set(digest, bytes);
-      this.pendingMeta.set(digest, record);
+      if (!meta.archiveOnly || !this.pendingMeta.has(digest)) this.pendingMeta.set(digest, record);
       return digest;
     }
     try {
@@ -310,15 +313,14 @@ export class EvidenceStore {
    * Recheck the persisted row/bytes in a single readonly transaction.
    */
   async isBundleDurable(digest) {
-    if (!this._db || this.pending.has(digest)) return false;
+    if (!this._db) return false;
     try {
       const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
-      const done=txDone(tx);
       const [idx,bundle]=await Promise.all([
         req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
         req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
+        txDone(tx),
       ]);
-      await done;
       return Boolean(idx && bundle?.bytes && idx.digest===digest && digestOfBytes(bundle.bytes)===digest);
     } catch { return false; }
   }
@@ -358,7 +360,7 @@ export class EvidenceStore {
     if (typeof expectedDigest !== 'string' || !expectedDigest) throw new EvidenceStoreError('digest-required', 'importBundle needs the expected bundle digest');
     const actual = bundleDigest(bytes);
     if (expectedDigest !== actual) throw new EvidenceStoreError('digest-mismatch', `expected ${expectedDigest}, got ${actual}`);
-    return this.put(bytes, { runId });
+    return runId === undefined ? this.put(bytes, {archiveOnly:true}) : this.put(bytes, {runId});
   }
 
   /** Durable protected evidence refs, independent of ghost display roles and cosmetic trace retention. */
@@ -368,7 +370,7 @@ export class EvidenceStore {
   protectedCount(digest) { return [...this.protections.values()].filter(r => r.digest === digest).length; }
 
   /** Authoritative persisted reference count; never trust another tab's cached list. */
-  async persistedProtectedCount(digest) {
+  async persistedProtections(digest = null) {
     if (!this._db) throw protectionError('not-durable', 'cannot verify retained roles in memory-only storage');
     try {
       const tx=this._db.transaction(EVIDENCE_REFS,'readonly');
@@ -376,9 +378,13 @@ export class EvidenceStore {
         req2p(tx.objectStore(EVIDENCE_REFS).getAll()),
         txDone(tx),
       ]);
-      return refs.filter(ref=>ref.digest===digest).length;
+      // Reconcile the in-memory snapshot only after the read completes.
+      this.protections=new Map(refs.map(ref=>[ref.key,ref]));
+      return refs.filter(ref=>digest===null||ref.digest===digest).map(ref=>({...ref}));
     } catch(e) { throw new EvidenceStoreError('read-failed','could not read persisted protected roles',e); }
   }
+
+  async persistedProtectedCount(digest) { return (await this.persistedProtections(digest)).length; }
 
   /**
    * Protect one ALREADY DURABLE canonical evidence bundle under a local role.
@@ -406,6 +412,7 @@ export class EvidenceStore {
     const tx = this._db.transaction([EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
     const done = txDone(tx);
     let problem = null;
+    let committedCount = 0;
     const current = tx.objectStore(EVIDENCE_INDEX).get(digest);
     current.onsuccess = () => {
       if (!current.result || current.result.runId !== runId) {
@@ -417,7 +424,13 @@ export class EvidenceStore {
           problem = protectionError('protection-conflict', 'same run/course/role already protects different evidence');
           tx.abort(); return;
         }
-        tx.objectStore(EVIDENCE_REFS).put(ref);
+        const all=tx.objectStore(EVIDENCE_REFS).getAll();
+        all.onsuccess=()=>{
+          // Compute the count in the SAME transaction as the committed put.
+          // A later read could fail after commit and falsely report failure.
+          committedCount=(all.result||[]).filter(r=>r.digest===digest).length + (existing.result?0:1);
+          tx.objectStore(EVIDENCE_REFS).put(ref);
+        };
       };
     };
     try { await done; }
@@ -426,7 +439,7 @@ export class EvidenceStore {
       this._report(err); throw err;
     }
     this.protections.set(key, ref);
-    return { ...ref, durable: true, count: await this.persistedProtectedCount(digest) };
+    return { ...ref, durable: true, count: committedCount };
   }
 
   /** Explicit release of one role; the canonical bytes remain archived until a separate explicit remove. */

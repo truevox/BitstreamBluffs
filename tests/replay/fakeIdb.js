@@ -5,7 +5,7 @@ const clone = v => (ArrayBuffer.isView(v) ? Uint8Array.from(v) : Array.isArray(v
 /** Small IDB mock supporting version upgrades, readwrite transaction rollback, and fault injection. */
 export function fakeIdb() {
   const dbs = new Map();
-  const hooks = { failPut: null, failDelete: null, failGetAll: null, onTransaction: null };
+  const hooks = { failPut: null, failDelete: null, failGetAll: null, failGet: null, closeCount: 0, onTransaction: null };
   const later = fn => Promise.resolve().then(fn);
   // Serialize ALL transactions for this test mock, a conservative subset of
   // browser IDB's overlapping-store readwrite lock guarantees. Queued txs
@@ -59,7 +59,7 @@ export function fakeIdb() {
         put: v => track(() => { const failure = typeof hooks.failPut === 'function' ? hooks.failPut(v) : hooks.failPut;
           if (mode === 'readwrite' && failure) throw failure;
           rows().set(v[model.keyPath],clone(v)); return v[model.keyPath]; }),
-        get: k => track(() => rows().has(k) ? clone(rows().get(k)) : undefined),
+        get: k => track(() => { if(hooks.failGet)throw hooks.failGet; return rows().has(k) ? clone(rows().get(k)) : undefined; }),
         getAll: () => track(() => { if (hooks.failGetAll) throw hooks.failGetAll; return [...rows().values()].map(clone); }),
         delete: k => track(() => { if (mode === 'readwrite' && hooks.failDelete) throw hooks.failDelete; rows().delete(k); }),
       };
@@ -93,7 +93,7 @@ export function fakeIdb() {
               db.stores.set(n,{keyPath,rows:new Map()});
             },
             transaction: (n,mode) => makeTx(db,[].concat(n),mode),
-            close: () => {},
+            close: () => {hooks.closeCount++;},
           };
           req.result = handle;
           if (version > db.version) { req.oldVersion = db.version; req.newVersion = version; req.onupgradeneeded?.(); db.version = version; }
