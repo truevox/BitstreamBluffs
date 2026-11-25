@@ -44,6 +44,23 @@ try {
  });
  assert.equal(unpin.count,0);assert.equal(unpin.label,'KEEP');
  results.push('explicit Keep/Unpin changes durable IndexedDB reference');
+ const foreignPin=await p.evaluate(async()=>{
+  const {view,store,digest}=window.__qaEvidence;
+  const {EvidenceStore}=await import('/src/systems/replay/evidenceStore.js');
+  const tab=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+  const held=await tab.protect(digest,{runId:'ui-smoke-run',role:'pinned'});
+  const cachedBefore=store.protectedCount(digest);
+  await view._refresh();
+  const afterPin=view.buttons[0].label.main.text;
+  await tab.unprotect(held.key);
+  await view._refresh();
+  return {cachedBefore,afterPin,afterUnpin:view.buttons[0].label.main.text};
+ });
+ assert.equal(foreignPin.cachedBefore,0);
+ assert.equal(foreignPin.afterPin,'UNPIN');
+ assert.equal(foreignPin.afterUnpin,'KEEP');
+ results.push('Refresh follows persisted pin/unpin from another browser tab');
+
  // Browser download must be triggered only when Export is explicitly clicked.
  const downloadPromise=p.waitForEvent('download',{timeout:15000});
  await p.evaluate(()=>window.__qaEvidence.view._export());
@@ -63,6 +80,9 @@ try {
  await chooser.setFiles({name:download.suggestedFilename(),mimeType:'application/octet-stream',buffer:exported});
  await p.waitForFunction(()=>window.__qaEvidence.view.status.main.text.includes('UNVERIFIED'),{timeout:15000});
  const imported=await p.evaluate(()=>({msg:window.__qaEvidence.view.status.main.text,count:window.__qaEvidence.store.protectedCount(window.__qaEvidence.digest)}));
+ const nativeFocus=await p.evaluate(()=>document.activeElement?.getAttribute('data-role'));
+ assert.notEqual(nativeFocus,'replay-evidence-import');
+ results.push('native picker returns keyboard focus to game after selecting a file');
  assert(imported.msg.includes('UNVERIFIED'));
  assert.equal(imported.count,0);
  results.push('explicit file picker imports local-only data, stays unverified/unpinned');
@@ -73,6 +93,17 @@ try {
  });
  assert.equal(stale,null);
  results.push('stale prior-run capture cannot be pinned as current run');
+ const busyInput=await p.evaluate(async()=>{
+  const {view}=window.__qaEvidence;
+  let release;
+  const task=view._run(()=>new Promise(resolve=>{release=resolve;}));
+  const blocked=view._nativeInput?.disabled===true;
+  release();await task;
+  return {blocked,reEnabled:view._nativeInput?.disabled===false};
+ });
+ assert(busyInput.blocked && busyInput.reEnabled);
+ results.push('native picker is disabled during in-flight archive operations');
+
  const memory=await p.evaluate(async()=>{
   const {view,store,scene,statusKey}=window.__qaEvidence;
   const {evidenceBundle,legacyManifestFromTape,bundleDigest}=await import('/src/systems/replay/manifest.js');
