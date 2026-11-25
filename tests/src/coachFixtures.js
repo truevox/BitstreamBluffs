@@ -36,3 +36,6 @@ export function standardTape(extra = {}) {
     ...extra,
   });
 }
+
+/** Words the coach must never use: it never claims its search is optimal or exhaustive. */
+export const BANNED = /optimal|best possible|only way|guaranteed/i;
