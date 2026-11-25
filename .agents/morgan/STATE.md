@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 20:58 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
+Last verified: 2026-11-25 21:07 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -79,7 +79,8 @@ means resume this queue, not take over another lane or merge a draft.
    per-tick state and no drops/desync or saves; then refused at crash-brief
    gate with exit 1 and empty stdout. No tick465 proof claimed. Comparator
    0/2, identity, build and 81 focused Jest tests passed. [Updated Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/338#issuecomment-7174428665).
-   No player data or runtime change; stay draft.
+   Exact-head [identity CI](https://github.com/truevox/BitstreamBluffs/actions/runs/45699867541) green;
+   still waiting for fresh review. No player data or runtime change.
    #79 replay annotation QA (independent prior slice):
    Exact public normal v2.20.2 entry and shipped SIM9 identity: four
    fresh Chromium contexts, positive record+replay and cutoff record+replay.
@@ -229,15 +230,18 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
-- #155 Pulp preflight: compiled v2.22.7/SIM9 in two fresh Chromium contexts,
+- **#155 / [#375](https://github.com/truevox/BitstreamBluffs/pull/375)** developer-only camera-roll diagnostic draft
+  `morgan/issue-155-roll-cue-diagnostic` @ `cee33cb87b112183fb71830bede064bc07190ab7`.
+  [Exact Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/375#issuecomment-7174625843). compiled v2.22.7/SIM9 in two fresh Chromium contexts,
   `main-CnvlsBaW.js` SHA256 `c733706b6fe810c335ac3966b009a16ed34bc84409db4a739b3543d0b985f41c`.
-  Scratch adaptation of hop-cue harness: freeze `sim-11` tick120, stable
-  synthetic hazard, zoom1, world cx mapped x468, high/low y36/230.
-  0° triangle right x476.25; +6° high x485.30 and −6° low x484.89,
-  cue pixels 130→97 and 139→113. All selected column; warn 800 ms,
-  hop 1000 ms, sampled sim/score fixed. Synthetic future risk, not live
-  bug. In a future roll pilot require projected cue bounds, visible fallback
-  and full causal plus Chromebook performance gates.
+  Six arms: freeze sim-11 tick120, fixed synthetic hazard, zoom1, rider
+  onscreen. Level triangle edge x476.25; +6° high x485.30 and −6° low
+  x481.23 clip columns. Same marked hazard/framing with forced existing
+  badge gives x464.43/x467.72 with visible pixels. Warn 800 ms, hop 1000 ms,
+  sampled sim/score fixed. Wrong build refused before output; 17 tests,
+  identity and all 4,882 production files byte-identical. Synthetic risk
+  and counterfactual, not actual Pulp or a general fallback fix. Await
+  exact-head review. Future framing/look-ahead/Chromebook gates open.
 - #350 closed #30: existing AirBrake doubles as ground brake; no binding,
   physics, replay change. Tricks Right A, Tricks Left ←, Classic ↑ or S on
   ground, gamepad X or B on ground, touch existing AirBrake. Public README
