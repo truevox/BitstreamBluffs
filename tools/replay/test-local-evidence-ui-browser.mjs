@@ -60,6 +60,37 @@ try {
  assert.equal(foreignPin.afterPin,'UNPIN');
  assert.equal(foreignPin.afterUnpin,'KEEP');
  results.push('Refresh follows persisted pin/unpin from another browser tab');
+ const failedRefs=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const original=store.persistedProtections;
+  store.persistedProtections=async()=>{throw new Error('test: protection index temporarily unavailable');};
+  try {
+    await view._refresh();
+    return {exportEnabled:view.buttons[1].disabled===false,
+      keepDisabled:view.buttons[0].disabled===true,
+      status:view.status.main.text};
+  } finally {store.persistedProtections=original;await view._refresh();}
+ });
+ assert(failedRefs.exportEnabled && failedRefs.keepDisabled && failedRefs.status.includes('EXPORT WORKS'));
+ results.push('verified bundle remains exportable when pin index lookup fails');
+
+ const staleRefresh=await p.evaluate(async()=>{
+  const {view,store,digest}=window.__qaEvidence;
+  const original=store.get.bind(store);
+  let signal,release;
+  const started=new Promise(resolve=>{signal=resolve;});
+  store.get=()=>{signal();return new Promise(resolve=>{release=async()=>resolve(await original(digest));});};
+  try{
+    const refreshing=view._refresh();
+    await started;
+    await view._run(async()=>{view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','RECENT USER ACTION');});
+    await release();await refreshing;
+    return {status:view.status.main.text,detail:view.detail.main.text};
+  }finally{store.get=original;await view._refresh();}
+ });
+ assert(staleRefresh.status.includes('IMPORTED LOCAL EVIDENCE'));
+ results.push('late Refresh result cannot overwrite newer Import action feedback');
+
 
  // Browser download must be triggered only when Export is explicitly clicked.
  const downloadPromise=p.waitForEvent('download',{timeout:15000});
@@ -157,6 +188,21 @@ try {
  },tape);
  assert(navigation.ghostOpen && navigation.archiveFocused && navigation.evidenceOpen && navigation.ghostReturned && navigation.closed && navigation.nativeInputsAfterClose===0);
  results.push('GameOver Ghost Favorites → Local Evidence → Ghost Favorites/close navigation');
+ await p.evaluate(async()=>{
+  const {ReplayEvidenceView}=await import('/src/ui/ReplayEvidenceView.js');
+  const {scene}=window.__qaEvidence;
+  const view=new ReplayEvidenceView(scene,scene.theme,{tape:{runId:'ui-smoke-run'},onClose:()=>view.destroy()});
+  window.__qaEscapeView=view;
+ });
+ const escapeInput=p.locator('input[data-role="replay-evidence-import"]');
+ await escapeInput.focus();
+ assert.equal(await escapeInput.evaluate(e=>document.activeElement===e),true);
+ await p.keyboard.press('Escape');
+ const esc=await p.evaluate(()=>({alive:window.__qaEscapeView.alive,
+   remaining:document.querySelectorAll('input[data-role="replay-evidence-import"]').length}));
+ assert(!esc.alive && esc.remaining===0);
+ results.push('Escape from focused native input closes panel and cleans up DOM');
+
  assert.deepEqual(errors,[]);
  await p.screenshot({path:'/tmp/bsb244-local-evidence-ui-browser.png'});
  console.log(JSON.stringify({format:'bsb-244-real-phaser-local-ui',checks:results.length,results,downloadBytes:exported.length,noUpload:true,errors,localURL:url},null,2));

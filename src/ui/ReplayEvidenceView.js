@@ -26,6 +26,7 @@ export class ReplayEvidenceView extends View {
     this.focus=0;
     this.actions=null;
     this.pinReady=false;
+    this._operationVersion=0; // reject stale async refresh after a user action
     const text=(x,y,v,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,v,{color,outline:'none'}));
     text(12,24,'PRIVATE TO THIS DEVICE. NEVER UPLOADED.','cyan');
     text(12,38,'A CHECKSUM DOES NOT PROVE WHO PLAYED.','amber');
@@ -79,6 +80,8 @@ export class ReplayEvidenceView extends View {
 
   async _refresh() {
     if (this.busy || !this.alive) return;
+    const version=++this._operationVersion;
+    const live=()=>this.alive && version===this._operationVersion;
     this.pinReady=false;
     this.buttons[0].setDisabled(true);
     this.buttons[1].setDisabled(true);
@@ -95,13 +98,26 @@ export class ReplayEvidenceView extends View {
     this.digestText.setText(`SHA256: ${capture.digest.slice(7,31).toUpperCase()}...`);
     try {
       const control=await this._getActions();
+      if (!live() || this._captureStatus()!==status) return;
       const bytes=await control.store.get(capture.digest);
+      if (!live() || this._captureStatus()!==status) return;
       if (!bytes) throw new Error('canonical evidence bytes not available');
+      // Export only needs rehashed bytes; a broken reference-index read MUST
+      // NOT prevent someone from saving those bytes to their own file.
+      this.buttons[1].setDisabled(false);
       const persisted=await control.store.isBundleDurable(capture.digest);
-      const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
-      const held=refs.some(r=>r.runId===this.tape.runId && r.role==='pinned');
-      if (!this.alive || this._captureStatus()!==status) return;
-      this.buttons[1].setDisabled(false); // exact bytes exist, including session-only
+      if (!live() || this._captureStatus()!==status) return;
+      let held=false;
+      try {
+        const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
+        if (!live() || this._captureStatus()!==status) return;
+        held=refs.some(r=>r.runId===this.tape.runId && r.role==='pinned');
+      } catch (e) {
+        if (!live() || this._captureStatus()!==status) return;
+        this._show('PIN STATUS UNAVAILABLE — EXPORT WORKS',statusText(e));
+        // Keep/Unpin remain disabled; no guessed pin state from stale cache.
+        return;
+      }
       this.pinReady=status.ok===true && persisted;
       this.buttons[0].setDisabled(!this.pinReady);
       this.buttons[0].setLabel(held?'UNPIN':'KEEP');
@@ -109,12 +125,16 @@ export class ReplayEvidenceView extends View {
         `STILL IN SESSION MEMORY: ${status.code || 'STORAGE ERROR'}`);
       else this._show(held?'LOCAL EVIDENCE PINNED':persisted?'SAVED LOCALLY':'SESSION ONLY — EXPORT NOW',
         persisted?'CAN BE LOST IF BROWSER SITE DATA IS CLEARED':'DISK NOT CONFIRMED: EXPORT TO A FILE');
-    } catch(e) {this._show('ARCHIVE READ FAILED',statusText(e));}
+    } catch(e) {
+      if (live() && this._captureStatus()===status)
+        this._show('ARCHIVE READ FAILED',statusText(e));
+    }
   }
 
   async _run(task) {
     if (this.busy || !this.alive) return;
     this.busy=true;
+    this._operationVersion++; // supersede any in-flight Refresh result
     if(this._nativeInput)this._nativeInput.disabled=true;
     try{await task();}
     catch(e){this._show(`LOCAL ARCHIVE ERROR: ${statusText(e)}`);uiSfx(this.scene,'uiBack');}
@@ -184,6 +204,15 @@ export class ReplayEvidenceView extends View {
       this._processImportFile(file);
     };
     input.oncancel=()=>{this._restoreGameFocus();this._show('IMPORT CANCELLED');};
+    input.onkeydown=e=>{
+      // InputRouter intentionally ignores keys aimed at DOM inputs. Escape
+      // must still back out of the menu when a keyboard user tabs to Import.
+      if(e.key==='Escape'){
+        e.preventDefault();e.stopPropagation();
+        this._restoreGameFocus();
+        if(this.alive)this.close();
+      }
+    };
     document.body.appendChild(input);
     this._nativeInput=input;
     this._positionNativeInput=()=>{
@@ -225,7 +254,8 @@ export class ReplayEvidenceView extends View {
     const control=await this._getActions();
     const imported=await control.import(bytes,{expectedDigest});
     this._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED',
-      imported.localDurable?'SAVED ON DEVICE, NOT VERIFIED':'SESSION ONLY — EXPORT A COPY');
+      imported.protectionCount===null?'PIN STATUS UNKNOWN — REFRESH LATER':
+        imported.localDurable?'SAVED ON DEVICE, NOT VERIFIED':'SESSION ONLY — EXPORT A COPY');
   });}
 
   destroy() {
