@@ -34,3 +34,29 @@ Private read-only evidence:
 ## Boundaries
 
 No claim of uninterrupted full-song coverage, all 12 identities per song, live terrain-driven mixed events, real fatal four-beat count-in (separate earlier sampled evidence), full overlap/crossfade matrix, standardized calibrated true-peak compliance, device CPU performance or human mastering acceptance. The earlier near-zero headroom crossfade and candidate headroom results remain relevant. Next: expand first/last segment coverage and investigate worst overlap passages on current production before considering any mastering change. No auto-normalization; owner listening and independent review remain prerequisites for any production mix change. Keep #291 open; QA-only draft.
+
+## Opening and ending extension
+
+`QA_R2_PHASE=opening` and `QA_R2_PHASE=ending` select 33 cases each, rotating the same five high-risk identities by -1/+1 respectively versus middle. Opening begins at source frame zero; ending seeks to max(0, last segment frames - 168000), at 48 kHz. All seven decoded buffer lengths must exactly match manifest frames. The measured window [7680,184800) includes the true source ending and some native effect tail. Six last segments are shorter than 3.5s; these cases include the entire last segment, not the preceding segment, and some later stress events occur after the music ends. The independent verifier checks these bounds, phase assignment, exact end-of-song frame and published hashes, PCM window length, interpolator coverage and dB arithmetic. No artificial padding of source recordings.
+
+| Phase | Cases | Measured seconds | Worst estimated dBTP |
+|---|---:|---:|---:|
+| Opening | 33 | 121.77 | -2.492398 |
+| Middle | 33 | 120.45 | -1.455542 |
+| Ending | 33 | 121.77 | -0.534602 |
+| Total | 99 | 363.99 | -0.534602 |
+
+99/99 sampled cases completed with zero sample clips, estimated intersample overs, nonfinite samples or HTTP/browser errors. 693 source hash checks across the three matrices (not necessarily 693 unique assets); 34 published metadata identities independently verified per phase. 68/68 focused tests again passed. All three reports pass updated independent verifier.
+
+Five ending cases exceeded the engineering headroom target of -1 dBTP, but none exceeded unity:
+- local-one-more-run-bitstream-bluffs / Vertigo / segment 14: -0.534602
+- ehy7VzQezYA / Candy / segment 20: -0.555558
+- S9WQYIg8VzY / Garbage / segment 19: -0.569181
+- GMvUptcX0Vc / Vertigo / segment 15: -0.640824
+- 4ex2Owu8yGM / Vertigo / segment 15: -0.910079
+
+Do not interpret the sampled no-clipping verdict as a -1 dBTP headroom pass. Preserve approved mix; compare these cases and real crossfade overlaps before deciding on any master guard candidate. No production changes; no full-song or actual device certification.
+
+Additional private report SHA-256:
+- opening fa57cc46f7443c2cffc04bb190368fc9c7fca86ffca0acfec6b12b374c8e321e
+- ending 2c3331ba80fc7ea0bcb13f12abcc66f14d97504cb1e8bc9c587e21fd0bfd2754

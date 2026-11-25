@@ -11,8 +11,11 @@ if(!dest||existsSync(dest))throw Error('Unique REPORT_OUT required; no existing 
 const published=process.env.QA_R2==='1';
 const catalogUrl=published?'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json':'/music/catalog.json';
 const highRisk=['candy-cane-canyon','garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs'];
+const phase=process.env.QA_R2_PHASE||'middle';
+if(!['opening','middle','ending'].includes(phase)||(!published&&phase!=='middle'))throw Error('Invalid R2 phase');
+const position=['opening','middle','ending'].indexOf(phase);
 const publicScenarios=Array.from({length:33},(_,songIndex)=>({
-	songIndex,position:1,biome:highRisk[songIndex%highRisk.length],
+	songIndex,position,biome:highRisk[(songIndex+position+4)%highRisk.length],
 	scenario:'mixed-game-stress',profile:'crash-static-overlap',
 }));
 const allScenarios=published?publicScenarios:process.env.QA_EXTENDED==='1'?
@@ -38,7 +41,7 @@ const scenarios=overlap?
 if(!scenarios.length)throw Error('No source scenario selected');
 const results=[],errors=[],httpErrors=[];
 const report={format:'bitstream-sim8-original-mixed-output-4x-estimate-v1',
-	referenceUrl:base,catalogUrl,sourceMode:published?'pinned-public-r2':'local-private',startedAt:new Date().toISOString(),
+	referenceUrl:base,catalogUrl,sourceMode:published?'pinned-public-r2':'local-private',matrixPhase:published?phase:null,startedAt:new Date().toISOString(),
 	scenarios:results,method:'Actual AudioSynth._buildGraph, SFX/wind/static APIs, real original source stems, full post-compressor peak guard; cosmetic noise seeded to fixed 0x2912026 for repeatability; 48kHz OfflineAudioContext, 48-tap 4x intersample estimate',
 	limitations:[
 		'Scripted stress SFX event schedule; NOT actual terrain traversal or replay',
@@ -87,7 +90,7 @@ try{
 		console.log('MIXED_SOURCE_START',i+1,'/',scenarios.length,
 			song.title,task.biome,task.scenario,'segment',task.segment);
 		const r=await page.evaluate(args=>window.__mixedFinalAudioQA.render(args),{
-			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard',manifestUrl:published?song.manifestUrl:null});
+			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard',manifestUrl:published?song.manifestUrl:null,windowPosition:published&&phase!=='middle'?phase:'legacy'});
 		assert.equal(r.trackId,song.id);
 		if(published)assert.equal(r.sourceManifestUrl,song.manifestUrl);
 		assert.equal(r.productionGraph.productionPeakGuard,true);

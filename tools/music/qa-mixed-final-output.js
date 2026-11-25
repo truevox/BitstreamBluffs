@@ -96,7 +96,7 @@ function actualAudioSynthGraph(ctx){
 	a.nodes.sfxBus.gain.value=.9;
 	return a;
 }
-function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
+function setOriginalSourceMix(ctx,a,originals,{biome,mode,offsetFrames=0}){
 	const mixer=new StemFXMixer(ctx,a.nodes.musicFilter,{roomQuality:'standard'});
 	mixer.selectBiome(biome);
 	a._stemMusic.mixer=mixer;
@@ -117,23 +117,31 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
 		const playback=ctx.createBufferSource();
 		playback.buffer=source;
 		playback.connect(input);
-		playback.start(START);
+		playback.start(START,offsetFrames/RATE);
 	}
 	return mixer;
 }
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
-	profile='standard',manifestUrl=null}){
+	profile='standard',manifestUrl=null,windowPosition='legacy'}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
 		throw Error('Unknown QA scenario');
 	if(!['standard','crash-static-overlap'].includes(profile))throw Error('Invalid QA profile');
 	const original=await decodeOriginals(pack,segmentIndex,biome,manifestUrl);
+	if(!['legacy','opening','ending'].includes(windowPosition))throw Error('Invalid source window');
+	// Capture the exact final source frame inside the measured window;
+	// leave room after the source ends for the native effect tails.
+	const offsetFrames=windowPosition==='ending'?Math.max(0,original.segment.frames-Math.round(3.5*RATE)):0;
+	if(windowPosition!=='legacy'){
+		for(const source of original.sources.values())
+			if(source.length!==original.segment.frames)throw Error('Decoded source frame count mismatch');
+	}
 	const ctx=new OfflineAudioContext(2,Math.round(RENDER_SECONDS*RATE),RATE);
 	// Pin only the presentational wind/SFX noise for repeatable source QA.
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
 	seedCosmeticRandom(QA_COSMETIC_SEED);
 	const a=actualAudioSynthGraph(ctx);
 	const mixer=scenario==='sfx-wind-only'?null:setOriginalSourceMix(ctx,a,original,
-		{biome,mode:scenario});
+		{biome,mode:scenario,offsetFrames});
 	let installedAudioSources=original.roles.length;
 	if(scenario==='sfx-wind-only')installedAudioSources=0;
 	const sent=[];
@@ -169,12 +177,12 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	const rejected=eventResults.find(x=>x.status==='rejected');
 	if(rejected)throw rejected.reason;
 	const window=measureFourTimesTruePeak(pcm,{
-		startFrame:Math.floor(.20*RATE),
+		startFrame:Math.floor((windowPosition==='legacy'?.20:START)*RATE),
 		endFrame:Math.floor(3.85*RATE),
 	});
 	mixer?.destroy();
 	return {pack,trackId:original.manifest.id,sourceSegment:segmentIndex,
-		sourceFrameStart:original.segment.startFrame,sourceSegmentFrames:original.segment.frames,sourceManifestUrl:original.packBase+'pack.json',biome,scenario,
+		sourceFrameStart:original.segment.startFrame,sourceSegmentFrames:original.segment.frames,sourceOffsetFrames:offsetFrames,sourceWindowPosition:windowPosition,sourcePlaybackStartFrame:Math.round(START*RATE),sourceManifestUrl:original.packBase+'pack.json',biome,scenario,
 		sourceHashes:original.hashes,sourceRoles:original.roles,
 		originalSourceCount:installedAudioSources,
 		originalVocalFxAndRoomSendsFromPack:true,
@@ -190,7 +198,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 			// the original AudioSynth._buildGraph() above owns connections.
 			postCompressorGuardNodeActive:a.nodes.peakGuard?.numberOfOutputs===1,
 		},
-		test:{profile,qaCosmeticSeed:QA_COSMETIC_SEED,renderSeconds:RENDER_SECONDS,windowSeconds:3.65,sampleRate:RATE,
+		test:{profile,qaCosmeticSeed:QA_COSMETIC_SEED,renderSeconds:RENDER_SECONDS,windowSeconds:(window.windowEndFrame-window.windowStartFrame)/RATE,sampleRate:RATE,
 			master:1,music:scenario==='sfx-wind-only'?0:1,
 			sfx:scenario==='music-only'?0:1,wind:scenario==='music-only'?0:1,
 			originalVocals:true,originalMelodyWithVocalsGain:.18,
