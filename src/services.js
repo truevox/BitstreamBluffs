@@ -7,6 +7,8 @@ import { EVT } from './events.js';
 import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
 import { GhostLibrary } from './systems/ghost/GhostLibrary.js';
+import { AttemptHistory } from './systems/ghost/AttemptHistory.js';
+import { installAttemptHistory, ATTEMPT_HISTORY_KEY } from './systems/ghost/attemptHistoryService.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
@@ -28,6 +30,11 @@ export async function createServices(game) {
   await ghosts.init();
   game.registry.set(REG.GHOSTS, ghosts);
   const settings = saveStore.loadSettings();
+  // Issue #68: separate, local-only past-attempt traces for the Cemetery Montage. Never touches the ghost library.
+  const history = new AttemptHistory();
+  await history.init();
+  game.registry.set(ATTEMPT_HISTORY_KEY, history);
+  installAttemptHistory(game, history);
   game.registry.set(REG.SAVE_STORE, saveStore);
   game.registry.set(REG.SETTINGS, settings);
   game.registry.set(REG.CONTENT, loadContent());
@@ -79,3 +86,4 @@ export function updateSetting(game, key, value) {
   game.registry.get(REG.SAVE_STORE).saveSettings(settings);
   game.events.emit(EVT.SETTINGS_CHANGED, { key, value, settings });
 }
+

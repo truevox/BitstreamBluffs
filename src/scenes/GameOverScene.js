@@ -13,6 +13,7 @@
  * In the open shop (Marvin decision 7): Enter / pad A buy or equip the highlighted row once the shop is armed, Space /
  * pad RB (MenuInput 'retry') retry, Esc / pad B / B / LB close it, N / X / Y start a new seed.
  */
+import { ATTEMPT_HISTORY_KEY } from '../systems/ghost/attemptHistoryService.js';
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, SCORING } from '../constants.js';
 import { updateSetting } from '../services.js';
@@ -43,6 +44,8 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
+import { CemeteryMontageView } from '../ui/CemeteryMontageView.js';
+import { sanitizeMontageStyle } from '../systems/ghost/montageSettings.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
@@ -155,6 +158,7 @@ export class GameOverScene extends Phaser.Scene {
     // from _buildStats() drew nothing at all because the panel was not constructed yet.
     this._buildMissions();
     this._buildButtons();
+    this._buildMontageButton();
     this._buildProgression();
     this._buildAchievementToast();
     this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 5, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
@@ -672,6 +676,7 @@ export class GameOverScene extends Phaser.Scene {
       b.setAlpha(0.7);
       this.left.add([a, b]);
       if (key === 'lime') {
+        if (m > bestM) this._montageBest();
         this.tweens.add({ targets: a, alpha: { from: 1, to: 0.4 }, duration: 260, yoyo: true, repeat: -1 });
         uiSfx(this, 'newBest');
         if (typeof this._fanfare === 'function') this._fanfare('best');
@@ -986,6 +991,41 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts() });
+  }
+
+  /**
+   * Issue #68: Cemetery Montage entry point, above the RUN REPORT panel (the only free band at every board state:
+   * the LEDGER title row grows to 'LEDGER // YOU ARE ON THE BOARD'). Shown when this run recorded a ghost tape and
+   * the montage is not switched off; never opens by itself.
+   */
+  _buildMontageButton() {
+    const tape = this.registry.get(REG.LAST_GHOST_TAPE);
+    const style = sanitizeMontageStyle((this.registry.get(REG.SETTINGS) || {}).cemeteryMontage);
+    this.montageBest = false;
+    if (style === 'off' || !tape || tape.runId !== this.rec.id) return;
+    this.montageBtn = new Button(this, this.theme, { x: 14, y: 36, w: 74, h: 14, label: 'MONTAGE  M', color: 'lime', onClick: () => this._openMontage() });
+  }
+
+  /** A new distance best: the montage is the celebration, so its button says so (static under reduced motion). */
+  _montageBest() {
+    this.montageBest = true;
+    const b = this.montageBtn;
+    if (!b || !this.alive) return;
+    try { b.setLabel?.('NEW BEST  M'); } catch (e) { /* label is cosmetic */ }
+    if (!isReducedMotion(this) && this.tweens) this.tweens.add({ targets: b, alpha: { from: 1, to: 0.55 }, duration: 420, yoyo: true, repeat: 5 });
+  }
+
+  /** Reuses the ghost overlay slot (ghostView / ghostDim), so pointer, retry and shutdown handling stay identical. */
+  _openMontage() {
+    const tape = this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!this.montageBtn || this.ghostView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id) return;
+    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
+    this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.ghostView = new CemeteryMontageView(this, this.theme, {
+      history: this.registry.get(ATTEMPT_HISTORY_KEY) || null, library: this.registry.get(REG.GHOSTS) || null,
+      tape, heroIsBest: this.montageBest === true, onClose: () => this._closeGhosts(),
+    });
   }
 
   _closeGhosts() {
@@ -1338,6 +1378,7 @@ export class GameOverScene extends Phaser.Scene {
     }
     if (this.ghostView) { this.ghostView.handleAction(action); return; }
     if (action === 'ghost' && !this.shopOpen && !this.entry) { this._openGhosts(); return; }
+    if (action === 'montage' && !this.shopOpen && !this.entry) { this._openMontage(); return; }
     if (this.shopOpen) {
       // Decision 7: in an ARMED shop Enter / pad A buy, equip, unequip or turn the page on the highlighted
       // row (ShopView's own rules, the same as Title -> Profile -> Shop). In an unarmed autoprompt shop

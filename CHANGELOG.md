@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.22.8 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
+
+- **Owner-approved local attempt history** (Marvin, #68, 2026-11-25): a separate IndexedDB store `bitstream-attempt-history` keeps each finished ordinary run's 30 Hz pose trace plus compatibility metadata only (no inputs, checkpoints, fingerprints or ledger data). **Default 5 per course**, Settings → PAST ATTEMPTS → *PAST ATTEMPTS TO KEEP* 0..40 (0 keeps none; the maximum is shown). FIFO eviction of this store only, ≤ 256 KB per attempt and ≤ 12 MB overall, quota recovery from its own oldest rows, damaged rows dropped, two-press CLEAR HISTORY. Lowering trims at once; raising cannot restore. Never uploaded.
+- **Game Over → MONTAGE (M)**: past attempts ride beside this run (follow camera), each fallen self leaves a headstone, then the whole field as an overview. MONTAGE style labels up to 8 recent attempts; SWARM draws every kept attempt within a device rider budget (40 standard, 16 Chromebook-class, adaptive down to 4). Exact course + ruleset/terrain revision only; also reads this course's existing Best/Latest/Favorite ghosts read-only. Never opens by itself; reduced motion (setting or OS under AUTO) shows a still overview that never autoplays.
+- Presentation only: no GhostRider/Matter body, collision, RNG, score, replay or physics change. `RunScene`, `GhostLibrary` and causal tripwire files are untouched; build identity unchanged apart from the package version.
+- Tests: 44 new Jest cases, real-Chromium acceptance + performance harness `tools/ghosts/cemetery-montage-browser.mjs` (CI workflow `cemetery-montage.yml`). Physical Chromebook acceptance is still owed; #68 stays open until it passes.
+
 ## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
 
 - After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.

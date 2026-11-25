@@ -1,0 +1,54 @@
+# Issue #68: Cemetery Montage / local attempt history acceptance on the exact PR commit.
+# Read-only token, disposable runner; no deployment, no Netlify, no network writes from the game.
+name: Cemetery Montage gate
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/src/attempt-history.test.js'
+      - 'tests/src/cemetery-montage.test.js'
+      - 'tools/ghosts/cemetery-montage-browser.mjs'
+      - '.github/workflows/cemetery-montage.yml'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: cemetery-montage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  cemetery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Unit tests (history store, montage plan, renderer, Game Over data)
+        run: npm test -- --runInBand tests/src/attempt-history.test.js tests/src/cemetery-montage.test.js tests/determinism/sim-math-boundary.test.js
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Real Chromium acceptance (default 5, restart, settings, course, corrupt, reduced motion, perf sweep)
+        env:
+          CI: '1'
+          GAME_URL: http://127.0.0.1:18368/
+          OUT_JSON: ${{ runner.temp }}/cemetery-perf.json
+        run: |
+          npx vite preview --port 18368 --strictPort --host 127.0.0.1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18368/ >/dev/null && break; sleep 1; done
+          node tools/ghosts/cemetery-montage-browser.mjs
+      - name: Keep the performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cemetery-perf
+          path: ${{ runner.temp }}/cemetery-perf.json
+          if-no-files-found: ignore
