@@ -23,7 +23,8 @@ const FXS=Object.freeze({
 	garbage:'garbage-dump-glacier',
 	vertigo:'vertigo-vents',
 	crystal:'crystal-cavern',
-	arcade:'bitstream-bluffs'
+	arcade:'bitstream-bluffs',
+	candy:'candy-cane-canyon'
 });
 const EVENTS=[
 	{at:.38,action:'bsod-wind',note:'real AudioSynth._onBsodState, normalized relative air >=1'},
@@ -34,11 +35,16 @@ const EVENTS=[
 	{at:2.82,action:'fatal-crash-sfx',note:'real AudioSynth.playSfx crash (not complete count-in)'},
 ];
 const db=x=>20*Math.log10(Math.max(1e-12,x));
-async function decodeOriginals(pack,segmentIndex,biome){
+// A fixed, immutable public release only; default QA remains local/private.
+const R2_RELEASE='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/';
+async function decodeOriginals(pack,segmentIndex,biome,manifestUrl=null){
 	if(!/^[\w-]{1,100}$/.test(pack)||!Number.isInteger(segmentIndex)||
-		segmentIndex<0||segmentIndex>30||!Object.values(FXS).includes(biome))
+		segmentIndex<0||!Object.values(FXS).includes(biome))
 		throw Error('Untrusted pack, segment or biome');
-	const packBase=new URL('/music/packs/'+pack+'/',location.origin).href;
+	const publishedManifest=R2_RELEASE+'packs/'+pack+'/pack.json';
+	const packBase=manifestUrl===null?new URL('/music/packs/'+pack+'/',location.origin).href:
+		manifestUrl===publishedManifest?new URL('.',manifestUrl).href:null;
+	if(!packBase)throw Error('Manifest outside pinned public R2 release');
 	const manifestResponse=await fetch(packBase+'pack.json');
 	if(!manifestResponse.ok)throw Error('Original manifest unavailable');
 	const manifest=await manifestResponse.json();
@@ -50,7 +56,7 @@ async function decodeOriginals(pack,segmentIndex,biome){
 	const ctx=new OfflineAudioContext(2,1,RATE);
 	const sources=new Map(),hashes={};
 	try{
-		for(const role of roles){
+		await Promise.all(roles.map(async role=>{
 			const rel=segment.sources[role];
 			if(!rel)throw Error('Missing authentic source: '+role);
 			const {response}=await fetchMusicAssetResponse(packBase,rel);
@@ -59,9 +65,9 @@ async function decodeOriginals(pack,segmentIndex,biome){
 			const digest=await crypto.subtle.digest('SHA-256',bytes);
 			hashes[role]=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
 			sources.set(role,await ctx.decodeAudioData(bytes));
-		}
+		}));
 	}finally{ /* OfflineAudioContext has no close(); it never starts. */ }
-	return {manifest,segment,segmentIndex,biome,sources,hashes,
+	return {manifest,segment,segmentIndex,biome,sources,hashes:Object.fromEntries(roles.map(role=>[role,hashes[role]])),packBase,
 		originalSourceVerified:true,roles};
 }
 function actualAudioSynthGraph(ctx){
@@ -116,11 +122,11 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
 	return mixer;
 }
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
-	profile='standard'}){
+	profile='standard',manifestUrl=null}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
 		throw Error('Unknown QA scenario');
 	if(!['standard','crash-static-overlap'].includes(profile))throw Error('Invalid QA profile');
-	const original=await decodeOriginals(pack,segmentIndex,biome);
+	const original=await decodeOriginals(pack,segmentIndex,biome,manifestUrl);
 	const ctx=new OfflineAudioContext(2,Math.round(RENDER_SECONDS*RATE),RATE);
 	// Pin only the presentational wind/SFX noise for repeatable source QA.
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
@@ -168,7 +174,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	});
 	mixer?.destroy();
 	return {pack,trackId:original.manifest.id,sourceSegment:segmentIndex,
-		sourceFrameStart:original.segment.startFrame,biome,scenario,
+		sourceFrameStart:original.segment.startFrame,sourceSegmentFrames:original.segment.frames,sourceManifestUrl:original.packBase+'pack.json',biome,scenario,
 		sourceHashes:original.hashes,sourceRoles:original.roles,
 		originalSourceCount:installedAudioSources,
 		originalVocalFxAndRoomSendsFromPack:true,

@@ -8,7 +8,14 @@ import {auditVerdictExitCode} from './audit-verdict-exit.js';
 const base=(process.env.QA_URL||'http://127.0.0.1:8220').replace(/\/+$/,'');
 const dest=process.env.REPORT_OUT;
 if(!dest||existsSync(dest))throw Error('Unique REPORT_OUT required; no existing evidence overwrite');
-const allScenarios=process.env.QA_EXTENDED==='1'?
+const published=process.env.QA_R2==='1';
+const catalogUrl=published?'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json':'/music/catalog.json';
+const highRisk=['candy-cane-canyon','garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs'];
+const publicScenarios=Array.from({length:33},(_,songIndex)=>({
+	songIndex,position:1,biome:highRisk[songIndex%highRisk.length],
+	scenario:'mixed-game-stress',profile:'crash-static-overlap',
+}));
+const allScenarios=published?publicScenarios:process.env.QA_EXTENDED==='1'?
 	[0,1,2,3].flatMap(songIndex=>[0,1,2].flatMap(position=>
 		['garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs']
 			.map(biome=>({songIndex,position,biome,scenario:'mixed-game-stress'})))):
@@ -21,17 +28,18 @@ const allScenarios=process.env.QA_EXTENDED==='1'?
 	{songIndex:3,segment:4,biome:'bitstream-bluffs',scenario:'mixed-game-stress'},
 ];
 const songFilter=process.env.QA_SONG_INDEX==null?null:Number(process.env.QA_SONG_INDEX);
-if(songFilter!==null&&(!Number.isInteger(songFilter)||songFilter<0||songFilter>3))
-	throw Error('QA_SONG_INDEX must be original song index 0..3');
+if(songFilter!==null&&(!Number.isInteger(songFilter)||songFilter<0||songFilter>(published?32:3)))
+	throw Error('Invalid QA_SONG_INDEX for selected catalog mode');
 const overlap=process.env.QA_OVERLAP==='1';
+if(published&&overlap)throw Error('Published matrix already includes crash/static overlap');
 const scenarios=overlap?
 	mixedOverlapCases():
 	songFilter===null?allScenarios:allScenarios.filter(x=>x.songIndex===songFilter);
 if(!scenarios.length)throw Error('No source scenario selected');
 const results=[],errors=[],httpErrors=[];
 const report={format:'bitstream-sim8-original-mixed-output-4x-estimate-v1',
-	referenceUrl:base,startedAt:new Date().toISOString(),
-	scenarios:[],method:'Actual AudioSynth._buildGraph, SFX/wind/static APIs, real original source stems, full post-compressor peak guard; cosmetic noise seeded to fixed 0x2912026 for repeatability; 48kHz OfflineAudioContext, 48-tap 4x intersample estimate',
+	referenceUrl:base,catalogUrl,sourceMode:published?'pinned-public-r2':'local-private',startedAt:new Date().toISOString(),
+	scenarios:results,method:'Actual AudioSynth._buildGraph, SFX/wind/static APIs, real original source stems, full post-compressor peak guard; cosmetic noise seeded to fixed 0x2912026 for repeatability; 48kHz OfflineAudioContext, 48-tap 4x intersample estimate',
 	limitations:[
 		'Scripted stress SFX event schedule; NOT actual terrain traversal or replay',
 		'4.1s excerpt from each selected segment; NOT complete 33 songs or segment transitions',
@@ -48,12 +56,12 @@ try{
 	page.on('response',r=>{if(r.status()>=400)httpErrors.push({status:r.status(),url:r.url()})});
 	await page.goto(base+'/tools/music/qa-mixed-final-output.html',{waitUntil:'load',timeout:30000});
 	await page.waitForFunction(()=>!!window.__mixedFinalAudioQA,null,{timeout:20000});
-	const songs=await page.evaluate(async()=>{
-		const r=await fetch('/music/catalog.json');
+	const songs=await page.evaluate(async catalogUrl=>{
+		const r=await fetch(catalogUrl);
 		if(!r.ok)throw Error('Private original music catalog not found');
 		const c=await r.json();
-		return c.tracks.map(x=>({id:x.id,title:x.title,pack:x.manifest.split('/')[1]}));
-	});
+		return c.tracks.map(x=>({id:x.id,title:x.title,pack:x.manifest.split('/')[1],manifestUrl:new URL(x.manifest,new URL(catalogUrl,location.href)).href}));
+	},catalogUrl);
 	assert.equal(songs.length,33);
 	// Resolve beginning/middle/last from the REAL pack metadata rather
 	// than assuming all four original songs have equal segment counts.
@@ -62,12 +70,12 @@ try{
 		if(item.position==null)continue;
 		const song=songs[item.songIndex];
 		if(!segmentsByPack.has(song.pack)){
-			const count=await page.evaluate(async pack=>{
-				const r=await fetch('/music/packs/'+pack+'/pack.json');
+			const count=await page.evaluate(async manifestUrl=>{
+				const r=await fetch(manifestUrl);
 				if(!r.ok)throw Error('Cannot inspect original pack');
 				const m=await r.json();
 				return m.segments?.length;
-			},song.pack);
+			},song.manifestUrl);
 			assert.ok(count>=3);
 			segmentsByPack.set(song.pack,count);
 		}
@@ -79,8 +87,9 @@ try{
 		console.log('MIXED_SOURCE_START',i+1,'/',scenarios.length,
 			song.title,task.biome,task.scenario,'segment',task.segment);
 		const r=await page.evaluate(args=>window.__mixedFinalAudioQA.render(args),{
-			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard'});
+			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard',manifestUrl:published?song.manifestUrl:null});
 		assert.equal(r.trackId,song.id);
+		if(published)assert.equal(r.sourceManifestUrl,song.manifestUrl);
 		assert.equal(r.productionGraph.productionPeakGuard,true);
 		assert.equal(r.originalSourceCount,task.scenario==='sfx-wind-only'?0:7);
 		assert.equal(r.nonfiniteSamples,0);
@@ -121,6 +130,7 @@ try{
 }catch(error){
 	report.status='INVALID_INCOMPLETE';
 	report.failure=String(error);
+	report.browserErrors=errors;report.httpErrors=httpErrors;
 	console.error('MIXED_OUTPUT_AUDIT_FAILED',String(error));
 	process.exitCode=1;
 }finally{
