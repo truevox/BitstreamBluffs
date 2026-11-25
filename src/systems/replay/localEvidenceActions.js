@@ -84,9 +84,17 @@ export class LocalEvidenceActions {
     const localDurable = await this.store.isBundleDurable(digest);
     // A second browser tab may have pinned/unpinned after this Store was
     // opened. The persisted references, not the cached Map, are authoritative.
-    const protectionCount = localDurable ? await this.store.persistedProtectedCount(digest) : 0;
+    let protectionCount = localDurable ? null : 0;
+    if (localDurable) {
+      try { protectionCount=await this.store.persistedProtectedCount(digest); }
+      catch { /* archive bytes committed; optional pin lookup cannot undo import */ }
+    }
     return freeze({ok:true,digest,inspection,localDurable,
-      newlyProtected:false,protectionCount,alreadyProtected:protectionCount>0,
-      publicRankEligible:false,status:'IMPORTED LOCAL EVIDENCE — UNVERIFIED'});
+      newlyProtected:false,protectionCount,
+      alreadyProtected:protectionCount===null?null:protectionCount>0,
+      publicRankEligible:false,
+      status:protectionCount===null
+        ? 'IMPORTED LOCAL EVIDENCE — UNVERIFIED (PIN STATUS UNKNOWN)'
+        : 'IMPORTED LOCAL EVIDENCE — UNVERIFIED'});
   }
 }
