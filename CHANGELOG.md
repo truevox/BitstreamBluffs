@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.22.5 — strict Heavy Mode diagnostic CI gate (2026-11-25)
+
+- #242: continuously verify compiled Chromium savestate capture/restore parity for contact and hazard scenarios on relevant PR source changes. The workflow runs focused Matter/recorder/CLI tests and deterministic build identity before the real browser gate.
+- Harden the fast CLI rejection test against overloaded runners: the subprocess and Jest timeout budgets agree, and an unexpected spawn error is explicitly refused.
+- Developer-only, no new in-game save/load, trusted slot, replay ranking, upload, gameplay physics, or SIM_REVISION changes. Full natural-run, moving-hazard and boundary probes remain independent evidence; #119 player-facing trust and eligibility still require separate acceptance.
+
 ## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
 
 - Replace indirect Phaser `Math.Between` calls (which use unseeded `Math.random`) in HUD, Pause and Game Over with independent named seeded cosmetic streams, including `pause/glitch`.
