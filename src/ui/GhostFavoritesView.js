@@ -165,6 +165,11 @@ export class GhostFavoritesView extends View {
           // the file; do not report a cloud share or durable export.
           this.status.setText('LOCAL FILE DOWNLOAD REQUESTED - NO UPLOAD');
           uiSfx(this.scene, 'uiSelect');
+        } catch {
+          // Blocked object URLs/CSP/download restrictions must not produce an
+          // unhandled rejected Button promise or a false saved-file claim.
+          if(this.alive)this.status.setText('LOCAL DOWNLOAD BLOCKED - FILE NOT SAVED');
+          uiSfx(this.scene, 'uiBack');
         } finally {if(url)setTimeout(()=>URL.revokeObjectURL(url),15000);}
         return;
       }
