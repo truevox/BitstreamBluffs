@@ -13,7 +13,6 @@
  * In the open shop (Marvin decision 7): Enter / pad A buy or equip the highlighted row once the shop is armed, Space /
  * pad RB (MenuInput 'retry') retry, Esc / pad B / B / LB close it, N / X / Y start a new seed.
  */
-import { ATTEMPT_HISTORY_KEY } from '../systems/ghost/attemptHistoryService.js';
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, SCORING } from '../constants.js';
 import { updateSetting } from '../services.js';
@@ -46,6 +45,7 @@ import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
 import { CemeteryMontageView } from '../ui/CemeteryMontageView.js';
 import { sanitizeMontageStyle } from '../systems/ghost/montageSettings.js';
+import { ATTEMPT_HISTORY_KEY } from '../systems/ghost/attemptHistoryService.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';

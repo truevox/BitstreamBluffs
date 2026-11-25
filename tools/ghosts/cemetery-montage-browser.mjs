@@ -200,7 +200,9 @@ try {
   await setSetting(pp.page, 'attemptHistoryKeep', 40);
   await setSetting(pp.page, 'reduceMotion', 'off');
   await pp.page.evaluate(() => window.__bbGame.registry.get('attemptHistory').clear());
+  console.log('perf tier', tier);
   const heroId = await run(pp.page, SEED, 2500);
+  console.log('perf hero', heroId);
   const frameStats = () => pp.page.evaluate(async () => {
     const frames = [];
     let last = performance.now();
@@ -251,6 +253,7 @@ try {
     });
     await pp.page.keyboard.press('Escape');
     await pp.page.waitForFunction(() => !window.__bbGame.scene.getScene('GameOverScene').ghostView, null, { timeout: 5000 });
+    console.log('perf step', tier, n, openMs);
     perf.push({ tier, attempts: n, storedKB: +(w.stats.bytes / 1024).toFixed(1), writeMsTotal: +w.writeMs.toFixed(1), openMs, ...m });
   }
   assert.deepEqual(pp.errors, []);

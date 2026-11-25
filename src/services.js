@@ -86,4 +86,3 @@ export function updateSetting(game, key, value) {
   game.registry.get(REG.SAVE_STORE).saveSettings(settings);
   game.events.emit(EVT.SETTINGS_CHANGED, { key, value, settings });
 }
-

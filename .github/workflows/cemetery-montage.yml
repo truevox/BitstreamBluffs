@@ -42,7 +42,7 @@ jobs:
           GAME_URL: http://127.0.0.1:18368/
           OUT_JSON: ${{ runner.temp }}/cemetery-perf.json
         run: |
-          npx vite preview --port 18368 --strictPort --host 127.0.0.1 &
+          npx vite preview --port 18368 --strictPort --host 127.0.0.1 --open false &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18368/ >/dev/null && break; sleep 1; done
           node tools/ghosts/cemetery-montage-browser.mjs
       - name: Keep the performance report
