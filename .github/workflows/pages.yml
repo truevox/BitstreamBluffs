@@ -43,6 +43,10 @@ jobs:
         run: |
           if [ "$EVENT" = pull_request ]; then PAGES_BASE="/$REPO_NAME"; fi
           echo "path=${PAGES_BASE%/}/" >> "$GITHUB_OUTPUT"
+      - name: Select release or safe rollback mode
+        id: rollout
+        run: |
+          echo "mode=$(node -e 'const c=require("./tools/pwa/production-rollout.json");if(!["pwa","rollback"].includes(c.mode))process.exit(1);process.stdout.write(c.mode)')" >> "$GITHUB_OUTPUT"
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
@@ -50,7 +54,7 @@ jobs:
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
-        run: node tools/pwa/build-pwa-release.mjs "$BASE" dist
+        run: node tools/pwa/build-pages-site.mjs "$BASE" dist
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Smoke test production game
@@ -63,6 +67,7 @@ jobs:
           for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:4173$BASE" >/dev/null && break; sleep 1; done
           node tools/hosting-browser-smoke.mjs "http://127.0.0.1:4173$BASE"
       - name: Check installability and real offline gameplay
+        if: steps.rollout.outputs.mode == 'pwa'
         env:
           BASE: ${{ steps.base.outputs.path }}
         run: |

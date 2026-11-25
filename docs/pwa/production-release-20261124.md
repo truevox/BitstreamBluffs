@@ -6,7 +6,7 @@ This release bundles original-source melody-only 33-song R2 audio (PR #337), sel
 
 ## Reproducible build (no upload credentials)
 
-`node tools/pwa/build-pwa-release.mjs / dist`
+`node tools/pwa/build-pages-site.mjs / dist` with `tools/pwa/production-rollout.json` mode `pwa` (delegates to the pinned `build-pwa-release.mjs`).
 
 * `tools/pwa/releases/melody-only-748a0670/offline-melody-index.bin` is the SHA-256-pinned **1.82 MB** compressed derivative index produced from the fully published immutable R2 manifest; it contains public recording descriptors, never audio masters, login information, or upload credentials.
 * Builder fails if the local index, release identity, group count, or **remote R2 catalog bytes/hash** do not match the pinned release. Then builds Vite with exact digest and catalog release, copies index, and generates `sw.js` from SHA-256-indexed shell assets.
@@ -22,7 +22,7 @@ This release bundles original-source melody-only 33-song R2 audio (PR #337), sel
 
 ## Rollback (no data loss)
 
-Record the deployment's main commit and the preceding main commit before launch. If a production issue appears, revert **only** the single release merge/feature activation via a fresh tested revert PR/commit, and let Pages redeploy the previous normal Vite build. The prior JavaScript does not register a new service worker, but an **already installed** PWA worker may retain control until it is explicitly replaced/unregistered; therefore a complete rollback also needs a **new safe, versioned worker** on the same root scope that retains both old and new verified caches and saved data, then deactivates itself after all live clients close. Never blindly clear CacheStorage or IndexedDB, never delete derivative objects. The safe worker rollback path must be independently tested before executing it. For emergency access, the default Netlify build remains independent of Pages PWA registration.
+Record the preceding release commit before merging. For emergency disablement, change **only** `tools/pwa/production-rollout.json` from `{ "mode": "pwa" }` to `{ "mode": "rollback" }` in a reviewed `[skip netlify]` commit/PR on main. Pages then builds the ordinary Vite game (no offline controller or auto-registration) **plus a tiny safe retiring `/sw.js`**. That worker waits for any active old-version clients to close, activates, then unregisters itself. It deliberately does **not** wipe CacheStorage, IndexedDB, audio, profile, ghosts, or game saves. The original immutable R2 release remains public and playable online. This is an **online rollback**; installed clients cannot expect offline launch after the retirement takes effect. Return to `pwa` mode for a new pinned offline release. Do not just delete `/sw.js`: already installed clients would remain controlled by the previous offline build indefinitely. Verify both the rollback worker state transition and live restored game on the actual host.
 
 ## Evidence from pre-release Chromium gates
 
@@ -32,3 +32,7 @@ Record the deployment's main commit and the preceding main commit before launch.
 * Two different compiled app versions: waited through two live tabs, retained exact music SHA-256, native scored run, ghost tape and playback after cold offline update.
 * Two-song original-source offline crossfade (14 overlapping audio nodes), cancelled R2 Lite download after 22 responses resumed using 20 already-verified entries, corrupted stem fails closed (503) and repair finds it.
 * Latest focused suite 213/213 passing, earlier broad Jest suite failures independently reproduced on base. Root-build Pages CI and actual deployed-host Second Look are additional release gates.
+
+## Verified emergency rollback test
+
+`node tools/pwa/build-pwa-rollback.mjs / <rollback-dist>` builds the normal online game plus a safe retiring `sw.js`; `node tools/pwa/test-real-pwa-retirement-browser.mjs <published-pwa-dist> <rollback-dist> /` tests the real change. Chromium validated that the retiring worker waits while two PWA clients are open, then unregisters after both have closed, returning a fresh online tab to the normal non-PWA game. The saved localStorage sentinel and **all three actual R2 recording/catalog caches** and prior versioned shell cache survived intact. There were zero JavaScript errors. Release mode is controlled by the single `tools/pwa/production-rollout.json` file; flipping its `mode` to `rollback` produces the tested retiring worker through the same Pages workflow, without a manual destructive cache operation. Netlify stays unchanged.
