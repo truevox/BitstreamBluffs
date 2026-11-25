@@ -450,13 +450,15 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).index.get(digest).runId).toBe('explicit-first');
   });
 
-  test('unbound duplicate write trusts persisted run binding despite a stale cached pending record', async () => {
+  test('failed redundant unbound write never retries or steals a later persisted run binding', async () => {
     const idb=fakeIdb();
     const old=await new EvidenceStore({idb,storage:null}).init();
     const digest=await old.put(bundle(),{runId:'stale-A'});
     idb.hooks.failPut=new Error('quota');
     await expect(old.put(bundle())).rejects.toMatchObject({code:'write-failed'});
-    expect(old.pendingMeta.get(digest).runId).toBeNull();
+    // Redundant failed writes must not become resurrection-capable pending work.
+    expect(old.pending.has(digest)).toBe(false);
+    expect(old.pendingMeta.has(digest)).toBe(false);
     idb.hooks.failPut=null;
     const fresh=await new EvidenceStore({idb,storage:null}).init();
     await fresh.remove(digest);
@@ -695,6 +697,82 @@ describe('protected local evidence references (#244)', () => {
     await expect(store.unprotect(original.key,{expectedGeneration:original.generation})).rejects.toMatchObject({code:'stale-protection'});
     expect(await store.persistedProtectedCount(digest)).toBe(1);
     expect((await new EvidenceStore({idb,storage:null}).init()).listProtections()[0].generation).toBe(replacement.generation);
+  });
+
+  test('P1 forged prevalidated digest cannot overwrite pinned canonical evidence bytes',async()=>{
+    const {store,digest,idb}=await seededStore();
+    const pinned=await store.protect(digest,{runId:RUN,role:'pinned'});
+    const original=await store.getProtected(pinned.key);
+    expect(original.bytes).toEqual(bundleBytes(bundle()));
+    const tampered=Uint8Array.from(bundleBytes(bundle()));
+    tampered[43]^=0x01;
+    await expect(store.put(tampered,{runId:RUN},{ok:true,bundleDigest:digest})).rejects.toMatchObject({code:'invalid-bundle'});
+    const validButDifferent={...bundle(),claims:{...bundle().claims,score:bundle().claims.score+19}};
+    expect(bundleDigest(validButDifferent)).not.toBe(digest);
+    await expect(store.put(validButDifferent,{runId:RUN},{ok:true,bundleDigest:digest})).rejects.toMatchObject({code:'validation-hint-mismatch'});
+    expect(await store.isBundleDurable(digest,{runId:RUN})).toBe(true);
+    expect((await store.getProtected(pinned.key)).bytes).toEqual(original.bytes);
+    const restarted=await new EvidenceStore({idb,storage:null}).init();
+    expect((await restarted.getProtected(pinned.key)).bytes).toEqual(original.bytes);
+    expect(restarted.list().map(r=>r.digest)).toEqual([digest]);
+    expect(restarted.protectedCount(digest)).toBe(1);
+  });
+
+  test('failed redundant duplicate never resurrects evidence another tab explicitly deletes',async()=>{
+    const idb=fakeIdb(),a=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await a.put(bundle(),{runId:RUN});
+    const b=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('duplicate update denied');
+    await expect(a.put(bundle(),{runId:RUN})).rejects.toMatchObject({code:'write-failed'});
+    expect(a.pending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await b.remove(digest);
+    await a.init(); // automatic recovery must NOT resurrect a deleted digest
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await s.put(bundle(),{runId:RUN});
+    s.pending.set(digest,bundleBytes(bundle()));
+    s.pendingMeta.set(digest,s.index.get(digest));
+    expect(s.durable).toBe(false);
+    expect(await s.isBundleDurable(digest,{runId:RUN})).toBe(true);
+    const ref=await s.protect(digest,{runId:RUN,role:'pinned'});
+    expect(ref).toMatchObject({count:1,durable:true});
+    expect(await s.persistedProtectedCount(digest)).toBe(1);
+  });
+
+  test('forced close and cleared DB allows a fresh explicit run binding, never stale cached identity',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await s.put(bundle(),{runId:'vanished-old-run'});
+    s._db.onclose();
+    s._idb=fakeIdb();
+    await expect(s.put(bundle(),{runId:'new-after-clear'})).resolves.toBe(digest);
+    expect(s.pendingMeta.get(digest).runId).toBe('new-after-clear');
+    await s.init();
+    const persisted=await new EvidenceStore({idb:s._idb,storage:null}).init();
+    expect(persisted.index.get(digest).runId).toBe('new-after-clear');
+    await expect(s.protect(digest,{runId:'vanished-old-run',role:'pinned'})).rejects.toMatchObject({code:'run-id-mismatch'});
+    expect((await s.protect(digest,{runId:'new-after-clear',role:'pinned'})).count).toBe(1);
+  });
+
+  test('single-snapshot inspection avoids triple hashing and Refresh retries quota-failed evidence',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    const newBundle={...bundle(),claims:{...bundle().claims,score:991}};
+    const digest=bundleDigest(newBundle);
+    idb.hooks.failPut=new Error('quota');
+    await expect(s.put(newBundle,{runId:'quota-run'})).rejects.toMatchObject({code:'write-failed'});
+    expect(await s.inspectBundle(digest,{runId:'quota-run'})).toEqual({readable:true,durable:false,runBound:false});
+    idb.hooks.failPut=null;
+    const receipt=await s.retryPending();
+    expect(receipt).toMatchObject({attempted:1,recovered:1,remaining:0});
+    const seen=[];idb.hooks.onTransaction=(names,mode)=>seen.push({names,mode});
+    const status=await s.inspectBundle(digest,{runId:'quota-run'});
+    idb.hooks.onTransaction=null;
+    expect(status).toEqual({readable:true,durable:true,runBound:true});
+    expect(seen.filter(x=>x.mode==='readonly')).toEqual([{names:['index','bundles'],mode:'readonly'}]);
+    expect(await s.isBundleDurable(digest,{runId:'incorrect'})).toBe(false);
   });
 
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {

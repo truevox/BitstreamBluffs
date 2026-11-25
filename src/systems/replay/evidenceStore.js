@@ -236,31 +236,33 @@ export class EvidenceStore {
    * write fails (the bundle then stays in memory for this session and `durable` is false until a later write succeeds).
    * @param {object|Uint8Array} bundle
    * @param {{runId?: string}} [meta] local index only; never exported
-   * @param {{ok:true, bundleDigest:string}|null} [validated] result of validateEvidenceBundle for exactly these bytes:
-   *   skips the second validation and hash
+   * @param {{ok:true, bundleDigest:string}|null} [validated] optional caller hint, NEVER an authority:
+   *   this method independently revalidates and rehashes the exact bytes.
    */
   async put(bundle, meta = {}, validated = null) {
     const bytes = ArrayBuffer.isView(bundle) ? copy(bundle) : bundleBytes(bundle);
-    let digest;
-    if (validated && validated.ok === true && typeof validated.bundleDigest === 'string') digest = validated.bundleDigest;
-    else {
-      const res = validateEvidenceBundle(bytes, meta.archiveOnly === true ? null : this.rulesetResolver);
-      if (!res.ok) throw new EvidenceStoreError('invalid-bundle', `${res.code} at ${res.pointer}`, res);
-      digest = res.bundleDigest;
-    }
+    // Do not trust `validated` or an asserted digest. A forged/mismatched hint
+    // could otherwise overwrite a DIFFERENT bundle's existing pinned bytes.
+    // This extra parsing cost is off the game simulation frame and buys actual
+    // archive integrity. Public replay verification remains separate.
+    const res = validateEvidenceBundle(bytes, meta.archiveOnly === true ? null : this.rulesetResolver);
+    if (!res.ok) throw new EvidenceStoreError('invalid-bundle', `${res.code} at ${res.pointer}`, res);
+    if (validated && (validated.ok !== true || validated.bundleDigest !== res.bundleDigest))
+      throw new EvidenceStoreError('validation-hint-mismatch', 'caller validation did not match actual canonical bytes');
+    const digest = res.bundleDigest;
     const prior = this.index.get(digest);
     if (meta.runId !== undefined && meta.runId !== null && !validRunId(meta.runId))
       throw protectionError('invalid-run-id', 'runId must be a bounded local opaque identifier');
     // Only the memory-only backend relies on its cache. With IndexedDB,
     // identity binding must be checked against the persisted record under lock.
-    if (!this._db && prior?.runId && meta.runId && prior.runId !== meta.runId)
+    if (!this._db && !this._everDurable && prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
     const pendingClaim = this.pendingMeta.get(digest);
     if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.archiveOnly === true
       ? (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) || null : null)
-      : meta.runId || pendingClaim?.runId || (!this._db ? prior?.runId : null) || null;
+      : meta.runId || pendingClaim?.runId || (!this._db && !this._everDurable ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
@@ -269,6 +271,13 @@ export class EvidenceStore {
       if (!meta.archiveOnly || !this.pendingMeta.has(digest)) this.pendingMeta.set(digest, record);
       return digest;
     }
+    // If these very same bytes AND their desired run binding were already
+    // durable before this redundant write, a failed update must NOT be queued
+    // for automatic retry: another tab may intentionally delete the evidence.
+    // A stale cached index alone is not proof; verify the persisted digest.
+    const wasPersistedDuplicate = prior && !this.pending.has(digest)
+      ? await this.isBundleDurable(digest,record.runId ? {runId:record.runId} : {})
+      : false;
     try {
       const committed = await this._writeDurable(record, bytes);
       this.index.set(digest, committed);
@@ -287,13 +296,15 @@ export class EvidenceStore {
       // A failed duplicate write must not erase an already durable run binding
       // (or a concurrent same-instance write that committed in the meantime).
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
-      this.pending.set(digest, bytes);
-      // Preserve the caller's requested run ID even when the existing on-disk
-      // entry had no binding. Retrying must NEVER silently drop that claim.
-      // A failed overlapping unbound write cannot erase a stronger explicit
-      // run-ID claim left pending by another failed write for these bytes.
-      const established = this.pendingMeta.get(digest);
-      this.pendingMeta.set(digest, established?.runId ? established : record);
+      if (!wasPersistedDuplicate) {
+        this.pending.set(digest, bytes);
+        // Preserve explicit pending run claims. Never overwrite a stronger
+        // prior claim with a failed overlapping unbound write.
+        const established = this.pendingMeta.get(digest);
+        this.pendingMeta.set(digest, established?.runId ? established : record);
+      }
+      // A redundant update of already saved identical bytes is still a
+      // reported failure, but not an instruction to resurrect deleted proof.
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
       this._report(err);
       throw err;
@@ -332,21 +343,52 @@ export class EvidenceStore {
 
   has(digest) { return this.index.has(digest); }
 
-  /** Is THIS digest durable in the current IndexedDB snapshot? Unlike
-   * `durable`, unrelated session-only pending bundles do not make it false.
-   * Recheck the persisted row/bytes in a single readonly transaction.
+  /** Explicit, on-demand retry after quota/IDB recovery; no network action. */
+  async retryPending() {
+    const before=this.pending.size;
+    if (this._db && before) await this._flushPending();
+    return {attempted:before,recovered:before-this.pending.size,remaining:this.pending.size};
+  }
+
+  /** One digest verification per Refresh, with an atomic persisted snapshot.
+   * Provides integrity/durability/run binding, NOT proof of honest play.
+   * Memory-only pending bytes may be readable but never count as durable.
    */
-  async isBundleDurable(digest, { runId } = {}) {
-    if (!this._db) return false;
+  async inspectBundle(digest, {runId} = {}) {
+    const pending=this.pending.get(digest);
+    const pendingReadable=()=>{
+      if (!pending)return false;
+      if (digestOfBytes(pending)!==digest)throw new EvidenceStoreError('corrupt-record',digest);
+      return true;
+    };
+    if (this._db) {
+      let idx,row;
+      try {
+        const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
+        [idx,row]=await Promise.all([
+          req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
+          req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
+          txDone(tx),
+        ]);
+      } catch (e) {
+        if (pendingReadable()) return {readable:true,durable:false,runBound:false};
+        throw new EvidenceStoreError('read-failed',digest,e);
+      }
+      if (idx && row?.bytes) {
+        if (idx.digest!==digest || digestOfBytes(row.bytes)!==digest)
+          throw new EvidenceStoreError('corrupt-record',digest);
+        return {readable:true,durable:true,runBound:runId!==undefined && idx.runId===runId};
+      }
+      if (idx || row) throw new EvidenceStoreError('corrupt-record',`${digest}: incomplete persisted evidence`);
+    }
+    return {readable:pendingReadable(),durable:false,runBound:false};
+  }
+
+  /** Exact bundle durability; false also represents unavailable storage. */
+  async isBundleDurable(digest, {runId} = {}) {
     try {
-      const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
-      const [idx,bundle]=await Promise.all([
-        req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
-        req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
-        txDone(tx),
-      ]);
-      return Boolean(idx && bundle?.bytes && idx.digest===digest &&
-        (runId===undefined || idx.runId===runId) && digestOfBytes(bundle.bytes)===digest);
+      const status=await this.inspectBundle(digest,{runId});
+      return status.durable && (runId===undefined || status.runBound);
     } catch { return false; }
   }
 
@@ -421,7 +463,7 @@ export class EvidenceStore {
   async protect(digest, { runId, role } = {}) {
     if (!validRunId(runId) || !PROTECTED_ROLES.includes(role))
       throw protectionError('invalid-protection', 'valid local runId and candidate/submitted/pinned role required');
-    if (!this._db || this.pending.has(digest))
+    if (!this._db)
       throw protectionError('not-durable', 'evidence must be durably saved before it can be protected');
     // The in-memory index can be stale across tabs or a browser storage clear.
     // Check the saved index and canonical bytes in ONE persisted snapshot.
