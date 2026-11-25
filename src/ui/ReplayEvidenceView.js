@@ -83,17 +83,17 @@ export class ReplayEvidenceView extends View {
     return s;
   }
 
-  async _getActions({reconnect=true}={}) {
+  async _getActions({reconnect=true,retryPending=reconnect}={}) {
     if (this.actions) {
       // A first open may have failed during an IndexedDB upgrade. Refresh is
       // the explicit recovery gesture: reopen IDB and flush pending evidence.
       if (this.actions.store.backend!=='idb') {
-        const recovered=reconnect?await sharedEvidenceStore():this.actions.store;
+        const recovered=reconnect?await sharedEvidenceStore({retryPending}):this.actions.store;
         if (this.alive) this.actions.store=recovered;
       }
       return this.actions;
     }
-    const store=await sharedEvidenceStore({retryPending:reconnect});
+    const store=await sharedEvidenceStore({retryPending});
     const rs=this.scene.registry.get(RULESET_KEY);
     const actions=new LocalEvidenceActions(store,{currentRulesetId:rs?.rulesetId || null});
     if (this.alive) this.actions=actions;
@@ -124,7 +124,7 @@ export class ReplayEvidenceView extends View {
     try {
       // Action-triggered reconciliation must never reopen IndexedDB or flush
       // pending bytes. Only an explicitly selected Refresh may do that.
-      const control=await this._getActions({reconnect:retryPending});
+      const control=await this._getActions({reconnect:retryPending,retryPending});
       if(!control){this._show('ARCHIVE STATUS UNAVAILABLE','SELECT REFRESH TO RECONNECT STORAGE');return false;}
       if (!live() || this._captureStatus()!==status) return;
       // An IDB backend can retain a quota-failed bundle in session RAM even
@@ -376,7 +376,8 @@ export class ReplayEvidenceView extends View {
     if(!expectedDigest){this._show('INVALID FILENAME','EXPECTED 64-HEX-DIGEST.BBREPLAY');return;}
     if(file.size>MAX_OUTPUT_BYTES){this._show('FILE TOO LARGE','MAXIMUM 16 MIB CANONICAL EVIDENCE');return;}
     const bytes=new Uint8Array(await file.arrayBuffer());
-    const control=await this._getActions({reconnect:false});
+    // Import may reconnect IndexedDB, but must not flush OTHER pending runs.
+    const control=await this._getActions({reconnect:true,retryPending:false});
     let imported;
     try { imported=await control.import(bytes,{expectedDigest}); }
     catch(e) {
