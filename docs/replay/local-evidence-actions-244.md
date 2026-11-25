@@ -11,3 +11,8 @@
 All results carry `publicRankEligible:false` and clear `UNVERIFIED`/`LOCAL ARCHIVE` labeling. **An independently authenticated dual-proof verifier is separate and not active.** Next step: build the actual Phaser user controls and browser file selection/export, with visible error/status UI, keyboard accessibility, import cross-build warnings, and live-browser UX tests. This PR is stacked against #347 and must not be merged before that dependency clears independent review and the release version gate.
 
 The import inspector rejects files above the canonical 16 MiB limit **before hashing** and refuses non-Uint8Array views with a stable error. Import reports `localDurable` for that specific bundle via the foundation's persisted byte check, unaffected by unrelated failed pending writes. Re-imports report any existing protection reference count, while accurately stating `newlyProtected:false` (the action creates no new pin).
+
+
+## Post-commit protection-status failure
+
+Once `importBundle()` commits canonical bytes successfully, a later IndexedDB failure while checking cross-tab protection count must **not** report the import itself as failed. The action returns `ok:true`, `protectionCount:null`, `alreadyProtected:null` and the explicit `PIN STATUS UNKNOWN` warning. It never silently substitutes cached counts. A negative test injects failure only in that post-commit lookup and verifies the imported bytes remain persisted and independently retrievable. All imports remain local and unverified.
