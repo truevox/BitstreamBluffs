@@ -83,8 +83,11 @@ export async function saveRunEvidence(tape, recorder, opts) {
   const report = (status) => {
     if (!status.ok) console.warn(`[replay-evidence] not saved: ${status.code}: ${status.message}`); // eslint-disable-line no-console
     else if (!status.durable) console.warn('[replay-evidence] saved to memory only (no durable storage)'); // eslint-disable-line no-console
-    try { if (reg && typeof reg.set === 'function') reg.set(EVIDENCE_STATUS_KEY, status); } catch { /* signal is optional */ }
-    return status;
+    const tagged={...status,runId:tape?.runId || null};
+    // Bind asynchronous capture status to the exact finished run. A new Game
+    // Over screen must never accidentally Keep or Export an older digest.
+    try { if (reg && typeof reg.set === 'function') reg.set(EVIDENCE_STATUS_KEY, tagged); } catch { /* signal is optional */ }
+    return tagged;
   };
   try {
     const { bundle, rulesetId, ruleset, detail } = buildRunEvidence({ tape, recorder, ruleset: opts.ruleset, gameVersion: opts.gameVersion });
