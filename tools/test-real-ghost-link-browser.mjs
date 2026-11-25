@@ -291,24 +291,38 @@ try{
     courses:lib.courses.size,tapes:lib.tapes.size,lastRecord:r.get('lastRecord')?.id||null,
     lastTape:r.get('lastGhostTape')?.runId||null};
   });
-  const practicePoint=await recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v.practiceBtn.zone;
-   const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=document.querySelector('canvas').getBoundingClientRect();
+  // A cross-machine CSS-scale/tween race can move the Phaser hitzone after
+  // the first coordinate sample. Re-read the real rendered hitbox on each
+  // attempt. Only genuine Playwright pointer clicks may arm/confirm.
+  const practicePoint=()=>recipient.evaluate(()=>{
+   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v?.practiceBtn?.zone;
+   if(!z||!z.scene)return null;
+   const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
+   const r=document.querySelector('canvas').getBoundingClientRect();
    return {x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
   });
   const allowed=await recipient.evaluate(()=>({disabled:window.__bbGame.scene.getScene('TitleScene').view.practiceBtn.disabled}));
   if(allowed.disabled)throw Error('Eligible NORMAL guest was refused by practice policy');
-  // The seed->ghost modal uses a brief fade/tween; clicking its hitzone before
-  // it finishes can land on the old view's dim rather than the button.
-  await recipient.waitForTimeout(600);
-  await recipient.mouse.click(practicePoint.x,practicePoint.y);
-  const armedRace=await recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
-   return {armed:v.practiceArmed,text:v.status.main.text,label:v.practiceBtn.label.main.text,running:g.scene.isActive('RunScene')};
-  });
-  if(!armedRace.armed||armedRace.running||!armedRace.text.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
-   throw Error('Unranked double-consent gate failed '+JSON.stringify(armedRace));
-  await recipient.mouse.click(practicePoint.x,practicePoint.y);
+  let armAttempts=0,armedRace=null;
+  for(;armAttempts<5;armAttempts++){
+   await recipient.waitForTimeout(220);
+   const point=await practicePoint();
+   if(!point)throw Error('Race Guest hitzone disappeared before consent');
+   await recipient.mouse.move(point.x,point.y);
+   await recipient.mouse.click(point.x,point.y);
+   armedRace=await recipient.evaluate(()=>{
+    const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
+    return {armed:v.practiceArmed,text:v.status.main.text,label:v.practiceBtn.label.main.text,running:g.scene.isActive('RunScene')};
+   });
+   if(armedRace.armed)break;
+  }
+  if(!armedRace?.armed||armedRace.running||!armedRace.text.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
+   throw Error('Unranked double-consent gate failed after stable pointer attempts '+JSON.stringify({armedRace,armAttempts}));
+  // Reacquire the same real hitzone after arming; the first click must NEVER
+  // launch gameplay and must not be repeated after practiceArmed becomes true.
+  const confirmPoint=await practicePoint();
+  if(!confirmPoint)throw Error('Race Guest hitzone disappeared after consent');
+  await recipient.mouse.click(confirmPoint.x,confirmPoint.y);
   await recipient.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&
     window.__bbGame.scene.getScene('RunScene').guestPractice===true&&
     window.__bbGame.scene.getScene('RunScene').sled?.body,null,{timeout:40000});
@@ -356,9 +370,19 @@ try{
    await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:14000});
    // The textbox owns a native keyboard shortcut; Ctrl+Alt+Enter must arm,
    // then a SECOND chord must start. Avoid Chrome's reserved Ctrl+Shift+R.
-   await recipient.locator('textarea').focus();
-   await recipient.keyboard.press('Control+Alt+Enter');
-   await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.practiceArmed===true,null,{timeout:5000});
+   let keyboardArmed=false,keyboardAttempts=0;
+   for(;keyboardAttempts<5;keyboardAttempts++){
+    // The first native text-input event after the closing scene's animation
+    // sometimes goes to the previous focus owner in Chromium/CI. Refocus and
+    // observe the actual armed UI after each real shortcut; never send a
+    // second chord once the first confirmation is accepted.
+    await recipient.locator('textarea').focus();
+    await recipient.waitForTimeout(160);
+    await recipient.keyboard.press('Control+Alt+Enter');
+    keyboardArmed=await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view?.practiceArmed===true);
+    if(keyboardArmed)break;
+   }
+   if(!keyboardArmed)throw Error('Native Ctrl+Alt+Enter never armed guest after 5 real key events');
    if(await recipient.evaluate(()=>window.__bbGame.scene.isActive('RunScene')))
     throw Error('Keyboard guest race started before a second consent');
    await recipient.keyboard.press('Control+Alt+Enter');
