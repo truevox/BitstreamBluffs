@@ -206,6 +206,31 @@ try {
  assert(exportAfterInterruptedImport.exportEnabled);
  record('unconfirmed import preserves EXPORT RUN NOW when current-run proof is memory-only');
 
+ const unboundExport=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const originalInspect=store.inspectBundle.bind(store);
+  let signal,release,intercepted=false;
+  const started=new Promise(resolve=>{signal=resolve;});
+  store.inspectBundle=(...args)=>{
+    if(intercepted)return Promise.resolve({readable:true,durable:true,runBound:false});
+    intercepted=true;signal();
+    return new Promise(resolve=>{release=async()=>resolve(await originalInspect(...args));});
+  };
+  try{
+    const refreshing=view._refresh();await started;
+    await view._run(async()=>view._show('KEEP ORIGINAL FILE','IMPORT STORAGE NOT CONFIRMED — DO NOT DELETE SOURCE'));
+    const result={status:view.status.main.text,detail:view.detail.main.text,
+      keepDisabled:view.buttons[0].disabled,exportEnabled:!view.buttons[1].disabled};
+    await release();await refreshing;
+    return result;
+  }finally{store.inspectBundle=originalInspect;await view._refresh();}
+ });
+ assert(unboundExport.status.includes('KEEP ORIGINAL FILE'));
+ assert(unboundExport.detail.includes('RUN UNBOUND'));
+ assert(unboundExport.detail.includes('EXPORT ONLY'));
+ assert(unboundExport.keepDisabled && unboundExport.exportEnabled);
+ record('unconfirmed import distinguishes unbound durable run from memory-only export urgency');
+
  const vanishedPin=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._refresh();

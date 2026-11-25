@@ -203,11 +203,13 @@ export class ReplayEvidenceView extends View {
             const archiveWarning=this.status.main.text;
             // The screen's detail line is pixel-width limited: concise and
             // lead with both safety facts rather than truncating the error.
-            const needsRunExport=archiveWarning.includes('EXPORT NOW') || archiveWarning.includes('EXPORT ONLY');
-            const shortWarning=needsRunExport?'EXPORT RUN NOW':
+            const unboundRun=archiveWarning.includes('RUN ID') || archiveWarning.includes('RUN BINDING') ||
+              archiveWarning.includes('RECOVERED BYTES');
+            const shortWarning=unboundRun?'RUN UNBOUND; EXPORT ONLY':
+              archiveWarning.includes('EXPORT NOW')?'EXPORT RUN NOW':
+              archiveWarning.includes('EXPORT ONLY')?'EXPORT ONLY; UNVERIFIED':
               archiveWarning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
               archiveWarning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':
-              archiveWarning.includes('RUN ID')?'RUN BINDING UNKNOWN':
               'ARCHIVE STATUS UNKNOWN';
             // The import may have committed before its confirmation read
             // failed: never claim either durable success or definite loss.
