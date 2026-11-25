@@ -327,6 +327,65 @@ describe('protected local evidence references (#244)', () => {
     } else expect(ref.count).toBe(1);
   });
 
+  test('retry retains explicit run binding when prior evidence was unbound and write failed', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await s.put(bundle()); // old unbound index row
+    expect(s.index.get(digest).runId).toBeNull();
+    idb.hooks.failPut=Object.assign(new Error('quota'),{name:'QuotaExceededError'});
+    await expect(s.put(bundle(),{runId:'later-bound'})).rejects.toMatchObject({code:'quota-exceeded'});
+    expect(s.pendingMeta.get(digest).runId).toBe('later-bound');
+    idb.hooks.failPut=null;
+    const another={...bundle(),claims:{...bundle().claims,score:107}};
+    await s.put(another,{runId:'new-run'}); // flushes original request with exact run binding
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.index.get(digest).runId).toBe('later-bound');
+    expect(s.pending.has(digest)).toBe(false);
+    expect(s.pendingMeta.has(digest)).toBe(false);
+  });
+
+  test('explicit remove while another put triggers flush never resurrects a pending bundle', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    const one={...bundle(),claims:{...bundle().claims,score:111}};
+    const two={...bundle(),claims:{...bundle().claims,score:222}};
+    idb.hooks.failPut=new Error('write temporarily failed');
+    await expect(s.put(one,{runId:'pending-delete'})).rejects.toMatchObject({code:'write-failed'});
+    const digest=bundleDigest(one);
+    expect(s.pending.has(digest)).toBe(true);
+    idb.hooks.failPut=null;
+    const writer=s.put(two,{runId:'independent'});
+    const remover=s.remove(digest);
+    await Promise.all([writer,remover]);
+    expect(s.pending.has(digest)).toBe(false);
+    expect(s.pendingMeta.has(digest)).toBe(false);
+    expect(s.has(digest)).toBe(false);
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.has(digest)).toBe(false);
+    expect(re.has(bundleDigest(two))).toBe(true);
+  });
+
+  test('reinit does not let a foreign persisted binding override pending run identity', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('temporary storage failure');
+    await expect(s.put(bundle(),{runId:'pending-original'})).rejects.toMatchObject({code:'write-failed'});
+    const digest=bundleDigest(bundle());
+    idb.hooks.failPut=null;
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    await other.put(bundle(),{runId:'foreign-persisted'});
+    await s.init();
+    expect(s.index.get(digest).runId).toBe('foreign-persisted');
+    expect(s.pendingMeta.get(digest).runId).toBe('pending-original');
+    const another={...bundle(),claims:{...bundle().claims,score:407}};
+    await s.put(another,{runId:'unrelated'}); // persisted conflict is not downgraded
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.index.get(digest).runId).toBe('foreign-persisted');
+    expect(re.has(bundleDigest(another))).toBe(true);
+    expect(s.pending.has(digest)).toBe(true);
+    expect(s.lastError.code).toBe('run-id-conflict');
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

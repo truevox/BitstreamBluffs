@@ -71,6 +71,10 @@ export class EvidenceStore {
     this.protections = new Map();
     /** @type {Map<string, Uint8Array>} bytes that exist only in memory (no IndexedDB, or a write failed) */
     this.pending = new Map();
+    /** Failed-write run claims are NOT the persisted index. Keep them separate. */
+    this.pendingMeta = new Map();
+    /** Explicit deletion wins over asynchronous retries for that digest. */
+    this._removing = new Set();
     this.backend = 'memory';
     this.persisted = null;
     this.lastError = null;
@@ -217,14 +221,24 @@ export class EvidenceStore {
     // identity binding must be checked against the persisted record under lock.
     if (!this._db && prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
-    const requestedRunId = meta.runId || (this.pending.has(digest) || !this._db ? prior?.runId : null) || null;
+    const pendingClaim = this.pendingMeta.get(digest);
+    if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
+      throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
+    const requestedRunId = meta.runId || pendingClaim?.runId ||
+      (this.pending.has(digest) || !this._db ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
-    if (!this._db) { this.index.set(digest, record); this.pending.set(digest, bytes); return digest; }
+    if (!this._db) {
+      this.index.set(digest, record);
+      this.pending.set(digest, bytes);
+      this.pendingMeta.set(digest, record);
+      return digest;
+    }
     try {
       const committed = await this._writeDurable(record, bytes);
       this.index.set(digest, committed);
       this.pending.delete(digest);
+      this.pendingMeta.delete(digest);
     } catch (e) {
       // We did not change the cache before the transaction. Another concurrent
       // put may already have committed; never roll its winning entry back.
@@ -233,6 +247,9 @@ export class EvidenceStore {
       // (or a concurrent same-instance write that committed in the meantime).
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
       this.pending.set(digest, bytes);
+      // Preserve the caller's requested run ID even when the existing on-disk
+      // entry had no binding. Retrying must NEVER silently drop that claim.
+      this.pendingMeta.set(digest, record);
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
       this._report(err);
       throw err;
@@ -243,11 +260,20 @@ export class EvidenceStore {
 
   /** Retry bundles that are still memory-only. Failures stay pending and are not reported again. */
   async _flushPending() {
+    if (!this._db) return;
     for (const [digest, bytes] of [...this.pending]) {
+      // `remove()` tombstones the digest before queueing its transaction.
+      // If a retry was already queued, the later remove transaction wins.
+      if (this._removing.has(digest) || this.pending.get(digest) !== bytes) continue;
+      const record = this.pendingMeta.get(digest) || this.index.get(digest);
+      if (!record) continue;
       try {
-        const committed = await this._writeDurable(this.index.get(digest), bytes);
-        this.index.set(digest, committed);
-        this.pending.delete(digest);
+        const committed = await this._writeDurable(record, bytes);
+        if (this.pending.get(digest) === bytes) {
+          this.index.set(digest, committed);
+          this.pending.delete(digest);
+          this.pendingMeta.delete(digest);
+        }
       } catch (e) {
         if (e?.code === 'run-id-conflict') {
           // One unrecoverable pending run binding must not starve independent
@@ -408,28 +434,35 @@ export class EvidenceStore {
 
   /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
+    if (this._removing.has(digest)) throw protectionError('delete-in-progress', 'deletion is already pending');
     if (!this._db && this.protectedCount(digest)) throw protectionError('protected-evidence', 'release all local roles first');
-    if (this._db) {
-      const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
-      const done = txDone(tx);
-      let problem = null;
-      const scan = tx.objectStore(EVIDENCE_REFS).getAll();
-      scan.onsuccess = () => {
-        if ((scan.result || []).some(r => r.digest === digest)) {
-          problem = protectionError('protected-evidence', 'another tab still protects this bundle');
-          tx.abort(); return;
+    this._removing.add(digest);
+    try {
+      if (this._db) {
+        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
+        const done = txDone(tx);
+        let problem = null;
+        const scan = tx.objectStore(EVIDENCE_REFS).getAll();
+        scan.onsuccess = () => {
+          if ((scan.result || []).some(r => r.digest === digest)) {
+            problem = protectionError('protected-evidence', 'another tab still protects this bundle');
+            tx.abort(); return;
+          }
+          tx.objectStore(EVIDENCE_STORE).delete(digest);
+          tx.objectStore(EVIDENCE_INDEX).delete(digest);
+        };
+        try { await done; }
+        catch (e) {
+          const err = problem || new EvidenceStoreError('write-failed', e?.message, e);
+          this._report(err); throw err;
         }
-        tx.objectStore(EVIDENCE_STORE).delete(digest);
-        tx.objectStore(EVIDENCE_INDEX).delete(digest);
-      };
-      try { await done; }
-      catch (e) {
-        const err = problem || new EvidenceStoreError('write-failed', e?.message, e);
-        this._report(err); throw err;
       }
+      // Complete only AFTER atomic durable deletion. On error keep old evidence.
+      this.index.delete(digest);
+      this.pending.delete(digest);
+      this.pendingMeta.delete(digest);
+    } finally {
+      this._removing.delete(digest);
     }
-    // Remove the index only AFTER the transaction completed successfully.
-    this.index.delete(digest);
-    this.pending.delete(digest);
   }
 }
