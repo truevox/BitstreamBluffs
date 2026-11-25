@@ -14,6 +14,7 @@ import { parseGhostLink, GhostLinkError, GHOST_LINK_MAX_URL } from '../systems/g
 import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../systems/SimClock.js';
 import { REG, PIXELS_PER_METER } from '../constants.js';
+import {guestPracticeEligible} from '../systems/ghost/GuestPractice.js';
 
 const PLOT={x:12,y:94,w:394,h:54};
 const MAX_PLOT_STEPS=300;
@@ -73,12 +74,12 @@ function messageFor(e){
 /**
  * @param {Phaser.Scene} scene
  * @param {object} theme
- * @param {{onClose:()=>void, initial?:string}} o
+ * @param {{onClose:()=>void, initial?:string,onPractice?:(tape:object)=>void}} o
  */
 export class GhostLinkView extends View {
  constructor(scene,theme,o){
   super(scene,theme,{w:420,h:208,y:31,title:'GUEST GHOST // UNVERIFIED',color:'magenta',
-   onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['CTRL+←/→'],label:'SCRUB'}]});
+   onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['CTRL+ALT+ENTER','PAD LB'],label:'RACE'}]});
   this.preview=null;
   this.localPreview=null;
   this.localRole=null;
@@ -88,6 +89,8 @@ export class GhostLinkView extends View {
   this.token=0;
   this.playing=false;
   this.elapsedMs=0;
+  this.practiceArmed=false;
+  this.onPractice=o.onPractice||null;
   this.status=new NeonText(scene,theme,12,24,
    'PASTE A LINK. NOTHING IS SAVED OR SUBMITTED.',{color:'cyan',outline:'none'});
   this.panel.add(this.status);
@@ -100,6 +103,7 @@ export class GhostLinkView extends View {
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowRight'){this.scrub(1);return true;}
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowLeft'){this.scrub(-1);return true;}
     if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='Enter'){this.togglePlayback();return true;}
+    if((e.ctrlKey||e.metaKey)&&e.altKey&&e.key==='Enter'){this.startGuestPractice();return true;}
     return false;
    },
   });
@@ -121,6 +125,10 @@ export class GhostLinkView extends View {
   this.playBtn=new Button(scene,theme,{x:215,y:185,w:81,h:16,
    label:'WATCH',color:'magenta',onClick:()=>this.togglePlayback()});
   this.panel.add(this.playBtn);
+  this.practiceBtn=new Button(scene,theme,{x:302,y:185,w:106,h:16,
+   label:'RACE GUEST',color:'amber',onClick:()=>this.startGuestPractice()});
+  this.practiceBtn.setDisabled(true);
+  this.panel.add(this.practiceBtn);
   this._onUpdate=(_,delta)=>this._tickPlayback(delta);
   scene.events.on(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this._draw();
@@ -133,6 +141,8 @@ export class GhostLinkView extends View {
   this.busy=false;
   this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;
   this.cursor=0;this.elapsedMs=0;this.playing=false;
+  this.practiceArmed=false;
+  this.practiceBtn?.setLabel('RACE GUEST');this.practiceBtn?.setDisabled(true);
   this.previewBtn?.setDisabled(false);
   this.playBtn?.setLabel('WATCH');
   this.meta?.setText('NO GHOST LOADED');
@@ -145,6 +155,7 @@ export class GhostLinkView extends View {
   // A failed second link must not leave the prior good preview on screen.
   this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.cursor=0;
   this.playing=false;this.elapsedMs=0;this.playBtn.setLabel('WATCH');
+  this.practiceArmed=false;this.practiceBtn.setLabel('RACE GUEST');this.practiceBtn.setDisabled(true);
   const token=++this.token;
   const raw=this.box.getValue().trim();
   this.status.setText('CHECKING UNTRUSTED GHOST LINK...');
@@ -174,6 +185,7 @@ export class GhostLinkView extends View {
    this.localPreview=comparator?.model||null;
    this.localRole=comparator?.role||null;
    this.tape=parsed.tape;
+   this.practiceBtn.setDisabled(!this.onPractice||!guestPracticeEligible(parsed.tape));
    this.status.setText(this.localPreview
     ?'UNVERIFIED GUEST VS LOCAL '+this.localRole
     :localRulesDiffer?'UNVERIFIED GUEST - LOCAL RULES DIFFER'
@@ -191,13 +203,36 @@ export class GhostLinkView extends View {
    if(token===this.token){this.busy=false;if(this.alive)this.previewBtn.setDisabled(false);}
   }
  }
+ /** One initial click discloses the unranked consequences; the next click
+  * starts a NEW live player-controlled practice run. Never writes the guest. */
+ startGuestPractice(){
+  if(!this.alive||this.busy||!this.preview||!this.tape||
+     !this.onPractice||!guestPracticeEligible(this.tape))return;
+  if(!this.practiceArmed){
+    this.practiceArmed=true;
+    this.practiceBtn.setLabel('CONFIRM RACE');
+    this.status.setText('UNRANKED: NO XP / SHARDS / SAVES. SELECT AGAIN.');
+    return;
+  }
+  this.practiceArmed=false;
+  this.practiceBtn.setDisabled(true);
+  this.onPractice(this.tape);
+ }
+ _disarmPractice(){
+  if(!this.practiceArmed)return;
+  this.practiceArmed=false;
+  this.practiceBtn.setLabel('RACE GUEST');
+  this.status.setText('UNVERIFIED GUEST - READ-ONLY PREVIEW');
+ }
  scrub(direction){
   if(!this.preview||!this.alive)return;
+  this._disarmPractice();
   this.cursor=Math.max(0,Math.min(this.preview.count-1,this.cursor+direction*Math.max(1,Math.ceil(this.preview.count/16))));
   this.elapsedMs=this.cursor*SAMPLE_MS;
   this._draw();
  }
  togglePlayback(){
+  this._disarmPractice();
   if(!this.preview||!this.alive){
    this.status.setText('PREVIEW A GHOST LINK BEFORE WATCHING');
    return;
@@ -282,10 +317,12 @@ export class GhostLinkView extends View {
   if(action==='left'||action==='right'){this.scrub(action==='left'?-1:1);return true;}
   if(action==='confirm'){this.inspect();return true;}
   if(action==='alt'){this.togglePlayback();return true;}
+  if(action==='shop'){this.startGuestPractice();return true;}
   return true;
  }
  destroy(){
   ++this.token;
+  this.practiceArmed=false;
   this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;this.playing=false;
   this.scene.events.off(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this.box?.destroy();this.box=null;

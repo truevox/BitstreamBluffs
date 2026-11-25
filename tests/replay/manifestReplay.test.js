@@ -161,8 +161,8 @@ describe('R-1..R-4: replay setup never reads the clock, the profile level or the
   test('RunScene replay path is wired to the resolved setup and live play paths are intact', () => {
     const src = fs.readFileSync('src/scenes/RunScene.js', 'utf8');
     expect(src).toMatch(/const rp = replay \? resolveReplaySetup\(replay, \{ rules: DailyPatch\.RULES \}\) : null;/);
-    expect(src).toMatch(/this\.dailyOfficial = !replay && reg\.get\(REG\.DAILY_OFFICIAL\) === true/);
-    expect(src).toMatch(/this\.bsodGym = !replay && reg\.get\(REG\.BSOD_GYM\) === true/);
+    expect(src).toMatch(/this\.dailyOfficial = !replay && !this\.guestPractice && reg\.get\(REG\.DAILY_OFFICIAL\) === true/);
+    expect(src).toMatch(/this\.bsodGym = !replay && !this\.guestPractice && reg\.get\(REG\.BSOD_GYM\) === true/);
     expect(src).toMatch(/const daily = rp \? \{ rule: rp\.dailyRule \} : seedDayInfo \? \{ rule: seedDayInfo\.rule \} : DailyPatch\.getDailyInfo\(\);/);
     expect(src).toMatch(/this\.magnetsDrop = rp \? rp\.magnetsDrop\n\s+: magnetsDropFor\(\{ level: prof\.level,/);
     expect(src).toMatch(/this\.kodiaksOn = rp \? rp\.kodiaksOn\n\s+: kodiaksEnabledFor\(\{ level: prof\.level,/);

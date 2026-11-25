@@ -283,6 +283,9 @@ export class UIScene extends Phaser.Scene {
     // zone chip (graphics repainted on palette change)
     this.zoneG = new Phaser.GameObjects.Graphics(this);
     this.hud.add(this.zoneG);
+    this.practiceTag=this._t(cx,16,'GUEST PRACTICE / UNRANKED',
+      {color:'magenta',anchor:'center',outline:'none'});
+    this.practiceTag.setVisible(this.scene.get(SCENES.RUN)?.guestPractice===true);
     this.zoneText = this._t(cx, 6, '', { color: 'cyan', anchor: 'center', outline: 'none' });
     this.zoneChip = { w: 0, key: 'cyan' };
     this.theme.bind(() => this._paintZone());
@@ -553,6 +556,7 @@ export class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------- events
 
   onRunStart(p) {
+    this.practiceTag?.setVisible?.(p?.practice===true);
     // First Gym launch gets the same frozen READY cue as later catches.
     this.gymReadyText?.setVisible?.(p?.gym === true);
     this.missionToastsThisRun.clear();

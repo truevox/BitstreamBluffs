@@ -42,6 +42,7 @@ import { SimClock } from '../systems/SimClock.js';
 import { GhostRecorder, TapePlayer, quantizeTilt } from '../systems/ghost/GhostTape.js';
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
+import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
@@ -177,6 +178,15 @@ export class RunScene extends Phaser.Scene {
     // upgrades, never the current profile (which may have levelled up and enabled new biomes since).
     this._replayTape = reg.get(REG.GHOST_REPLAY) || null;
     if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
+    // Fail closed: even a malformed or externally planted handoff may only
+    // start an unranked practice session, NEVER an ordinary credited run.
+    const candidate = reg.get(REG.GUEST_PRACTICE);
+    reg.remove(REG.GUEST_PRACTICE);
+    this.guestPractice = candidate !== undefined && candidate !== null;
+    this.guestPracticeTape = this.guestPractice && guestPracticeEligible(candidate) ? candidate : null;
+    // An untrusted guest must never be promoted into TapePlayer/input replay,
+    // even if a stale earlier replay handoff was still in the registry.
+    if(this.guestPractice)this._replayTape=null;
     const replay = this._replayTape;
     // Replay Contract R-1..R-4: a replay resolves daily rule, Sync Level and Kodiak/magnet flags from the recorded
     // tape/manifest, never from the clock, the live profile or the live registry flags.
@@ -201,7 +211,7 @@ export class RunScene extends Phaser.Scene {
     // The today check means a retry or a pause-restart after 00:00 UTC cannot back-fill yesterday.
     const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
     const todayKey = DailyPatch.getDailyInfo().dateKey;
-    this.dailyOfficial = !replay && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    this.dailyOfficial = !replay && !this.guestPractice && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
     // Separate ranked Daily lane. A typed seed, Gym or stale-date retry
     // can NEVER turn itself into an official competitive Draft.
     this.dailyMode=this.dailyOfficial&&reg.get(REG.DAILY_MODE)==='draft'?'draft':'classic';
@@ -215,7 +225,7 @@ export class RunScene extends Phaser.Scene {
     // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
     // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
-    this.bsodGym = !replay && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
+    this.bsodGym = !replay && !this.guestPractice && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
@@ -508,7 +518,8 @@ export class RunScene extends Phaser.Scene {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
       dailyMode:this.dailyMode,
-      gym: this.bsodGym === true, // non-ranked practice must never trigger live mission-completion toasts
+      gym: this.bsodGym === true, // Gym READY remains an independent mode
+      practice: this.guestPractice === true, // explicitly unranked: suppress mission/award toasts
     });
   }
 
@@ -522,8 +533,17 @@ export class RunScene extends Phaser.Scene {
     const replay = this._replayTape;
     this.tapePlayer = replay ? new TapePlayer(replay) : null;
     // Ghosts are cosmetic: a recorder that cannot start must never stop the run from starting.
-    try { this.ghostRecorder = this.bsodGym || replay ? null : new GhostRecorder(this._ghostHeader()); }
+    try { this.ghostRecorder = this.bsodGym || replay || this.guestPractice ? null : new GhostRecorder(this._ghostHeader()); }
     catch (e) { this.ghostRecorder = null; }
+    if(this.guestPractice){
+      // Just ONE visual-only guest, never a Matter body or an input driver;
+      // no asynchronous local library fetch and no persistence.
+      if(this.guestPracticeTape){
+        try {this.ghostRiders=[new GhostRider(this,{tape:this.guestPracticeTape,roles:['guest']},this.palette)];}
+        catch{this.ghostRiders=[];}
+      }
+      return;
+    }
     const lib = this.registry.get(REG.GHOSTS);
     if (!lib || this.bsodGym || replay) return;
     const st = this.settings || {};
@@ -822,8 +842,8 @@ export class RunScene extends Phaser.Scene {
     // Stamp the actual live achievement BEFORE the store marks the Gym as
     // discovered. Otherwise legacy-migration logic would infer a historical
     // unlock at timestamp zero and swallow the real first-time reveal toast.
-    const achieved = !this.bsodGym ? store?.recordBsodBluff?.(event.chain,Date.now()) : null;
-    const discovered = !this.bsodGym && store?.discoverBsodGym?.();
+    const achieved = !this.bsodGym && !this.guestPractice ? store?.recordBsodBluff?.(event.chain,Date.now()) : null;
+    const discovered = !this.bsodGym && !this.guestPractice && store?.discoverBsodGym?.();
     if (discovered?.discovered || achieved?.added?.length)
       this.registry?.set?.(REG.PROFILE, store.profile);
     // The nested Easter egg is earned ONLY by five genuine scored escapes
@@ -2259,7 +2279,7 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
-      this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
+      if(!this.guestPractice)this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
       if (this.bestMarker) this.bestMarker.markPassed();
       this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.28);
       this.fx.ring(sled.x, sled.y, this.palette.amber, 80, 700);
@@ -2634,8 +2654,11 @@ export class RunScene extends Phaser.Scene {
     this.sled.vanish();
     this.shake(TUNING.shakeCrash);
     this.flashRect.setFillStyle(0xffffff, 1).setAlpha(0.55);
-    this.reportCrash(c, fs);
+    if(!this.guestPractice)this.reportCrash(c, fs);
 
+    // Untrusted guest practice NEVER creates a RunRecord, GhostTape, award,
+    // score submission or RUN_END. Crash animation ends with RUN_ABORT->Title.
+    if(this.guestPractice)return;
     // A replay is a re-simulation of an existing run: it never saves a record, awards progress or records a tape.
     if (this.tapePlayer) return;
     // persist + hand off
@@ -2718,6 +2741,12 @@ export class RunScene extends Phaser.Scene {
     this.renderFrame(dt);
     if (this.crashTimerMs >= CRASH_TO_GAMEOVER_MS && !this._leaving) {
       this._leaving = true;
+      if(this.guestPractice){
+        this.game.events.emit(EVT.RUN_ABORT,{runId:this.runId,reason:'guest-practice-ended',practice:true});
+        this.scene.stop(SCENES.UI);
+        this.scene.start(SCENES.TITLE);
+        return;
+      }
       this.scene.stop(SCENES.UI);
       this.scene.start(SCENES.GAME_OVER);
     }
@@ -2733,7 +2762,7 @@ export class RunScene extends Phaser.Scene {
     this._manualPausePending = true;
     const pauseToken = `${this.runId}:${++this._manualPauseSeq}`;
     const manual = { runTimeMs: this.runTimeMs, runId: this.runId,
-      reason: 'manual', pauseToken, gym: this.bsodGym === true };
+      reason: 'manual', pauseToken, gym: this.bsodGym === true, practice: this.guestPractice === true };
     // The transition must complete even if an audio/third-party observer
     // throws while constructing its scratch. Nothing may hold gameplay hostage.
     try { this.game.events.emit(EVT.GAME_PAUSE, manual); }

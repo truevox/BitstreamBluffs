@@ -89,7 +89,7 @@ export class MissionsService {
 
     this.resetLive();
     on(EVT.RUN_START, (payload) => {
-      this._gymPractice = payload?.gym === true;
+      this._gymPractice = payload?.gym === true || payload?.practice === true;
       this.resetLive();
       this._completedThisRun.clear();
       // The run's biome mask, so a biome mission toasts live only when this run can actually pay it.

@@ -7,8 +7,8 @@ import { decodeTrace, tracePose } from '../systems/ghost/GhostTape.js';
 
 export const GHOST_ALPHA = 0.42;
 export const GHOST_DEPTH = 19; // just behind the live sled (20)
-const ROLE_LABEL = { best: 'BEST', latest: 'LAST', fav0: 'FAV A', fav1: 'FAV B', fav2: 'FAV C' };
-const ROLE_ORDER = ['best', 'latest', 'fav0', 'fav1', 'fav2'];
+const ROLE_LABEL = { guest: 'GUEST', best: 'BEST', latest: 'LAST', fav0: 'FAV A', fav1: 'FAV B', fav2: 'FAV C' };
+const ROLE_ORDER = ['guest', 'best', 'latest', 'fav0', 'fav1', 'fav2'];
 
 /** Tag text and colour key for a run holding `roles` (best wins, then latest, then favorites). */
 export function ghostTag(roles) {

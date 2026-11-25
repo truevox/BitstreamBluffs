@@ -25,6 +25,7 @@ import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -37,11 +38,13 @@ export class PauseScene extends Phaser.Scene {
     this.runIdFromData = (data && data.runId) || '';
     this.manualPauseToken = (data && data.pauseToken) || '';
     this.manualPauseGym = data?.gym === true;
+    this.manualPauseGuest = data?.practice === true;
   }
 
   create() {
     this.leaving = false;
-    this.gymPractice = this.registry.get(REG.BSOD_GYM) === true;
+    this.guestPractice = this.manualPauseGuest || this.scene?.get?.(SCENES.RUN)?.guestPractice === true;
+    this.gymPractice = this.registry.get(REG.BSOD_GYM) === true || this.guestPractice;
     this.view = null;
     this.dim = null;
     const theme = (this.theme = new Theme(this));
@@ -56,7 +59,7 @@ export class PauseScene extends Phaser.Scene {
     this._buildHeader(theme);
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
@@ -283,6 +286,14 @@ export class PauseScene extends Phaser.Scene {
   /** Abort this run and start a new one with the same seed. @returns {void} */
   restart() {
     if (this.leaving) return;
+    if(this.guestPractice){
+      const guest=this.scene.get(SCENES.RUN)?.guestPracticeTape;
+      // A missing/stale guest cannot silently become a ranked restart.
+      if(!guestPracticeEligible(guest)){this.quit();return;}
+      this.registry.set(REG.GUEST_PRACTICE,guest);
+      this.registry.set(REG.DAILY_OFFICIAL,false);
+      this.registry.set(REG.BSOD_GYM,false);
+    }
     this.leaving = true;
     uiSfx(this, 'uiSelect');
     try {
@@ -307,6 +318,7 @@ export class PauseScene extends Phaser.Scene {
     } catch (e) { console.warn('Quit observer failed; continuing', e); }
     // Clear the practice flag before showing the normal title/menu.
     this.registry.set(REG.BSOD_GYM, false);
+    this.registry.remove(REG.GUEST_PRACTICE);
     this.scene.stop(SCENES.RUN);
     this.scene.stop(SCENES.UI);
     this.scene.start(SCENES.TITLE);
