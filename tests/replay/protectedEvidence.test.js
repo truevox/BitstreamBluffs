@@ -731,6 +731,22 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
   });
 
+  test('P1: a cross-tab explicit deletion cannot be undone by unrelated pending auto-flush',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('transient failure before first save');
+    await expect(stale.put(target,{runId:'original'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pending.has(digest)).toBe(true);
+    idb.hooks.failPut=null;
+    await other.put(target,{archiveOnly:true});
+    await other.remove(digest); // authoritative explicit deletion in another tab
+    expect(await other.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+    await stale.put({...target,claims:{...target.claims,score:721}},{runId:'another'});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
