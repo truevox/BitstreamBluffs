@@ -243,6 +243,17 @@ try {
       assert(b.marker.onscreen.best&&b.marker.onscreen.death,'both labels must intersect camera during genuine rendered frames');
       assert(b.marker.capturedFrame.best&&b.marker.capturedFrame.death,
         'both label text bounds must intersect camera ON THE FRAME BEING CAPTURED');
+      // Camera shake draws a NEW cosmetic RNG offset even for dt=0: an
+      // identical simulation tick may otherwise move the whole screenshot
+      // several pixels between visibility toggles. Stabilize ONLY the local
+      // test camera after all causal comparisons, never production physics.
+      await marked.p.evaluate(()=>{
+        const run=window.__bbGame.scene.getScene('RunScene');
+        const tick=run.simClock.tick;
+        run.shakeAmp=0;
+        run.updateCamera(0);
+        if(run.simClock.tick!==tick)throw Error('Raster camera stabilization advanced simulation');
+      });
       // Pixel proof of EACH label, not merely the gate poles. Hide only one
       // Phaser text object at a time, re-render the SAME camera with zero
       // simulation delta, and compare a tightly clipped text region. The
