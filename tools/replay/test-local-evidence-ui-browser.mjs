@@ -96,18 +96,40 @@ try {
   const base=evidenceBundle({manifest:legacyManifestFromTape(legacyTape),tape:legacyTape});
   const bundle={...base,claims:{...base.claims,score:base.claims.score+912}};
   const digest=bundleDigest(bundle),bytes=bundleBytes(bundle);
-  const saved=view.actions.store;
-  view.actions.store={backend:'memory'}; // previously blocked upgrade recovered in shared store
+  const unrelated={...base,claims:{...base.claims,score:base.claims.score+913}};
+  const pendingDigest=bundleDigest(unrelated);
+  const originalWrite=store._writeDurable;
+  store._writeDurable=async(_record,_bytes,receipt)=>{
+    if(receipt)receipt.classification='new';
+    throw new Error('temporary quota');
+  };
+  try{await store.put(unrelated,{runId:'reopen-pending'}).catch(()=>{});}
+  finally{store._writeDurable=originalWrite;}
+  const previousDb=store._db;
+  const originalInit=store.init.bind(store),initOptions=[];
+  store.init=async options=>{initOptions.push(options);return originalInit(options);};
+  // Model an unexpected IDB closure: reconnect must go through REAL init().
+  previousDb.close();store._db=null;store.backend='memory';
+  view.buttons[0].setDisabled(true);view.buttons[1].setDisabled(true);
   try{
     await view._processImportFile({name:`${digest.slice(7)}.bbreplay`,size:bytes.length,
       arrayBuffer:async()=>bytes.slice().buffer});
-    return {backend:view.actions.store.backend,durable:await store.isBundleDurable(digest),
+    return {backend:store.backend,realReopen:store._db!==null&&store._db!==previousDb,
+      noFlush:initOptions.some(o=>o?.skipPendingFlush===true),
+      pendingUnrelated:store.pending.has(pendingDigest),durable:await store.isBundleDurable(digest),
+      controlsReady:!view.buttons[0].disabled&&!view.buttons[1].disabled,
       feedback:view.status.main.text};
-  }finally{view.actions.store=saved;await view._refresh({retryPending:false});}
+  }finally{
+    store.init=originalInit;
+    store.pending.delete(pendingDigest);store.pendingMeta.delete(pendingDigest);
+    store._unsafePending.delete(pendingDigest);
+    await view._refresh({retryPending:false});
+  }
  });
  assert.equal(importReconnect.backend,'idb');
- assert(importReconnect.durable && importReconnect.feedback.includes('IMPORTED'));
- record('Import reconnects formerly memory-only archive without retrying other bundles');
+ assert(importReconnect.realReopen && importReconnect.noFlush && importReconnect.pendingUnrelated);
+ assert(importReconnect.durable && importReconnect.controlsReady && importReconnect.feedback.includes('IMPORTED'));
+ record('Import really reopens IndexedDB, restores controls, and preserves unrelated pending bytes');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();
