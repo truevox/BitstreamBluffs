@@ -786,6 +786,36 @@ describe('protected local evidence references (#244)', () => {
     expect(stale._unsafePending.has(digest)).toBe(true);
   });
 
+  test('P1: deliberate post-deletion import recovers after write failure if deletion has not changed',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});
+    await owner.remove(digest);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('transient quota');
+    await expect(fresh.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    expect(fresh.pending.has(digest)).toBe(true);
+    expect(fresh._unsafePending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await fresh.retryPending({digest});
+    expect(await new EvidenceStore({idb,storage:null}).init().then(s=>s.inspectBundle(digest,{runId:'new-owner'})))
+      .toEqual({readable:true,durable:true,runBound:true});
+  });
+
+  test('P1: a second delete invalidates a pending re-import that followed an earlier delete',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('temporary quota');
+    await expect(fresh.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await owner.remove(digest); // newer user delete overrides subsequent retry
+    await fresh.retryPending({digest});
+    expect(fresh._unsafePending.has(digest)).toBe(true);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
