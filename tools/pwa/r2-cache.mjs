@@ -23,8 +23,16 @@ function markerUrl(group,origin,scope){return new URL(scope+'.bitstream/r2-compl
 async function verifiedResponse(cache,e,subtle){const r=await cache.match(e.url);if(!r?.ok||r.type==='opaque')return null;const b=await r.clone().arrayBuffer();return b.byteLength===e.bytes&&await digest(b,subtle)===e.sha256?r:null;}
 export async function catalogCacheGroup(entry,subtle){const entries=[entry];return {id:'release-catalog',version:(await digest(new TextEncoder().encode(JSON.stringify(entries)),subtle)).slice(0,20),entries};}
 /** Full readiness is verified, not inferred from an old completion marker. */
-export async function inspectR2Group(group,{storage,origin,scope,subtle}){
-  await groupCheck(group,subtle);const cache=await storage.open(groupName(group,scope));
+export async function inspectR2Group(group,{storage,origin,scope,subtle,knownCacheNames=null}){
+  await groupCheck(group,subtle);
+  // CacheStorage.open CREATES a cache. A cold 33-song status check used to
+  // manufacture 133 empty caches, then pointlessly scan every recording.
+  // A single CacheStorage.keys snapshot lets missing groups fail safely
+  // without any mutation. Existing partial caches still get per-file checks.
+  if(knownCacheNames&&!knownCacheNames.has(groupName(group,scope)))return {
+    ready:false,missingBytes:group.entries.reduce((n,e)=>n+e.bytes,0),verifiedBytes:0,
+  };
+  const cache=await storage.open(groupName(group,scope));
   const marker=await cache.match(markerUrl(group,origin,scope));let complete=false;
   if(marker?.ok){try{const saved=await marker.json();complete=saved.id===group.id&&saved.version===group.version&&JSON.stringify(saved.entries)===JSON.stringify(group.entries);}catch{}}
   let missingBytes=0,verifiedBytes=0;
@@ -35,9 +43,19 @@ export async function downloadR2Group(group,{storage,origin,scope,subtle,fetcher
   if(consent!==true)throw Error('Explicit download consent required');
   scopePath(scope);await groupCheck(group,subtle);
   if(!Number.isInteger(concurrency)||concurrency<1||concurrency>8)throw Error('Invalid download concurrency');
-  const cache=await storage.open(groupName(group,scope)),marker=markerUrl(group,origin,scope);
-  await cache.delete(marker);let next=0,completed=0,bytes=0,failure=null;
   const aborted=()=>{if(signal?.aborted)throw Error('R2 download aborted');};
+  aborted();
+  const cache=await storage.open(groupName(group,scope)),marker=markerUrl(group,origin,scope);
+  // Preserve an already-verified marker across cancellation/repair. A broken
+  // unrelated group must not temporarily make this completed group unplayable.
+  const existing=await inspectR2Group(group,{storage,origin,scope,subtle});
+  aborted();
+  if(existing.ready){
+    const bytes=group.entries.reduce((n,e)=>n+e.bytes,0);
+    onProgress({completed:group.entries.length,total:group.entries.length,bytes});
+    return {completed:group.entries.length,bytes};
+  }
+  await cache.delete(marker);let next=0,completed=0,bytes=0,failure=null;
   await Promise.all(Array.from({length:Math.min(concurrency,group.entries.length)},async()=>{
     while(!failure&&next<group.entries.length){const e=group.entries[next++];try{
       aborted();if(!await verifiedResponse(cache,e,subtle)){

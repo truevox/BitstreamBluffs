@@ -10,3 +10,11 @@ test('cancel aborts in-flight request and duplicate start does not spawn another
 test('bonus opt-in comes last and readiness derives from required verification, not progress',async()=>{const f=fixture();await f.c.start({consent:true,includeBonus:true});expect(f.calls).toEqual(['release-catalog','required','bonus']);expect(f.c.state.ready).toBe(true);const f2=fixture({download:async()=>{}});expect((await f2.c.start({consent:true})).ready).toBe(false);});
 
 test('no selected required recordings means zero transfers; ready cache needs no quota estimate',async()=>{const off=fixture({plan:{...plan,groups:[]}});expect((await off.c.start({consent:true})).status).toBe('no-music');expect(off.calls).toEqual([]);const ready=fixture({estimate:async()=>({})});ready.ready.add('release-catalog');ready.ready.add('required');expect((await ready.c.start({consent:true})).ready).toBe(true);expect(ready.calls).toEqual([]);});
+
+test('cold readiness scans one CacheStorage.keys snapshot without creating empty group caches',async()=>{
+ const entry={url:'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/packs/a/0000-bass.ogg',bytes:8,sha256:'a'.repeat(64)};
+ const version=[...new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([entry]))))].map(n=>n.toString(16).padStart(2,'0')).join('').slice(0,20);
+ let keys=0,opened=0;const storage={keys:async()=>{keys++;return[];},open:async()=>{opened++;throw Error('CacheStorage.open must not be invoked for an absent group');}};
+ const c=new R2DownloadControls({plan:{format:'bb-published-music-plan-v1',catalog:e,groups:[{id:'a:base',version,priority:'required',entries:[entry]}]},storage,origin:'https://game.example',scope:'/BitstreamBluffs/',subtle:webcrypto.subtle,estimate:async()=>({quota:1e8,usage:0})});
+ const state=await c.refresh();expect(state.ready).toBe(false);expect(state.status).toBe('download-required');expect(state.missingBytes).toBe(e.bytes+entry.bytes);expect(keys).toBe(1);expect(opened).toBe(0);
+});

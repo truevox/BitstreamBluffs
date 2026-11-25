@@ -8,7 +8,12 @@ export class R2DownloadControls {
  }
  _set(next){this.state={...this.state,...next};this.onState({...this.state});}
  async _groups(includeBonus=false){return [await catalogCacheGroup(this.plan.catalog,this.opts.subtle),...this.plan.groups.filter(g=>g.priority==='required'||(includeBonus&&g.priority==='bonus'))];}
- async _check(groups){const states=await Promise.all(groups.map(g=>this.inspect(g,this.opts)));return {ready:states.every(x=>x.ready),missingBytes:states.reduce((n,x)=>n+x.missingBytes,0)};}
+ async _check(groups){
+  const knownCacheNames=typeof this.opts.storage?.keys==='function'
+    ?new Set(await this.opts.storage.keys()):null;
+  const states=await Promise.all(groups.map(g=>this.inspect(g,{...this.opts,knownCacheNames})));
+  return {ready:states.every(x=>x.ready),missingBytes:states.reduce((n,x)=>n+x.missingBytes,0)};
+ }
  async refresh(){if(this.running)return this.state;if(!this.plan.groups.some(g=>g.priority==='required')){this._set({status:'no-music',ready:false,missingBytes:0});return this.state;}const x=await this._check(await this._groups());if(!this.running)this._set({...x,status:x.ready?'ready':'download-required'});return this.state;}
  start({consent=false,includeBonus=false}={}){
   if(consent!==true)return Promise.reject(Error('Explicit player download consent required'));
