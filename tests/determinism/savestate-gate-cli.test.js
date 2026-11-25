@@ -54,4 +54,4 @@ test('terminal window rejects an invalid bound before starting the build',()=>{
   expect(r.status).toBe(2);
   expect(r.stderr).toContain('terminal window: 937..12000');
   expect(r.stdout).not.toContain('building for production');
-});
+},20000); // Jest must outlive the 15s child timeout, including slow CI runners
