@@ -80,6 +80,7 @@ export class EvidenceStore {
     this.lastError = null;
     this._seq = 0;
     this._db = null;
+    this._everDurable = false;
   }
 
   /** True only while IndexedDB is the backend and no bundle is memory-only. */
@@ -122,8 +123,16 @@ export class EvidenceStore {
             this._report(new EvidenceStoreError('read-failed', 'IndexedDB version changed; reopen evidence archive before protecting'));
           }
         };
-        const all = await req2p(db.transaction(EVIDENCE_INDEX, 'readonly').objectStore(EVIDENCE_INDEX).getAll());
-        const refs = await req2p(db.transaction(EVIDENCE_REFS, 'readonly').objectStore(EVIDENCE_REFS).getAll());
+        // One readonly transaction is a consistent snapshot of evidence AND
+        // protection indexes. Separate transactions could observe different tabs.
+        const readTx = db.transaction([EVIDENCE_INDEX,EVIDENCE_REFS], 'readonly');
+        const doneRead = txDone(readTx);
+        const reads = Promise.all([
+          req2p(readTx.objectStore(EVIDENCE_INDEX).getAll()),
+          req2p(readTx.objectStore(EVIDENCE_REFS).getAll()),
+        ]);
+        const [all, refs] = await reads;
+        await doneRead;
         if (connectionClosed) throw new Error('IndexedDB closed during initialization');
         // Reopening is a REPLACEMENT of the persisted snapshot, not a merge.
         // Browser storage may have been cleared while the old tab remained open.
@@ -152,6 +161,7 @@ export class EvidenceStore {
         this.protections = loadedRefs;
         this._seq = latestSeq;
         this._db = db;
+        this._everDurable = true;
         this.backend = 'idb';
       }
     } catch (e) {
@@ -237,8 +247,14 @@ export class EvidenceStore {
     try {
       const committed = await this._writeDurable(record, bytes);
       this.index.set(digest, committed);
-      this.pending.delete(digest);
-      this.pendingMeta.delete(digest);
+      const olderClaim = this.pendingMeta.get(digest);
+      // A second overlapping unbound write may succeed while an earlier
+      // explicit run-ID write is still pending. Do not discard the latter's
+      // session-only bytes until the persisted binding actually matches.
+      if (!olderClaim?.runId || committed.runId === olderClaim.runId) {
+        this.pending.delete(digest);
+        this.pendingMeta.delete(digest);
+      }
     } catch (e) {
       // We did not change the cache before the transaction. Another concurrent
       // put may already have committed; never roll its winning entry back.
@@ -435,6 +451,10 @@ export class EvidenceStore {
   /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
     if (this._removing.has(digest)) throw protectionError('delete-in-progress', 'deletion is already pending');
+    // After versionchange, a previously durable bundle may still exist on
+    // disk. Never claim deletion when only the tab's stale cache was changed.
+    if (!this._db && this._everDurable)
+      throw protectionError('not-durable', 'reopen the evidence database before deleting saved evidence');
     if (!this._db && this.protectedCount(digest)) throw protectionError('protected-evidence', 'release all local roles first');
     this._removing.add(digest);
     try {

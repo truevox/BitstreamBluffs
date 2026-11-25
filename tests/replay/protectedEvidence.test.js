@@ -386,6 +386,53 @@ describe('protected local evidence references (#244)', () => {
     expect(s.lastError.code).toBe('run-id-conflict');
   });
 
+  test('overlapping explicit and unbound writes never discard the explicit pending run claim', async () => {
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    const d=bundleDigest(bundle());
+    idb.hooks.failPut=v=>v?.runId==='claimed-A'?new Error('targeted failure'):null;
+    const first=store.put(bundle(),{runId:'claimed-A'});
+    const second=store.put(bundle());
+    const [a,b]=await Promise.allSettled([first,second]);
+    expect(a.status).toBe('rejected'); expect(a.reason.code).toBe('write-failed');
+    expect(b.status).toBe('fulfilled');
+    expect(store.pendingMeta.get(d).runId).toBe('claimed-A');
+    expect(store.pending.has(d)).toBe(true);
+    idb.hooks.failPut=null;
+    const unrelated={...bundle(),claims:{...bundle().claims,score:507}};
+    await store.put(unrelated,{runId:'another-run'}); // flushes exact pending A binding
+    const reopened=await new EvidenceStore({idb,storage:null}).init();
+    expect(reopened.index.get(d).runId).toBe('claimed-A');
+    expect(store.pending.has(d)).toBe(false);
+  });
+
+  test('index and protection references are loaded in one readonly transaction snapshot', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    const d=await s.put(bundle(),{runId:RUN});
+    await s.protect(d,{runId:RUN,role:'candidate'});
+    const events=[];
+    idb.hooks.onTransaction=(names,mode)=>events.push({names,mode});
+    const reopened=await new EvidenceStore({idb,storage:null}).init();
+    expect(reopened.protectedCount(d)).toBe(1);
+    expect(reopened.has(d)).toBe(true);
+    expect(events.filter(v=>v.mode==='readonly')).toEqual([
+      {names:['index','protectedRefs'],mode:'readonly'},
+    ]);
+  });
+
+  test('database version change makes explicit deletion refuse until a real durable reopen', async () => {
+    const {store,digest,idb}=await seededStore();
+    store._db.onversionchange();
+    await expect(store.remove(digest)).rejects.toMatchObject({code:'not-durable'});
+    expect(store.has(digest)).toBe(true);
+    await store.init();
+    expect(store.durable).toBe(true);
+    await store.remove(digest);
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.has(digest)).toBe(false);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{
