@@ -9,36 +9,43 @@ import {chromium} from 'playwright';
 import {measureFourTimesTruePeak} from './estimate-true-peak-4x.js';
 const url=process.env.GAME_URL||'http://127.0.0.1:8220/';
 const index=Number(process.env.QA_INDEX);
+const publicR2=process.env.QA_R2==='1';
+const biome=process.env.QA_BIOME||'debutmont';
+const root='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/';
+assert.ok(['debutmont','vertigo-vents','garbage-dump-glacier','candy-cane-canyon','crystal-cavern','bitstream-bluffs'].includes(biome));
 const out=process.env.REPORT_OUT;
 assert.ok(Number.isInteger(index)&&index>=0&&index<33);
 assert.ok(out&&!existsSync(out),'Unique report required');
-const report={format:'bsb-crossfade-live-v4-output-v1',index,status:'FAIL_QA_OR_SOURCE',pageErrors:[],httpErrors:[],mode:'controlled-gameplay-dsp'};
+const report={format:'bsb-crossfade-live-v4-output-v1',index,status:'FAIL_QA_OR_SOURCE',pageErrors:[],httpErrors:[],mode:'controlled-gameplay-dsp',publicR2,biome};
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist']});
 try{
  const page=await browser.newPage({viewport:{width:1080,height:720}});
  page.on('pageerror',e=>report.pageErrors.push(String(e)));
- page.on('response',r=>{if(r.status()>=400&&!(/\/music\/packs\/[^/]+\/adaptive\/debutmont\//.test(r.url())&&r.status()===404))report.httpErrors.push({status:r.status(),url:r.url()});});
+ page.on('response',r=>{if(r.status()>=400&&!(/\/music\/packs\/[^/]+\/adaptive\/debutmont\//.test(r.url())&&r.status()===404)&&!(publicR2&&r.status()===404&&new URL(r.url()).pathname==='/music/transition-grids.json'))report.httpErrors.push({status:r.status(),url:r.url()});});
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__bbGame?.registry.get('audioSynth')?._stemMusic?.ready&&window.__bbGame.scene.getScene('TitleScene')?.sys.isActive(),null,{timeout:30000});
  await page.keyboard.press('x');
  await page.waitForFunction(()=>window.__bbGame?.registry.get('audioSynth')?.ctx?.state==='running',null,{timeout:30000});
- await page.evaluate(async()=>{
+ await page.evaluate(async({publicR2,root})=>{
   const g=window.__bbGame,a=g.registry.get('audioSynth'),d=a._stemMusic;
   g.registry.set('profile',{...(g.registry.get('profile')||{}),unlocked:{...(g.registry.get('profile')?.unlocked||{}),musicVocals:true}});
   a.applySettings({...a.settings,masterVolume:1,musicVolume:1,sfxVolume:1,windVolume:1,windEnabled:true,musicVocals:true,vocalGain:1,musicCrossfade:true,dynamicOrchestra:false,musicShuffle:false});
   await d._gridRequest;
-  if(d.transitionGrids.size!==33||!a.settings.musicVocals)throw Error('Missing 33 grids or unlocked vocals');
+  if(!a.settings.musicVocals)throw Error('Missing unlocked vocals');
+  if(publicR2){if(d.catalogUrl!==root+'catalog.json'||d.catalog.length!==33||d.transitionGrids.size!==0)throw Error('Expected published R2 catalog and time-based fallback');}
+  else if(d.transitionGrids.size!==33)throw Error('Missing 33 private grids');
   g.scene.getScene('TitleScene').startRun('crossfade-output-qa');
- });
+ },{publicR2,root});
  await page.waitForFunction(()=>window.__bbGame.scene.getScene('RunScene')?.sys.isActive(),null,{timeout:25000});
- report.expected=await page.evaluate(async index=>{
+ report.expected=await page.evaluate(async({index,biome,publicR2,root})=>{
   const g=window.__bbGame,a=g.registry.get('audioSynth'),d=a._stemMusic,c=a.ctx;
-  g.loop.stop();d.setMenuMode(false);d.stop();d.lastCrossfade=null;d.trackIndex=index;
+  g.loop.stop();d.setMenuMode(false);d.stop();d.setBiome(biome);d.lastCrossfade=null;d.trackIndex=index;
   const info=await d._getTrack(index);
+  if(publicR2&&!info.base.startsWith(root+'packs/'))throw Error('Wrong public source pack');
   await c.audioWorklet.addModule('/tools/music/live-final-master-capture-processor.js');
   d._resumeOffset=info.pack.duration-9;d.start();
-  return {from:info.track.id,to:d.catalog[(index+1)%33].id,biome:d.biome,vocals:a.settings.musicVocals};
- },index);
+  return {from:info.track.id,to:d.catalog[(index+1)%33].id,biome:d.biome,vocals:a.settings.musicVocals,packBase:info.base,gridCount:d.transitionGrids.size};
+ },{index,biome,publicR2,root});
  await page.waitForFunction(index=>{const d=window.__bbGame.registry.get('audioSynth')._stemMusic;return d.started&&d.trackIndex===index&&d.pack&&!d._loading&&d.activeNodes.size>=6},index,{timeout:30000});
  await page.evaluate(()=>{
   const a=window.__bbGame.registry.get('audioSynth'),c=a.ctx;
@@ -57,6 +64,7 @@ try{
  });
  const f=report.observed.fade;
  assert.equal(f.from,report.expected.from);assert.equal(f.to,report.expected.to);assert.equal(report.observed.menuMode,false);
+ if(publicR2)assert.equal(f.beatAligned,false);
  assert.ok(f.end-f.start>=1.9&&f.end-f.start<=4.05);assert.equal(report.observed.clock,f.start);
  for(const role of ['drums','bass','guitar','piano','other','vocals']){
   assert.ok(report.observed.nodes.some(n=>n.role===role&&n.token===report.observed.token-1&&n.end>f.start),'Missing outgoing '+role);

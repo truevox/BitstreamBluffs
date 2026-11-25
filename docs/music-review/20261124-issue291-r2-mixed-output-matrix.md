@@ -60,3 +60,31 @@ Do not interpret the sampled no-clipping verdict as a -1 dBTP headroom pass. Pre
 Additional private report SHA-256:
 - opening fa57cc46f7443c2cffc04bb190368fc9c7fca86ffca0acfec6b12b374c8e321e
 - ending 2c3331ba80fc7ea0bcb13f12abcc66f14d97504cb1e8bc9c587e21fd0bfd2754
+
+## Paired headroom experiment and targeted live public crossfades
+
+QA only: identical native offline compressor output branches into the unchanged production 2x shaper and a parallel 8193-point 2x experimental shaper (knee .78, ceiling .88, same transfer equation as draft #321). Both stereo outputs are measured in the same four-channel offline render; baseline peaks/RMS reproduce the independently verified original ending report within 1e-6, and all source hashes/event receipts match. The original mixes and production guard remain unchanged.
+
+| Song ID | Biome | Production estimated dBTP | Candidate estimated dBTP | RMS delta dB |
+|---|---|---:|---:|---:|
+| local-one-more-run-bitstream-bluffs | Vertigo | -.535 | -1.216 | -.00911 |
+| ehy7VzQezYA | Candy | -.556 | -1.260 | -.00019 |
+| S9WQYIg8VzY | Garbage | -.569 | -1.242 | -.00250 |
+| GMvUptcX0Vc | Vertigo | -.641 | -1.273 | -.00045 |
+| 4ex2Owu8yGM | Vertigo | -.910 | -1.389 | -.00028 |
+
+All five passed sampled -1 dBTP target without clipping. This does not establish perceptual transparency or full-track/device compliance. Private paired report SHA-256 53097bd89555582796700685b77d2aa41e36e1f761fcd9a3d35258a293fc8336.
+
+Actual released R2 game transport, controlled high-risk biome, public time-based 2.8s fallback (no private beat grids), max volume/vocals: two of five live overlap attempts qualified, no near-silent overlap windows and no clipping. Both independently verified against catalog identity and v4 continuity receipts; live source bytes not independently hashed in this capture. Remaining attempts preserved, not counted as passes. Index 4 failed browser-state evaluation (possibly dev-server reload, not established); indices 25 and 31 failed quantum continuity instrumentation. No conclusion on cause or device reliability.
+
+| Catalog index | Result | Estimated dBTP | FFmpeg dBTP |
+|---|---|---:|---:|
+| 1 | Qualified, 9.140s | -.500 | -.5 |
+| 4 | Browser-state failure | — | — |
+| 25 | Invalid capture continuity | — | — |
+| 26 | Qualified, 9.021s | -1.764 | -1.8 |
+| 31 | Invalid capture continuity | — | — |
+
+Private report SHA-256 values respectively: 7dcba6bf5ef519c1fd6296c99d5c2b4451caf364ef51673664e8ae8123f41e7d; 293f3e528a824b6c7657d08f42c5ea71b2d2206407275f63308544ad6858cc9e; 23a8b4be5abaf5d6e3499edebc463565b68e3bdddecbafea701119c46f062e78; 1aaec5749145097bfe3818a7de6fde4e73bfec69d9bd30f093e61fc69b9d333e; 5aba0e7f686d883ec6ffe22951fdc090fc2e7051d4ec269ccf10dccf727e832a.
+
+81/81 focused tests passed, including new public R2 verifier negative controls. Next: stable live capture of the three unqualified overlaps and same-input crossfade guard comparison, independent review and listening/device gate. No production changes or deployment.

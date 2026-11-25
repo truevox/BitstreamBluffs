@@ -12,7 +12,16 @@ export function verifyCase(r,index,tracks){
  assert.deepEqual(r.pageErrors,[]);assert.deepEqual(r.httpErrors,[]);
  const from=tracks[index].id,to=tracks[(index+1)%33].id;
  assert.equal(r.expected.from,from);assert.equal(r.expected.to,to);
- assert.equal(r.expected.biome,'debutmont');assert.equal(r.expected.vocals,true);
+ if(r.publicR2===true){
+  const root='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/';
+  assert.ok(['debutmont','vertigo-vents','garbage-dump-glacier','candy-cane-canyon','crystal-cavern','bitstream-bluffs'].includes(r.biome));
+  assert.equal(r.expected.biome,r.biome);
+  assert.match(tracks[index].manifest,/^packs\/[\w-]+\/pack\.json$/);
+  assert.equal(r.expected.packBase,root+tracks[index].manifest);
+  assert.equal(r.expected.gridCount,0);
+  assert.equal(r.observed.fade.beatAligned,false);
+ }else assert.equal(r.expected.biome,'debutmont');
+ assert.equal(r.expected.vocals,true);
  const o=r.observed,f=o.fade,c=r.receipt,t=c.terminal,m=r.metrics;
  assert.equal(f.from,from);assert.equal(f.to,to);assert.equal(o.menuMode,false);
  assert.equal(f.start,o.clock);assert.ok(f.end-f.start>=1.9&&f.end-f.start<=4.05);

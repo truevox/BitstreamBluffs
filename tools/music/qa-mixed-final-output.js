@@ -122,7 +122,7 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode,offsetFrames=0}){
 	return mixer;
 }
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
-	profile='standard',manifestUrl=null,windowPosition='legacy'}){
+	profile='standard',manifestUrl=null,windowPosition='legacy',pairedHeadroom=false}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
 		throw Error('Unknown QA scenario');
 	if(!['standard','crash-static-overlap'].includes(profile))throw Error('Invalid QA profile');
@@ -135,11 +135,30 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 		for(const source of original.sources.values())
 			if(source.length!==original.segment.frames)throw Error('Decoded source frame count mismatch');
 	}
-	const ctx=new OfflineAudioContext(2,Math.round(RENDER_SECONDS*RATE),RATE);
+	const ctx=new OfflineAudioContext(pairedHeadroom?4:2,Math.round(RENDER_SECONDS*RATE),RATE);
 	// Pin only the presentational wind/SFX noise for repeatable source QA.
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
 	seedCosmeticRandom(QA_COSMETIC_SEED);
 	const a=actualAudioSynthGraph(ctx);
+	// Both guards receive the identical native compressor PCM in a single
+	// render. Preserve production curve and oversampling; candidate is QA-only.
+	if(pairedHeadroom){
+		const candidate=ctx.createWaveShaper();
+		const curve=new Float32Array(8193);
+		for(let i=0;i<curve.length;i++){
+			const v=2*i/(curve.length-1)-1,m=Math.abs(v),t=(m-.78)/.10;
+			curve[i]=m<=.78?v:Math.sign(v)*(.78+.10*(1-1/(1+t+t*t/2+t*t*t/6)));
+		}
+		candidate.curve=curve;candidate.oversample='2x';
+		a.nodes.comp.connect(candidate);
+		a.nodes.peakGuard.disconnect(ctx.destination);
+		const merge=ctx.createChannelMerger(4);
+		for(const [index,node] of [a.nodes.peakGuard,candidate].entries()){
+			const split=ctx.createChannelSplitter(2);
+			node.connect(split);split.connect(merge,0,index*2);split.connect(merge,1,index*2+1);
+		}
+		merge.connect(ctx.destination);
+	}
 	const mixer=scenario==='sfx-wind-only'?null:setOriginalSourceMix(ctx,a,original,
 		{biome,mode:scenario,offsetFrames});
 	let installedAudioSources=original.roles.length;
@@ -176,10 +195,14 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	]);
 	const rejected=eventResults.find(x=>x.status==='rejected');
 	if(rejected)throw rejected.reason;
-	const window=measureFourTimesTruePeak(pcm,{
+	const stereo=offset=>({length:pcm.length,sampleRate:pcm.sampleRate,numberOfChannels:2,getChannelData:i=>pcm.getChannelData(i+offset)});
+	const bounds={
 		startFrame:Math.floor((windowPosition==='legacy'?.20:START)*RATE),
 		endFrame:Math.floor(3.85*RATE),
-	});
+	};
+	const window=measureFourTimesTruePeak(stereo(0),bounds);
+	const paired=pairedHeadroom?{method:'same offline native compressor PCM, two parallel 2x shapers',knee:.78,ceiling:.88,
+		metrics:measureFourTimesTruePeak(stereo(2),bounds)}:null;
 	mixer?.destroy();
 	return {pack,trackId:original.manifest.id,sourceSegment:segmentIndex,
 		sourceFrameStart:original.segment.startFrame,sourceSegmentFrames:original.segment.frames,sourceOffsetFrames:offsetFrames,sourceWindowPosition:windowPosition,sourcePlaybackStartFrame:Math.round(START*RATE),sourceManifestUrl:original.packBase+'pack.json',biome,scenario,
@@ -204,7 +227,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 			originalVocals:true,originalMelodyWithVocalsGain:.18,
 			eventOrigin:'scripted OFFLINE stress timeline, not authoritative physics/replay',
 			events:sent},
-		...window,sourceFingerprintInputs:Object.keys(original.hashes).length,
+		...window,pairedHeadroom:paired,sourceFingerprintInputs:Object.keys(original.hashes).length,
 	};
 }
 
