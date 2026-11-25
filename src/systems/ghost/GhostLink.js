@@ -36,7 +36,7 @@ const reject=(code,message)=>{throw new GhostLinkError(code,message);};
 const uint=(x,max)=>Number.isSafeInteger(x)&&x>=0&&x<=max;
 const finite=(x)=>typeof x==='number'&&Number.isFinite(x)&&Math.abs(x)<1e10;
 const plain=(x)=>x!==null&&typeof x==='object'&&!Array.isArray(x);
-const seedOkay=s=>typeof s==='string'&&s.length>0&&s.length<=128&&!/[\u0000-\u001f\u007f<>]/u.test(s);
+const seedOkay=s=>typeof s==='string'&&s.length>0&&s.length<=128&&!/[\u0000-\u001f\u007f]/u.test(s);
 const textOkay=s=>typeof s==='string'&&s.length<=128&&!/[\u0000-\u001f\u007f<>]/u.test(s);
 
 /** Exact-compatible, bounded replay input. Fail CLOSED, not a verifier. */
@@ -98,6 +98,9 @@ function selected(tape){
   wallX:t.bsod.initial.wallX,wallSpeedPxS:t.bsod.initial.wallSpeedPxS,
   accelerationPxS2:t.bsod.initial.accelerationPxS2,
  }};
+ // Kodiak ruleset version is causally relevant only when bears are enabled.
+ // Never transport arbitrary unchecked nested data from an inactive field.
+ if(!t.kodiaksOn)delete t.kodiakVersion;
  if(t.upgradeRanks!==null){
   const ranks=Object.create(null), entries=Object.entries(t.upgradeRanks);
   if(entries.length>60)reject('invalid-loadout');

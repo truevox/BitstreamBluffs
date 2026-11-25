@@ -1,4 +1,4 @@
-import { guestPreview,visualGuestGapM,sameGuestCourse } from '../../src/ui/GhostLinkView.js';
+import { guestPreview,visualGuestGapM,sameGuestCourse,comparableLocalGhost } from '../../src/ui/GhostLinkView.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../../src/systems/ghost/GhostTape.js';
 
 function tape(points) {
@@ -20,6 +20,18 @@ describe('guest/local visual comparison course identity',()=>{
   expect(sameGuestCourse(guest,{seed:'s',biomeMask:5,simRevision:9,mode:'daily'})).toBe(false);
   expect(sameGuestCourse(guest,null)).toBe(false);
  });
+});
+
+test('favorite-only same-rules comparison is never incorrectly labeled Latest',()=>{
+ const guest={seed:'same',biomeMask:3,simRevision:9,mode:'normal',dailyRuleId:null,dailyRuleSource:'seed-date'};
+ const wrong={...guest,dailyRuleSource:'other'};
+ const selected=comparableLocalGhost(guest,[
+  {roles:['best'],tape:wrong},
+  {roles:['latest'],tape:wrong},
+  {roles:['fav0'],tape:{...guest,runId:'older-favorite'}}
+ ]);
+ expect(selected).toMatchObject({role:'FAVORITE',tape:{runId:'older-favorite'}});
+ expect(comparableLocalGhost(guest,[{roles:['latest'],tape:wrong}])).toBeNull();
 });
 
 describe('Guest Ghost-in-a-Link trace preview is strictly read-only',()=>{

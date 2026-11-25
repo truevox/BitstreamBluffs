@@ -44,6 +44,23 @@ test('explicit compact URL round-trip keeps only allowlisted replay fields, no p
  expect(GHOST_LINK_MAX_URL).toBe(8192);
 });
 
+test('valid original seeds containing angle brackets round-trip without HTML escaping',async()=>{
+ const t={...valid(),seed:'ridge<3 > summit'};
+ const link=await createGhostLink(t,URL);
+ const imported=await parseGhostLink(link);
+ expect(imported.tape.seed).toBe(t.seed);
+ expect(imported.canCreditScore).toBe(false);
+});
+
+test('inactive Kodiak version cannot smuggle nested untrusted fields',async()=>{
+ const t={...valid(),kodiaksOn:false,kodiakVersion:{secret:'DO_NOT_EXPORT',nested:{token:'PRIVATE'}}};
+ const link=await createGhostLink(t,URL);
+ const imported=await parseGhostLink(link);
+ expect(imported.tape).not.toHaveProperty('kodiakVersion');
+ expect(link).not.toContain('DO_NOT_EXPORT');
+ expect(imported.canSubmitOfficial).toBe(false);
+});
+
 test('encoding is deterministic, unkeyed checksum is NOT publisher authentication',async()=>{
  const t=valid(),a=await createGhostLink(t,URL),b=await createGhostLink(t,URL);
  expect(a).toBe(b);const got=await parseGhostLink(a);expect(got.trust).toBe('unverified-local-practice');
@@ -55,7 +72,7 @@ test('rejects future versions, incompatible physics, malformed start and invalid
  for(const [patch,want] of [
   [{version:99},'unsupported-tape'],[{simTickHz:60},'unsupported-tape'],
   [{simRevision:SIM_REVISION+1},'unsupported-ruleset'],[{biomeMask:2048},'invalid-course'],
-  [{seed:'<script>'},'invalid-course'],[{startPose:[0,0,0]},'invalid-initial-state'],
+  [{seed:'bad\nseed'},'invalid-course'],[{startPose:[0,0,0]},'invalid-initial-state'],
   [{random:{version:1,physicsScramble:2,visualSled:3,evilKey:'secret'}},'invalid-initial-state'],
   [{inputs:[[241,0,0]]},'invalid-input'],[{inputs:[[1,0,0],[0,1,0]]},'invalid-input'],
   [{trace:'not base64!'},'invalid-trace'],[{trace:floatTrace([[0,0,Infinity]])},'invalid-trace'],

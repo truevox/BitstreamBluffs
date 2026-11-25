@@ -44,6 +44,16 @@ export function sameGuestCourse(guest,local){
   (guest.dailyRuleId||'')===(local.dailyRuleId||'')&&
   (guest.dailyRuleSource||'')===(local.dailyRuleSource||'');
 }
+/** Prefer meaningful current local roles, not a stale favorite masquerading as Latest. */
+export function comparableLocalGhost(guest, candidates){
+ const matching=Array.isArray(candidates)?candidates.filter(g=>g?.tape&&sameGuestCourse(guest,g.tape)):[];
+ const has=(g,role)=>Array.isArray(g.roles)&&g.roles.includes(role);
+ const chosen=matching.find(g=>has(g,'best'))||matching.find(g=>has(g,'latest'))||
+  matching.find(g=>Array.isArray(g.roles)&&g.roles.some(r=>/^fav[012]$/.test(r)));
+ if(!chosen)return null;
+ const role=has(chosen,'best')?'BEST':has(chosen,'latest')?'LATEST':'FAVORITE';
+ return {tape:chosen.tape,role};
+}
 /** Visual distance gap only; never a trusted score or physical replay verdict. */
 export function visualGuestGapM(guest,local,tick){
  if(!guest||!local)return null;
@@ -155,13 +165,9 @@ export class GhostLinkView extends View {
     const all=await library?.ghostsFor(parsed.tape.seed,parsed.tape.biomeMask,{},{
      simRevision:parsed.tape.simRevision,
     });
-    const sameCourse=all?.filter(g=>sameGuestCourse(parsed.tape,g.tape));
-    localRulesDiffer=Boolean(all?.length&&!sameCourse?.length);
-    const best=sameCourse?.find(g=>g.roles.includes('best'));
-    const latest=sameCourse?.find(g=>g.roles.includes('latest'));
-    const chosen=best||latest||sameCourse?.[0];
-    if(chosen)comparator={model:guestPreview(chosen.tape),
-     role:chosen.roles.includes('best')?'BEST':'LATEST'};
+    const chosen=comparableLocalGhost(parsed.tape,all);
+    localRulesDiffer=Boolean(all?.length&&!chosen);
+    if(chosen)comparator={model:guestPreview(chosen.tape),role:chosen.role};
    }catch{ /* optional local comparison never blocks guest viewing */ }
    if(!this.alive||token!==this.token)return;
    this.preview=model;

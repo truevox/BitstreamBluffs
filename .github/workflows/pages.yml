@@ -4,6 +4,8 @@ on:
     paths:
       - '.github/workflows/pages.yml'
       - 'tools/hosting-browser-smoke.mjs'
+      - 'tools/test-real-ghost-link-browser.mjs'
+      - 'tests/src/ghost-link*.test.js'
       - 'tools/pwa/**'
       - 'src/**'
       - 'public/**'
