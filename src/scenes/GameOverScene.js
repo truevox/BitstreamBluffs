@@ -1455,7 +1455,7 @@ export class GameOverScene extends Phaser.Scene {
       const j = cosmeticRandom('gameover/fx').next() < 0.25;
       this.ghostA.setX(GAME_WIDTH / 2 - (j ? 5 : 2));
       this.ghostB.setX(GAME_WIDTH / 2 + (j ? 5 : 2));
-      this.title.setX(GAME_WIDTH / 2 + (j ? Phaser.Math.Between(-2, 2) : 0));
+      this.title.setX(GAME_WIDTH / 2 + (j ? cosmeticRandom('gameover/fx').int(-2, 2) : 0));
       this.ghostT = j ? 90 : 700;
     }
   }

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.22.4 — #59 seeded cosmetic RNG completion (2026-11-25)
+
+- Replace Phaser `Math.Between` calls (which hide unseeded `Math.random`) in HUD, Pause and Game Over with seeded, named cosmetic streams, including `pause/glitch`.
+- Add static guard for Phaser RNG helpers and seeded integer jitter regression tests.
+- Presentation-only: SIM_REVISION 9, authoritative physics, scoring, saved records and replay protocol unchanged. Public verifier and heavy savestates remain separate trust work.
+
 ## Unreleased — #245 dual-proof contract v1 (2026-11-25)
 
 - Add pure, separately versioned public-eligibility policy (`bb-dual-proof` v1) with independent replay, trusted entitlement and explicit publication-consent decisions. Free peer and paid hosted routes produce the same canonical verdict; payment cannot change competitive eligibility or rewards.

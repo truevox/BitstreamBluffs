@@ -3,6 +3,7 @@ import fs from 'fs';
 import { Rng } from '../../src/systems/Rng.js';
 import { runRandomStreams, runRandomState, RUN_STREAMS, RUN_RANDOM_VERSION } from '../../src/systems/RunRandom.js';
 import { randomSeed } from '../../src/ui/Format.js';
+import { cosmeticRandom, seedCosmeticRandom } from '../../src/systems/CosmeticRandom.js';
 
 const draws = (rng, n) => Array.from({ length: n }, () => rng.next());
 
@@ -62,6 +63,22 @@ describe('new seeds use the CSPRNG', () => {
     }
     expect(seen.size).toBeGreaterThan(45);
     expect(fs.readFileSync('src/ui/Format.js', 'utf8')).not.toMatch(/Math\.random/);
+  });
+});
+
+describe('issue #59: indirect Phaser random helpers are forbidden in live UI',()=>{
+  test('all scene code avoids Phaser.Math.Between and other Math.random-backed helpers',()=>{
+    const walk=(dir)=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>
+      e.isDirectory()?walk(`${dir}/${e.name}`):e.name.endsWith('.js')?[`${dir}/${e.name}`]:[]);
+    const offenders=walk('src').filter(f=>/Phaser\.Math\.(Between|FloatBetween|RND)/.test(fs.readFileSync(f,'utf8')));
+    expect(offenders).toEqual([]);
+  });
+  test('pause glitch jitter is inclusive and reproducible from a named seeded cosmetic stream',()=>{
+    seedCosmeticRandom(0x12345678);
+    const first=Array.from({length:20},()=>cosmeticRandom('pause/glitch').int(-2,4));
+    seedCosmeticRandom(0x12345678);
+    expect(Array.from({length:20},()=>cosmeticRandom('pause/glitch').int(-2,4))).toEqual(first);
+    expect(first.every(x=>Number.isInteger(x)&&x>=-2&&x<=4)).toBe(true);
   });
 });
 
