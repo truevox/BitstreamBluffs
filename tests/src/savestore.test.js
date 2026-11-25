@@ -621,3 +621,10 @@ describe('chase queries (seed best, daily best, daily streak)', () => {
     expect(Date.now() - t).toBeLessThan(200);
   });
 });
+
+test('offline quality persists as preference only and invalid values default to High',()=>{
+  const store=new SaveStore();
+  for(const mode of ['high','space-saver','no-music']){store.saveSettings({...defaultSettings(),offlineMusicQuality:mode});expect(new SaveStore().loadSettings().offlineMusicQuality).toBe(mode);}
+  expect(sanitizeSettings({offlineMusicQuality:'full',downloadConsent:true})).toMatchObject({offlineMusicQuality:'high'});
+  expect(sanitizeSettings({downloadConsent:true})).not.toHaveProperty('downloadConsent');
+});

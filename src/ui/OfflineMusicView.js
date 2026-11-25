@@ -3,6 +3,7 @@
 import {View} from './View.js';
 import {MenuList} from './MenuList.js';
 import {NeonText} from './Neon.js';
+import {updateSetting} from '../services.js';
 export const OFFLINE_MUSIC_CONTROLLER='offlineMusicDownloads';
 const mb=n=>Number.isFinite(n)?(n/1e6).toFixed(2)+' MB':'UNKNOWN';
 export function downloadStatusText(state={}){
@@ -41,7 +42,7 @@ export class OfflineMusicView extends View {
   this.note.setText(this.armed?'CONFIRM TO DOWNLOAD '+mb(s.missingBytes)+' OF MUSIC':this.tiered?'ACTIVE: '+(s.quality?.toUpperCase()||'NONE')+' / NO AUTO DOWNLOAD':'ORIGINAL QUALITY PREVIEW - NO AUTO DOWNLOAD');
   const items=this.menu.items;const arm=items.find(i=>i.label==='DOWNLOAD / REPAIR'),confirm=items.find(i=>i.label==='CONFIRM DOWNLOAD'),cancel=items.find(i=>i.label==='CANCEL DOWNLOAD'),refresh=items.find(i=>i.label==='CHECK OFFLINE STATUS');if(this.tiered){items[0].disabled=busy;items.at(-1).disabled=busy||!(s.liteReady||s.ready||s.mode==='no-music');}arm.disabled=busy||s.status==='no-music'||s.ready===true;confirm.disabled=busy||!this.armed;cancel.disabled=!busy;refresh.disabled=busy;this.menu.refresh();
  }
- async _mode(mode){if(this.pending||this.controller.running)return;this.armed=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.setMode(mode);}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
+ async _mode(mode){if(this.pending||this.controller.running)return;this.armed=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.setMode(mode);updateSetting(this.scene.game,'offlineMusicQuality',mode);}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
  async _apply(){if(this.pending||this.controller.running)return;this.pending=true;this.armed=false;this.localError=false;this._paint();try{await this.controller.apply();}catch(e){this.localError=String(e.message||e).includes('Stop music')?'STOP MUSIC BEFORE APPLYING QUALITY':'QUALITY NOT READY - CHECK DOWNLOAD';}finally{this.pending=false;this._paint();}}
  _arm(){if(this.pending||this.controller.running||this.controller.state?.ready||this.controller.state?.status==='no-music')return;this.armed=true;this._paint();}
  async _start(){if(!this.armed||this.pending)return;this.armed=false;this.pending=true;this.localError=false;this._paint();try{await this.controller.start({consent:true});}catch{this.localError=true;}finally{this.pending=false;this._paint();}}
