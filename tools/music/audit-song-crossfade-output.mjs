@@ -59,7 +59,7 @@ try{
  await page.waitForFunction(()=>{const d=window.__bbGame.registry.get('audioSynth')._stemMusic;return !!d.lastCrossfade||window.__crossfadeTap.state.errors.length},null,{timeout:15000,polling:50});
  report.observed=await page.evaluate(()=>{
   const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
-  if(window.__crossfadeTap.state.errors.length)throw Error('INSTRUMENT_CAPTURE: render discontinuity');
+  if(window.__crossfadeTap.state.errors.length)throw Error('INSTRUMENT_CAPTURE: render discontinuity '+JSON.stringify(window.__crossfadeTap.state.errors));
   return {fade:d.lastCrossfade,clock:d.clockStart,token:d._token,menuMode:d.menuMode,nodes:[...d._sourceEnvelopes.values()].map(({role,token,end})=>({role,token,end}))};
  });
  const f=report.observed.fade;

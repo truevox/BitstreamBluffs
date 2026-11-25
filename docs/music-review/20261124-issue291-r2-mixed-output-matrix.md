@@ -88,3 +88,19 @@ Actual released R2 game transport, controlled high-risk biome, public time-based
 Private report SHA-256 values respectively: 7dcba6bf5ef519c1fd6296c99d5c2b4451caf364ef51673664e8ae8123f41e7d; 293f3e528a824b6c7657d08f42c5ea71b2d2206407275f63308544ad6858cc9e; 23a8b4be5abaf5d6e3499edebc463565b68e3bdddecbafea701119c46f062e78; 1aaec5749145097bfe3818a7de6fde4e73bfec69d9bd30f093e61fc69b9d333e; 5aba0e7f686d883ec6ffe22951fdc090fc2e7051d4ec269ccf10dccf727e832a.
 
 81/81 focused tests passed, including new public R2 verifier negative controls. Next: stable live capture of the three unqualified overlaps and same-input crossfade guard comparison, independent review and listening/device gate. No production changes or deployment.
+
+## Static production build follow-up
+
+The previously unqualified three live overlap cases were rerun sequentially on a production build of ffa37036 (production source unchanged from 044ebd4b), served by a loopback-only static HTTP server, with the existing test-only capture worklet copied into dist/tools/music. No Vite HMR. All three qualified; independent verifier validated the entire five-case set against the published catalog SHA and v4 continuity receipts. 45.322449 seconds of accepted contiguous stereo PCM, zero sample clips, estimated overs, nonfinite samples, or near-silent overlap windows. All five transitions are actual 2.8-second time-based fallback crossfades, with vocals enabled and the designated controlled biome. Original three rejected attempts remain in the previous section; static success does not establish their root cause.
+
+| Index | Biome | Estimated dBTP | FFmpeg dBTP | Accepted report SHA-256 |
+|---|---|---:|---:|---|
+| 1 | Vertigo | -.500 | -.5 | 7dcba6bf5ef519c1fd6296c99d5c2b4451caf364ef51673664e8ae8123f41e7d |
+| 4 | Candy | -2.155 | -2.2 | 8a554de3463b63080bcd1e435ff47c5ff0f7e6ca941ec5b270798766a45db180 |
+| 25 | Garbage | -2.858 | -2.9 | 3aa72915ade4ca96f015d4124cd951bde14d1f92d52a9f89ca2d458f0e6c1675 |
+| 26 | Vertigo | -1.764 | -1.8 | 1aaec5749145097bfe3818a7de6fde4e73bfec69d9bd30f093e61fc69b9d333e |
+| 31 | Vertigo | -1.082 | -1.1 | 3450ec0c7e5793a11a0f272557edf86be66aedc6b985e4a91f331d971a7c5ec2 |
+
+Reproduction: build locally, copy the developer-only live capture worklet into the built assets at its expected URL, and serve dist on loopback using a static server. Invoke existing audit with QA_R2=1, QA_INDEX, QA_BIOME, GAME_URL and a unique REPORT_OUT for each case. The static server is for developer QA only, not publication.
+
+Experimental same-input crossfade guard replay was attempted twice for index 1, tapping live compressor output upstream of the production guard and planning native offline replay through both curves. Both attempts failed strict post-arm continuity with a repeated 128-frame quantum timestamp (expected 329344, got 329216; expected 334592, got 334464). No valid paired metrics exist, no cause established, and no retry of measured clipping occurred. The unqualified experimental code is retained as a private patch, not included in this PR. Established capture diagnostics now retain the actual discontinuity receipt. The five qualified same-input ending comparisons remain valid. Do not promote candidate until crossfade comparison, listening, device testing and review are satisfactory. All source and production DSP remain unchanged.
