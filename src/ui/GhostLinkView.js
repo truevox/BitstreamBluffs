@@ -35,6 +35,15 @@ export function guestPreview(tape){
  }
  return {trace,count,minX,maxX,minY,maxY};
 }
+/** Only compare traces recorded under the same course and mode rules.
+ * Sharing a seed alone does not make Daily and Normal runs equivalent. */
+export function sameGuestCourse(guest,local){
+ if(!guest||!local)return false;
+ return guest.seed===local.seed&&guest.biomeMask===local.biomeMask&&
+  guest.simRevision===local.simRevision&&guest.mode===local.mode&&
+  (guest.dailyRuleId||'')===(local.dailyRuleId||'')&&
+  (guest.dailyRuleSource||'')===(local.dailyRuleSource||'');
+}
 /** Visual distance gap only; never a trusted score or physical replay verdict. */
 export function visualGuestGapM(guest,local,tick){
  if(!guest||!local)return null;
@@ -146,9 +155,10 @@ export class GhostLinkView extends View {
     const all=await library?.ghostsFor(parsed.tape.seed,parsed.tape.biomeMask,{},{
      simRevision:parsed.tape.simRevision,
     });
-    const best=all?.find(g=>g.roles.includes('best'));
-    const latest=all?.find(g=>g.roles.includes('latest'));
-    const chosen=best||latest||all?.[0];
+    const sameCourse=all?.filter(g=>sameGuestCourse(parsed.tape,g.tape));
+    const best=sameCourse?.find(g=>g.roles.includes('best'));
+    const latest=sameCourse?.find(g=>g.roles.includes('latest'));
+    const chosen=best||latest||sameCourse?.[0];
     if(chosen)comparator={model:guestPreview(chosen.tape),
      role:chosen.roles.includes('best')?'BEST':'LATEST'};
    }catch{ /* optional local comparison never blocks guest viewing */ }

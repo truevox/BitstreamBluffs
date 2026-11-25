@@ -1,9 +1,26 @@
-import { guestPreview,visualGuestGapM } from '../../src/ui/GhostLinkView.js';
+import { guestPreview,visualGuestGapM,sameGuestCourse } from '../../src/ui/GhostLinkView.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../../src/systems/ghost/GhostTape.js';
 
 function tape(points) {
  return {trace:Buffer.from(new Float32Array(points.flat()).buffer).toString('base64')};
 }
+
+describe('guest/local visual comparison course identity',()=>{
+ const guest={seed:'s',biomeMask:5,simRevision:9,mode:'daily',dailyRuleId:'2026-11-25',dailyRuleSource:'rotation'};
+ test('accepts precisely matching course and daily rules',()=>{
+  expect(sameGuestCourse(guest,{...guest})).toBe(true);
+ });
+ test.each([
+  ['seed','other'],['biomeMask',0],['simRevision',8],['mode','normal'],
+  ['dailyRuleId','2026-11-26'],['dailyRuleSource','custom'],
+ ])('rejects a different %s', (field,value)=>{
+  expect(sameGuestCourse(guest,{...guest,[field]:value})).toBe(false);
+ });
+ test('does not treat missing daily rule identity as matching',()=>{
+  expect(sameGuestCourse(guest,{seed:'s',biomeMask:5,simRevision:9,mode:'daily'})).toBe(false);
+  expect(sameGuestCourse(guest,null)).toBe(false);
+ });
+});
 
 describe('Guest Ghost-in-a-Link trace preview is strictly read-only',()=>{
  test('extracts bounded physical path for an untrusted visual replay',()=>{
