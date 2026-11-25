@@ -15,6 +15,10 @@ import { FP_PREFIX } from './canonicalBinary.js';
 
 /** Registry key holding the status of the last evidence write: `{ok, digest?, durable?, code?, message?}`. */
 export const EVIDENCE_STATUS_KEY = 'lastEvidenceStatus';
+/** Bounded session-only status by run ID: older asynchronous writes cannot clobber newer runs. */
+export const EVIDENCE_STATUS_BY_RUN_KEY = 'evidenceStatusByRun';
+/** Run most recently scheduled for evidence capture, even before it finishes. */
+export const EVIDENCE_ACTIVE_RUN_KEY = 'activeEvidenceRunId';
 /** Optional registry key holding an EvidenceStore (tests, or a UI that created one); otherwise a shared lazy store is used. */
 export const EVIDENCE_STORE_KEY = 'evidenceStore';
 /** Registry key holding `{doc, rulesetId}`: the ruleset of this build (set by services.js). */
@@ -84,9 +88,23 @@ export async function saveRunEvidence(tape, recorder, opts) {
     if (!status.ok) console.warn(`[replay-evidence] not saved: ${status.code}: ${status.message}`); // eslint-disable-line no-console
     else if (!status.durable) console.warn('[replay-evidence] saved to memory only (no durable storage)'); // eslint-disable-line no-console
     const tagged={...status,runId:tape?.runId || null};
-    // Bind asynchronous capture status to the exact finished run. A new Game
-    // Over screen must never accidentally Keep or Export an older digest.
-    try { if (reg && typeof reg.set === 'function') reg.set(EVIDENCE_STATUS_KEY, tagged); } catch { /* signal is optional */ }
+    // Evidence captures are asynchronous and may finish OUT OF ORDER. Keep
+    // each run's status separately; older completions cannot overwrite the
+    // current run's visible outcome. This is session memory, never uploaded.
+    try {
+      if (reg && typeof reg.set === 'function') {
+        const old=reg.get?.(EVIDENCE_STATUS_BY_RUN_KEY);
+        const byRun=old instanceof Map ? new Map(old) : new Map();
+        if (tagged.runId) {
+          byRun.delete(tagged.runId);
+          byRun.set(tagged.runId, tagged);
+          while(byRun.size>32)byRun.delete(byRun.keys().next().value);
+          reg.set(EVIDENCE_STATUS_BY_RUN_KEY,byRun);
+        }
+        const active=reg.get?.(EVIDENCE_ACTIVE_RUN_KEY);
+        if (!active || active===tagged.runId) reg.set(EVIDENCE_STATUS_KEY,tagged);
+      }
+    } catch { /* status publication is optional; never break archiving */ }
     return tagged;
   };
   let validatedDigest = null;
@@ -115,6 +133,9 @@ export async function saveRunEvidence(tape, recorder, opts) {
  * @returns {void}
  */
 export function scheduleRunEvidence(tape, recorder, opts) {
+  // Set the active run synchronously at scheduling time, but do NOT set the
+  // legacy result key until the deferred validation/write has completed.
+  try { opts?.registry?.set?.(EVIDENCE_ACTIVE_RUN_KEY,tape?.runId||null); } catch { /* optional */ }
   const run = () => { saveRunEvidence(tape, recorder, opts); };
   if (typeof setTimeout === 'function') setTimeout(run, 0); else Promise.resolve().then(run);
 }
