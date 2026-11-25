@@ -201,7 +201,13 @@ export class ReplayEvidenceView extends View {
             // Preserving a selected file is more urgent than the current-run
             // archive read, but show BOTH warnings, not stale success.
             const archiveWarning=this.status.main.text;
-            this._show('KEEP ORIGINAL FILE',`${details} — ${archiveWarning}`);
+            // The screen's detail line is pixel-width limited: concise and
+            // lead with both safety facts rather than truncating the error.
+            const shortWarning=archiveWarning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
+              archiveWarning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':
+              archiveWarning.includes('RUN ID')?'RUN BINDING UNKNOWN':
+              'ARCHIVE STATUS UNKNOWN';
+            this._show('KEEP ORIGINAL FILE',`IMPORT UNSAVED; ${shortWarning}`);
           }
         }
       }
@@ -224,7 +230,16 @@ export class ReplayEvidenceView extends View {
     if (wantsUnpin){
       const displayed=this.displayedPin;
       if (!displayed?.generation) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
-      const result=await control.unpin(displayed.key,{expectedGeneration:displayed.generation});
+      let result;
+      try{result=await control.unpin(displayed.key,{expectedGeneration:displayed.generation});}
+      catch(e){
+        if(e?.code!=='stale-protection')throw e;
+        // A different IndexedDB connection can invalidate this tab's pin
+        // generation by throwing rather than returning a false receipt.
+        this._reconcileRequested=true;
+        this._show('PIN STATUS CHANGED','ANOTHER TAB CHANGED THE PIN — RECHECKING');
+        return;
+      }
       if(!result.ok){
         this._reconcileRequested=true;
         this._show('PIN STATUS CHANGED','ANOTHER TAB MAY HAVE REMOVED IT — RECHECKING');
