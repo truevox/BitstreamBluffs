@@ -51,7 +51,7 @@ function messageFor(e){
 export class GhostLinkView extends View {
  constructor(scene,theme,o){
   super(scene,theme,{w:420,h:208,y:31,title:'GUEST GHOST // UNVERIFIED',color:'magenta',
-   onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['←','→'],label:'SCRUB'}]});
+   onClose:o.onClose,hints:[{keys:['CTRL+ENTER'],label:'PREVIEW'},{keys:['CTRL+←/→'],label:'SCRUB'}]});
   this.preview=null;
   this.tape=null;
   this.cursor=0;
@@ -66,6 +66,12 @@ export class GhostLinkView extends View {
    x:this.panel.x+PLOT.x,y:this.panel.y+39,w:394,h:45,maxLength:GHOST_LINK_MAX_URL,
    multiline:true,value:o.initial||'',placeholder:'PASTE GHOST LINK HERE (CTRL+V)',
    color:'magenta',onSubmit:()=>this.inspect(),onCancel:()=>this.close(),
+   onShortcut:(e)=>{
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowRight'){this.scrub(1);return true;}
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowLeft'){this.scrub(-1);return true;}
+    if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='Enter'){this.togglePlayback();return true;}
+    return false;
+   },
   });
   this.plot=scene.add.graphics();this.panel.add(this.plot);
   this.meta=new NeonText(scene,theme,12,155,'NO GHOST LOADED',{color:'amber',outline:'none'});

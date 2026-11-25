@@ -13,7 +13,7 @@ export class DomTextBox {
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
    * @param {{x:number,y:number,w:number,h:number,multiline?:boolean,readOnly?:boolean,value?:string,maxLength?:number,
-   *          placeholder?:string,onSubmit?:function(string):void,onCancel?:function():void,color?:string}} o
+   *          placeholder?:string,onSubmit?:function(string):void,onCancel?:function():void,onShortcut?:function(KeyboardEvent):boolean,color?:string}} o
    */
   constructor(scene, theme, o) {
     this.scene = scene;
@@ -33,6 +33,12 @@ export class DomTextBox {
       'font-family:ui-monospace,Menlo,Consolas,monospace;border-radius:0;overflow:hidden;';
     el.addEventListener('keydown', (e) => {
       e.stopPropagation();
+      // Only screens opting into a special chord can intercept it. This runs
+      // before the standard Enter handler; all other text editing is intact.
+      if (o.onShortcut && o.onShortcut(e) === true) {
+        e.preventDefault();
+        return;
+      }
       if (e.key === 'Escape') {
         e.preventDefault();
         if (o.onCancel) o.onCancel();

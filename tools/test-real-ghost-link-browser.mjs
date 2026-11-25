@@ -4,6 +4,7 @@ import {resolve} from 'node:path';
 import {createGhostLink,parseGhostLink,GhostLinkError} from '../src/systems/ghost/GhostLink.js';
 import {chromium} from 'playwright';
 const natural=process.env.BSB_LINK_NATURAL==='1',base=process.env.BSB_LINK_BASE||'/';
+const mobile=process.env.BSB_LINK_MOBILE==='1';
 let vite,browser;
 try{
  const dist=process.env.BSB_LINK_DIST;
@@ -11,7 +12,7 @@ try{
  else {vite=await createServer({base,server:{host:'127.0.0.1',port:0,strictPort:true}});await vite.listen();}
  const origin='http://127.0.0.1:'+vite.httpServer.address().port+base;
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const ctx=await browser.newContext({viewport:{width:1000,height:540}}),p=await ctx.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ const ctx=await browser.newContext(mobile?{viewport:{width:412,height:915},deviceScaleFactor:2,isMobile:true,hasTouch:true}: {viewport:{width:1000,height:540}}),p=await ctx.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(()=>{window.__ghostCopies=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__ghostCopies.push(text);}}});});
  await p.goto(origin,{waitUntil:'domcontentloaded'});await p.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:40000});
  await p.evaluate(natural=>window.__bbGame.scene.getScene('TitleScene').startRun(natural?'sim-05@0':'ghost-link-proof@0'),natural);
@@ -116,6 +117,17 @@ try{
   return {cursor:v.cursor,position:v.position.main.text};
  });
  if(!(scrub.cursor>0)||!scrub.position.includes('UNRANKED'))throw Error('Trace scrub failed '+JSON.stringify(scrub));
+ // The paste textarea owns keyboard focus: Ctrl+Right/Left must still scrub,
+ // and Ctrl+Shift+Enter must start/pause visual playback without a run.
+ await p.locator('textarea').focus();
+ await p.keyboard.press('Control+ArrowRight');
+ const keyboardScrub=await p.evaluate(()=>({cursor:window.__bbGame.scene.getScene('TitleScene').view?.cursor}));
+ if(!(keyboardScrub.cursor>scrub.cursor))throw Error('Keyboard paste-field scrub failed '+JSON.stringify(keyboardScrub));
+ await p.keyboard.press('Control+Shift+Enter');
+ await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.playing===true,null,{timeout:8000});
+ await p.keyboard.press('Control+Shift+Enter');
+ await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.playing===false,null,{timeout:8000});
+
  const watchPoint=await clickPoint('playBtn');
  await p.mouse.click(watchPoint.x,watchPoint.y);
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.playing===true,null,{timeout:8000});
@@ -167,14 +179,8 @@ try{
   throw Error('A URL fragment caused automatic guest activity '+JSON.stringify(landed));
  await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene')._openSeed());
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.ghostLinkBtn,null,{timeout:8000});
- await recipient.waitForTimeout(400);
- const point=await recipient.evaluate(()=>{
-  const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v.ghostLinkBtn.zone,
-    pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),
-    rect=document.querySelector('canvas').getBoundingClientRect();
-  return {x:rect.left+pt.x/g.scale.gameSize.width*rect.width,y:rect.top+pt.y/g.scale.gameSize.height*rect.height};
- });
- await recipient.mouse.click(point.x,point.y);
+ await recipient.locator('input').focus();
+ await recipient.keyboard.press('Shift+Enter');
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
  const direct=await recipient.evaluate(()=>{
   const v=window.__bbGame.scene.getScene('TitleScene').view;
@@ -195,6 +201,6 @@ try{
  await recipient.close();
 
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,watching,paused,reduced,invalid,landed,direct,accepted,errors,recipientErrors}));
+ console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,invalid,landed,direct,accepted,errors,recipientErrors}));
 }finally{if(browser)await browser.close();if(vite){if(typeof vite.close==='function')await vite.close();
 else if(vite.httpServer)await new Promise((r,j)=>vite.httpServer.close(e=>e?j(e):r()));}}

@@ -1063,9 +1063,16 @@ export class SeedView extends View {
     this.box = new DomTextBox(scene, theme, {
       x: px + 12, y: py + 40, w: 316, h: 20, value: o.initial || '', maxLength: 32, placeholder: 'TYPE A SEED (EMPTY = RANDOM)',
       color: 'lime', onSubmit: () => this.submit(), onCancel: () => this.close(),
+      onShortcut: (e) => {
+        if (e.key === 'Enter' && e.shiftKey && this.onGhostLink) {
+          this.onGhostLink();
+          return true;
+        }
+        return false;
+      },
     });
     this.panel.add(new Keycaps(scene, theme, { x: 12, y: 66, color: 'lime',
-      items: [{ keys: ['ENTER'], label: 'GO' }, { keys: ['ESC'], label: 'BACK' }] }));
+      items: [{ keys: ['ENTER'], label: 'GO' }, { keys: ['SHIFT+ENTER'], label: 'GHOST' }, { keys: ['ESC'], label: 'BACK' }] }));
     this.go = new Button(scene, theme, { x: 12, y: this.h - 22, w: 96, h: 16, label: 'GO!', color: 'lime', onClick: () => this.submit() });
     this.panel.add(this.go);
     if(this.onGhostLink){
@@ -1083,6 +1090,7 @@ export class SeedView extends View {
   handleAction(action) {
     if (action === 'cancel') this.close();
     else if (action === 'confirm') this.submit();
+    else if (action === 'alt' && this.onGhostLink) this.onGhostLink();
     return true;
   }
 
