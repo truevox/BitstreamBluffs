@@ -272,11 +272,9 @@ try {
         run.updateCamera(0);
         if(run.simClock.tick!==tick)throw Error('Raster camera stabilization advanced simulation');
       });
-      // Pixel proof of EACH label, not merely the gate poles. Hide only one
-      // Phaser text object at a time, re-render the SAME camera with zero
-      // simulation delta, and compare a tightly clipped text region. The
-      // marker pole and all other scenery remain unchanged; the tick must not
-      // advance. This catches visible-but-not-painted labels.
+      // Pixel proof of EACH real marker label. After verifying genuine scene
+      // visibility, isolate only native Phaser text objects from unrelated
+      // decorative redraws; a zero-tick hide/restore must reproduce pixels.
       const clipRegions=await marked.p.evaluate(()=>{
         const g=window.__bbGame,run=g.scene.getScene('RunScene');
         const view=run.cameras.main.worldView;
@@ -304,36 +302,16 @@ try {
       },{label,visible});
       for(const label of ['best','death']){
         const clip=clipRegions[label];
-        const markerState=()=>marked.p.evaluate(label=>{
-          const run=window.__bbGame.scene.getScene('RunScene');
-          const m=run[label==='best'?'bestMarker':'deathMarker'];
-          const cam=run.cameras.main,rect=m.label.getBounds();
-          return {tick:run.simClock.tick,passed:m.passed,text:m.label.text,
-            x:m.label.x,y:m.label.y,visible:m.label.visible,
-            scrollX:cam.scrollX,scrollY:cam.scrollY,shakeAmp:run.shakeAmp,
-            bounds:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
-        },label);
         // Establish the same zero-simulation-frame rendering baseline used
         // for the hidden and restored captures. The bounded replay's final
         // frame may precede Phaser camera/label presentation settlement.
         await renderWithoutSim(label,true);
-        const visibleModel=await markerState();
         const visiblePixels=await marked.p.screenshot({clip});
         await renderWithoutSim(label,false);
-        const hiddenModel=await markerState();
         const hiddenPixels=await marked.p.screenshot({clip});
         assert(!visiblePixels.equals(hiddenPixels),`${label} text pixels did not change when only that label was hidden`);
         await renderWithoutSim(label,true);
-        const restoredModel=await markerState();
         const restoredPixels=await marked.p.screenshot({clip});
-        if(!visiblePixels.equals(restoredPixels))
-          console.log('RASTER_MODEL_MISMATCH',label,JSON.stringify({visibleModel,hiddenModel,restoredModel}));
-        // Developer diagnostic only: preserve the three crops when this strict
-        // byte-equality gate fails, so a real mismatch can be inspected.
-        if(!visiblePixels.equals(restoredPixels)){
-          for(const [stage,png] of [['visible',visiblePixels],['hidden',hiddenPixels],['restored',restoredPixels]])
-            fs.writeFileSync(`/tmp/bsb253-${label}-${stage}.png`,png);
-        }
         assert(visiblePixels.equals(restoredPixels),`${label} pixel crop not restored after zero-tick rerender`);
         const bytesSha=(buf)=>createHash('sha256').update(buf).digest('hex');
         labelPixelProof[label]={clip,visibleSha:bytesSha(visiblePixels),hiddenSha:bytesSha(hiddenPixels),restored:true};
