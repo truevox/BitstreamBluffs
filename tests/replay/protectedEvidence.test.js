@@ -893,6 +893,22 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
   });
 
+  test('P1: unbound import cannot clear unknown-generation pending run claim',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failGet=new Error('cannot read tombstone');
+    await expect(stale.put(target,{runId:'owner-A'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failGet=null;
+    await stale.put(target,{archiveOnly:true}); // unrelated unbound explicit import
+    expect(stale.pending.has(digest)).toBe(true);
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    await expect(stale.put(target,{runId:'owner-B'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
