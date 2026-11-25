@@ -51,6 +51,7 @@ import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
+import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -113,6 +114,7 @@ export class TitleScene extends Phaser.Scene {
       this._closeView();
     });
     this.cameras.main.fadeIn(180, 5, 6, 15);
+    showTakeoverNotice(this, theme); // #72: why a takeover was refused or aborted, shown once
   }
 
   // ------------------------------------------------------------------ logo

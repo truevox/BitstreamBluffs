@@ -10,6 +10,7 @@ import { RunScene } from './scenes/RunScene.js';
 import { UIScene } from './scenes/UIScene.js';
 import { PauseScene } from './scenes/PauseScene.js';
 import { GameOverScene } from './scenes/GameOverScene.js';
+import { TakeoverEndScene } from './scenes/TakeoverEndScene.js';
 import { GlitchPipeline, GLITCH_PIPELINE_KEY } from './shaders/GlitchPipeline.js';
 
 /** @type {Phaser.Types.Core.GameConfig} */
@@ -34,7 +35,7 @@ export const config = {
     },
   },
   // Order only matters for the first scene; the rest are started by key.
-  scene: [PreloadScene, TitleScene, RunScene, UIScene, PauseScene, GameOverScene],
+  scene: [PreloadScene, TitleScene, RunScene, UIScene, PauseScene, GameOverScene, TakeoverEndScene],
   callbacks: {
     postBoot: (game) => {
       game.renderer.pipelines.addPostPipeline(GLITCH_PIPELINE_KEY, GlitchPipeline);

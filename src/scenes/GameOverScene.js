@@ -43,6 +43,7 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
+import { installTakeoverHook } from '../ui/TakeoverHook.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
@@ -168,6 +169,7 @@ export class GameOverScene extends Phaser.Scene {
     // Input is live immediately; nothing below waits on async work.
     // retryAction: Space and pad RB also send 'retry', which retries even from inside the shop (decision 7).
     this.input_ = new MenuInput(this, (a) => this._onAction(a), { retryAction: true });
+    installTakeoverHook(this, theme); // #72: T = Replay Takeover (unranked practice / TAS); all of it lives in ui/TakeoverHook.js
     this._onPointer = (pointer, over) => {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.

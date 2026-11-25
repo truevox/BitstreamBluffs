@@ -1431,6 +1431,10 @@ export class RunScene extends Phaser.Scene {
   stepReplayTick() {
     const r = this._stepTick(this.tapePlayer.padAt(this.simClock.tick + 1));
     this._verifyTraceSample();
+    // The camera and `_view` are presentation that the diagnostic kit still classes as read-by-sim (PRESENTATION_READ_BY_SIM):
+    // advance them once per tick, exactly as a replay shown at 120 display frames per second does, so the state at N has the
+    // same camera / `_view` / shake as an uninterrupted replay. Draw, fx, audio and particles stay skipped.
+    if (!this.crashed) { this.updateCamera(this.simClock.tickMs); this._updateView(); }
     return r;
   }
 
@@ -1773,10 +1777,7 @@ export class RunScene extends Phaser.Scene {
     const fxDt = this.hitStopMs > 0 ? dt * 0.08 : this.crashed ? dt * crashBeat(this.crashTimerMs, TUNING.hitStopCrashMs).fxScale : dt;
     this.updateCamera(dt);
     const cam = this.cameras.main;
-    const halfW = GAME_WIDTH / (2 * cam.zoom);
-    const left = cam.scrollX + GAME_WIDTH / 2 - halfW;
-    const right = cam.scrollX + GAME_WIDTH / 2 + halfW;
-    this._view = { left, right, top: cam.scrollY + GAME_HEIGHT / 2 - GAME_HEIGHT / (2 * cam.zoom), bottom: cam.scrollY + GAME_HEIGHT / 2 + GAME_HEIGHT / (2 * cam.zoom) };
+    const { left, right } = this._updateView();
     this.mesh.cull(left - 40, right + 40);
     const t = this.runTimeMs;
     for (const list of this.hazards.values()) for (const h of list) h.update(t, left, right);
@@ -1835,6 +1836,16 @@ export class RunScene extends Phaser.Scene {
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
+  }
+
+  /** The visible world rectangle from the camera (`_view`). Shared by renderFrame and the takeover seek (#72). */
+  _updateView() {
+    const cam = this.cameras.main;
+    const halfW = GAME_WIDTH / (2 * cam.zoom);
+    const left = cam.scrollX + GAME_WIDTH / 2 - halfW;
+    const right = cam.scrollX + GAME_WIDTH / 2 + halfW;
+    this._view = { left, right, top: cam.scrollY + GAME_HEIGHT / 2 - GAME_HEIGHT / (2 * cam.zoom), bottom: cam.scrollY + GAME_HEIGHT / 2 + GAME_HEIGHT / (2 * cam.zoom) };
+    return this._view;
   }
 
   /**
@@ -2898,11 +2909,9 @@ export class RunScene extends Phaser.Scene {
     try {
       // The seek made fx particles / shake / flash that were never updated or drawn: they belong to no frame the player saw.
       if (this.fx) { for (const it of this.fx.items || []) it.on = false; this.fx.active = 0; this.fx.gfx?.clear?.(); }
-      this.shakeAmp = 0; this._landingShake = 0; this._zoomKick = 0;
       this.flashRect?.setAlpha?.(0);
     } catch (e) { /* presentation only */ }
-    this.snapCamera();
-    this.renderFrame(0);
+    this.renderFrame(0); // dt 0: draws the frame at tick N without moving the camera
     // Keys pressed while the seek ran must not auto-confirm READY: only a fresh press after this point counts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     // The seek ran muted: bring the HUD to the state at tick N.

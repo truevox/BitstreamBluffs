@@ -183,3 +183,29 @@ export function seekStep(scene, target, o = {}) {
   }
   return { done: scene.simClock.tick >= target, tick: scene.simClock.tick, steps };
 }
+
+/** `M:SS.s` of a tick at the fixed 120 Hz rate (display only). */
+export function fmtTickTime(tick) {
+  const s = Math.max(0, tick) / 120;
+  const m = Math.floor(s / 60);
+  const r = s - m * 60;
+  return `${m}:${r < 10 ? '0' : ''}${r.toFixed(1)}`;
+}
+
+/**
+ * A fresh descriptor for "retry from the same tick": rebuilt from the parent tape and RE-VALIDATED (every retry is an
+ * independent attempt, and a tape that stopped being compatible refuses instead of being replayed anyway).
+ * @param {{tape:object, tick:number, source?:string}} d the descriptor of the attempt that just ended
+ * @param {{rulesetId?:string}} ctx
+ * @returns {{ok:true, descriptor:object}|{ok:false, reason:string, message:string}}
+ */
+export function retryDescriptor(d, ctx = {}) {
+  try {
+    if (!d || !d.tape) return refuse('undecodable');
+    const e = takeoverEligible(d.tape, d.tick, ctx);
+    if (!e.ok) return e;
+    return { ok: true, descriptor: buildTakeoverDescriptor({ tape: d.tape, tick: d.tick, source: 'retry' }) };
+  } catch {
+    return refuse('undecodable');
+  }
+}
