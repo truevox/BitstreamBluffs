@@ -844,6 +844,28 @@ describe('protected local evidence references (#244)', () => {
     expect(s.pendingMeta.get(bundleDigest(bundle())).runId).toBe('old-run');
   });
 
+  test('P1: overlapping post-delete direct imports cannot overwrite pending run identity',async()=>{
+    const idb=fakeIdb(),writer=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await writer.put(target,{archiveOnly:true});await writer.remove(digest);
+    const sameTab=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('offline for both overlapping imports');
+    const settled=await Promise.allSettled([
+      sameTab.put(target,{runId:'first-new-owner'}),
+      sameTab.put(target,{runId:'second-new-owner'}),
+    ]);
+    expect(settled[0].status).toBe('rejected');
+    expect(settled[0].reason.code).toBe('write-failed');
+    expect(settled[1].status).toBe('rejected');
+    expect(settled[1].reason.code).toBe('run-id-conflict');
+    expect(sameTab.pendingMeta.get(digest).runId).toBe('first-new-owner');
+    idb.hooks.failPut=null;
+    await sameTab.retryPending({digest});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest,{runId:'first-new-owner'})).toEqual({readable:true,durable:true,runBound:true});
+    await expect(fresh.put(target,{runId:'second-new-owner'})).rejects.toMatchObject({code:'run-id-conflict'});
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
