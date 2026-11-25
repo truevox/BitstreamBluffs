@@ -193,8 +193,13 @@ export class ReplayEvidenceView extends View {
     this.busy=true;
     this._operationVersion++; // supersede any in-flight Refresh result
     if(this._nativeInput)this._nativeInput.disabled=true;
+    let actionError=null;
     try{await task();}
-    catch(e){this._show(`LOCAL ARCHIVE ERROR: ${statusText(e)}`);uiSfx(this.scene,'uiBack');}
+    catch(e){
+      actionError=statusText(e);
+      this._show(`LOCAL ARCHIVE ERROR: ${actionError}`);
+      uiSfx(this.scene,'uiBack');
+    }
     finally{
       this.busy=false;
       if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
@@ -212,6 +217,10 @@ export class ReplayEvidenceView extends View {
           if(healthy){
             this.status.setText(message);
             this.detail.setText(details);
+          }else if(actionError){
+            // The selected file may have failed digest/grammar admission.
+            // Never overwrite that rejection with a separate run's warning.
+            this._show('LOCAL ARCHIVE ERROR',`${actionError}; ${shortArchiveWarning(this.status.main.text)}`);
           }else if(keepOriginal){
             // Preserving a selected file is more urgent than the current-run
             // archive read, but show BOTH warnings, not stale success.

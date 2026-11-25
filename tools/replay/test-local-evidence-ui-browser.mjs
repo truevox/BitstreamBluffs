@@ -130,6 +130,24 @@ try {
  assert(importReconnect.realReopen && importReconnect.noFlush && importReconnect.pendingUnrelated);
  assert(importReconnect.durable && importReconnect.controlsReady && importReconnect.feedback.includes('IMPORTED'));
  record('Import really reopens IndexedDB, restores controls, and preserves unrelated pending bytes');
+ const rejectionDuringReconcile=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const original=store.inspectBundle.bind(store);
+  store.inspectBundle=async()=>({readable:true,durable:false,runBound:false});
+  try{
+    await view._run(async()=>{
+      view._reconcileRequested=true; // a just-recovered Import requested control reconciliation
+      throw Object.assign(new Error('selected file has wrong checksum'),{code:'digest-mismatch'});
+    });
+    return {status:view.status.main.text,details:view.detail.main.text,
+      exportEnabled:!view.buttons[1].disabled,keepDisabled:view.buttons[0].disabled};
+  }finally{store.inspectBundle=original;await view._refresh({retryPending:false});}
+ });
+ assert(rejectionDuringReconcile.status.includes('LOCAL ARCHIVE ERROR'));
+ assert(rejectionDuringReconcile.details.includes('digest-mismatch'));
+ assert(rejectionDuringReconcile.details.includes('EXPORT RUN NOW'));
+ assert(rejectionDuringReconcile.exportEnabled && rejectionDuringReconcile.keepDisabled);
+ record('failed Import reconciliation retains the selected-file rejection and run storage warning');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();
