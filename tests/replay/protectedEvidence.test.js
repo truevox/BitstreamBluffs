@@ -20,7 +20,7 @@ const transactionDone = tx => new Promise((resolve,reject)=>{
   tx.oncomplete=resolve; tx.onabort=()=>reject(tx.error); tx.onerror=()=>reject(tx.error);
 });
 
-beforeEach(() => expect(EVIDENCE_DB_VERSION).toBe(2));
+beforeEach(() => expect(EVIDENCE_DB_VERSION).toBe(3));
 
 describe('protected local evidence references (#244)', () => {
   test('candidate/submitted/pinned roles share one immutable bundle, counts survive restart and require explicit release', async () => {
@@ -747,6 +747,45 @@ describe('protected local evidence references (#244)', () => {
     expect(await fresh.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
   });
 
+  test('v2 evidence and protected references upgrade to v3 deletion marks without loss',async()=>{
+    const idb=fakeIdb();
+    const old=await new Promise((resolve,reject)=>{
+      const req=idb.open(EVIDENCE_DB,2);
+      req.onupgradeneeded=()=>{
+        for(const [name,keyPath] of [['bundles','digest'],['index','digest'],['protectedRefs','key']])
+          req.result.createObjectStore(name,{keyPath});
+      };
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+    const digest=bundleDigest(bundle());
+    const tx=old.transaction(['bundles','index'],'readwrite');const done=transactionDone(tx);
+    tx.objectStore('bundles').put({digest,bytes:bundleBytes(bundle())});
+    tx.objectStore('index').put({digest,runId:RUN,size:bundleBytes(bundle()).length,seq:1});
+    await done;old.close();
+    const upgraded=await new EvidenceStore({idb,storage:null}).init();
+    expect(await upgraded.inspectBundle(digest,{runId:RUN})).toEqual({readable:true,durable:true,runBound:true});
+    const ref=await upgraded.protect(digest,{runId:RUN,role:'pinned'});
+    expect(ref.count).toBe(1);
+    await upgraded.unprotect(ref.key);
+    await upgraded.remove(digest);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('a deliberate re-import after deletion cannot enable an older tab to silently rebind it',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('first write failed');
+    await expect(stale.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await owner.put(target,{archiveOnly:true});
+    await owner.remove(digest);
+    await owner.put(target,{runId:'new-owner'}); // deliberate user re-import
+    await stale.put({...target,claims:{...target.claims,score:998}},{runId:'unrelated'});
+    expect(await new EvidenceStore({idb,storage:null}).init().then(s=>s.inspectBundle(digest,{runId:'new-owner'}))).toEqual({readable:true,durable:true,runBound:true});
+    expect(stale._unsafePending.has(digest)).toBe(true);
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
@@ -906,7 +945,7 @@ describe('protected local evidence references (#244)', () => {
     expect(idb.hooks.closeCount).toBe(1);
   });
 
-  test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
+  test('v1 database upgrades in place to v3 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{
       const req=idb.open(EVIDENCE_DB,1);
