@@ -93,17 +93,45 @@ try {
   const original=store.inspectBundle.bind(store);
   let signal,release;
   const started=new Promise(resolve=>{signal=resolve;});
-  store.inspectBundle=(...args)=>{signal();return new Promise(resolve=>{release=async()=>resolve(await original(...args));});};
+  let intercepted=false;
+  store.inspectBundle=(...args)=>{
+    if(intercepted)return original(...args); // follow-up reconciliation must not inherit the old delayed read
+    intercepted=true;
+    signal();return new Promise(resolve=>{release=async()=>resolve(await original(...args));});
+  };
   try{
     const refreshing=view._refresh();
     await started;
     await view._run(async()=>{view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','RECENT USER ACTION');});
     await release();await refreshing;
-    return {status:view.status.main.text,detail:view.detail.main.text};
+    return {status:view.status.main.text,detail:view.detail.main.text,
+      keepEnabled:view.buttons[0].disabled===false,exportEnabled:view.buttons[1].disabled===false};
   }finally{store.inspectBundle=original;await view._refresh();}
  });
  assert(staleRefresh.status.includes('IMPORTED LOCAL EVIDENCE'));
- record('late Refresh result cannot overwrite newer Import action feedback');
+ assert(staleRefresh.keepEnabled && staleRefresh.exportEnabled);
+ record('late Refresh cannot overwrite newer Import feedback or strand archive buttons disabled');
+
+ const vanishedPin=await p.evaluate(async()=>{
+  const {view,store,digest}=window.__qaEvidence;
+  await view._refresh();
+  await view._keepOrUnpin(); // establish a real local pin
+  const original=view.actions.unpin.bind(view.actions);
+  view.actions.unpin=async()=>({ok:false});
+  try{
+    await view._keepOrUnpin();
+    return {message:view.status.main.text,count:await store.persistedProtectedCount(digest),
+      button:view.buttons[0].label.main.text};
+  }finally{view.actions.unpin=original;
+    const refs=await store.persistedProtections(digest);
+    for(const ref of refs)if(ref.role==='pinned')await store.unprotect(ref.key);
+    await view._refresh();}
+ });
+ assert(vanishedPin.message.includes('PIN STATUS CHANGED'));
+ assert(!vanishedPin.message.includes('PIN REMOVED'));
+ assert.equal(vanishedPin.count,1);
+ assert.equal(vanishedPin.button,'UNPIN');
+ record('Unpin false receipt refuses to report deletion or flip button label');
 
 
  // Browser download must be triggered only when Export is explicitly clicked.

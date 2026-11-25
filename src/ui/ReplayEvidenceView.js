@@ -169,6 +169,21 @@ export class ReplayEvidenceView extends View {
     finally{
       this.busy=false;
       if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
+      if(this.alive){
+        // A user action cancels an outstanding Refresh after it disabled the
+        // buttons. Re-inspect the actual persisted state; never leave valid
+        // Keep/Export controls disabled until the player manually refreshes.
+        // Preserve the newer action's feedback instead of allowing the
+        // follow-up inspection to overwrite it with an older status.
+        const message=this.status.main.text, details=this.detail.main.text;
+        const reconcile=this._refresh();
+        const refreshVersion=this._operationVersion;
+        await reconcile;
+        if(this.alive && !this.busy && this._operationVersion===refreshVersion){
+          this.status.setText(message);
+          this.detail.setText(details);
+        }
+      }
     }
   }
 
@@ -188,7 +203,11 @@ export class ReplayEvidenceView extends View {
     if (wantsUnpin){
       const displayed=this.displayedPin;
       if (!displayed?.generation) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
-      await control.unpin(displayed.key,{expectedGeneration:displayed.generation});
+      const result=await control.unpin(displayed.key,{expectedGeneration:displayed.generation});
+      if(!result.ok){
+        this._show('PIN STATUS CHANGED','ANOTHER TAB MAY HAVE REMOVED IT — REFRESHED BELOW');
+        return;
+      }
       this.displayedPin=null;
       this._show('PIN REMOVED','THE EVIDENCE FILE HAS NOT BEEN DELETED');
     } else {
