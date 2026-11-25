@@ -9,6 +9,7 @@ import { DomTextBox } from './DomTextBox.js';
 import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
 import { ellipsize } from './PixelFont.js';
+import { isReducedMotion } from './Motion.js';
 import { parseGhostLink, GhostLinkError, GHOST_LINK_MAX_URL } from '../systems/ghost/GhostLink.js';
 import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../systems/SimClock.js';
@@ -24,8 +25,9 @@ export function guestPreview(tape){
  if(!count)throw new Error('Ghost has no trace');
  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
  for(let i=0;i<count;i++){
-  const x=trace[i*3],y=trace[i*3+1];
-  if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>1e10||Math.abs(y)>1e10)
+  const x=trace[i*3],y=trace[i*3+1],angle=trace[i*3+2];
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(angle)||
+   Math.abs(x)>1e10||Math.abs(y)>1e10||Math.abs(angle)>1e10)
    throw new Error('Invalid ghost coordinates');
   minX=Math.min(minX,x);maxX=Math.max(maxX,x);
   minY=Math.min(minY,y);maxY=Math.max(maxY,y);
@@ -130,6 +132,12 @@ export class GhostLinkView extends View {
    this.status.setText('PREVIEW A GHOST LINK BEFORE WATCHING');
    return;
   }
+  if(isReducedMotion(this.scene)){
+   this.playing=false;
+   this.playBtn.setLabel('WATCH');
+   this.status.setText('REDUCED MOTION: SCRUB INSTEAD');
+   return;
+  }
   if(this.playing){
    this.playing=false;
    this.playBtn.setLabel('WATCH');
@@ -143,6 +151,12 @@ export class GhostLinkView extends View {
  }
  _tickPlayback(delta){
   if(!this.playing||!this.preview||!this.alive)return;
+  if(isReducedMotion(this.scene)){
+   this.playing=false;
+   this.playBtn.setLabel('WATCH');
+   this.status.setText('REDUCED MOTION: SCRUB INSTEAD');
+   return;
+  }
   this.elapsedMs+=Math.max(0,Math.min(Number(delta)||0,120));
   const next=Math.min(this.preview.count-1,Math.floor(this.elapsedMs/SAMPLE_MS));
   if(next!==this.cursor){this.cursor=next;this._draw();}

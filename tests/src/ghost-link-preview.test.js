@@ -19,6 +19,7 @@ describe('Guest Ghost-in-a-Link trace preview is strictly read-only',()=>{
   expect(()=>guestPreview(tape([[Number.NaN,0,0]]))).toThrow('Invalid ghost');
   expect(()=>guestPreview(tape([[0,Infinity,0]]))).toThrow('Invalid ghost');
   expect(()=>guestPreview(tape([[1e15,0,0]]))).toThrow('Invalid ghost');
+  expect(()=>guestPreview(tape([[0,0,Number.NaN]]))).toThrow('Invalid ghost');
  });
  test('does not create any persistent ghost or run records',()=>{
   const store=globalThis.localStorage;

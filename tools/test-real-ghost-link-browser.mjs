@@ -129,6 +129,16 @@ try{
  await p.mouse.click(watchPoint.x,watchPoint.y);
  const paused=await p.evaluate(()=>({playing:window.__bbGame.scene.getScene('TitleScene').view?.playing}));
  if(paused.playing)throw Error('Guest playback cannot be paused');
+ // Both explicit and live-updated reduced-motion policies must stop animation
+ // and keep manual scrubbing available, never start a RunScene.
+ const motion=await p.evaluate(()=>{const g=window.__bbGame,settings=g.registry.get('settings');
+  const prev=settings.reduceMotion;settings.reduceMotion='on';return prev;});
+ await p.mouse.click(watchPoint.x,watchPoint.y);
+ const reduced=await p.evaluate(()=>{const v=window.__bbGame.scene.getScene('TitleScene').view;
+  return {playing:v.playing,status:v.status.main.text,position:v.position.main.text};});
+ if(reduced.playing||!reduced.status.includes('REDUCED MOTION'))
+  throw Error('Reduced motion allowed continuous ghost animation '+JSON.stringify(reduced));
+ await p.evaluate(prev=>{window.__bbGame.registry.get('settings').reduceMotion=prev;},motion);
  // A malformed replacement cannot leave the previously valid guest selected.
  await p.locator('textarea').fill('https://simulate.sledhead.ing/#bbghost=1.malformed');
  await p.mouse.click(previewPoint.x,previewPoint.y);
@@ -185,6 +195,6 @@ try{
  await recipient.close();
 
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,watching,paused,invalid,landed,direct,accepted,errors,recipientErrors}));
+ console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,watching,paused,reduced,invalid,landed,direct,accepted,errors,recipientErrors}));
 }finally{if(browser)await browser.close();if(vite){if(typeof vite.close==='function')await vite.close();
 else if(vite.httpServer)await new Promise((r,j)=>vite.httpServer.close(e=>e?j(e):r()));}}
