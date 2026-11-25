@@ -99,8 +99,16 @@ try{
   const {store,samples}=globalThis.__quotaQA,large=samples[1];
   const receipt=await store.retryPending({digest:large.digest});
   const after=await new(store.constructor)({idb:indexedDB,storage:null}).init();
-  return {receipt,large:await after.inspectBundle(large.digest),small:await after.inspectBundle(samples[0].digest)};
+  const persisted=after.list(); // freshly loaded durable index, not this tab's cache
+  return {receipt,pending:store.pending.has(large.digest),
+   pendingMeta:store.pendingMeta.has(large.digest),
+   runIds:samples.map(s=>persisted.find(r=>r.digest===s.digest)?.runId),
+   large:await after.inspectBundle(large.digest),small:await after.inspectBundle(samples[0].digest)};
  });
+ assert.deepEqual(recovered.receipt,{attempted:1,recovered:1,remaining:0});
+ assert.equal(recovered.pending,false,'recovery must clear session-only bytes');
+ assert.equal(recovered.pendingMeta,false,'recovery must clear queued run claims');
+ assert.deepEqual(recovered.runIds,[null,null],'archive-only entries must never acquire run binding');
  assert.deepEqual(recovered.large,{readable:true,durable:true,runBound:false});
  assert.deepEqual(recovered.small,{readable:true,durable:true,runBound:false});
  await page.close();page=await context.newPage();
@@ -114,11 +122,13 @@ try{
   const result=[];
   for(const item of items){
    const r=await store.get(item.canonicalDigest);
-   result.push({digest:item.canonicalDigest,valid:!!r&&r.length===item.canonicalEnvelopeBytes&&digestOfBytes(r)===item.canonicalDigest});
+   const index=store.list().find(row=>row.digest===item.canonicalDigest);
+   result.push({digest:item.canonicalDigest,valid:!!r&&r.length===item.canonicalEnvelopeBytes&&digestOfBytes(r)===item.canonicalDigest,
+    runId:index?.runId});
   }
   return result;
  },[expected[0],stressExpected]);
- assert.ok(restart.every(x=>x.valid));
+ assert.ok(restart.every(x=>x.valid&&x.runId===null),'fresh page must confirm intact UNBOUND archive-only entries');
  assert.deepEqual(mutations,[]);
  assert.deepEqual(pageErrors,[]);
  console.log(JSON.stringify({format:'bb-244-real-browser-quota-v1',url,stressFixture:{synthetic:true,inputRows:QUOTA_STRESS_ROWS,bytes:stressExpected.canonicalEnvelopeBytes},first,realChromiumQuota:{usageBefore:usage.usage,forcedLimit:temporaryQuota,activeOverride:active.overrideActive},
