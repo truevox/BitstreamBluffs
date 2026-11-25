@@ -115,22 +115,21 @@ async function handleFiles(files) {
   busy = true;
   const errors = [];
   let accepted = 0;
-  let count = items.length;
-  let total = items.reduce((sum, item) => sum + item.byteLength, 0);
   const allowed = [];
   for (const file of selection) {
     const label = typeof file.name === 'string' ? file.name.slice(0, 80) : 'Unnamed file';
-    if (count >= MAX_GALLERY_FILES) { errors.push(`${label}: eight-file gallery limit reached`); continue; }
     if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MAX_GALLERY_FILE_BYTES) {
       errors.push(`${label}: exceeds the 2 MiB per-file limit or is empty`); continue;
     }
-    if (total + file.size > MAX_GALLERY_BYTES) { errors.push(`${label}: 8 MiB gallery total exceeded`); continue; }
     allowed.push({ file, label });
-    count += 1;
-    total += file.size;
   }
   for (const { file, label } of allowed) {
     if (token !== generation) return;
+    // Recheck against actual accepted entries, not reservations for files that may fail validation.
+    if (items.length >= MAX_GALLERY_FILES) { errors.push(`${label}: eight-file gallery limit reached`); continue; }
+    if (items.reduce((sum, item) => sum + item.byteLength, 0) + file.size > MAX_GALLERY_BYTES) {
+      errors.push(`${label}: 8 MiB gallery total exceeded`); continue;
+    }
     try {
       const bytes = await file.arrayBuffer();
       if (token !== generation) return;
