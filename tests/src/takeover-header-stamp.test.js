@@ -1,7 +1,7 @@
 /** #72: new tape headers carry rulesetId + buildId, and the stamp is header-only (no ledger hash / checkpoint / fingerprint change). */
 import { jest } from '@jest/globals';
 const H = await import('./takeoverHarness.js');
-const { CURRENT_RULESET_ID, currentBuildId } = await import('../../src/systems/replay/currentRulesetId.js');
+const { CURRENT_RULESET_ID } = await import('../../src/systems/replay/currentRulesetId.js');
 const { takeoverEligible } = await import('../../src/systems/replay/Takeover.js');
 
 const SEED = 'A'; // crashes at tick ~1394 under coastPad: a real record + ledgerHash
@@ -29,7 +29,7 @@ describe('rulesetId / buildId header stamp', () => {
     expect(stamped.tape).toBeTruthy();
     expect(stamped.tape.rulesetId).toBe(CURRENT_RULESET_ID);
     expect(stamped.tape.buildId).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(stamped.tape.buildId).toBe(currentBuildId(H.RULESET));
+    expect(stamped.tape.buildId).toBe(H.BUILD_ID);
   });
 
   test('negative control: the stamp is really absent on the control scene (so the equalities below are not vacuous)', () => {
@@ -44,10 +44,12 @@ describe('rulesetId / buildId header stamp', () => {
     expect(h.buildId).toBeNull();
   });
 
-  test('a mismatching or missing ruleset never yields a buildId', () => {
-    expect(currentBuildId(null)).toBeNull();
-    expect(currentBuildId({ rulesetId: 'sha256:' + '0'.repeat(64), doc: {} })).toBeNull();
-    expect(currentBuildId({ rulesetId: CURRENT_RULESET_ID, doc: null })).toBeNull();
+  test('a non-string build id on the registry is never stamped', () => {
+    const early = H.recordRun({ seed: SEED, padFor: H.coastPad, maxTicks: 5 });
+    early.scene.registry.set(H.BUILD_ID_KEY, { not: 'a string' });
+    expect(early.scene._ghostHeader().buildId).toBeNull();
+    early.scene.registry.set(H.BUILD_ID_KEY, H.BUILD_ID);
+    expect(early.scene._ghostHeader().buildId).toBe(H.BUILD_ID);
   });
 
   test('control: two identical stamped runs have the same ledgerHash (the comparison basis is deterministic)', () => {

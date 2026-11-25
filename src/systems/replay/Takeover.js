@@ -22,6 +22,10 @@ export const TAKEOVER_VERSION = 1;
 export const TAKEOVER_MODE = 'takeover';
 export const OLDER_BUILD_MESSAGE = 'recorded on an older build; not takeover-compatible';
 
+/** Seek metering: at most this many re-simulated ticks, and this much wall time, per display frame. */
+export const SEEK_MAX_TICKS_PER_FRAME = 1500;
+export const SEEK_BUDGET_MS = 12;
+
 const U32 = 0xffffffff;
 const isInt = (v) => typeof v === 'number' && Number.isSafeInteger(v);
 

@@ -39,17 +39,18 @@ import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
 import { SimClock } from '../systems/SimClock.js';
-import { GhostRecorder, TapePlayer, quantizeTilt } from '../systems/ghost/GhostTape.js';
+import { GhostRecorder, TapePlayer, quantizeTilt, decodeTrace, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
+import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS } from '../systems/replay/Takeover.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { resolveReplaySetup } from '../systems/replay/manifest.js';
-import { scheduleRunEvidence, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
+import { scheduleRunEvidence, RULESET_KEY, BUILD_ID_KEY } from '../systems/replay/evidenceCapture.js';
 import { SIM_REVISION } from '../systems/replay/ruleset.js';
-import { CURRENT_RULESET_ID, currentBuildId } from '../systems/replay/currentRulesetId.js';
+import { CURRENT_RULESET_ID } from '../systems/replay/currentRulesetId.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
@@ -188,6 +189,21 @@ export class RunScene extends Phaser.Scene {
     // An untrusted guest must never be promoted into TapePlayer/input replay,
     // even if a stale earlier replay handoff was still in the registry.
     if(this.guestPractice)this._replayTape=null;
+    // #72 Replay Takeover: a one-shot descriptor (REG.TAKEOVER), read and cleared like GUEST_PRACTICE. FAIL CLOSED: a
+    // descriptor that does not validate against THIS build never falls through to an ordinary (ranked) run. The sim
+    // prefix is re-simulated from the tape (authoritative), then control is handed over; the whole run is UNRANKED.
+    const takeoverCandidate = reg.get(REG.TAKEOVER);
+    reg.remove(REG.TAKEOVER);
+    this.takeover = null;
+    if (takeoverCandidate !== undefined && takeoverCandidate !== null) {
+      const verdict = validateTakeoverDescriptor(takeoverCandidate, { rulesetId: CURRENT_RULESET_ID, guestPractice: this.guestPractice });
+      if (!verdict.ok) { this._refuseTakeover(verdict); return; }
+      this.takeover = { descriptor: takeoverCandidate, phase: 'seeking', targetTick: takeoverCandidate.tick, seekTicks: 0, seekMs: 0, seekFrames: 0 };
+      this._replayTape = takeoverCandidate.tape; // TapePlayer drives ticks 1..N, then it is dropped at handoff
+    }
+    // Takeover and guest practice share one predicate for every write site (record, XP, shards, missions, ghost library,
+    // evidence, tutorial flags, progression stores). Set before tick 0 and never changed mid-run.
+    this.unrankedPractice = this.guestPractice || !!this.takeover;
     const replay = this._replayTape;
     // Replay Contract R-1..R-4: a replay resolves daily rule, Sync Level and Kodiak/magnet flags from the recorded
     // tape/manifest, never from the clock, the live profile or the live registry flags.
@@ -212,7 +228,7 @@ export class RunScene extends Phaser.Scene {
     // The today check means a retry or a pause-restart after 00:00 UTC cannot back-fill yesterday.
     const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
     const todayKey = DailyPatch.getDailyInfo().dateKey;
-    this.dailyOfficial = !replay && !this.guestPractice && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    this.dailyOfficial = !replay && !this.guestPractice && !this.unrankedPractice && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
     // Separate ranked Daily lane. A typed seed, Gym or stale-date retry
     // can NEVER turn itself into an official competitive Draft.
     this.dailyMode=this.dailyOfficial&&reg.get(REG.DAILY_MODE)==='draft'?'draft':'classic';
@@ -226,7 +242,7 @@ export class RunScene extends Phaser.Scene {
     // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
     // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
-    this.bsodGym = !replay && !this.guestPractice && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
+    this.bsodGym = !replay && !this.guestPractice && !this.unrankedPractice && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
@@ -520,7 +536,8 @@ export class RunScene extends Phaser.Scene {
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
       dailyMode:this.dailyMode,
       gym: this.bsodGym === true, // Gym READY remains an independent mode
-      practice: this.guestPractice === true, // explicitly unranked: suppress mission/award toasts
+      practice: this.unrankedPractice === true, // explicitly unranked: suppress mission/award toasts
+      ...(this.takeover ? { takeover: true } : {}), // #72: UNRANKED PRACTICE / TAS
     });
   }
 
@@ -574,7 +591,7 @@ export class RunScene extends Phaser.Scene {
       // ruleset has loaded, its build id. A takeover refuses tapes without a matching rulesetId. Header only: neither
       // field is a causal input, a checkpoint, a fingerprint channel or part of the RunRecord / ledger hash.
       rulesetId: CURRENT_RULESET_ID,
-      buildId: currentBuildId(this.registry.get(RULESET_KEY)),
+      buildId: typeof this.registry.get(BUILD_ID_KEY) === 'string' ? this.registry.get(BUILD_ID_KEY) : null,
       mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
       dailyRuleId: this.dailyRuleId || null,
       dailyRuleSource: DailyPatch.dateKeyFromSeed(this.seed) ? 'seed-date' : 'clock-at-start',
@@ -595,6 +612,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   _saveGhostTape(record) {
+    if (this.unrankedPractice) { this.ghostRecorder = null; return; } // #72: never a library tape or an evidence capture
     const rec = this.ghostRecorder;
     this.ghostRecorder = null;
     if (!rec) return;
@@ -848,8 +866,8 @@ export class RunScene extends Phaser.Scene {
     // Stamp the actual live achievement BEFORE the store marks the Gym as
     // discovered. Otherwise legacy-migration logic would infer a historical
     // unlock at timestamp zero and swallow the real first-time reveal toast.
-    const achieved = !this.bsodGym && !this.guestPractice ? store?.recordBsodBluff?.(event.chain,Date.now()) : null;
-    const discovered = !this.bsodGym && !this.guestPractice && store?.discoverBsodGym?.();
+    const achieved = !this.bsodGym && !this.unrankedPractice ? store?.recordBsodBluff?.(event.chain,Date.now()) : null;
+    const discovered = !this.bsodGym && !this.unrankedPractice && store?.discoverBsodGym?.();
     if (discovered?.discovered || achieved?.added?.length)
       this.registry?.set?.(REG.PROFILE, store.profile);
     // The nested Easter egg is earned ONLY by five genuine scored escapes
@@ -1068,6 +1086,7 @@ export class RunScene extends Phaser.Scene {
 
   /** One-shot SFX through the registry audio (never throws). */
   playSfx(name, opts) {
+    if (this._seeking) return; // #72: a seek re-simulates seconds of play in a few frames; it must be silent
     try {
       const audio = this.registry.get(REG.AUDIO);
       if (audio) audio.playSfx(name, opts);
@@ -1325,6 +1344,9 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
+    // #72: SEEKING (re-simulating the tape prefix) and READY (frozen at tick N) are not live play.
+    if (this.takeover && this.takeover.phase !== 'live') { this._updateTakeoverPrelude(time, dt); return; }
+
     // Every attempt first freezes real-time gameplay for ~1000ms. Only at
     // that boundary can MUSIC SUGGEST a verified regular pulse <=300ms away.
     // The optional delay is Gym-owned, never a music-engine timer or physics
@@ -1379,15 +1401,7 @@ export class RunScene extends Phaser.Scene {
     let pad = polled;
     for (const tickPad of pads) {
       pad = tickPad;
-      const tick = ++this.simClock.tick;
-      // Air brake on the ground brakes: decided per tick, not per display frame.
-      tickPad.brake = !!tickPad.brakeHeld || (!!tickPad.airBrake && !!this.sled?.grounded);
-      this.ghostRecorder?.input(tick, tickPad);
-      const r = this.simTick(this.simClock.tickMs, tickPad);
-      if (!this.crashed) {
-        this.ghostRecorder?.afterTick(tick, this);
-        this.tapePlayer?.check(tick, this);
-      }
+      const r = this._stepTick(tickPad);
       if (r === 'hold') { this.renderFrame(0); return; }
       if (this.crashed) break;
     }
@@ -1396,7 +1410,79 @@ export class RunScene extends Phaser.Scene {
   }
 
   /**
-   * One fixed simulation tick: every causal gameplay system (timers, physics, contacts,
+   * The per-tick body shared by live play, tape replay and the takeover seek (#72): advance the tick counter, record the
+   * pad, run the simulation tick, then checkpoint / verify. One definition, so a seeked prefix cannot drift from a replay.
+   * @returns {'hold'|undefined}
+   */
+  _stepTick(tickPad) {
+    const tick = ++this.simClock.tick;
+    // Air brake on the ground brakes: decided per tick, not per display frame.
+    tickPad.brake = !!tickPad.brakeHeld || (!!tickPad.airBrake && !!this.sled?.grounded);
+    this.ghostRecorder?.input(tick, tickPad);
+    const r = this.simTick(this.simClock.tickMs, tickPad);
+    if (!this.crashed) {
+      this.ghostRecorder?.afterTick(tick, this);
+      this.tapePlayer?.check(tick, this);
+    }
+    return r;
+  }
+
+  /** One authoritative replay tick from the TapePlayer (the replay branch of update(), without the frame). */
+  stepReplayTick() {
+    const r = this._stepTick(this.tapePlayer.padAt(this.simClock.tick + 1));
+    this._verifyTraceSample();
+    return r;
+  }
+
+  /**
+   * #72: checkpoints are 1 s apart; the tape's pose trace is every TRACE_EVERY ticks and was stored as float32. On every
+   * trace tick of a seek the sled pose must equal it EXACTLY (after fround), which narrows undetected divergence from 119
+   * ticks to 3. Reuses TapePlayer.desync, so the seek driver aborts on it like on a failed checkpoint.
+   */
+  _verifyTraceSample() {
+    const tp = this.tapePlayer, tick = this.simClock.tick;
+    if (!tp || tp.desync || this.crashed || tick % TRACE_EVERY !== 0) return;
+    const t = this.takeover;
+    if (!t) return;
+    if (!t.trace) t.trace = decodeTrace(t.descriptor.tape);
+    const i = (tick / TRACE_EVERY - 1) * 3;
+    if (i + 2 >= t.trace.length) return;
+    const b = this.sled.body;
+    const got = [Math.fround(b.position.x), Math.fround(b.position.y), Math.fround(b.angle)];
+    if (got[0] !== t.trace[i] || got[1] !== t.trace[i + 1] || got[2] !== t.trace[i + 2]) {
+      tp.desync = { tick, via: 'trace', want: [t.trace[i], t.trace[i + 1], t.trace[i + 2]], got };
+    }
+  }
+
+  /**
+   * Re-simulate the loaded tape up to tick `target` (default: the takeover tick), at most `maxTicks` / `budgetMs` per call,
+   * with presentation suppressed (events, SFX, music reads). Every sim-read system still runs, because it is the real
+   * simTick: terrain streaming, chunk take/drop, hazards, telegraph, BSOD, tricks, score. Callable without a takeover
+   * (#66 will re-simulate candidates off-screen through this).
+   * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean}}
+   */
+  seekTo(target = this.takeover?.targetTick, opts = {}) {
+    if (!this.tapePlayer) return { done: false, tick: this.simClock.tick, steps: 0, desync: { tick: this.simClock.tick, reason: 'no-tape' } };
+    const restore = this._muteForSeek();
+    try { return seekStep(this, target, opts); } finally { restore(); }
+  }
+
+  /** Suppress presentation side effects of a seek; returns the function that undoes it. */
+  _muteForSeek() {
+    const ev = this.game && this.game.events;
+    const own = ev && Object.prototype.hasOwnProperty.call(ev, 'emit');
+    const prior = ev && ev.emit;
+    this._seeking = true;
+    if (ev) ev.emit = () => true;
+    return () => {
+      this._seeking = false;
+      if (!ev) return;
+      if (own) ev.emit = prior; else delete ev.emit;
+    };
+  }
+
+  /**
+   * One simulation tick: every causal gameplay system (timers, physics, contacts,
    * BSOD, tricks, score, pickups, hazards, streaming, glitch schedule). `dt` is always
    * SimClock.tickMs; slow-mo, blink and hit-stop scale the physics delta inside it.
    * @returns {'hold'|undefined} 'hold' when a Gym retry froze the new attempt.
@@ -1534,7 +1620,7 @@ export class RunScene extends Phaser.Scene {
     // only surviving ticks may commit the landing awards.
 
     // SFX with no event: push / hop (+ wind speed every frame)
-    const audio = this.registry.get(REG.AUDIO);
+    const audio = this._seeking ? null : this.registry.get(REG.AUDIO);
     if (audio) {
       try {
         if (sled.hopPulse) audio.playSfx('hop');
@@ -2153,7 +2239,7 @@ export class RunScene extends Phaser.Scene {
       this.emitIf(EVT.TUTORIAL_HINT, e);
       if (e.id === 'tuck' && e.show) {
         this.tuckShows += 1;
-        if (!this.bsodGym) saveTuckShows(this.tuckShows);
+        if (!this.bsodGym && !this.unrankedPractice) saveTuckShows(this.tuckShows);
       } else if (!e.show && ((e.id === 'boost') || (e.id === 'tuck' && this.tuckShows >= TUNING.tuckHintMaxShows))) {
         this.tutDoneId(e.id); // explained once / shown often enough
       }
@@ -2166,7 +2252,7 @@ export class RunScene extends Phaser.Scene {
     const ev = this.hints.complete(id, this.runTimeMs);
     // Practice hints may be completed for this session, but never consume a
     // first-run hint in the player's permanent normal-game tutorial history.
-    if (!this.bsodGym) saveTutorialDone(this.tutDone);
+    if (!this.bsodGym && !this.unrankedPractice) saveTutorialDone(this.tutDone);
     this.applyHintEvents(ev);
   }
 
@@ -2285,7 +2371,7 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
-      if(!this.guestPractice)this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
+      if(!this.unrankedPractice)this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
       if (this.bestMarker) this.bestMarker.markPassed();
       this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.28);
       this.fx.ring(sled.x, sled.y, this.palette.amber, 80, 700);
@@ -2660,11 +2746,12 @@ export class RunScene extends Phaser.Scene {
     this.sled.vanish();
     this.shake(TUNING.shakeCrash);
     this.flashRect.setFillStyle(0xffffff, 1).setAlpha(0.55);
-    if(!this.guestPractice)this.reportCrash(c, fs);
+    if(!this.unrankedPractice)this.reportCrash(c, fs);
 
-    // Untrusted guest practice NEVER creates a RunRecord, GhostTape, award,
-    // score submission or RUN_END. Crash animation ends with RUN_ABORT->Title.
-    if(this.guestPractice)return;
+    // Untrusted guest practice and a takeover (#72) NEVER create a RunRecord, GhostLibrary tape, award, score submission,
+    // evidence capture or RUN_END. A guest ends with RUN_ABORT->Title; a takeover keeps its tape in memory only
+    // (REG.LAST_TAKEOVER_TAPE) and ends with RUN_ABORT->TakeoverEnd.
+    if(this.unrankedPractice){ this._storeTakeoverTape(c.cause); return; }
     // A replay is a re-simulation of an existing run: it never saves a record, awards progress or records a tape.
     if (this.tapePlayer) return;
     // persist + hand off
@@ -2742,11 +2829,150 @@ export class RunScene extends Phaser.Scene {
     }));
   }
 
+  // ------------------------------------------------------------------ #72 replay takeover (UNRANKED PRACTICE / TAS)
+
+  /** Fail closed: a takeover that does not validate NEVER becomes an ordinary run. Back to TITLE with a visible reason. */
+  _refuseTakeover(verdict) {
+    this.sled = null; // update() is a no-op until the next create(): nothing was built
+    this.takeover = null;
+    this.unrankedPractice = true;
+    this._leaving = true;
+    this._postTakeoverNotice(verdict.reason, verdict.message);
+    try {
+      this.game.events.emit(EVT.RUN_ABORT, { runId: null, reason: 'takeover-refused', practice: true, takeover: true, why: verdict.reason });
+    } catch (e) { console.warn('Takeover refusal observer failed; continuing', e); }
+    try { this.scene.stop(SCENES.UI); } catch (e) { /* not launched */ }
+    this.scene.start(SCENES.TITLE);
+  }
+
+  _postTakeoverNotice(reason, message) {
+    try { this.registry.set(REG.TAKEOVER_NOTICE, { reason, message, at: Date.now() }); } catch (e) { /* the notice is optional */ }
+  }
+
+  /** A takeover that cannot continue (desync during the seek, prefix crash, recorder failure): visible reason, TITLE, never continue. */
+  _abortTakeover(reason, detail) {
+    if (this._leaving) return;
+    this._leaving = true;
+    const msg = reason === 'desync'
+      ? `the tape desynced at tick ${detail && detail.desync ? detail.desync.tick : '?'} (${detail && detail.desync && detail.desync.via === 'trace' ? 'pose' : 'checkpoint'}); takeover cancelled`
+      : reason === 'prefix-crash' ? 'the replay crashed before the chosen tick; takeover cancelled' : 'takeover could not start';
+    if (this.takeover) { this.takeover.phase = 'aborted'; this.takeover.abort = { reason, detail: detail || null }; }
+    this._postTakeoverNotice(reason, msg);
+    this.ghostRecorder = null;
+    this.tapePlayer = null;
+    try {
+      this.game.events.emit(EVT.RUN_ABORT, { runId: this.runId, reason: 'takeover-aborted', practice: true, takeover: true, why: reason });
+    } catch (e) { console.warn('Takeover abort observer failed; continuing', e); }
+    this.scene.stop(SCENES.UI);
+    this.scene.start(SCENES.TITLE);
+  }
+
+  /** SEEKING (bounded re-simulation of ticks 1..N) and READY (frozen at N, waiting for the player). */
+  _updateTakeoverPrelude(time, dt) {
+    const t = this.takeover;
+    if (!t || this._leaving) return;
+    if (t.phase === 'seeking') {
+      const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const r = this.seekTo(t.targetTick, { maxTicks: SEEK_MAX_TICKS_PER_FRAME, budgetMs: SEEK_BUDGET_MS });
+      t.seekMs += (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+      t.seekTicks += r.steps;
+      t.seekFrames++;
+      if (r.desync) { this._abortTakeover('desync', r); return; }
+      if (r.crashed) { this._abortTakeover('prefix-crash', r); return; }
+      if (r.done) { this._finishSeek(); return; }
+      this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'seeking', tick: r.tick, target: t.targetTick, pct: Math.floor(100 * r.tick / t.targetTick) });
+      return;
+    }
+    if (t.phase !== 'ready') return;
+    // READY: the sim is paused at tick N and the frame is drawn. The key that ends it is consumed here.
+    const polled = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
+    if (polled.pressed.pause) { this.pauseRun(); return; }
+    this.renderFrame(0);
+    if (polled.pressed.hop || polled.pressed.confirm) this._takeoverGo();
+  }
+
+  /** Seek reached tick N: drop the presentation debris of the re-simulation, draw the frame, wait for the player. */
+  _finishSeek() {
+    const t = this.takeover;
+    t.phase = 'ready';
+    try {
+      // The seek made fx particles / shake / flash that were never updated or drawn: they belong to no frame the player saw.
+      if (this.fx) { for (const it of this.fx.items || []) it.on = false; this.fx.active = 0; this.fx.gfx?.clear?.(); }
+      this.shakeAmp = 0; this._landingShake = 0; this._zoomKick = 0;
+      this.flashRect?.setAlpha?.(0);
+    } catch (e) { /* presentation only */ }
+    this.snapCamera();
+    this.renderFrame(0);
+    // Keys pressed while the seek ran must not auto-confirm READY: only a fresh press after this point counts.
+    try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
+    // The seek ran muted: bring the HUD to the state at tick N.
+    this.emitScore();
+    this.game.events.emit(EVT.DISTANCE_CHANGED, { meters: Math.floor(this.score.distanceM) });
+    if (this.bsodState) this.publishBsodState(this.bsodState);
+    this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'ready', tick: this.simClock.tick, target: t.targetTick, pct: 100 });
+  }
+
+  /**
+   * Handoff at tick N. Drop the tape driver, zero the sub-tick clock and every carried edge, drain the input router so the
+   * key that ended READY (and anything pressed while seeking) is consumed and can never become a hop / trick edge on tick
+   * N + 1, and start recording the independent live suffix.
+   */
+  _takeoverGo() {
+    const t = this.takeover;
+    if (!t || t.phase !== 'ready') return;
+    try {
+      this.ghostRecorder = createTakeoverRecorder(t.descriptor);
+    } catch (e) { console.warn('Takeover recorder failed', e); this._abortTakeover('recorder', null); return; }
+    this.tapePlayer = null;
+    this.simClock.accMs = 0;
+    this.simClock._edges = null;
+    this.simClock._timeline = null;
+    try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
+    t.phase = 'live';
+    t.liveFromTick = this.simClock.tick;
+    this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'live', tick: this.simClock.tick, target: t.targetTick, pct: 100 });
+  }
+
+  /** Keep the live suffix tape in MEMORY ONLY (REG.LAST_TAKEOVER_TAPE). Never GhostLibrary, IDB, localStorage or evidence. */
+  _storeTakeoverTape(cause) {
+    const rec = this.ghostRecorder;
+    this.ghostRecorder = null;
+    if (!this.takeover) return;
+    this.takeover.cause = cause || 'crash';
+    if (!rec) return;
+    try {
+      const snap = this.score.getSnapshot();
+      const tape = rec.finish({ runId: `${this.runId}:takeover`, distanceM: Math.floor(snap.distanceM), score: Math.max(0, Math.round(snap.total)), cause: this.takeover.cause });
+      this.takeover.endTick = tape.endTick;
+      this.registry.set(REG.LAST_TAKEOVER_TAPE, tape);
+    } catch (e) { /* the practice tape is a convenience; it must never break the end of a run */ }
+  }
+
+  /** End a takeover that is still going (PauseScene QUIT): keep the tape, then leave like a crash would. */
+  endTakeover(cause = 'quit') {
+    if (!this.takeover || this._leaving) return false;
+    if (this.takeover.phase === 'live') this._storeTakeoverTape(cause);
+    this._leaving = true;
+    this._leaveTakeover(cause);
+    return true;
+  }
+
+  /** RUN_ABORT {takeover-ended, practice, takeover}, then the small end screen: retry from the same tick, or back. Never GAME_OVER. */
+  _leaveTakeover(cause) {
+    const t = this.takeover;
+    try {
+      this.game.events.emit(EVT.RUN_ABORT, { runId: this.runId, reason: 'takeover-ended', practice: true, takeover: true, cause });
+    } catch (e) { console.warn('Takeover end observer failed; continuing', e); }
+    try { this.scene.stop(SCENES.UI); } catch (e) { /* ignore */ }
+    this.scene.start(SCENES.TAKEOVER_END, { descriptor: t.descriptor, cause, endTick: t.endTick ?? null, liveFromTick: t.liveFromTick ?? t.targetTick });
+  }
+
   updateCrashed(dt) {
     this.crashTimerMs += dt;
     this.renderFrame(dt);
     if (this.crashTimerMs >= CRASH_TO_GAMEOVER_MS && !this._leaving) {
       this._leaving = true;
+      if (this.takeover) { this._leaveTakeover(this.takeover.cause || 'crash'); return; }
       if(this.guestPractice){
         this.game.events.emit(EVT.RUN_ABORT,{runId:this.runId,reason:'guest-practice-ended',practice:true});
         this.scene.stop(SCENES.UI);
@@ -2768,7 +2994,8 @@ export class RunScene extends Phaser.Scene {
     this._manualPausePending = true;
     const pauseToken = `${this.runId}:${++this._manualPauseSeq}`;
     const manual = { runTimeMs: this.runTimeMs, runId: this.runId,
-      reason: 'manual', pauseToken, gym: this.bsodGym === true, practice: this.guestPractice === true };
+      reason: 'manual', pauseToken, gym: this.bsodGym === true, practice: this.guestPractice === true,
+      ...(this.takeover ? { takeover: true } : {}) };
     // The transition must complete even if an audio/third-party observer
     // throws while constructing its scratch. Nothing may hold gameplay hostage.
     try { this.game.events.emit(EVT.GAME_PAUSE, manual); }
