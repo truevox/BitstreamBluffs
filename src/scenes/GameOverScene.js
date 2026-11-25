@@ -43,6 +43,8 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
+import { CemeteryView } from '../ui/CemeteryView.js';
+import { CemeteryArchive } from '../systems/ghost/CemeteryArchive.js';
 import { ReplayEvidenceView } from '../ui/ReplayEvidenceView.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
@@ -140,6 +142,9 @@ export class GameOverScene extends Phaser.Scene {
     this.rows = [];
     this.rec = this.registry.get(REG.LAST_RECORD) || this._emptyRecord();
     const rec = this.rec;
+    // #68 local opt-in presentation history is saved independently from the
+    // five ghosts and authoritative replay evidence, without blocking Game Over.
+    this._archiveCemeteryPose();
     const theme = (this.theme = new Theme(this));
     theme.bind((pal) => this.cameras.main.setBackgroundColor(pal.bg));
     this.backdrop = new Backdrop(this, theme, { horizon: 232, alpha: 0.6 });
@@ -212,6 +217,14 @@ export class GameOverScene extends Phaser.Scene {
     // W4.1: last, so the footer and buttons already exist when the hint is measured against them.
     this._buildShopAccess();
     this._startReveal();
+  }
+
+  _archiveCemeteryPose() {
+    if (this.registry.get(REG.SETTINGS)?.cemeteryMontage !== true) return;
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!tape || tape.runId !== this.rec?.id || !tape.trace) return;
+    // A failure/quota never interrupts the screen or claims durable retention.
+    new CemeteryArchive().add(tape).catch(()=>{});
   }
 
   _emptyRecord() {
@@ -986,7 +999,9 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
-    this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
+    this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape,
+      onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView(),
+      onCemetery: this.registry.get(REG.SETTINGS)?.cemeteryMontage===true ? ()=>this._openCemeteryView() : null });
   }
 
   /** Keep the existing dimmed Game Over screen; only swap the overlay panel. */
@@ -997,11 +1012,22 @@ export class GameOverScene extends Phaser.Scene {
     this.ghostView=new ReplayEvidenceView(this,this.theme,{tape,onClose:()=>this._returnToGhosts()});
   }
 
+  /** Separate pose-only archive, strictly unranked and opt-in. */
+  _openCemeteryView() {
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!this.ghostView || !this.alive || this.leaving || !tape || tape.runId!==this.rec?.id ||
+      this.registry.get(REG.SETTINGS)?.cemeteryMontage!==true) return;
+    this.ghostView.destroy();
+    this.ghostView=new CemeteryView(this,this.theme,{tape,onClose:()=>this._returnToGhosts()});
+  }
+
   _returnToGhosts() {
     const tape=this.registry.get(REG.LAST_GHOST_TAPE),library=this.registry.get(REG.GHOSTS);
     if (!this.ghostView || !this.alive || this.leaving || !tape || !library) { this._closeGhosts(); return; }
     this.ghostView.destroy();
-    this.ghostView=new GhostFavoritesView(this,this.theme,{library,tape,onClose:()=>this._closeGhosts(),onEvidence:()=>this._openEvidenceView()});
+    this.ghostView=new GhostFavoritesView(this,this.theme,{library,tape,
+      onClose:()=>this._closeGhosts(),onEvidence:()=>this._openEvidenceView(),
+      onCemetery:this.registry.get(REG.SETTINGS)?.cemeteryMontage===true?()=>this._openCemeteryView():null});
   }
 
   _closeGhosts() {

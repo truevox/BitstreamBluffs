@@ -78,7 +78,7 @@ const IDB_TIMEOUT_MS = 2500;
 export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
-    ghostBest: true, ghostLatest: true, kodiakPacks: 'same',
+    ghostBest: true, ghostLatest: true, cemeteryMontage: false, kodiakPacks: 'same',
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     offlineMusicQuality: 'high',
@@ -117,6 +117,7 @@ export function sanitizeSettings(raw) {
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
     ghostBest: typeof raw.ghostBest === 'boolean' ? raw.ghostBest : d.ghostBest,
     ghostLatest: typeof raw.ghostLatest === 'boolean' ? raw.ghostLatest : d.ghostLatest,
+    cemeteryMontage: raw.cemeteryMontage === true,
     kodiakPacks: raw.kodiakPacks === 'mixed' ? 'mixed' : d.kodiakPacks,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     controlLayout: normalizeControlLayout(raw.controlLayout),

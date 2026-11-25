@@ -27,6 +27,7 @@ export class GhostFavoritesView extends View {
       hints: [{ keys: ['↑', '↓'], label: 'ROW' }, { keys: ['←', '→'], label: 'SHOW' }, { keys: ['ENTER'], label: 'SELECT' }] });
     this.library = o.library;
     this.onEvidence = o.onEvidence || null;
+    this.onCemetery = o.onCemetery || null;
     this.tape = o.tape;
     // Preserve the existing G, Enter shortcut for pinning Favorite A.
     this.focus = GHOST_COURSE_ROWS.findIndex(({ slot }) => slot === 0);
@@ -67,7 +68,16 @@ export class GhostFavoritesView extends View {
         onClick: () => this._openEvidence(),
       });
       this.panel.add(this.archiveButton);
-      text(115, 160, 'PRIVATE — NO UPLOAD', 'cyan');
+      // A third, opt-in action uses the formerly informational center band.
+      // Never reveal it when extra local pose retention is disabled.
+      this.cemeteryButton = null;this.cemeteryArrow = null;
+      if (this.onCemetery) {
+        this.cemeteryButton = new Button(scene,theme,{x:122,y:157,w:106,h:15,
+          label:'CEMETERY',color:'magenta',onClick:()=>this._openCemetery()});
+        this.panel.add(this.cemeteryButton);
+        this.cemeteryArrow = new NeonText(scene,theme,113,160,'>',{color:'magenta',outline:'none'});
+        this.panel.add(this.cemeteryArrow);
+      } else text(115, 160, 'PRIVATE — NO UPLOAD', 'cyan');
       this.archiveArrow = new NeonText(scene, theme, 4, 160, '>', { color: 'cyan', outline: 'none' });
       this.panel.add(this.archiveArrow);
     } else text(12, 160, 'LINK SHARES INPUTS + SCORE.');
@@ -92,6 +102,8 @@ export class GhostFavoritesView extends View {
     this.shareBtn?.setHover(this.focus === this.rows.length);
     this.archiveArrow?.setVisible(this.focus === this.rows.length + 1);
     this.archiveButton?.setHover(this.focus === this.rows.length + 1);
+    this.cemeteryArrow?.setVisible(this.focus === this.rows.length + 2);
+    this.cemeteryButton?.setHover(this.focus === this.rows.length + 2);
   }
 
   _openEvidence() {
@@ -100,6 +112,13 @@ export class GhostFavoritesView extends View {
     this.focus = this.rows.length + 1;
     this._markFocus();
     this.onEvidence();
+  }
+
+  _openCemetery() {
+    if (!this.cemeteryButton || !this.onCemetery || !this.alive) return;
+    this._disarmShare();
+    this.focus = this.rows.length + 2;this._markFocus();
+    this.onCemetery();
   }
 
   _select(i, save) {
@@ -214,13 +233,14 @@ export class GhostFavoritesView extends View {
     if (action === 'cancel' || action === 'ghost') { this.close(); return true; }
     if (action === 'up' || action === 'down') {
       this._disarmShare();
-      const available = this.rows.length + 1 + (this.archiveButton ? 1 : 0);
+      const available = this.rows.length + 1 + (this.archiveButton ? 1 : 0) + (this.cemeteryButton ? 1 : 0);
       this.focus = (this.focus + (action === 'up' ? -1 : 1) + available) % available;
       uiSfx(this.scene, 'uiMove');
       this._markFocus();
     } else if (action === 'confirm') {
       if (this.focus === this.rows.length) this._shareGhost();
       else if (this.archiveButton && this.focus === this.rows.length + 1) this._openEvidence();
+      else if (this.cemeteryButton && this.focus === this.rows.length + 2) this._openCemetery();
       else this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
     } else if ((action === 'left' || action === 'right') && this.focus < this.rows.length) this._toggle(this.focus);
     return true;

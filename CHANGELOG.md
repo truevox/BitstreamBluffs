@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.22.10 — #68 opt-in local Cemetery Montage candidate (2026-11-25)
+
+- Add a **separate** locally retained pose-trace archive (24 most recent per exact seed/biome course; max 128 across courses). Recording defaults **OFF** in Settings, and only completed ordinary run poses are eligible. No new Ghost Library roles, full input tapes, checkpoints, authoritative proof records, external service calls, or gameplay/physics changes.
+- Add Game Over → Course Ghosts → Cemetery, preserving Share Link and Local Evidence. Overlay visually renders earlier attempts as noncolliding ghost trails and a longest-archived-trace marker, provides keyboard/pointer playback/scrubbing, and stops automatic movement under reduced motion.
+- Add explicit **two-press course-only CLEAR** to delete locally retained pose traces, leaving the protected evidence archive and five cosmetic ghost roles untouched. Turning the setting OFF stops future Cemetery capture and hides its entry; existing local traces remain until the player explicitly clears them or clears site data.
+- Bound render work with one-time Float32 pose decoding and cached background paths; moving-marker updates are decimated. Add real Chromium UI, privacy, opt-in, course isolation, archive eviction, reduced-motion and deletion tests to the source-triggered QA workflow.
+- **Draft candidate:** user-facing physical Chromebook performance/playtest, independent exact-head review and release coordination remain. No public scoreboard trust or official replay verification is implied; #135 and #119 remain separate. This is an adjustable visual pilot rather than a decision on #56's repeatable course-library upgrade economics.
+
 ## v2.22.9 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
 
 - Enforce compiled Chromium savestate capture→fresh restore→strict identical contact/hazard suffix checks on relevant PR source changes, after the source-bound Matter/recorder and fast CLI refusal tests. Retain the already proved native long-run and moving-hazard gate evidence.

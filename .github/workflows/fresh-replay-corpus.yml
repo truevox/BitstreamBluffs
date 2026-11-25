@@ -31,6 +31,8 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: '1'
       - name: Check deterministic build identity
         run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Validate opt-in local-only cemetery policy
+        run: npm test -- --runInBand tests/replay/cemeteryArchive.test.js
       - name: Capture native fatal terminal evidence
         env:
           BSB244_FRESH_CORPUS_OUT: ${{ runner.temp }}/fresh-sim9-replay-corpus.json
@@ -58,3 +60,4 @@ jobs:
           GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-current-corpus-browser.mjs
           BSB244_FRESH_CORPUS_OUT=${{ runner.temp }}/dense-sim9-replay-corpus.json GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-current-corpus-browser.mjs
           BSB244_FRESH_CORPUS_OUT=${{ runner.temp }}/native-quota-sim9-replay-corpus.json GAME_URL=http://127.0.0.1:18371/ node tools/replay/test-native-quota-browser.mjs
+          GAME_URL=http://127.0.0.1:18371/ node tools/ghosts/test-cemetery-browser.mjs

@@ -160,15 +160,15 @@ export class LeaderboardView extends View {
 }
 
 /** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
-const SETTINGS_ROWS = 16;
-/** Row pitch: 14 px up to fourteen rows; 12 px beyond, so sixteen rows still end above the 270 px floor. */
+const SETTINGS_ROWS = 17;
+/** Row pitch: 14 px up to fourteen rows; 12 px beyond, keeping seventeen rows inside 270 px. */
 const SETTINGS_ROW_H = SETTINGS_ROWS > 14 ? 12 : 14;
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    // Height follows the row count (22 + rows * pitch + 30): sixteen 12 px rows
-    // yield 244 px, positioned at y=18 and ending at y=262 in a 270px view.
+    // Height follows the row count: seventeen 12 px rows make 256 px,
+    // positioned at y=8 and ending at y=264 inside the 270 px viewport.
     const h = 22 + SETTINGS_ROWS * SETTINGS_ROW_H + 30;
     super(scene, theme, { w: 360, h, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
@@ -193,6 +193,11 @@ export class SettingsView extends View {
         {value:'both',label:'BEST+LATEST'},{value:'best',label:'BEST'},{value:'latest',label:'LATEST'},{value:'off',label:'OFF'}],
         get:()=>{const st=settings(),b=st.ghostBest!==false,l=st.ghostLatest!==false;return b&&l?'both':b?'best':l?'latest':'off';},
         set:v=>{updateSetting(game,'ghostBest',v==='both'||v==='best');updateSetting(game,'ghostLatest',v==='both'||v==='latest');} },
+      // #68: explicit opt-in. OFF means no additional recording; separate
+      // pose-only local storage, not the five ghost roles or replay evidence.
+      { kind:'choice',label:'CEMETERY',options:[
+        {value:false,label:'OFF'},{value:true,label:'ON / LOCAL'}],
+        get:()=>settings().cemeteryMontage===true,set:v=>updateSetting(game,'cemeteryMontage',v===true) },
       // Issue #47 playtest: Kodiak packs of one type, or mixed types.
       { kind:'choice',label:'KODIAK PACKS',options:[
         {value:'same',label:'SAME TYPE'},{value:'mixed',label:'MIXED'}],
