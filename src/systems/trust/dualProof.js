@@ -61,9 +61,14 @@ function simulationVerdict(request, s) {
   if (s === null || s === undefined) return TRUST.missing;
   if (!keys(s, ['kind', 'runId', 'buildId', 'verifierBuildId', 'verifiedCourse', 'score', 'endTick', 'tapeComplete', 'assistanceObserved', 'record']) ||
       s.kind !== 'trusted-replay-execution' || !bounded(s.runId) || !bounded(s.buildId) ||
-      !isDigest(s.verifierBuildId) || !integer(s.score) || !integer(s.endTick) || typeof s.tapeComplete !== 'boolean' ||
+      !(isDigest(s.verifierBuildId) || s.verifierBuildId === null) || !integer(s.score) || !integer(s.endTick) || typeof s.tapeComplete !== 'boolean' ||
       !ASSISTANCE.includes(s.assistanceObserved)) return TRUST.malformed;
   try { validateOutcomeRecord(s.record); } catch { return TRUST.malformed; }
+  // A verifier that does not exist has no executable build digest. This is
+  // legitimate ONLY for a refusal explicitly naming verifier unavailability.
+  if (s.verifierBuildId === null &&
+      !(s.record.outcome === 'refused' && UNAVAILABLE_VERIFIER.includes(s.record.reason)))
+    return TRUST.malformed;
   // These identity fields exist even for a refusal or legacy verdict. A
   // refusal from some OTHER submission cannot trigger provisional publishing.
   if (s.runId !== request.runId || s.buildId !== request.buildId ||
@@ -131,12 +136,14 @@ function eligibilityVerdict(request, a) {
 function privacyVerdict(request, c) {
   if (request.intent === 'local') return value('valid', 'local-no-publication');
   if (c === null || c === undefined) return TRUST.missing;
-  if (!keys(c, ['kind', 'status', 'runId', 'scope', 'audienceGate']) ||
+  if (!keys(c, ['kind', 'status', 'runId', 'intent', 'scope', 'audienceGate']) ||
       c.kind !== 'trusted-consent-receipt' ||
       !['granted','denied','pending'].includes(c.status) || !bounded(c.runId) ||
+      !['provisional-public','verified-public'].includes(c.intent) ||
       !['score-only', 'score-and-evidence'].includes(c.scope) ||
       !['passed','failed','pending'].includes(c.audienceGate)) return TRUST.malformed;
   if (c.runId !== request.runId) return value('invalid', 'consent-run-mismatch');
+  if (c.intent !== request.intent) return value('invalid', 'consent-intent-mismatch');
   if (c.status === 'denied' || c.audienceGate === 'failed') return value('invalid', 'consent-or-audience-denied');
   if (c.status !== 'granted' || c.audienceGate !== 'passed')
     return value('unverified', 'consent-or-audience-pending');

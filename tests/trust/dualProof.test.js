@@ -25,7 +25,7 @@ const authorization = (r = request()) => ({
   challengeStatus: 'fresh', economyStatus: 'authorized', equipmentStatus: 'authorized', modeStatus: 'allowed', pinnedVerifierBuildId:d('e'),
 });
 const consent = (r = request()) => ({
-  kind: 'trusted-consent-receipt', status: 'granted', runId: r.runId,
+  kind: 'trusted-consent-receipt', status: 'granted', runId: r.runId, intent:r.intent,
   scope: 'score-only', audienceGate: 'passed',
 });
 const good = (r = request()) => ({request: r, simulation: simulation(r), authorization: authorization(r), consent: consent(r)});
@@ -282,6 +282,37 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const s=simulation();s.record={outcome:'refused',verifiedUnder:null,verifierId:null,
       tapeDigest:request().tapeDigest,manifestDigest:request().manifestDigest,reason:'unknown-ruleset',claimedRulesetId:request().rulesetId};
     const v=run({simulation:s});NO_RANK(v);expect(v.proof.status).toBe('inconclusive');
+  });
+
+  test('consent for provisional publication never authorizes verified publication', () => {
+    const r=request();
+    const wrong=consent({...r,intent:'provisional-public'});
+    const v=adjudicateDualProof({...good(r),consent:wrong});
+    expect(v.privacy).toEqual({status:'invalid',reason:'consent-intent-mismatch'});
+    expect(v.publication).toBe('none');NO_RANK(v);
+    const provisional={...r,intent:'provisional-public'};
+    const wrong2=consent({...r,intent:'verified-public'});
+    const v2=adjudicateDualProof({...good(provisional),simulation:null,consent:wrong2,allowProvisional:true});
+    expect(v2.privacy.reason).toBe('consent-intent-mismatch');
+    expect(v2.publication).toBe('none');NO_RANK(v2);
+  });
+
+  test('unavailable verifier may truthfully provide null executable digest, not a fabricated pin', () => {
+    const r={...request(),intent:'provisional-public'};
+    const source=simulation(r);
+    for (const reason of ['unknown-ruleset','historical-verifier-required']){
+      const record={outcome:'refused',verifiedUnder:null,verifierId:null,
+        tapeDigest:r.tapeDigest,manifestDigest:r.manifestDigest,claimedRulesetId:r.rulesetId,reason};
+      const v=adjudicateDualProof({...good(r),simulation:{...source,verifierBuildId:null,record},allowProvisional:true});
+      expect(v.proof).toEqual({status:'inconclusive',reason:'verifier-unavailable'});
+      expect(v.publication).toBe('provisional-unverified');NO_RANK(v);
+    }
+    const malformed=adjudicateDualProof({...good(r),simulation:{...source,verifierBuildId:null},allowProvisional:true});
+    expect(malformed.proof.reason).toBe('malformed-input');NO_RANK(malformed);
+    const wrong={outcome:'refused',verifiedUnder:null,verifierId:null,
+      tapeDigest:r.tapeDigest,manifestDigest:r.manifestDigest,claimedRulesetId:r.rulesetId,reason:'malformed-manifest'};
+    const invalid=adjudicateDualProof({...good(r),simulation:{...source,verifierBuildId:null,record:wrong},allowProvisional:true});
+    expect(invalid.proof.status).toBe('invalid');NO_RANK(invalid);
   });
 
   test('privacy and child/audience gate are independent from a perfect simulation and wallet', () => {
