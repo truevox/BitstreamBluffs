@@ -21,11 +21,13 @@ const simulation = (r = request()) => ({
 const authorization = (r = request()) => ({
   kind: 'trusted-eligibility-receipt', status: 'authorized', runId: r.runId, buildId: r.buildId,
   rulesetId: r.rulesetId, seed: r.seed, biomeMask: r.biomeMask, lane: r.lane,
-  loadoutDigest: r.loadoutDigest, manifestDigest:r.manifestDigest, challengeId: r.challengeId,
+  loadoutDigest: r.loadoutDigest, manifestDigest:r.manifestDigest, tapeDigest:r.tapeDigest,
+  score:r.score, endTick:r.endTick, challengeId: r.challengeId,
   challengeStatus: 'fresh', economyStatus: 'authorized', equipmentStatus: 'authorized', modeStatus: 'allowed', pinnedVerifierBuildId:d('e'),
 });
 const consent = (r = request()) => ({
-  kind: 'trusted-consent-receipt', status: 'granted', runId: r.runId, intent:r.intent,
+  kind: 'trusted-consent-receipt', status: 'granted', runId: r.runId,
+  manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,score:r.score,endTick:r.endTick,intent:r.intent,
   scope: 'score-only', audienceGate: 'passed',
 });
 const good = (r = request()) => ({request: r, simulation: simulation(r), authorization: authorization(r), consent: consent(r)});
@@ -282,6 +284,26 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const s=simulation();s.record={outcome:'refused',verifiedUnder:null,verifierId:null,
       tapeDigest:request().tapeDigest,manifestDigest:request().manifestDigest,reason:'unknown-ruleset',claimedRulesetId:request().rulesetId};
     const v=run({simulation:s});NO_RANK(v);expect(v.proof.status).toBe('inconclusive');
+  });
+
+  test('old trusted receipts cannot authorize altered score or tape for same run/manifest',()=>{
+    const initial=request();
+    const reusedAuthorization=authorization(initial),reusedConsent=consent(initial);
+    for(const update of [
+      {score:999999}, {tapeDigest:d('f')}, {endTick:201},
+    ]){
+      const second={...initial,...update};
+      const v=adjudicateDualProof({...good(second),
+        authorization:reusedAuthorization,consent:reusedConsent});
+      expect(v.proof.status).toBe('valid'); // independently replayed claim B
+      expect(v.eligibility).toEqual({status:'invalid',reason:'eligibility-identity-mismatch'});
+      expect(v.privacy).toEqual({status:'invalid',reason:'consent-submission-mismatch'});
+      NO_RANK(v);
+    }
+    const changedManifest={...initial,manifestDigest:d('f')};
+    const v=adjudicateDualProof({...good(changedManifest),consent:reusedConsent});
+    expect(v.privacy.reason).toBe('consent-submission-mismatch');NO_RANK(v);
+    expect(adjudicateDualProof(good()).publication).toBe('verified-eligible');
   });
 
   test('consent for provisional publication never authorizes verified publication', () => {

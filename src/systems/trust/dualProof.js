@@ -115,17 +115,18 @@ function simulationVerdict(request, s) {
 function eligibilityVerdict(request, a) {
   if (a === null || a === undefined) return TRUST.missing;
   const req = ['kind', 'status', 'runId', 'buildId', 'rulesetId', 'seed', 'biomeMask', 'lane',
-    'loadoutDigest', 'manifestDigest', 'challengeId', 'challengeStatus', 'economyStatus', 'equipmentStatus', 'modeStatus', 'pinnedVerifierBuildId'];
+    'loadoutDigest', 'manifestDigest', 'tapeDigest', 'score', 'endTick', 'challengeId', 'challengeStatus', 'economyStatus', 'equipmentStatus', 'modeStatus', 'pinnedVerifierBuildId'];
   if (!keys(a, req) || a.kind !== 'trusted-eligibility-receipt' ||
       !['authorized', 'denied', 'pending'].includes(a.status) ||
       !bounded(a.runId) || !bounded(a.buildId) || !isDigest(a.rulesetId) || !seedText(a.seed) ||
       !integer(a.biomeMask) || !LANES.includes(a.lane) || !isDigest(a.loadoutDigest) || !isDigest(a.manifestDigest) ||
+      !isDigest(a.tapeDigest) || !integer(a.score) || !integer(a.endTick) ||
       !(a.challengeId === null || bounded(a.challengeId)) ||
       !['fresh', 'expired', 'reused', 'missing'].includes(a.challengeStatus) ||
       !['authorized', 'rejected', 'missing'].includes(a.economyStatus) ||
       !['authorized', 'rejected', 'missing'].includes(a.equipmentStatus) ||
       !['allowed', 'denied', 'missing'].includes(a.modeStatus) || !isDigest(a.pinnedVerifierBuildId)) return TRUST.malformed;
-  for (const key of ['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','manifestDigest','challengeId'])
+  for (const key of ['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','manifestDigest','tapeDigest','score','endTick','challengeId'])
     if (a[key] !== request[key]) return value('invalid', 'eligibility-identity-mismatch');
   if (a.status === 'denied' || a.economyStatus === 'rejected' ||
       a.equipmentStatus === 'rejected' || a.modeStatus === 'denied')
@@ -142,13 +143,17 @@ function eligibilityVerdict(request, a) {
 function privacyVerdict(request, c) {
   if (request.intent === 'local') return value('valid', 'local-no-publication');
   if (c === null || c === undefined) return TRUST.missing;
-  if (!keys(c, ['kind', 'status', 'runId', 'intent', 'scope', 'audienceGate']) ||
+  if (!keys(c, ['kind', 'status', 'runId', 'manifestDigest', 'tapeDigest', 'score', 'endTick', 'intent', 'scope', 'audienceGate']) ||
       c.kind !== 'trusted-consent-receipt' ||
       !['granted','denied','pending'].includes(c.status) || !bounded(c.runId) ||
+      !isDigest(c.manifestDigest) || !isDigest(c.tapeDigest) || !integer(c.score) || !integer(c.endTick) ||
       !['provisional-public','verified-public'].includes(c.intent) ||
       !['score-only', 'score-and-evidence'].includes(c.scope) ||
       !['passed','failed','pending'].includes(c.audienceGate)) return TRUST.malformed;
   if (c.runId !== request.runId) return value('invalid', 'consent-run-mismatch');
+  if (c.manifestDigest !== request.manifestDigest || c.tapeDigest !== request.tapeDigest ||
+      c.score !== request.score || c.endTick !== request.endTick)
+    return value('invalid', 'consent-submission-mismatch');
   if (c.intent !== request.intent) return value('invalid', 'consent-intent-mismatch');
   if (c.status === 'denied' || c.audienceGate === 'failed') return value('invalid', 'consent-or-audience-denied');
   if (c.status !== 'granted' || c.audienceGate !== 'passed')
