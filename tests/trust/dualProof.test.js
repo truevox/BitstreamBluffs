@@ -27,7 +27,8 @@ const authorization = (r = request()) => ({
 });
 const consent = (r = request()) => ({
   kind: 'trusted-consent-receipt', status: 'granted', runId: r.runId,
-  manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,score:r.score,endTick:r.endTick,intent:r.intent,
+  manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,score:r.score,endTick:r.endTick,
+  seed:r.seed,biomeMask:r.biomeMask,lane:r.lane,loadoutDigest:r.loadoutDigest,intent:r.intent,
   scope: 'score-only', audienceGate: 'passed',
 });
 const good = (r = request()) => ({request: r, simulation: simulation(r), authorization: authorization(r), consent: consent(r)});
@@ -304,6 +305,49 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const v=adjudicateDualProof({...good(changedManifest),consent:reusedConsent});
     expect(v.privacy.reason).toBe('consent-submission-mismatch');NO_RANK(v);
     expect(adjudicateDualProof(good()).publication).toBe('verified-eligible');
+  });
+
+  test('provisional score consent cannot switch course, lane or loadout without new consent',()=>{
+    const original={...request(),intent:'provisional-public'};
+    const originalConsent=consent(original);
+    for(const change of [{seed:'another-terrain'}, {biomeMask:0},
+      {lane:'modded'}, {loadoutDigest:d('f')}]){
+      const altered={...original,...change};
+      const verdict=adjudicateDualProof({...good(altered),simulation:null,authorization:null,
+        consent:originalConsent,allowProvisional:true});
+      expect(verdict.privacy.reason).toBe('consent-submission-mismatch');
+      NO_RANK(verdict);expect(verdict.publication).toBe('none');
+    }
+    expect(adjudicateDualProof({...good(original),simulation:null,authorization:null,
+      allowProvisional:true}).publication).toBe('provisional-unverified');
+  });
+
+  test('one stable snapshot defeats time-varying programmatic Proxy receipts',()=>{
+    const base=good();
+    let reads=0;
+    const shiftingRequest=new Proxy(base.request,{
+      get(target,key,receiver){
+        if(key==='lane')return (++reads%2)?'stock':'modded';
+        return Reflect.get(target,key,receiver);
+      }
+    });
+    const verdict=adjudicateDualProof({...base,request:shiftingRequest});
+    // A snapshot may legitimately match the original receipt on its ONE
+    // captured value. The invariant is that no later read changes lanes.
+    expect(reads).toBe(1);
+    expect(verdict.publication).toBe('verified-eligible');
+    // A consent that changes across reads cannot defeat the snapshotted
+    // course/lane equality gate either.
+    let flips=0;
+    const changingConsent=new Proxy(base.consent,{
+      get(target,key,receiver){
+        if(key==='lane')return (++flips%2)?'stock':'modded';
+        return Reflect.get(target,key,receiver);
+      }
+    });
+    const next=adjudicateDualProof({...base,consent:changingConsent});
+    expect(['valid','invalid'].includes(next.privacy.status)).toBe(true);
+    expect(flips).toBe(1); // read once, not at multiple policy stages
   });
 
   test('consent for provisional publication never authorizes verified publication', () => {

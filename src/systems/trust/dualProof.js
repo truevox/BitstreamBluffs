@@ -143,16 +143,19 @@ function eligibilityVerdict(request, a) {
 function privacyVerdict(request, c) {
   if (request.intent === 'local') return value('valid', 'local-no-publication');
   if (c === null || c === undefined) return TRUST.missing;
-  if (!keys(c, ['kind', 'status', 'runId', 'manifestDigest', 'tapeDigest', 'score', 'endTick', 'intent', 'scope', 'audienceGate']) ||
+  if (!keys(c, ['kind', 'status', 'runId', 'manifestDigest', 'tapeDigest', 'score', 'endTick', 'seed', 'biomeMask', 'lane', 'loadoutDigest', 'intent', 'scope', 'audienceGate']) ||
       c.kind !== 'trusted-consent-receipt' ||
       !['granted','denied','pending'].includes(c.status) || !bounded(c.runId) ||
       !isDigest(c.manifestDigest) || !isDigest(c.tapeDigest) || !integer(c.score) || !integer(c.endTick) ||
+      !seedText(c.seed) || !integer(c.biomeMask) || !LANES.includes(c.lane) || !isDigest(c.loadoutDigest) ||
       !['provisional-public','verified-public'].includes(c.intent) ||
       !['score-only', 'score-and-evidence'].includes(c.scope) ||
       !['passed','failed','pending'].includes(c.audienceGate)) return TRUST.malformed;
   if (c.runId !== request.runId) return value('invalid', 'consent-run-mismatch');
   if (c.manifestDigest !== request.manifestDigest || c.tapeDigest !== request.tapeDigest ||
-      c.score !== request.score || c.endTick !== request.endTick)
+      c.score !== request.score || c.endTick !== request.endTick ||
+      c.seed !== request.seed || c.biomeMask !== request.biomeMask ||
+      c.lane !== request.lane || c.loadoutDigest !== request.loadoutDigest)
     return value('invalid', 'consent-submission-mismatch');
   if (c.intent !== request.intent) return value('invalid', 'consent-intent-mismatch');
   if (c.status === 'denied' || c.audienceGate === 'failed') return value('invalid', 'consent-or-audience-denied');
@@ -214,12 +217,40 @@ function adjudicateDualProofCore(input = {}) {
   });
 }
 
+/** Reject executable properties and exotic prototypes before creating ONE stable
+ * JSON value. No receipt or claimed request is ever reread from the original
+ * potentially stateful Proxy; no mutation is made to its input objects.
+ * A server adapter still MUST authenticate every trusted receipt separately. */
+function snapshotInput(input){
+  const ancestors=new WeakSet();
+  let budget=0;
+  const check=(v,depth)=>{
+    if(++budget>12000||depth>16)throw new TypeError('unbounded trust input');
+    if(v===null||typeof v==='string'||typeof v==='boolean'||typeof v==='number')return;
+    if(typeof v!=='object'||ancestors.has(v))throw new TypeError('non-JSON trust input');
+    ancestors.add(v);
+    if(!Array.isArray(v)&&!isObj(v))throw new TypeError('exotic trust input');
+    const descriptors=Object.getOwnPropertyDescriptors(v);
+    const entries=Object.entries(descriptors);
+    if(entries.length>4096)throw new TypeError('oversized trust input');
+    for(const [key,descriptor] of entries){
+      if(!OWN(descriptor,'value')||typeof key!=='string')throw new TypeError('accessor trust input');
+      check(descriptor.value,depth+1);
+    }
+    ancestors.delete(v);
+  };
+  check(input,0);
+  const raw=JSON.stringify(input);
+  if(typeof raw!=='string'||raw.length>262144)throw new TypeError('oversized trust input');
+  return JSON.parse(raw);
+}
+
 /** Fail closed even when a programmatic caller supplies hostile objects,
  * proxies, throwing accessors or exotic prototypes instead of parsed JSON.
  * Unexpected property failures do not authorize a score and do not escape.
  */
 export function adjudicateDualProof(input = {}) {
-  try { return adjudicateDualProofCore(input); }
+  try { return adjudicateDualProofCore(snapshotInput(input)); }
   catch {
     return Object.freeze({
       format: DUAL_PROOF_FORMAT, version: DUAL_PROOF_VERSION,

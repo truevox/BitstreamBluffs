@@ -45,3 +45,7 @@ A digest-valued `record.verifierId` (historical publisher bundle ID) must equal 
 ## Exact submission receipt binding (2026-11-25)
 
 The separately authenticated entitlement and consent receipts must independently bind `manifestDigest`, `tapeDigest`, `score`, and `endTick` to the same requested run. A reused authorization and consent from run A MUST NOT authorize run B with changed score/tape/terminal tick even if both claims share a run ID, build ID, manifest and nonce and B has a separately successful replay. The adapter must mint these bindings from its trusted evidence/consent process, never by copying a client assertion and calling it verified. This is still a pure policy contract; the authenticated adapter, immutable submission ledger, nonce lifecycle and user consent collection are NOT implemented.
+
+## Exact-head independent-review fixes (2026-11-25)
+
+Provisional-public consent also binds seed, biome mask, competition lane and exact loadout digest, so replay and eligibility absence cannot allow moving a single consent receipt to a different scoreboard/course. Before policy evaluation, all input receipts and claims are checked for JSON-only own data properties and normal prototypes, then copied into one bounded JSON snapshot: all subsequent comparisons use that single immutable-by-isolation value, never a time-varying Proxy or getter. Programmatic object copying is not receipt authentication; the future adapter is still responsible for authenticated receipt origins and nonce reuse.
