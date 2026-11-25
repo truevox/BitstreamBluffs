@@ -30,7 +30,7 @@ import { NON_CAUSAL } from '../src/systems/replay/fingerprintSchemas.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const SEED = process.env.BSB_TAKEOVER_SEED || 'bot4';
+const SEED = process.env.BSB_TAKEOVER_SEED || 'bot22';
 const LEAD = Number(process.env.BSB_TAKEOVER_LEAD || 0.28);
 const QUICK = process.env.BSB_TAKEOVER_QUICK === '1';
 const ONLY = process.env.BSB_TAKEOVER_ONLY ? new Set(process.env.BSB_TAKEOVER_ONLY.split(',')) : null; // ui,cases,neg,key,throughput (debugging aid)
@@ -347,7 +347,7 @@ async function perNCase(kind, N, tape, rec, info) {
     const run = tk.run();
     if (!run.tapePlayer || run.simClock.tick !== 0) throw new Error('oracle replay scene did not start');
     while (run.simClock.tick < N) tk.step(1);
-    return { tick: run.simClock.tick, fp: tk.fp(run), digests: window.__ssGameKit.digests(run), desync: run.tapePlayer.desync, leafs: (() => { const c = window.__ssGameKit.capture(run).game; return JSON.stringify({ sled: c.sled, hazards: c.hazards, runRandom: c.runRandom }); })() };
+    return { tick: run.simClock.tick, fp: tk.fp(run), digests: window.__ssGameKit.digests(run), desync: run.tapePlayer.desync, leafs: (() => { const c = window.__ssGameKit.capture(run).game; return JSON.stringify({ sled: c.sled, hazards: c.hazards, runRandom: c.runRandom, _crashHazard: c._crashHazard }); })() };
   }, { tape, N, seed: tape.seed });
   await O.close();
   const O_leafs = oracle.leafs;
@@ -360,7 +360,7 @@ async function perNCase(kind, N, tape, rec, info) {
   await launchTakeoverInPage(T.page, descriptor);
   const empty = await T.page.evaluate(() => window.__tk.snapshot());
   const phase1 = await seekToReady(T.page);
-  const a1 = await T.page.evaluate(() => { const tk = window.__tk, r = tk.run(); return { tick: r.simClock.tick, fp: tk.fp(r), digests: window.__ssGameKit.digests(r), leafs: (() => { const c = window.__ssGameKit.capture(r).game; return JSON.stringify({ sled: c.sled, hazards: c.hazards, runRandom: c.runRandom }); })(), unranked: r.unrankedPractice, tp: !!r.tapePlayer, rec: !!r.ghostRecorder, seekTicks: r.takeover.seekTicks, seekMs: r.takeover.seekMs, startPractice: tk.events.filter((e) => e.name === 'runStart').map((e) => e.p) }; });
+  const a1 = await T.page.evaluate(() => { const tk = window.__tk, r = tk.run(); return { tick: r.simClock.tick, fp: tk.fp(r), digests: window.__ssGameKit.digests(r), leafs: (() => { const c = window.__ssGameKit.capture(r).game; return JSON.stringify({ sled: c.sled, hazards: c.hazards, runRandom: c.runRandom, _crashHazard: c._crashHazard }); })(), unranked: r.unrankedPractice, tp: !!r.tapePlayer, rec: !!r.ghostRecorder, seekTicks: r.takeover.seekTicks, seekMs: r.takeover.seekMs, startPractice: tk.events.filter((e) => e.name === 'runStart').map((e) => e.p) }; });
   check(`(a) N=${N} ${kind}: takeover reached READY at exactly N`, phase1 === 'ready' && a1.tick === N && a1.seekTicks === N, { phase1, tick: a1.tick });
   check(`(a) N=${N} ${kind}: 13-channel fingerprint at N == uninterrupted GHOST_REPLAY == the recording`, a1.fp === oracle.fp && a1.fp === rec.fps[N], { takeover: a1.fp, oracle: oracle.fp, recording: rec.fps[N] });
   const dKeys = Object.keys(oracle.digests);
@@ -370,7 +370,7 @@ async function perNCase(kind, N, tape, rec, info) {
   // the visual* RNG streams. They are written by renderFrame / Sled.render / Hazard.update, which a seek skips by design
   // ("skip only draw, fx, audio and particles"). Every OTHER key (matter.*, terrain, camera, pool, ids, ...) must be identical, and
   // for those three the differing LEAVES must all be presentation fields.
-  const leafKeys = ['sled', 'hazards', 'runRandom'];
+  const leafKeys = ['sled', 'hazards', 'runRandom', '_crashHazard'];
   const hardDiff = diff.filter((k) => !leafKeys.includes(k));
   let leafReport = { leaves: [], bad: [] };
   if (diff.some((k) => leafKeys.includes(k))) {
@@ -456,7 +456,7 @@ function presentationOnly(aJson, bJson) {
   const isPresentation = (path) => {
     const seg = path.split('.').filter((x) => x && x !== '__obj');
     if (seg[0] === 'runRandom') return /^visual/.test(seg[1] || '');
-    const table = seg[0] === 'sled' ? NON_CAUSAL.Sled : seg[0] === 'hazards' ? NON_CAUSAL.Hazard : null;
+    const table = seg[0] === 'sled' ? NON_CAUSAL.Sled : seg[0] === 'hazards' || seg[0] === '_crashHazard' ? NON_CAUSAL.Hazard : null;
     return !!table && seg.slice(1).some((x) => Object.hasOwn(table, x) && /presentation|draw|render|animation/i.test(table[x]));
   };
   const walk = (a, b, path) => {
@@ -488,12 +488,14 @@ async function uiPathAndSideEffects(main, tape, rec, Ns) {
     await page.waitForTimeout(400);
   }
   await page.evaluate(() => window.__tk.step(10));
-  const before = await page.evaluate(() => window.__tk.snapshot());
+  const before = await page.evaluate(() => { window.__tk.events.length = 0; return window.__tk.snapshot(); }); // events: only what the takeover itself emits
   // Game Over -> T opens the picker (real key), banner/eligibility, scrubbing keys, Enter launches
   await page.evaluate(() => { window.__tk.key('KeyT', true); window.__tk.key('KeyT', false); });
   const opened = await until(page, '(tk)=>!!tk.g.scene.getScene("GameOverScene").takeoverPicker', 40);
+  await page.waitForTimeout(300); // the picker's own MenuInput ignores input for its first 120 ms of real time
   const pk0 = await page.evaluate(() => { const p = window.__tk.g.scene.getScene('GameOverScene').takeoverPicker; return p && { tick: p.tick, max: p.max, ok: p.elig.ok, banner: p.constructor.name }; });
   check('UI: T on Game Over opens the picker; the last run is eligible; scrub range is [1, endTick-1]', opened && pk0 && pk0.ok === true && pk0.max === tape.endTick - 1, pk0);
+  await page.evaluate(() => window.__tk.g.scene.getScene('GameOverScene').takeoverPicker.setTick(5000)); // mid-run, so no scrub clamps at an end
   const scrub = await page.evaluate(() => {
     const tk = window.__tk, p = () => tk.g.scene.getScene('GameOverScene').takeoverPicker, st = (n = 3) => tk.step(n);
     const out = [];
@@ -677,7 +679,7 @@ async function throughput(tape, rec) {
 
 async function recordAlt() {
   const P = await freshPage({ kit: true });
-  const seedAlt = process.env.BSB_TAKEOVER_LONG_SEED || 'bot6';
+  const seedAlt = process.env.BSB_TAKEOVER_LONG_SEED || 'bot22';
   await P.page.evaluate((seed) => {
     const tk = window.__tk; tk.startRun(seed); tk.R = tk.run().ghostRecorder.constructor;
     const run = tk.run(); let n = 0;

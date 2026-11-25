@@ -2913,7 +2913,7 @@ export class RunScene extends Phaser.Scene {
       if (this.fx) { for (const it of this.fx.items || []) it.on = false; this.fx.active = 0; this.fx.gfx?.clear?.(); }
       this.flashRect?.setAlpha?.(0);
     } catch (e) { /* presentation only */ }
-    this.renderFrame(0); // dt 0: draws the frame at tick N without moving the camera
+    // No frame is drawn here: the first READY update draws it (renderFrame(0)), so the state reached at N is left untouched.
     // Keys pressed while the seek ran must not auto-confirm READY: only a fresh press after this point counts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     // The seek ran muted: bring the HUD to the state at tick N.
@@ -3131,7 +3131,10 @@ export class RunScene extends Phaser.Scene {
     else if (s.y - this._camY > GAME_HEIGHT - margin) this._camY = s.y - (GAME_HEIGHT - margin);
     let ox = 0;
     let oy = 0;
-    if (this.shakeAmp > 0.15) {
+    if (this.takeover && this.takeover.phase === 'ready') {
+      // #72: the frozen READY frame neither jitters nor decays nor consumes the visual camera RNG, so the state the seek
+      // reached at tick N is exactly the state of an uninterrupted replay at N, however long the player waits.
+    } else if (this.shakeAmp > 0.15) {
       // per-pixel RNG jitter, decaying
       ox = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
       oy = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
