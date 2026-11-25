@@ -85,21 +85,19 @@ export class LocalEvidenceActions {
     const inspection=this.inspectImport(bytes,{expectedDigest});
     if (!inspection.ok) throw new EvidenceStoreError(inspection.code,inspection.location);
     const digest=await this.store.importBundle(bytes,{expectedDigest}); // no forged original run ID
-    // IndexedDB may have committed but closed before the following read.
-    // `isBundleDurable` returns false for both a missing row AND a failed
-    // read. Never convert that ambiguity into "zero existing pins".
-    let durabilityProbe = null;
-    try { durabilityProbe=await this.store.isBundleDurable(digest); }
-    catch { /* committed import stays successful; state needs recheck */ }
-    // An available IDB factory does not prove it was readable or stayed open.
-    // If it failed, a different tab might still hold persisted pins. Only a
-    // browser with NO IDB facility can conclusively report memory-only here.
-    const localDurable = durabilityProbe === true ? true : this.store._idb ? null : false;
-    let protectionCount = localDurable === false ? 0 : null;
-    if (localDurable === true) {
-      try { protectionCount=await this.store.persistedProtectedCount(digest); }
-      catch { /* optional status lookup cannot undo a completed import */ }
-    }
+    // Read byte integrity, persisted run identity and the protected ref count
+    // atomically. Two sequential IDB transactions could observe a bundle
+    // before another tab deletes it, then zero refs after deletion, falsely
+    // reporting a durable unprotected import. A successful put is never
+    // revoked by an optional post-commit status-read failure.
+    let snapshot = null;
+    try { snapshot = await this.store.inspectBundle(digest,{withProtections:true}); }
+    catch { /* post-commit status unknown, never fabricated */ }
+    // A blocked/closed IDB factory cannot establish whether another tab has
+    // saved/pinned the same bytes. Only NO IndexedDB is definitively local RAM.
+    const localDurable = snapshot?.durable === true ? true : this.store._idb ? null : false;
+    const protectionCount = localDurable === true && Number.isInteger(snapshot?.protectionCount)
+      ? snapshot.protectionCount : localDurable === false ? 0 : null;
     return freeze({ok:true,digest,inspection,localDurable,
       newlyProtected:false,protectionCount,
       alreadyProtected:protectionCount===null?null:protectionCount>0,
