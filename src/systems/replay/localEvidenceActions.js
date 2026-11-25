@@ -58,8 +58,8 @@ export class LocalEvidenceActions {
   }
 
   /** Only releases retention; does NOT remove the underlying canonical bytes. */
-  async unpin(key) {
-    const changed=await this.store.unprotect(key);
+  async unpin(key, { expectedGeneration } = {}) {
+    const changed=await this.store.unprotect(key, { expectedGeneration });
     // Only confirm the ref was released. Another tab may delete the bytes as
     // soon as the final pin is gone; no retained-byte claim is made here.
     return freeze({ok:changed,publicRankEligible:false});
@@ -87,12 +87,11 @@ export class LocalEvidenceActions {
     let durabilityProbe = null;
     try { durabilityProbe=await this.store.isBundleDurable(digest); }
     catch { /* committed import stays successful; state needs recheck */ }
-    const localDurable = durabilityProbe === true ? true
-      : this.store.backend === 'idb' ? null : false;
-    // A second browser tab may have pinned/unpinned after this Store opened.
-    // An unavailable/closed database cannot establish a zero pin count.
-    let protectionCount = localDurable === true ? null
-      : this.store.backend === 'memory' && !this.store._everDurable ? 0 : null;
+    // An available IDB factory does not prove it was readable or stayed open.
+    // If it failed, a different tab might still hold persisted pins. Only a
+    // browser with NO IDB facility can conclusively report memory-only here.
+    const localDurable = durabilityProbe === true ? true : this.store._idb ? null : false;
+    let protectionCount = localDurable === false ? 0 : null;
     if (localDurable === true) {
       try { protectionCount=await this.store.persistedProtectedCount(digest); }
       catch { /* optional status lookup cannot undo a completed import */ }
