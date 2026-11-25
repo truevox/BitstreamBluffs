@@ -188,7 +188,7 @@ describe('byte budget and quota', () => {
   test('a throwing backend never throws out of the store', async () => {
     const backend = new MemoryAttemptBackend();
     const h = await new AttemptHistory({ backend }).init();
-    backend.commit = async () => { throw new Error('disk on fire'); };
+    backend.mutate = async () => { throw new Error('disk on fire'); };
     await expect(h.record(makeTape(), 5)).resolves.toMatchObject({ ok: false, reason: 'storage' });
     await expect(h.clear()).resolves.toBe(0);
   });
@@ -312,5 +312,79 @@ describe('service wiring: RUN_END records, settings trim', () => {
     await flush(); await flush();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(h.stats().attempts).toBe(1);
+  });
+});
+
+describe('two tabs on one store: every change is planned from disk, not a tab cache (PR #378 review P1)', () => {
+  const tabs = async () => {
+    const backend = new MemoryAttemptBackend();
+    return [await new AttemptHistory({ backend }).init(), await new AttemptHistory({ backend }).init(), backend];
+  };
+  const onDisk = async (backend) => (await backend.loadMetas()).sort((a, b) => a.seq - b.seq);
+
+  test('racing records from two stale tabs get distinct, increasing sequence numbers', async () => {
+    const [a, b, backend] = await tabs();
+    const ta = makeTape({ id: 'from-tab-a' }), tb = makeTape({ id: 'from-tab-b' });
+    const [ra, rb] = await Promise.all([a.record(ta, 5), b.record(tb, 5)]);
+    expect([ra.ok, rb.ok]).toEqual([true, true]);
+    const disk = await onDisk(backend);
+    expect(disk.map((m) => m.seq)).toEqual([1, 2]);
+    expect(new Set([ra.seq, rb.seq])).toEqual(new Set([1, 2]));
+    // Many more interleaved writes from both tabs: still strictly increasing and unique.
+    await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? a : b).record(makeTape(), 40)));
+    const seqs = (await onDisk(backend)).map((m) => m.seq);
+    expect(seqs).toEqual([...seqs].sort((x, y) => x - y));
+    expect(new Set(seqs).size).toBe(seqs.length);
+  });
+
+  test('both tabs racing at keep=1 leave exactly the newest committed attempt', async () => {
+    const [a, b, backend] = await tabs();
+    await a.record(makeTape({ id: 'old' }), 5);
+    const [ra, rb] = await Promise.all([a.record(makeTape({ id: 'x' }), 1), b.record(makeTape({ id: 'y' }), 1)]);
+    const newest = ra.seq > rb.seq ? 'x' : 'y';
+    expect((await onDisk(backend)).map((m) => m.id)).toEqual([newest]);
+    // Each tab's cache now mirrors the disk it last committed against; a refresh makes both agree.
+    await a.refresh(); await b.refresh();
+    expect(ids(a)).toEqual([newest]);
+    expect(ids(b)).toEqual([newest]);
+  });
+
+  test('a stale tab trim cannot undo newer writes or resurrect deleted rows', async () => {
+    const [a, b, backend] = await tabs();
+    for (let i = 0; i < 3; i++) await a.record(makeTape({ id: `a${i}` }), 5);
+    // Tab B, whose cache is still empty, records two newer attempts and lowers the limit to 2.
+    await b.record(makeTape({ id: 'b0' }), 5);
+    await b.record(makeTape({ id: 'b1' }), 5);
+    expect(await b.trim(2)).toEqual(['a0', 'a1', 'a2']);
+    // Tab A still caches a0..a2. Its trim/record must plan from disk: nothing comes back, the newest survive.
+    expect(ids(a)).toEqual(['a0', 'a1', 'a2']);
+    expect(await a.trim(5)).toEqual([]);
+    expect((await onDisk(backend)).map((m) => m.id)).toEqual(['b0', 'b1']);
+    const r = await a.record(makeTape({ id: 'a3' }), 2);
+    expect(r.evicted).toEqual(['b0']);
+    expect((await onDisk(backend)).map((m) => m.id)).toEqual(['b1', 'a3']);
+  });
+
+  test('a stale tab clearing one course never touches another course written by the other tab', async () => {
+    const [a, b, backend] = await tabs();
+    await a.record(makeTape({ seed: 'A', id: 'A1' }), 5);
+    await b.record(makeTape({ seed: 'B', id: 'B1' }), 5);
+    await b.record(makeTape({ seed: 'A', id: 'A2' }), 5); // newer, unknown to tab A's cache
+    expect(await a.clear('B', 0)).toBe(1);
+    expect((await onDisk(backend)).map((m) => m.id)).toEqual(['A1', 'A2']);
+    expect(await a.clear('A', 0)).toBe(2); // both, including the one this tab never saw
+    expect(await onDisk(backend)).toEqual([]);
+  });
+
+  test('the ghost library is untouched by racing tabs', async () => {
+    const lib = new GhostLibrary();
+    await lib.init();
+    const best = makeTape({ ticks: 600 });
+    await lib.saveRun(best);
+    const before = JSON.stringify([...lib.courses]);
+    const [a, b] = await tabs();
+    await Promise.all([a.record(best, 1), b.record(makeTape(), 1), a.trim(0), b.clear()]);
+    expect(JSON.stringify([...lib.courses])).toBe(before);
+    expect(await lib.getTape(best.runId)).toBe(best);
   });
 });

@@ -11,6 +11,8 @@
  *     overview. Nothing interactive, no page errors, no network writes.
  *  6. REDUCED MOTION: OS prefers-reduced-motion with the setting on AUTO opens a still overview that never plays.
  *  7. CORRUPT: a damaged pose row is skipped, the montage still opens.
+ *  9. TWO TABS: two same-origin tabs race record() at keep 5 and keep 1; ordinals stay distinct and increasing, only
+ *     the newest committed survives keep=1, a stale tab's trim/record/clear plans from disk, GhostLibrary untouched.
  *  8. PERF: synthetic QA traces (ids `synthetic-qa-*`, derived from this device's real trace) at 0/5/10/20/40 kept
  *     attempts, swarm style, at real requestAnimationFrame pacing (optionally CPU-throttled): frame p50/p95, the
  *     montage's own update cost per frame, history write time and bytes.
@@ -163,6 +165,57 @@ try {
   assert.ok(!corrupt.ids.includes(ids[0]) && corrupt.ids.includes(ids[1]) && corrupt.skipped === 1 && corrupt.montage, JSON.stringify(corrupt));
   await p2.page.keyboard.press('Escape');
   console.log('CEMETERY_CORRUPT_PASS', JSON.stringify(corrupt));
+
+  // 9. TWO TABS on the same origin racing the same store (PR #378 review P1): every change is planned inside one
+  //    IndexedDB readwrite transaction from what is on disk, so ordinals stay distinct and increasing, a keep=1 race
+  //    leaves exactly the newest committed attempt, and a stale tab cannot undo newer changes or touch GhostLibrary.
+  {
+    const tapeJson = await p2.page.evaluate(() => window.__bbGame.registry.get('lastGhostTape'));
+    const tab2 = await open();
+    const TABS = 'CEMETERY68-TABS';
+    const both = [p2.page, tab2.page];
+    const libBefore = await p2.page.evaluate(() => JSON.stringify([...window.__bbGame.registry.get('ghostLibrary').courses]));
+    // Both tabs start from the same (empty for this course) cache, then fire at the same instant.
+    const race = (keep, tag) => {
+      const at = Date.now() + 400;
+      return Promise.all(both.map((pg, i) => pg.evaluate(async ({ tape, i, at, keep, tag, seed }) => {
+        const h = window.__bbGame.registry.get('attemptHistory');
+        while (Date.now() < at) await new Promise((r) => setTimeout(r, 1));
+        return h.record({ ...tape, seed, biomeMask: 0, runId: `${tag}-tab${i}`, endedAt: at }, keep);
+      }, { tape: tapeJson, i, at, keep, tag, seed: TABS })));
+    };
+    const disk = () => p2.page.evaluate(async (seed) => {
+      const db = await new Promise((r) => { const q = indexedDB.open('bitstream-attempt-history'); q.onsuccess = () => r(q.result); });
+      const rows = await new Promise((r) => { const q = db.transaction('meta').objectStore('meta').getAll(); q.onsuccess = () => r(q.result); });
+      db.close();
+      return rows.filter((m) => m.key.startsWith(seed + '|')).sort((a, b) => a.seq - b.seq).map((m) => ({ id: m.id, seq: m.seq }));
+    }, TABS);
+    const r1 = await race(5, 'race5');
+    const d1 = await disk();
+    assert.deepEqual(r1.map((r) => r.ok), [true, true], JSON.stringify(r1));
+    assert.equal(new Set(d1.map((m) => m.seq)).size, 2, `distinct ordinals ${JSON.stringify(d1)}`);
+    assert.ok(d1[1].seq > d1[0].seq);
+    const r2 = await race(1, 'race1');
+    const d2 = await disk();
+    const newest = r2[0].seq > r2[1].seq ? 'race1-tab0' : 'race1-tab1';
+    assert.deepEqual(d2.map((m) => m.id), [newest], `keep=1 race leaves only the newest: ${JSON.stringify({ r2, d2 })}`);
+    // Tab 2's cache predates tab 1's newest write; its trim and a record at keep 5 must plan from disk.
+    await tab2.page.evaluate(() => window.__bbGame.registry.get('attemptHistory').trim(5));
+    assert.deepEqual((await disk()).map((m) => m.id), [newest], 'stale trim changed nothing');
+    const seqAfter = await tab2.page.evaluate(async ({ tape, seed }) => (await window.__bbGame.registry.get('attemptHistory')
+      .record({ ...tape, seed, biomeMask: 0, runId: 'late-tab1', endedAt: 1 }, 5)).seq, { tape: tapeJson, seed: TABS });
+    const d3 = await disk();
+    assert.deepEqual(d3.map((m) => m.id), [newest, 'late-tab1']);
+    assert.ok(seqAfter > d2[0].seq, 'ordinal continues from disk, not the stale cache');
+    await tab2.page.evaluate((seed) => window.__bbGame.registry.get('attemptHistory').clear(seed, 0), TABS);
+    assert.deepEqual(await disk(), []);
+    const libAfter = await p2.page.evaluate(() => JSON.stringify([...window.__bbGame.registry.get('ghostLibrary').courses]));
+    assert.equal(libAfter, libBefore, 'GhostLibrary untouched by racing tabs');
+    assert.deepEqual(tab2.errors, []);
+    report.steps.twoTabs = { race5: d1, race1: d2, late: d3 };
+    console.log('CEMETERY_TWO_TABS_PASS', JSON.stringify(report.steps.twoTabs));
+    await tab2.page.close();
+  }
 
   // 6. reduced motion via the OS preference under AUTO
   await setSetting(p2.page, 'reduceMotion', 'auto');

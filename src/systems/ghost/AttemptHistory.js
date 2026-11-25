@@ -121,6 +121,24 @@ const req2p = (req) => new Promise((resolve, reject) => {
 });
 const isQuota = (e) => Boolean(e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota/i.test(String(e.message))));
 
+/**
+ * Apply one planned change to a list of on-disk rows. `plan(rows)` sees every VALID row currently stored (a fresh copy)
+ * and returns `{puts, deletes, value}`; invalid rows are always deleted as well. Pure helper shared by both backends.
+ */
+function applyPlan(rows, plan) {
+  const valid = [], bad = [];
+  for (const m of rows || []) {
+    if (validMeta(m)) valid.push({ ...m });
+    else if (m && typeof m.id === 'string') bad.push(m.id);
+  }
+  const r = plan(valid.map((m) => ({ ...m }))) || {};
+  const deletes = [...new Set([...(r.deletes || []), ...bad])];
+  const after = new Map(valid.map((m) => [m.id, m]));
+  for (const id of deletes) after.delete(id);
+  for (const p of r.puts || []) after.set(p.meta.id, { ...p.meta });
+  return { puts: r.puts || [], deletes, value: r.value, metas: [...after.values()] };
+}
+
 /** Plain in-memory backend (Jest, private windows, IndexedDB refused). Optional `quotaBytes` simulates a full disk. */
 export class MemoryAttemptBackend {
   constructor({ quotaBytes = Infinity } = {}) {
@@ -132,15 +150,18 @@ export class MemoryAttemptBackend {
   async loadMetas() { return [...this.meta.values()].map((m) => ({ ...m })); }
   async getPoses(id) { const p = this.poses.get(id); return p ? new Float32Array(p) : null; }
   async getManyPoses(ids) { return Promise.all(ids.map((id) => this.getPoses(id))); }
-  /** All or nothing. @returns {Promise<true|'quota'|false>} */
-  async commit({ puts = [], deletes = [] }) {
-    let after = 0;
-    for (const [id, m] of this.meta) if (!deletes.includes(id)) after += m.bytes;
-    for (const p of puts) after += p.meta.bytes;
-    if (after > this.quotaBytes) return 'quota';
-    for (const id of deletes) { this.meta.delete(id); this.poses.delete(id); }
-    for (const p of puts) { this.meta.set(p.meta.id, { ...p.meta }); this.poses.set(p.meta.id, new Float32Array(p.poses)); }
-    return true;
+  /**
+   * Read, plan and write as one step (synchronous here, so nothing can interleave), like the IndexedDB transaction.
+   * @returns {Promise<{status:true|'quota'|false, metas?:object[], value?:any}>}
+   */
+  async mutate(plan) {
+    const a = applyPlan([...this.meta.values()], plan);
+    let bytes = 0;
+    for (const m of a.metas) bytes += m.bytes;
+    if (bytes > this.quotaBytes) return { status: 'quota' };
+    for (const id of a.deletes) { this.meta.delete(id); this.poses.delete(id); }
+    for (const p of a.puts) { this.meta.set(p.meta.id, { ...p.meta }); this.poses.set(p.meta.id, new Float32Array(p.poses)); }
+    return { status: true, metas: a.metas, value: a.value };
   }
 }
 
@@ -192,39 +213,51 @@ export class IdbAttemptBackend {
     });
   }
 
-  /** One readwrite transaction over both stores: a meta row never exists without its poses, or vice versa. */
-  commit({ puts = [], deletes = [] }) {
+  /**
+   * One readwrite transaction over both stores: read every meta row, plan against THAT (never a tab's cached copy),
+   * write. IndexedDB serializes overlapping readwrite transactions across tabs of the origin, so two tabs can never
+   * plan from the same snapshot: sequence numbers stay distinct and increasing, and eviction sees every newer row.
+   * No await happens inside the transaction. A meta row never exists without its poses, or vice versa.
+   * @returns {Promise<{status:true|'quota'|false, metas?:object[], value?:any}>}
+   */
+  mutate(plan) {
     return new Promise((resolve) => {
       let tx;
-      try { tx = this.db.transaction(['meta', 'poses'], 'readwrite'); } catch { resolve(false); return; }
-      let quota = false;
-      tx.oncomplete = () => resolve(true);
-      tx.onabort = () => resolve(quota || isQuota(tx.error) ? 'quota' : false);
+      try { tx = this.db.transaction(['meta', 'poses'], 'readwrite'); } catch { resolve({ status: false }); return; }
+      let quota = false, done = null;
+      tx.oncomplete = () => resolve(done ? { status: true, metas: done.metas, value: done.value } : { status: false });
+      tx.onabort = () => resolve({ status: quota || isQuota(tx.error) ? 'quota' : false });
       tx.onerror = (ev) => { if (isQuota(ev?.target?.error)) quota = true; };
-      try {
-        const meta = tx.objectStore('meta'), poses = tx.objectStore('poses');
-        for (const id of deletes) { meta.delete(id); poses.delete(id); }
-        for (const p of puts) {
-          // Copy into a fresh, exact-size ArrayBuffer: never persist a view onto someone else's buffer.
-          poses.put({ id: p.meta.id, data: p.poses.slice().buffer });
-          meta.put(p.meta);
+      const meta = tx.objectStore('meta'), poses = tx.objectStore('poses');
+      meta.getAll().onsuccess = (ev) => {
+        try {
+          const a = applyPlan(ev.target.result, plan);
+          for (const id of a.deletes) { meta.delete(id); poses.delete(id); }
+          for (const p of a.puts) {
+            // Copy into a fresh, exact-size ArrayBuffer: never persist a view onto someone else's buffer.
+            poses.put({ id: p.meta.id, data: p.poses.slice().buffer });
+            meta.put(p.meta);
+          }
+          done = a;
+        } catch (e) {
+          if (isQuota(e)) quota = true;
+          try { tx.abort(); } catch { /* already finishing */ }
         }
-      } catch (e) {
-        if (isQuota(e)) quota = true;
-        try { tx.abort(); } catch { resolve(quota ? 'quota' : false); }
-      }
+      };
     });
   }
 }
+
+const bySeq = (a, b) => a.seq - b.seq;
+const nextSeq = (rows) => rows.reduce((m, r) => Math.max(m, r.seq), 0) + 1;
 
 export class AttemptHistory {
   /** @param {{backend?:object, maxBytes?:number}} [o] inject a backend in tests; init() picks IndexedDB otherwise */
   constructor({ backend = null, maxBytes = MAX_TOTAL_BYTES } = {}) {
     this.backend = backend;
     this.maxBytes = maxBytes;
-    /** @type {Map<string, object>} id -> meta, always in memory (small) */
+    /** @type {Map<string, object>} id -> meta: a CACHE of the last state read from or committed to disk */
     this.metas = new Map();
-    this._seq = 0;
     this._queue = Promise.resolve();
     this.ready = false;
   }
@@ -237,29 +270,43 @@ export class AttemptHistory {
     }
     let rows = [];
     try { rows = await this.backend.loadMetas(); } catch { rows = []; }
-    const bad = [];
-    for (const m of rows) {
-      if (validMeta(m) && !this.metas.has(m.id)) { this.metas.set(m.id, m); this._seq = Math.max(this._seq, m.seq); }
-      else if (m && typeof m.id === 'string') bad.push(m.id);
-    }
-    if (bad.length) { try { await this.backend.commit({ deletes: bad }); } catch { /* retried next start */ } }
+    this._adopt(rows.filter(validMeta));
+    if (rows.some((m) => !validMeta(m))) await this._mutate(() => ({})); // deletes the damaged rows
     this.ready = true;
     return this;
   }
 
   get kind() { return this.backend?.kind || 'none'; }
 
-  /** Serialize mutations so concurrent record/trim/clear calls never interleave their read-plan-write steps. */
+  /** Replace the cache with an authoritative row list. */
+  _adopt(rows) {
+    this.metas = new Map((rows || []).filter(validMeta).map((m) => [m.id, { ...m }]));
+  }
+
+  /** Re-read the authoritative index (other tabs may have written). Never rejects. */
+  async refresh() {
+    try { this._adopt(await this.backend.loadMetas()); } catch { /* keep the cache */ }
+    return this;
+  }
+
+  /** In-tab ordering only (cross-tab ordering is the backend transaction's job). */
   _serial(fn) {
     const run = this._queue.then(fn, fn);
     this._queue = run.catch(() => {});
     return run;
   }
 
+  async _mutate(plan) {
+    let res;
+    try { res = await this.backend.mutate(plan); } catch (e) { res = { status: isQuota(e) ? 'quota' : false }; }
+    if (res && res.status === true) this._adopt(res.metas);
+    return res || { status: false };
+  }
+
   /**
-   * Keep a finished run's pose trace, then evict to the budgets. keep <= 0 records nothing (and trims nothing: use
-   * trim(0) to empty the store). Idempotent per runId.
-   * @returns {Promise<{ok:boolean, reason?:string, evicted:string[]}>}
+   * Keep a finished run's pose trace, then evict to the budgets, all inside one storage transaction planned from what
+   * is on disk at that moment. keep <= 0 records nothing (use trim(0) to empty the store). Idempotent per runId.
+   * @returns {Promise<{ok:boolean, reason?:string, evicted:string[], seq?:number}>}
    */
   record(tape, keep) {
     return this._serial(async () => {
@@ -267,63 +314,62 @@ export class AttemptHistory {
       if (k === 0) return { ok: false, reason: 'disabled', evicted: [] };
       const entry = attemptFromTape(tape);
       if (!entry) return { ok: false, reason: 'ineligible', evicted: [] };
-      if (this.metas.has(entry.meta.id)) return { ok: false, reason: 'duplicate', evicted: [] };
-      entry.meta.seq = this._seq + 1;
-      const all = [...this.metas.values(), entry.meta];
-      let deletes = planEviction(all, k, this.maxBytes, entry.meta.id);
-      let res = await this._commit({ puts: [entry], deletes });
-      if (res === 'quota') {
-        // Disk full (another site, the browser's own quota): make room from THIS store only, oldest first, then try
-        // once more. Never touches any other database. A second failure leaves the store exactly as it was.
-        const others = [...this.metas.values()].filter((m) => !deletes.includes(m.id)).sort((a, b) => a.seq - b.seq);
-        const extra = others.slice(0, Math.max(1, Math.ceil(others.length / 2))).map((m) => m.id);
-        deletes = [...deletes, ...extra];
-        res = await this._commit({ puts: [entry], deletes });
-        if (res === 'quota') {
-          // Still no room for the new trace: at least release what the retry planned to free.
-          await this._commit({ deletes });
-          return { ok: false, reason: 'quota', evicted: deletes.filter((id) => !this.metas.has(id)) };
+      // `room`: on a full disk, also free the oldest half of THIS store's other rows (never any other database).
+      const planWrite = (room) => (rows) => {
+        if (rows.some((m) => m.id === entry.meta.id)) return { value: { duplicate: true } };
+        const meta = { ...entry.meta, seq: nextSeq(rows) };
+        let deletes = planEviction([...rows, meta], k, this.maxBytes, meta.id);
+        if (room) {
+          const others = rows.filter((m) => !deletes.includes(m.id)).sort(bySeq);
+          deletes = [...deletes, ...others.slice(0, Math.max(1, Math.ceil(others.length / 2))).map((m) => m.id)];
+        }
+        return { puts: [{ meta, poses: entry.poses }], deletes, value: { deletes, seq: meta.seq } };
+      };
+      let res = await this._mutate(planWrite(false));
+      if (res.status === 'quota') {
+        res = await this._mutate(planWrite(true));
+        if (res.status === 'quota') {
+          // Still no room for the new trace: release what the retry planned to free, without the new row.
+          const freed = await this._mutate((rows) => {
+            const deletes = planWrite(true)(rows).deletes || [];
+            return { deletes, value: deletes };
+          });
+          return { ok: false, reason: 'quota', evicted: freed.status === true ? freed.value : [] };
         }
       }
-      if (res !== true) return { ok: false, reason: 'storage', evicted: [] };
-      this._seq = entry.meta.seq;
-      return { ok: true, evicted: deletes };
+      if (res.status !== true) return { ok: false, reason: 'storage', evicted: [] };
+      if (res.value?.duplicate) return { ok: false, reason: 'duplicate', evicted: [] };
+      return { ok: true, evicted: res.value.deletes, seq: res.value.seq };
     });
   }
 
-  /** Apply a (lowered) per-course limit now. @returns {Promise<string[]>} evicted ids */
+  /** Apply a (lowered) per-course limit now, to what is on disk. @returns {Promise<string[]>} evicted ids */
   trim(keep) {
     return this._serial(async () => {
-      const deletes = planEviction([...this.metas.values()], keep, this.maxBytes);
-      if (!deletes.length) return [];
-      return (await this._commit({ deletes })) === true ? deletes : [];
+      const res = await this._mutate((rows) => {
+        const deletes = planEviction(rows, keep, this.maxBytes);
+        return { deletes, value: deletes };
+      });
+      return res.status === true ? res.value : [];
     });
   }
 
-  /** Delete every attempt (or one course's, given seed + mask). Only this store. @returns {Promise<number>} */
+  /** Delete every attempt on disk (or one course's, given seed + mask). Only this store. @returns {Promise<number>} */
   clear(seed, biomeMask = 0) {
     return this._serial(async () => {
       const key = seed === undefined ? null : courseKey(seed, biomeMask);
-      const deletes = [...this.metas.values()].filter((m) => key === null || m.key === key).map((m) => m.id);
-      if (!deletes.length) return 0;
-      return (await this._commit({ deletes })) === true ? deletes.length : 0;
+      const res = await this._mutate((rows) => {
+        const deletes = rows.filter((m) => key === null || m.key === key).map((m) => m.id);
+        return { deletes, value: deletes.length };
+      });
+      return res.status === true ? res.value : 0;
     });
   }
 
-  async _commit({ puts = [], deletes = [] }) {
-    let res;
-    try { res = await this.backend.commit({ puts, deletes }); } catch (e) { res = isQuota(e) ? 'quota' : false; }
-    if (res === true) {
-      for (const id of deletes) this.metas.delete(id);
-      for (const p of puts) this.metas.set(p.meta.id, { ...p.meta });
-    }
-    return res;
-  }
-
-  /** Stored entries of one course, oldest first (metadata only). */
+  /** Stored entries of one course, oldest first (metadata only, from the cache). */
   list(seed, biomeMask = 0) {
     const key = courseKey(seed, biomeMask);
-    return [...this.metas.values()].filter((m) => m.key === key).sort((a, b) => a.seq - b.seq);
+    return [...this.metas.values()].filter((m) => m.key === key).sort(bySeq);
   }
 
   /** {attempts, bytes, courses} for the Settings readout. */
@@ -335,11 +381,12 @@ export class AttemptHistory {
   }
 
   /**
-   * Compatible past attempts of a course with their poses, oldest first. Missing or corrupt traces are skipped (a
-   * damaged row never stops the montage). `excludeId` drops the run being celebrated.
+   * Compatible past attempts of a course with their poses, oldest first, after re-reading the index (another tab may
+   * have recorded or cleared). Missing or corrupt traces are skipped. `excludeId` drops the run being celebrated.
    * @returns {Promise<Array<{meta:object, poses:Float32Array}>>}
    */
   async attemptsFor(seed, biomeMask = 0, { simRevision, excludeId = null } = {}) {
+    await this.refresh();
     const metas = this.list(seed, biomeMask).filter((m) => m.id !== excludeId && attemptCompatible(m, simRevision));
     let all = [];
     try {
