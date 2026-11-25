@@ -142,6 +142,19 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     expect(result.inspection.replayVerified).toBe(false);
   });
 
+  test('post-commit pin lookup failure cannot turn a successful import into an error',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const action=new LocalEvidenceActions(store);
+    const previous=store.persistedProtectedCount;
+    store.persistedProtectedCount=async()=>{throw new Error('browser closed between transactions');};
+    const result=await action.import(bytes(),{expectedDigest:digest()});
+    expect(result).toMatchObject({ok:true,digest:digest(),localDurable:true,
+      protectionCount:null,alreadyProtected:null,newlyProtected:false,publicRankEligible:false});
+    expect(result.status).toContain('PIN STATUS UNKNOWN');
+    store.persistedProtectedCount=previous;
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest())).toBe(true);
+  });
+
   test('imported local evidence on denied storage remains clearly non-durable, never silently protected',async()=>{
     const memory=await new EvidenceStore({idb:null,storage:null}).init();
     const action=new LocalEvidenceActions(memory);
