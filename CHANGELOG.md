@@ -1,19 +1,27 @@
 # Changelog
 
-## v2.22.8 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
+## v2.22.9 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
 
 - Enforce compiled Chromium savestate capture→fresh restore→strict identical contact/hazard suffix checks on relevant PR source changes, after the source-bound Matter/recorder and fast CLI refusal tests. Retain the already proved native long-run and moving-hazard gate evidence.
 - Harmonize the child-process and Jest timeouts for fast negative tests so slow CI cannot falsely label a routine refusal as a test failure; unexpected spawn errors remain fatal.
 - Exempt only a browser-cancelled *optional* Apple touch icon (`net::ERR_ABORTED`) from offline-PWA release QA. Worker, JavaScript, manifest, audio and all other resource failures remain hard failures with dedicated negative tests.
-- Developer-only diagnostics and offline browser QA: **no** live player savestate UI, trusted suspend slot, public score acceptance, simulation physics, changed SIM_REVISION or automatic upload. Parent #119 and player-facing trusted savestates remain open. This is an isolated draft stacked after v2.22.7, awaiting independent exact-head review and coordinated deployment.
+- Developer-only diagnostics and offline browser QA: **no** live player savestate UI, trusted suspend slot, public score acceptance, simulation physics, changed SIM_REVISION or automatic upload. Parent #119 and player-facing trusted savestates remain open. This is an isolated draft stacked after v2.22.8, awaiting independent exact-head review and coordinated deployment.
 
-## v2.22.7 — #244 private protected replay evidence release candidate (2026-11-25)
+## v2.22.8 — #244 private protected replay evidence release candidate (2026-11-25)
 
 - Retain canonical full-run input evidence in a separate local IndexedDB v3 archive independent of the five visible ghost roles, with atomic run-ID/seed/biome binding, candidate/submitted/pinned references, explicit unpin, and corruption/quota fail-closed behavior.
 - Add deliberate private Game Over Keep, Export, Import and Refresh controls with visible durable-versus-memory-only statuses and explicit source-file retention guidance. No automatic network uploads, rankings or official verification.
 - Reconcile the new Local Evidence entry with the already released #69 Share Link button: both fit in the same Game Over ghost panel, keyboard/pointer navigation preserves both, and entering local files disarms any prepared share URL. Preserve #56 exact-course atomic ghost roles and retention.
 - Extend source-bound current-SIM9 terminal replay QA: 12 ordinary + 12 high-density native RunScene/Matter captures, plus a 32-run genuine-native Chromium 300 KB quota stress test. All observed byte integrity, actual contact and quota/retry results remain **local technical evidence**, not honest-human-play authentication or actual Chromebook capacity proof.
 - Keep public score/entitlement proof #135, competitive submission, physical-device storage acceptance and parent #119 trusted savestate UI **open**. No SIM9 physics, input-tick meaning, scoring, automatic publication or user consent behavior is changed. This is a draft candidate pending exact-head independent review and release coordination.
+
+## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
+
+- After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.
+- Mark every practice run GUEST PRACTICE / UNRANKED, suppress ghost recording and mission completion/BSOD-Gym unlocks, never create a ranked RunRecord, mutate local/leaderboard/XP/shards or emit RUN_END, and return directly to Title after a practice crash via RUN_ABORT. Pause/Restart preserves the nonrewarding handoff; Quit clears it; the next normal run has its normal recorder.
+- The action is fully opt-in; direct URL-fragment arrival, preview, WATCH, and malformed/incompatible/Daily ghost data cannot launch practice. No public verifier, authenticated producer, hosted upload, wallet claims or saved guest-favorite import is introduced.
+- Practice is an unranked chase against a displayed historical trace, NOT full authoritative snapshot takeover, fair equipment parity or a trusted competitive verdict. Parent #69 remains open for hosted oversize fallback, physical Chromebook/Android and further practice UX audit.
+- SIM_REVISION 9/physics and ranked input/scoring rules remain unchanged; source tripwire updated with a reviewed no-causal-behavior-change attestation and updated build identity.
 
 ## v2.22.6 — #69 Ghost-in-a-Link unverified visual sharing (2026-11-25)
 

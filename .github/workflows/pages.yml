@@ -6,6 +6,7 @@ on:
       - 'tools/hosting-browser-smoke.mjs'
       - 'tools/test-real-ghost-link-browser.mjs'
       - 'tests/src/ghost-link*.test.js'
+      - 'tests/src/ghost-guest-practice.test.js'
       - 'tools/pwa/**'
       - 'src/**'
       - 'public/**'
@@ -52,7 +53,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js tests/src/ghost-link-preview.test.js
+      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js tests/src/ghost-link-preview.test.js tests/src/ghost-guest-practice.test.js
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
@@ -71,6 +72,9 @@ jobs:
           node tools/test-ground-brake-browser.mjs dist "$BASE"
           BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
           BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
+          # Opt-in-only unranked playable guest QA; no wallet/run/ghost writes.
+          BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
+          BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE="$BASE" node tools/test-real-ghost-link-browser.mjs
       - name: Check installability and real offline gameplay
         if: steps.rollout.outputs.mode == 'pwa'
         env:
