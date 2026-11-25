@@ -111,7 +111,19 @@ try {
   const tape = cutoff.tape;
   await writeFile(cutoffPath, JSON.stringify({ ...tape, endedAt: tape.startedAt,
     runId: tape.startedAt + '-' + tape.seed }), { flag: 'wx' });
-  await readAirtimeTape(cutoffPath);
+  const validatedCutoff = await readAirtimeTape(cutoffPath);
+  assert.equal(validatedCutoff.checkpoints.length, 3);
+  // Crash-brief checks the fatal event before checkpoints, so refusal alone
+  // cannot distinguish a clean nonfatal boundary from a failed playback.
+  // Independently verify the same bytes with the strict saved-tape runner.
+  const cutoffPlayback = cli('tools/sim/benchmark-replay.mjs',
+    ['--url', url.href, '--airtime-build', build, '--tape', cutoffPath, '--repeats', '2']);
+  assert.equal(cutoffPlayback.status, 0, cutoffPlayback.stderr.trim());
+  assert.equal(cutoffPlayback.stderr, '');
+  const cutoffProof = JSON.parse(cutoffPlayback.stdout);
+  assert.equal(cutoffProof.airtime.observedTicks, 464);
+  assert.deepEqual(cutoffProof.replay, { freshRuns: 2, checkpointsCheckedPerRun: 3,
+    matchedGroundedAndStateEveryTick: true, savedRunsOrTapes: false });
 
   const brief = (path) => cli('tools/sim/benchmark-replay.mjs',
     ['--url', url.href, '--crash-brief-build', build, '--tape', path, '--repeats', '2']);
@@ -138,7 +150,7 @@ try {
     assert.equal(comparison.status, status);
     assert.equal(JSON.parse(comparison.stdout).status, label);
   }
-  console.log('CRASH_BRIEF_CHAIN_PASS terrain=2x7 cutoff=refused compare=0/2');
+  console.log('CRASH_BRIEF_CHAIN_PASS terrain=2x7 cutoff=2x3+refused compare=0/2');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

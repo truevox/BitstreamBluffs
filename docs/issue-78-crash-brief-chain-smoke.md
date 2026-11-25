@@ -14,7 +14,7 @@ uploaded. The smoke is pinned to one version, not a compatibility gate.
    (`npx playwright install chromium` or set `CHROMIUM_EXECUTABLE`).
    Run `node tools/sim/crash-brief-chain-smoke.mjs`. For a different preview
    port, set `GAME_URL` to its HTTP `127.0.0.1` root.
-3. Expect `CRASH_BRIEF_CHAIN_PASS terrain=2x7 cutoff=refused compare=0/2`.
+3. Expect `CRASH_BRIEF_CHAIN_PASS terrain=2x7 cutoff=2x3+refused compare=0/2`.
    This is not a timing benchmark; software WebGL can take a minute or longer.
 
 The smoke checks the preview index and game entry hashes before capturing
@@ -27,9 +27,12 @@ checkpoints and emit a redacted terrain brief without saving a run or tape.
 The second run stops at tick 464 without crashing. The fixture gives its
 synthetic cutoff valid run ID and end-time metadata, leaving the misleading
 `cause: "crash"` header, encoded inputs, checkpoints and poses unchanged.
-It passes strict tape intake but the CLI exits 1 with no JSON because the
-expected fatal event never occurs. This checks event rejection, not just
-header validation.
+The same bytes pass strict tape intake and two fresh strict saved-tape
+playbacks to tick 464, each with all three checkpoints, matched per-tick
+state, no dropped time and no saved run or tape. In the separate
+crash-brief invocation the CLI then exits 1 without JSON at the
+missing-fatal gate. The clean playback proof ends at the recorded
+boundary; no extra-tick replay proof is claimed.
 
 The unchanged shell comparator returns 0 when given the new terrain brief
 against itself and 2 when compared against the committed, historical
