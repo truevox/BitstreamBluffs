@@ -174,3 +174,28 @@ Created **six blind, matched 4.8-second 24-bit FLAC A/B pairs**, baseline vs can
 The existing isolated candidate build and draft PR #321 still represent **v1 (.78/.88)**, not v2. In that isolated build, four of five targeted live post-guard crossfade captures qualified with no clipping; index 1 failed strict continuity twice. **No v2 live output has been certified.** Repeated -128-frame timestamp failures in preguard tap experiments are preserved as invalid instrumentation, not filtered out or assumed to represent actual speaker glitches.
 
 **Remaining release gates:** owner blind listening feedback, independent code/QA review, direct v2 live-device/browser output capture (or an explicitly accepted substitute with accurate limitations), and a decision on acceptable sound and target margin. No production guard or approved biome mix has changed; no Netlify deployment requested. Issue #291 and QA-only PR #339 remain open/draft.
+
+## Isolated v2 native candidate: actual live final master (2026-11-24)
+
+A clean production build was generated from draft candidate branch `friday/issue291-guard-v2-20261124` commit `171fb5cab2131c380e76ee40a5c87329271542b1`, based directly on main. The only runtime changes are the native final post-compressor soft guard knee/ceiling (.74/.82; unchanged 8193-point curve implementation, 2x oversample). The built `main-JieFBNnP.js` bundle SHA-256 is `3c0884e8e86acfdef433bf17cbe1ad644a9eb9070de5a4dc0a22de628ec7927b`. This build and QA worklet were served via a loopback-only static HTTP server, **not deployed**.
+
+Using existing unmodified v4 worklet continuous final-output tap and actual game StemMusicDirector crossfades (released R2 catalogue; max master/music/SFX/wind settings and vocals unlocked, controlled high-risk biome, g.loop.stop), **six of six** targeted v2 live transitions obtained qualified continuous PCM: 54.372426 seconds, no measured sample clips, intersample overs, nonfinite samples, or near-silent overlap windows. All fades were real 2.8-second time-based fallback. Independently computed FFmpeg true peaks agree with the separate 4× estimator. Three earlier attempts were rejected for v4 per-quantum timestamp chronology faults, retained and not counted as passes; retries were permitted **only** for invalid instrument captures, never a measured audio failure.
+
+| Index | Biome | Live estimated dBTP | Independent FFmpeg dBTP | Accepted report SHA-256 |
+|---|---|---:|---:|---|
+| 0 | Candy | -1.806 | -1.8 | bc8d5dac0b421292c467b9e3bfd7a69aeb5299319151b5ebd2881a55f8f95ee0 |
+| 1 | Vertigo | -1.555 | -1.5 | 37bc54df904c49cb74eb51fd0487051c949c4f82f5c817ba16c118435674d8ba |
+| 4 | Candy | -2.415 | -2.4 | b039dfb942319d38709c87c098093fbcaaaba8f2c0ba7c68814aae98dfce2b2a |
+| 25 | Garbage | -2.641 | -2.6 | 17107c075f54a5a2ba5cc1ac86f8d33b498e683f9bd88b5a7f740843c2a1723e |
+| 26 | Vertigo | -1.993 | -2.0 | bff1a89874f98464c613222514a702b1d8f31beef5b92135991a6b16576eca69 |
+| 31 | Vertigo | -1.871 | -1.9 | c4cfce1d2647bf9e97aab786f1b3405cb56f1ead6eb72c8b82acba2da418b30f |
+
+Rejected report SHA-256 values for 25-a, 26-a, 26-b respectively: `e58cf55a8e34f10b36a220caa375561d35ee350ad7bb4bc0406708e41f2a2863`, `fe58f037ac92b1f0012144ea0fc5e7a94df25e32386f9b0ff29063155d1447ba`, `27bf9b9906adeb9a830a6397ce380d311f9a16cb91496dea29062e043644a704`.
+
+The new independent verifier checks the original immutable R2 catalog SHA, exact ordered song/pack identity, native fade length/clock, incoming and outgoing source role lifetimes, complete v4 worklet receipts, samples/FFmpeg thresholds, zero quiet intervals, all accepted report hashes and the three invalid attempts. Run:
+
+```sh
+node tools/music/verify-r2-guard-v2-live.mjs /path/to/report-directory /path/to/publication-330-inventory.json
+```
+
+**Limitations remain:** the captured report does not cryptographically attest which JS bundle was running; the build identity and SHA were recorded separately. Controlled game DSP is not uninterrupted real terrain/gameplay; browser is local headless Chromium, not physical Chromebook. The stronger guard is still awaiting owner blind A/B listening and independent production code review. No claim of complete full-song or all-biome mastering certification. Current production curve remains unchanged; new clean proposal is draft PR #340. No Netlify deployment requested.
