@@ -26,3 +26,20 @@ test('fast playback readiness skips absent caches without a download or empty-ca
  const c=new R2DownloadControls({plan:{format:'bb-published-music-plan-v1',catalog:e,groups:[{id:'song:base',version,priority:'required',entries:[entry]}]},storage,origin:'https://game.example',scope:'/BitstreamBluffs/',subtle:webcrypto.subtle,estimate:async()=>({quota:100,usage:0})});
  expect(await c.quickReady()).toBe(false);expect(keys).toBe(1);expect(opened).toBe(0);
 });
+
+test('mid-transfer CacheStorage quota error keeps verified progress and allows user-consented repair',async()=>{
+ let full=false;const f=fixture({estimate:async()=>({quota:1e8,usage:full?2e7:9e7}),download:async(g,o)=>{
+  f.calls.push(g.id);if(g.id==='required'&&!full)throw Object.assign(new Error('No room'),{name:'QuotaExceededError'});
+  f.ready.add(g.id);o.onProgress({bytes:g.entries.reduce((n,e)=>n+e.bytes,0)});
+ }});
+ const first=await f.c.start({consent:true});expect(first.status).toBe('insufficient-storage');
+ expect(first.ready).toBe(false);expect(first.missingBytes).toBe(20);expect(first.availableBytes).toBe(1e7);
+ expect(f.ready.has('release-catalog')).toBe(true);expect(f.ready.has('required')).toBe(false);
+ await expect(f.c.start()).rejects.toThrow(/consent/);full=true;
+ const repaired=await f.c.start({consent:true});expect(repaired.status).toBe('ready');expect(repaired.ready).toBe(true);
+ expect(f.ready.has('release-catalog')).toBe(true);expect(f.ready.has('required')).toBe(true);
+});
+test('a non-quota asset failure still reports failed rather than claiming storage is exhausted',async()=>{
+ const f=fixture({download:async()=>{throw Object.assign(new Error('Bad hash'),{name:'IntegrityError'});}});
+ const result=await f.c.start({consent:true});expect(result.status).toBe('failed');expect(result.error).toMatch(/Bad hash/);
+});

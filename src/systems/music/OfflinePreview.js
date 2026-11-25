@@ -25,14 +25,16 @@ export async function installOfflinePreview(game){
  if(!expected||!globalThis.isSecureContext||!navigator.serviceWorker||!globalThis.caches||!globalThis.DecompressionStream)return false;
  const base=new URL(import.meta.env.BASE_URL,location.origin).pathname;
  await navigator.serviceWorker.register(base+'sw.js',{scope:base,updateViaCache:'none'});
- const worker=navigator.serviceWorker.controller;if(!worker)return false; // first install requires next navigation; never force claim/reload
+ const worker=navigator.serviceWorker.controller;
+ if(!worker){game.registry.set('offlineMusicNeedsReopen',true);return false;} // never force claim/reload
+ game.registry.set('offlineMusicNeedsReopen',false);
  const response=await fetch(base+'offline-melody-index.bin',{cache:'no-store'});if(!response.ok)throw Error('Missing offline index');
  const data=await response.arrayBuffer(),digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',data))].map(b=>b.toString(16).padStart(2,'0')).join('');if(digest!==expected)throw Error('Offline index integrity mismatch');
  const index=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
  const settings=game.registry.get(REG.SETTINGS),director=game.registry.get(REG.AUDIO)?._stemMusic,initial=offlinePreviewContext(game);
  if(!director||!initial)return false;
  const plan=await expandOfflineRuntimePlan(index,initial);
- const controller=new MelodyDownloadControls({plan,mode:settings.offlineMusicQuality,options:{storage:caches,origin:location.origin,scope:base,worker,subtle:crypto.subtle,fetcher:fetch.bind(window),connection:navigator.connection},estimate:()=>navigator.storage.estimate(),isStopped:()=>director.isPlaybackBoundary()||(!director.started&&!director.cache.size&&!director.activeNodes.size),withStoppedTransport:fn=>director.withPlaybackBoundary(fn)});
+ const controller=new MelodyDownloadControls({plan,mode:settings.offlineMusicQuality,options:{storage:caches,origin:location.origin,scope:base,worker,subtle:crypto.subtle,fetcher:fetch.bind(window),connection:navigator.connection,storageManager:navigator.storage},estimate:()=>navigator.storage.estimate(),isStopped:()=>director.isPlaybackBoundary()||(!director.started&&!director.cache.size&&!director.activeNodes.size),withStoppedTransport:fn=>director.withPlaybackBoundary(fn)});
  game.registry.set('offlineMusicDownloads',controller);director.setPlaybackBoundary(()=>controller.beforePlayback());
  // Phaser DataManager changedata-profile also covers a player toggling a
  // biome in the Profile menu; settings events cover playlist changes. No
