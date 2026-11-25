@@ -28,6 +28,7 @@ export class ReplayEvidenceView extends View {
     this.pinReady=false;
     this.displayedPin=null; // immutable UI generation snapshot; never retarget Unpin from a newer cache
     this._operationVersion=0; // reject stale async refresh after a user action
+    this._refreshPending=0; // only reconcile if a user action interrupts an actual Refresh
     const text=(x,y,v,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,v,{color,outline:'none'}));
     text(12,24,'PRIVATE TO THIS DEVICE. NEVER UPLOADED.','cyan');
     text(12,38,'A CHECKSUM DOES NOT PROVE WHO PLAYED.','amber');
@@ -90,8 +91,10 @@ export class ReplayEvidenceView extends View {
     return actions;
   }
 
-  async _refresh() {
-    if (this.busy || !this.alive) return;
+  async _refresh({retryPending=true}={}) {
+    if (this.busy || !this.alive) return false;
+    this._refreshPending++;
+    try {
     const version=++this._operationVersion;
     const live=()=>this.alive && version===this._operationVersion;
     this.pinReady=false;
@@ -114,7 +117,7 @@ export class ReplayEvidenceView extends View {
       if (!live() || this._captureStatus()!==status) return;
       // An IDB backend can retain a quota-failed bundle in session RAM even
       // after space comes back. An EXPLICIT Refresh retries those pending bytes.
-      if (control.store.pending.has(capture.digest))
+      if (retryPending && control.store.pending.has(capture.digest))
         await control.store.retryPending({digest:capture.digest}); // prioritize the run on screen
       if (!live() || this._captureStatus()!==status) return;
       // One persisted snapshot / digest check establishes readable bytes,
@@ -153,14 +156,21 @@ export class ReplayEvidenceView extends View {
         this._show('RUN ID NOT CONFIRMED — EXPORT ONLY','CURRENT DEVICE BINDING DOES NOT MATCH');
       else this._show(held?'LOCAL EVIDENCE PINNED':persisted?'SAVED LOCALLY':'SESSION ONLY — EXPORT NOW',
         persisted?'CAN BE LOST IF BROWSER SITE DATA IS CLEARED':'DISK NOT CONFIRMED: EXPORT TO A FILE');
+      // Preserve interrupted-action feedback only when refresh recovered
+      // healthy and current-run-bound durable controls. Otherwise its more
+      // important storage warning must remain visible to the player.
+      return persisted && boundToCurrentRun;
     } catch(e) {
       if (live() && this._captureStatus()===status)
         this._show('ARCHIVE READ FAILED',statusText(e));
+      return false;
     }
+    } finally {this._refreshPending--;}
   }
 
   async _run(task) {
     if (this.busy || !this.alive) return;
+    const interruptedRefresh=this._refreshPending>0;
     this.busy=true;
     this._operationVersion++; // supersede any in-flight Refresh result
     if(this._nativeInput)this._nativeInput.disabled=true;
@@ -169,17 +179,15 @@ export class ReplayEvidenceView extends View {
     finally{
       this.busy=false;
       if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
-      if(this.alive){
-        // A user action cancels an outstanding Refresh after it disabled the
-        // buttons. Re-inspect the actual persisted state; never leave valid
-        // Keep/Export controls disabled until the player manually refreshes.
-        // Preserve the newer action's feedback instead of allowing the
-        // follow-up inspection to overwrite it with an older status.
+      if(this.alive && interruptedRefresh){
+        // Only an action that superseded an in-flight Refresh needs to undo
+        // its disabled controls. This is a read-only reconciliation: explicit
+        // player Refresh is the sole UI gesture that retries pending writes.
         const message=this.status.main.text, details=this.detail.main.text;
-        const reconcile=this._refresh();
+        const reconcile=this._refresh({retryPending:false});
         const refreshVersion=this._operationVersion;
-        await reconcile;
-        if(this.alive && !this.busy && this._operationVersion===refreshVersion){
+        const healthy=await reconcile;
+        if(healthy && this.alive && !this.busy && this._operationVersion===refreshVersion){
           this.status.setText(message);
           this.detail.setText(details);
         }

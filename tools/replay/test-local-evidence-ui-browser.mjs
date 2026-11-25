@@ -102,15 +102,56 @@ try {
   try{
     const refreshing=view._refresh();
     await started;
-    await view._run(async()=>{view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','RECENT USER ACTION');});
+    // Force the pending guard true ONLY after the user's original Refresh has
+    // already passed its retry point. An automatic reconciliation must not
+    // reinterpret an Import action as permission for another disk write.
+    const wasPendingHas=store.pending.has;
+    const retryPending=store.retryPending;
+    let unintendedRetries=0;
+    store.pending.has=()=>true;
+    store.retryPending=async()=>{unintendedRetries++;throw new Error('implicit write during archive action');};
+    try{
+      await view._run(async()=>{view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','RECENT USER ACTION');});
+    }finally{store.pending.has=wasPendingHas;store.retryPending=retryPending;}
     await release();await refreshing;
-    return {status:view.status.main.text,detail:view.detail.main.text,
+    return {status:view.status.main.text,detail:view.detail.main.text,unintendedRetries,
       keepEnabled:view.buttons[0].disabled===false,exportEnabled:view.buttons[1].disabled===false};
   }finally{store.inspectBundle=original;await view._refresh();}
  });
  assert(staleRefresh.status.includes('IMPORTED LOCAL EVIDENCE'));
  assert(staleRefresh.keepEnabled && staleRefresh.exportEnabled);
- record('late Refresh cannot overwrite newer Import feedback or strand archive buttons disabled');
+ assert.equal(staleRefresh.unintendedRetries,0);
+ record('late Refresh reconciles without implicit disk retry or disabled controls');
+
+ const failedReconcile=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const originalInspect=store.inspectBundle.bind(store);
+  const originalRefs=store.persistedProtections.bind(store);
+  let signal,release,intercepted=false;
+  const started=new Promise(resolve=>{signal=resolve;});
+  store.inspectBundle=(...args)=>{
+    if(intercepted)return originalInspect(...args);
+    intercepted=true;signal();
+    return new Promise(resolve=>{release=async()=>resolve(await originalInspect(...args));});
+  };
+  try{
+    const refreshing=view._refresh();
+    await started;
+    store.persistedProtections=async()=>{throw new Error('injected reference read failure');};
+    await view._run(async()=>view._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED','NEWER ACTION'));
+    const result={status:view.status.main.text,keepDisabled:view.buttons[0].disabled,
+      exportEnabled:!view.buttons[1].disabled};
+    await release();await refreshing;
+    return result;
+  }finally{
+    store.inspectBundle=originalInspect;
+    store.persistedProtections=originalRefs;
+    await view._refresh();
+  }
+ });
+ assert(failedReconcile.status.includes('PIN STATUS UNAVAILABLE'));
+ assert(failedReconcile.keepDisabled && failedReconcile.exportEnabled);
+ record('reconciliation failure keeps storage warning visible rather than restoring stale success');
 
  const vanishedPin=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
