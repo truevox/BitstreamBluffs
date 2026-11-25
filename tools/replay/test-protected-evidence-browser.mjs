@@ -116,5 +116,46 @@ try {
   reports.push({case:'chromium-real-idb-blocked-v1-upgrade-fails-closed-and-recovers',result:'PASS'});
   await blockedContext.close();
 
+  // Real IndexedDB cross-tab delete barrier, not merely fake-IDB atomicity.
+  // Model a previously failed session-only capture by inserting validated
+  // canonical bytes into the TEST store's pending queue, never into IDB.
+  const deletionContext=await browser.newContext();
+  const pendingPage=await deletionContext.newPage(),ownerPage=await deletionContext.newPage();
+  await Promise.all([pendingPage.goto(origin,{waitUntil:'domcontentloaded'}),ownerPage.goto(origin,{waitUntil:'domcontentloaded'})]);
+  const staged=await pendingPage.evaluate(async tape=>{
+    const [{EvidenceStore},{evidenceBundle,legacyManifestFromTape,bundleDigest,bundleBytes}]=await Promise.all([
+      import('/src/systems/replay/evidenceStore.js'),import('/src/systems/replay/manifest.js')]);
+    const target=evidenceBundle({manifest:legacyManifestFromTape(tape),tape});
+    const bytes=bundleBytes(target),digest=bundleDigest(target);
+    const store=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+    store.pending.set(digest,bytes);
+    store.pendingMeta.set(digest,{digest,runId:'stale-tab-original',size:bytes.length,seq:1});
+    globalThis.__staleDeleteQa={store,target,digest};
+    return digest;
+  },tape);
+  const erased=await ownerPage.evaluate(async({tape,digest})=>{
+    const [{EvidenceStore},{evidenceBundle,legacyManifestFromTape}]=await Promise.all([
+      import('/src/systems/replay/evidenceStore.js'),import('/src/systems/replay/manifest.js')]);
+    const store=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+    const target=evidenceBundle({manifest:legacyManifestFromTape(tape),tape});
+    await store.put(target,{archiveOnly:true});
+    await store.remove(digest);
+    return await store.inspectBundle(digest);
+  },{tape,digest:staged});
+  assert.deepEqual(erased,{readable:false,durable:false,runBound:false});
+  const blocked=await pendingPage.evaluate(async()=>{
+    const {store,target,digest}=globalThis.__staleDeleteQa;
+    await store.put({...target,claims:{...target.claims,score:777}},{runId:'unrelated-new-save'});
+    return {unsafe:store._unsafePending.has(digest),pending:store.pending.has(digest)};
+  });
+  assert.equal(blocked.unsafe,true);assert.equal(blocked.pending,true);
+  const persisted=await ownerPage.evaluate(async digest=>{
+    const {EvidenceStore}=await import('/src/systems/replay/evidenceStore.js');
+    return new EvidenceStore({idb:indexedDB,storage:null}).init().then(s=>s.inspectBundle(digest));
+  },staged);
+  assert.deepEqual(persisted,{readable:false,durable:false,runBound:false});
+  reports.push({case:'chromium-real-idb-cross-tab-delete-tombstone-blocks-stale-autoflush',result:'PASS'});
+  await deletionContext.close();
+
   console.log(JSON.stringify({format:'bb-protected-evidence-browser-qa',checks:reports.length,reports,source:origin,headlessChromium:true,NO_UPLOAD:true},null,2));
 } finally { await browser.close(); }

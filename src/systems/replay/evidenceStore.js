@@ -2,7 +2,7 @@
  * Durable local replay evidence (Replay Contract v1.0, section 1.2; issue #116). NO Phaser imports. No network.
  *
  * A SEPARATE IndexedDB database (`bitstream-replay-evidence`), never an object store inside `bitstream-ghosts`, so
- * GhostLibrary._collect cannot touch it by construction. Schema v2 adds protectedRefs to the original two stores:
+ * GhostLibrary._collect cannot touch it by construction. Schema v2 adds protectedRefs; v3 adds durable deletionMarks to the original two stores:
  * `bundles` (`{digest, bytes}`: the canonical
  * `bb-replay-evidence` bytes keyed by their `bundleDigest`) and `index` (`{digest, size, runId, seq}`). Only the index is
  * loaded into memory; bytes are read on demand. `seq` is a local insertion sequence (no wall-clock values are stored, so
@@ -21,10 +21,11 @@ import { validateEvidenceBundle, bundleDigest, bundleBytes, bundleFilename } fro
 import { digestOfBytes } from './canonicalSha256.js';
 
 export const EVIDENCE_DB = 'bitstream-replay-evidence';
-export const EVIDENCE_DB_VERSION = 2;
+export const EVIDENCE_DB_VERSION = 3;
 export const EVIDENCE_STORE = 'bundles';
 export const EVIDENCE_INDEX = 'index';
 export const EVIDENCE_REFS = 'protectedRefs';
+export const EVIDENCE_DELETIONS = 'deletionMarks';
 export const PROTECTED_ROLES = Object.freeze(['candidate', 'submitted', 'pinned']);
 export const EVIDENCE_EXTENSION = '.bbreplay';
 const IDB_TIMEOUT_MS = 2500;
@@ -80,6 +81,8 @@ export class EvidenceStore {
     this.pending = new Map();
     /** Failed-write run claims are NOT the persisted index. Keep them separate. */
     this.pendingMeta = new Map();
+    /** Deletion generation observed by the original attempted write; null = no deletion yet. */
+    this._pendingDeletionGeneration = new Map();
     /** Uncertain IDB reads: retain bytes for export, never auto-retry. */
     this._unsafePending = new Set();
     /** Explicit deletion wins over asynchronous retries for that digest. */
@@ -88,6 +91,8 @@ export class EvidenceStore {
     // second write after another tab's explicit deletion.
     this._pendingFlush = null;
     this._openingPromise = null;
+    /** Serialize direct writes per digest through pending-state settlement. */
+    this._putChains = new Map();
     this.backend = 'memory';
     this.persisted = null;
     this.lastError = null;
@@ -126,6 +131,7 @@ export class EvidenceStore {
             if (!d.objectStoreNames.contains(EVIDENCE_STORE)) d.createObjectStore(EVIDENCE_STORE, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_INDEX)) d.createObjectStore(EVIDENCE_INDEX, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_REFS)) d.createObjectStore(EVIDENCE_REFS, { keyPath: 'key' });
+            if (!d.objectStoreNames.contains(EVIDENCE_DELETIONS)) d.createObjectStore(EVIDENCE_DELETIONS, { keyPath: 'digest' });
           };
           req.onsuccess = () => {
             // `onblocked`/timeout cannot cancel an IDB open. Close its eventual
@@ -223,13 +229,33 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes, receipt = null) {
-    const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX], 'readwrite');
+  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null,priorPendingRunId=null,priorPendingGeneration=null,priorPendingGenerationKnown=false}={}) {
+    // A deletion tombstone and the bundle update share ONE IDB lock. Stale
+    // tabs must not resurrect deliberately deleted bytes from pending RAM.
+    const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX,EVIDENCE_DELETIONS], 'readwrite');
     const done = txDone(tx);
     let problem = null;
     let actual = record;
-    const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
-    current.onsuccess = () => {
+    const checkDeletion=tx.objectStore(EVIDENCE_DELETIONS).get(record.digest);
+    checkDeletion.onsuccess=()=>{
+      const observed=checkDeletion.result?.generation ?? null;
+      if(receipt)receipt.deletionGeneration=observed;
+      // A different run cannot overwrite an existing session-only run claim
+      // unless an ACTUAL newer explicit delete is observed under this lock.
+      if(!retry && priorPendingRunId && record.runId &&
+          priorPendingRunId!==record.runId &&
+          (!priorPendingGenerationKnown || observed===priorPendingGeneration)){
+        problem=protectionError('run-id-conflict','pending digest belongs to another run and was not deleted');
+        tx.abort();return;
+      }
+      // Only the generation visible to the INITIAL direct write authorizes a
+      // later retry. Deletion since that attempt always supersedes pending RAM.
+      if(retry && observed!==expectedDeletionGeneration){
+        problem=protectionError('deleted-evidence','a different tab explicitly deleted this digest after this write began; export session bytes instead');
+        tx.abort();return;
+      }
+      const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
+      current.onsuccess = () => {
       const previous = current.result;
       // The database is authoritative, never the tab's possibly stale cache.
       if (previous?.runId && record.runId && previous.runId !== record.runId) {
@@ -263,6 +289,7 @@ export class EvidenceStore {
         } catch { receipt.classification='unknown'; }
         write();
       };
+      };
     };
     try { await done; } catch (e) { throw problem || e; }
     return actual;
@@ -287,6 +314,26 @@ export class EvidenceStore {
     if (validated && (validated.ok !== true || validated.bundleDigest !== res.bundleDigest))
       throw new EvidenceStoreError('validation-hint-mismatch', 'caller validation did not match actual canonical bytes');
     const digest = res.bundleDigest;
+    return this._withDigestMutation(digest,()=>this._putValidatedBytes(digest,bytes,meta));
+  }
+
+  /** Shared per-digest linearization point for explicit save AND delete.
+   * The slot is registered synchronously, before any await, so a later delete
+   * cannot overtake a previously invoked save in the same tab. */
+  async _withDigestMutation(digest,work) {
+    const prior=this._putChains.get(digest) || Promise.resolve();
+    let release;
+    const gate=new Promise(resolve=>{release=resolve;});
+    this._putChains.set(digest,gate);
+    await prior;
+    try {return await work();}
+    finally {
+      if(this._putChains.get(digest)===gate)this._putChains.delete(digest);
+      release();
+    }
+  }
+
+  async _putValidatedBytes(digest,bytes,meta) {
     const prior = this.index.get(digest);
     if (meta.runId !== undefined && meta.runId !== null && !validRunId(meta.runId))
       throw protectionError('invalid-run-id', 'runId must be a bounded local opaque identifier');
@@ -295,11 +342,11 @@ export class EvidenceStore {
     if (!this._db && !this._everDurable && prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
     const pendingClaim = this.pendingMeta.get(digest);
-    if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
+    if (!this._db && pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.archiveOnly === true
       ? (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) || null : null)
-      : meta.runId || pendingClaim?.runId || (!this._db && !this._everDurable ? prior?.runId : null) || null;
+      : meta.runId || (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
@@ -310,17 +357,23 @@ export class EvidenceStore {
     }
     // Receipt is set by the SAME atomic transaction that tries to write;
     // a cross-tab saved row might be absent from this tab's stale index.
+    const priorPendingGeneration=this._pendingDeletionGeneration.get(digest) ?? null;
+    const priorPendingKnown=this._pendingDeletionGeneration.has(digest);
     const writeReceipt = { classification:'unknown' };
     try {
-      const committed = await this._writeDurable(record, bytes, writeReceipt);
+      const committed = await this._writeDurable(record, bytes, writeReceipt,{
+        priorPendingRunId:pendingClaim?.runId || null,priorPendingGeneration,
+        priorPendingGenerationKnown:priorPendingKnown});
       this.index.set(digest, committed);
       const olderClaim = this.pendingMeta.get(digest);
       // A second overlapping unbound write may succeed while an earlier
       // explicit run-ID write is still pending. Do not discard the latter's
       // session-only bytes until the persisted binding actually matches.
-      if (!olderClaim?.runId || committed.runId === olderClaim.runId) {
+      if (!olderClaim?.runId || committed.runId === olderClaim.runId ||
+          (priorPendingKnown && writeReceipt.deletionGeneration!==priorPendingGeneration)) {
         this.pending.delete(digest);
         this.pendingMeta.delete(digest);
+        this._pendingDeletionGeneration.delete(digest);
         this._unsafePending.delete(digest);
       }
     } catch (e) {
@@ -332,13 +385,22 @@ export class EvidenceStore {
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
       if (writeReceipt.classification!=='duplicate') {
         this.pending.set(digest, bytes);
+        // Write classification and deletion generation come from the SAME
+        // transaction. Do not replace an older pending claim with a new fence.
+        const newerDelete=priorPendingKnown && writeReceipt.classification!=='unknown' &&
+          writeReceipt.deletionGeneration!==priorPendingGeneration;
+        if(writeReceipt.classification!=='unknown' &&
+           (!pendingClaim || newerDelete))
+          this._pendingDeletionGeneration.set(digest,writeReceipt.deletionGeneration ?? null);
         // An IDB lookup error cannot distinguish a novel failed write from
         // an already-durable duplicate. Keep its bytes exportable but never
         // automatically resurrect them after another tab deletes the digest.
-        if (writeReceipt.classification==='unknown') this._unsafePending.add(digest);
+        if(writeReceipt.classification==='unknown' ||
+           (pendingClaim && !priorPendingKnown && !newerDelete))
+          this._unsafePending.add(digest);
         else this._unsafePending.delete(digest);
         const established = this.pendingMeta.get(digest);
-        this.pendingMeta.set(digest, established?.runId ? established : record);
+        this.pendingMeta.set(digest, newerDelete ? record : established?.runId ? established : record);
       }
       // A redundant update of already saved identical bytes is still a
       // reported failure, but not an instruction to resurrect deleted proof.
@@ -380,16 +442,21 @@ export class EvidenceStore {
         if(!record)continue;
         receipt.digests.add(digest);receipt.count++;
         try{
-          const committed=await this._writeDurable(record,bytes);
+          const committed=await this._writeDurable(record,bytes,null,{retry:true,
+            expectedDeletionGeneration:this._pendingDeletionGeneration.get(digest) ?? null});
           if(this.pending.get(digest)===bytes){
             this.index.set(digest,committed);
             this.pending.delete(digest);
             this.pendingMeta.delete(digest);
+            this._pendingDeletionGeneration.delete(digest);
             this._unsafePending.delete(digest);
           }
         }catch(e){
-          if(e?.code==='run-id-conflict'){
-            // A failed binding must not prevent independent pending bundles.
+          if(e?.code==='run-id-conflict'||e?.code==='deleted-evidence'){
+            // Explicit delete and conflicting persisted bindings beat a stale
+            // tab's RAM retry. Preserve bytes for manual export, quarantine
+            // automatic recovery and keep processing other pending bundles.
+            if(e?.code==='deleted-evidence')this._unsafePending.add(digest);
             this._report(e);continue;
           }
           // Quota/write failure: do not retry this digest concurrently or
@@ -683,6 +750,10 @@ export class EvidenceStore {
 
   /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
+    return this._withDigestMutation(digest,()=>this._removeUnlocked(digest));
+  }
+
+  async _removeUnlocked(digest) {
     if (this._removing.has(digest)) throw protectionError('delete-in-progress', 'deletion is already pending');
     // After versionchange, a previously durable bundle may still exist on
     // disk. Never claim deletion when only the tab's stale cache was changed.
@@ -692,7 +763,7 @@ export class EvidenceStore {
     this._removing.add(digest);
     try {
       if (this._db) {
-        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
+        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS,EVIDENCE_DELETIONS], 'readwrite');
         const done = txDone(tx);
         let problem = null;
         const scan = tx.objectStore(EVIDENCE_REFS).getAll();
@@ -701,6 +772,7 @@ export class EvidenceStore {
             problem = protectionError('protected-evidence', 'another tab still protects this bundle');
             tx.abort(); return;
           }
+          tx.objectStore(EVIDENCE_DELETIONS).put({digest,generation:newReferenceGeneration()});
           tx.objectStore(EVIDENCE_STORE).delete(digest);
           tx.objectStore(EVIDENCE_INDEX).delete(digest);
         };
@@ -714,6 +786,7 @@ export class EvidenceStore {
       this.index.delete(digest);
       this.pending.delete(digest);
       this.pendingMeta.delete(digest);
+      this._pendingDeletionGeneration.delete(digest);
       this._unsafePending.delete(digest);
       // Another tab may have released a role while our local cache was stale.
       // The persisted transaction proved there were no remaining protections.

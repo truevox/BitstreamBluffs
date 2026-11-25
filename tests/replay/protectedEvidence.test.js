@@ -20,7 +20,7 @@ const transactionDone = tx => new Promise((resolve,reject)=>{
   tx.oncomplete=resolve; tx.onabort=()=>reject(tx.error); tx.onerror=()=>reject(tx.error);
 });
 
-beforeEach(() => expect(EVIDENCE_DB_VERSION).toBe(2));
+beforeEach(() => expect(EVIDENCE_DB_VERSION).toBe(3));
 
 describe('protected local evidence references (#244)', () => {
   test('candidate/submitted/pinned roles share one immutable bundle, counts survive restart and require explicit release', async () => {
@@ -731,6 +731,208 @@ describe('protected local evidence references (#244)', () => {
     expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
   });
 
+  test('P1: a cross-tab explicit deletion cannot be undone by unrelated pending auto-flush',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('transient failure before first save');
+    await expect(stale.put(target,{runId:'original'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pending.has(digest)).toBe(true);
+    idb.hooks.failPut=null;
+    await other.put(target,{archiveOnly:true});
+    await other.remove(digest); // authoritative explicit deletion in another tab
+    expect(await other.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+    await stale.put({...target,claims:{...target.claims,score:721}},{runId:'another'});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
+  test('v2 evidence and protected references upgrade to v3 deletion marks without loss',async()=>{
+    const idb=fakeIdb();
+    const old=await new Promise((resolve,reject)=>{
+      const req=idb.open(EVIDENCE_DB,2);
+      req.onupgradeneeded=()=>{
+        for(const [name,keyPath] of [['bundles','digest'],['index','digest'],['protectedRefs','key']])
+          req.result.createObjectStore(name,{keyPath});
+      };
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+    const digest=bundleDigest(bundle());
+    const tx=old.transaction(['bundles','index'],'readwrite');const done=transactionDone(tx);
+    tx.objectStore('bundles').put({digest,bytes:bundleBytes(bundle())});
+    tx.objectStore('index').put({digest,runId:RUN,size:bundleBytes(bundle()).length,seq:1});
+    await done;old.close();
+    const upgraded=await new EvidenceStore({idb,storage:null}).init();
+    expect(await upgraded.inspectBundle(digest,{runId:RUN})).toEqual({readable:true,durable:true,runBound:true});
+    const ref=await upgraded.protect(digest,{runId:RUN,role:'pinned'});
+    expect(ref.count).toBe(1);
+    await upgraded.unprotect(ref.key);
+    await upgraded.remove(digest);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('a deliberate re-import after deletion cannot enable an older tab to silently rebind it',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('first write failed');
+    await expect(stale.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await owner.put(target,{archiveOnly:true});
+    await owner.remove(digest);
+    await owner.put(target,{runId:'new-owner'}); // deliberate user re-import
+    await stale.put({...target,claims:{...target.claims,score:998}},{runId:'unrelated'});
+    expect(await new EvidenceStore({idb,storage:null}).init().then(s=>s.inspectBundle(digest,{runId:'new-owner'}))).toEqual({readable:true,durable:true,runBound:true});
+    expect(stale._unsafePending.has(digest)).toBe(true);
+  });
+
+  test('P1: deliberate post-deletion import recovers after write failure if deletion has not changed',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});
+    await owner.remove(digest);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('transient quota');
+    await expect(fresh.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    expect(fresh.pending.has(digest)).toBe(true);
+    expect(fresh._unsafePending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await fresh.retryPending({digest});
+    expect(await new EvidenceStore({idb,storage:null}).init().then(s=>s.inspectBundle(digest,{runId:'new-owner'})))
+      .toEqual({readable:true,durable:true,runBound:true});
+  });
+
+  test('P1: a second delete invalidates a pending re-import that followed an earlier delete',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('temporary quota');
+    await expect(fresh.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await owner.remove(digest); // newer user delete overrides subsequent retry
+    await fresh.retryPending({digest});
+    expect(fresh._unsafePending.has(digest)).toBe(true);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('P1: same-tab newer delete supersedes stale run and generation after failed re-import',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failPut=new Error('old run cannot persist');
+    await expect(stale.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await other.put(target,{archiveOnly:true});await other.remove(digest);
+    idb.hooks.failPut=new Error('new re-import temporarily blocked');
+    await expect(stale.put(target,{runId:'new-owner'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('new-owner');
+    expect(stale._unsafePending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await stale.retryPending({digest});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest,{runId:'new-owner'})).toEqual({readable:true,durable:true,runBound:true});
+    await expect(fresh.put(target,{runId:'old-owner'})).rejects.toMatchObject({code:'run-id-conflict'});
+  });
+
+  test('P1: absent intervening delete does not permit a same-tab run claim replacement',async()=>{
+    const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('first write failed');
+    await expect(s.put(bundle(),{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failPut=null;
+    await expect(s.put(bundle(),{runId:'new-run'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(s.pendingMeta.get(bundleDigest(bundle())).runId).toBe('old-run');
+  });
+
+  test('P1: overlapping post-delete direct imports cannot overwrite pending run identity',async()=>{
+    const idb=fakeIdb(),writer=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await writer.put(target,{archiveOnly:true});await writer.remove(digest);
+    const sameTab=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('offline for both overlapping imports');
+    const settled=await Promise.allSettled([
+      sameTab.put(target,{runId:'first-new-owner'}),
+      sameTab.put(target,{runId:'second-new-owner'}),
+    ]);
+    expect(settled[0].status).toBe('rejected');
+    expect(settled[0].reason.code).toBe('write-failed');
+    expect(settled[1].status).toBe('rejected');
+    expect(settled[1].reason.code).toBe('run-id-conflict');
+    expect(sameTab.pendingMeta.get(digest).runId).toBe('first-new-owner');
+    idb.hooks.failPut=null;
+    await sameTab.retryPending({digest});
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest,{runId:'first-new-owner'})).toEqual({readable:true,durable:true,runBound:true});
+    await expect(fresh.put(target,{runId:'second-new-owner'})).rejects.toMatchObject({code:'run-id-conflict'});
+  });
+
+  test('P1: same-tab delete ordered after invoked direct put cannot be overtaken',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await store.put(target,{runId:'owner-A'});
+    const writing=store.put(target,{runId:'owner-A'});
+    const deleting=store.remove(digest);
+    await Promise.all([writing,deleting]);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    expect(await fresh.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
+  test('P1: unknown failed tombstone lookup cannot authorize replacing a pending run',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failGet=new Error('deletion generation unreadable');
+    await expect(stale.put(target,{runId:'owner-A'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+    idb.hooks.failGet=null;
+    await expect(stale.put(target,{runId:'owner-B'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('P1: unbound import cannot clear unknown-generation pending run claim',async()=>{
+    const idb=fakeIdb(),owner=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    await owner.put(target,{archiveOnly:true});await owner.remove(digest);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failGet=new Error('cannot read tombstone');
+    await expect(stale.put(target,{runId:'owner-A'})).rejects.toMatchObject({code:'write-failed'});
+    idb.hooks.failGet=null;
+    await stale.put(target,{archiveOnly:true}); // unrelated unbound explicit import
+    expect(stale.pending.has(digest)).toBe(true);
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    await expect(stale.put(target,{runId:'owner-B'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(stale.pendingMeta.get(digest).runId).toBe('owner-A');
+  });
+
+  test('P1: unknown pending generation survives later failed reads and writes without resurrection',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    const target=bundle(),digest=bundleDigest(target);
+    idb.hooks.failGet=new Error('cannot establish original deletion generation');
+    await expect(stale.put(target,{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+    idb.hooks.failGet=null;
+    await other.put(target,{archiveOnly:true});await other.remove(digest);
+    idb.hooks.failPut=new Error('transient after deletion');
+    for(let repeat=0;repeat<2;repeat++){
+      await expect(stale.put(target,{runId:'old-run'})).rejects.toMatchObject({code:'write-failed'});
+      expect(stale._pendingDeletionGeneration.has(digest)).toBe(false);
+      expect(stale.pendingMeta.get(digest).runId).toBe('old-run');
+      expect(stale._unsafePending.has(digest)).toBe(true);
+    }
+    idb.hooks.failPut=null;
+    expect(await stale.retryPending({digest})).toMatchObject({attempted:0,recovered:0,remaining:1});
+    await stale.put({...target,claims:{...target.claims,score:907}},{runId:'unrelated'});
+    expect(stale._unsafePending.has(digest)).toBe(true);
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(await re.inspectBundle(digest)).toEqual({readable:false,durable:false,runBound:false});
+  });
+
   test('a previous durable record remains protectable despite stale pending duplicate bytes',async()=>{
     const idb=fakeIdb(),s=await new EvidenceStore({idb,storage:null}).init();
     const digest=await s.put(bundle(),{runId:RUN});
@@ -890,7 +1092,7 @@ describe('protected local evidence references (#244)', () => {
     expect(idb.hooks.closeCount).toBe(1);
   });
 
-  test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
+  test('v1 database upgrades in place to v3 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{
       const req=idb.open(EVIDENCE_DB,1);
