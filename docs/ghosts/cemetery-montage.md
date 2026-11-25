@@ -68,10 +68,34 @@ A new action row in Settings (17 rows; the panel still ends at y = 264 of 270) o
   (≤ 4 cores, ≤ 4 GB, or ChromeOS). A `DensityGovernor` halves riders and tails after ~30 smoothed frames over 26 ms
   (never below 4; the hero and the newest past attempts survive) and restores them slowly after sustained fast frames.
 
-## Measured cost (real Chromium, SwiftShader WebGL, this repo's harness)
+## Measured cost (2026-11-25, production build, container Chromium + SwiftShader WebGL)
 
-See `tools/ghosts/cemetery-montage-browser.mjs` (`PERF_ONLY=1 CPU_THROTTLE=n`). Numbers are filled in by the PR that
-ships this document; see the PR description for the exact run.
+`GAME_URL=… PERF_ONLY=1 CPU_THROTTLE=n node tools/ghosts/cemetery-montage-browser.mjs`. Synthetic QA attempts
+(`synthetic-qa-*`, 20–80 s each, derived from this device's real trace), swarm style, follow view playing. Tier forced
+via `navigator.hardwareConcurrency/deviceMemory`. Frame times are rAF deltas (p50 / p95, ms); "update" is the
+montage's own JS per frame; "open" is M press to first montage frame.
+
+| CPU | Tier | Game Over alone | Montage, 5 kept | 10 | 20 | 40 kept | Update (mean) | Open | Riders after governor |
+|---|---|---|---|---|---|---|---|---|---|
+| 1× | low (16) | 16.7 / 16.8 | 16.7 / 33.4 | 16.7 / 33.4 | 16.7 / 33.4 | 16.7 / 33.4 | 0.03–0.06 | 38–138 | 16 (no shedding) |
+| 1× | standard (40) | 16.7 / 16.8 | 16.7 / 33.4 | 16.7 / 33.4 | 16.7 / 33.4 | 16.7 / 33.4 | 0.03–0.05 | 158–213 | 40 (no shedding) |
+| 4× | low | 16.7 / 33.4 | 33.3 / 50 | 33.3 / 50 | 33.3 / 50 | 33.3 / 33.5 | 0.11–0.26 | 260–330 | 4 |
+| 4× | standard | 16.7 / 33.4 | 33.3 / 33.4 | 33.3 / 50 | 33.3 / 50 | 33.3 / 50 | 0.13–0.20 | 213–308 | 4 |
+| 6× | low | 33.3 / 50 | 33.4 / 50 | 33.3 / 50 | 33.4 / 50 | 33.3 / 50 | 0.20–0.41 | 230–292 | 4 |
+| 6× | standard | 33.3 / 50 | 33.4 / 66.6 | 33.4 / 66.6 | 33.4 / 50 | 33.4 / 50 | 0.25–0.45 | 351–407 | 4 |
+
+Stored size: 5 / 10 / 20 / 40 attempts = 80 / 162 / 339 / 691 KB.
+
+Reading it:
+- The montage's own work is ≤ 0.45 ms per frame even at 6× throttling, and does not grow with the number of
+  attempts kept (it is bounded by the rider budget). Opening grows mildly and stays under ~0.4 s at 6×.
+- At 4× the median drops from 60 to 30 fps when the overlay opens, **independent of rider count** (shedding to 4 riders
+  does not recover it). A probe shows the same 16.7 → 33.3 ms step for the existing Ghost Favorites overlay (G), and
+  hiding only the View panel restores 16.7 ms: the cost is the shared View panel chrome under SwiftShader, not this
+  renderer. Worth a separate look; out of #68's scope.
+- Because that fixed cost trips the governor, slow devices settle on 4 riders. That is the designed graceful degradation
+  (hero + newest three) but it means a throttled Chromebook shows a sparse swarm; a real-GPU Chromebook may not shed.
+- SwiftShader (software WebGL) under CPU throttling is pessimistic. **Physical Chromebook acceptance is still owed.**
 
 ## Why 40 is the maximum
 
@@ -84,4 +108,3 @@ ships this document; see the PR description for the exact run.
 - **Open time.** Opening reads and decimates every kept trace of the course once; it grows linearly with the count and
   is the cost that a higher maximum would make worse on low-end hardware.
 
-Physical Chromebook frame-time acceptance is still owed (this container has no real GPU).
