@@ -89,7 +89,14 @@ export class ReplayEvidenceView extends View {
       // the explicit recovery gesture: reopen IDB and flush pending evidence.
       if (this.actions.store.backend!=='idb') {
         const recovered=reconnect?await sharedEvidenceStore({retryPending}):this.actions.store;
-        if (this.alive) this.actions.store=recovered;
+        if (this.alive) {
+          this.actions.store=recovered;
+          // Import may reopen a previously unavailable IDB backend. Its
+          // current-run controls were disabled before recovery; re-read them
+          // after the import without implicitly flushing unrelated packages.
+          if (reconnect && !retryPending && recovered.backend==='idb')
+            this._reconcileRequested=true;
+        }
       }
       return this.actions;
     }
