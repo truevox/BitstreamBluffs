@@ -12,7 +12,7 @@ function put(path, content = 'a') {
 }
 function prepare() {
   put('index.html', '<html><script type="module" src="/assets/index-ABC.js"></script></html>');
-  put('manifest.webmanifest', '{}'); put('favicon.ico', 'ICO'); put('music/catalog.json', '{"tracks":[]}');
+  put('manifest.webmanifest', '{}'); put('favicon.ico', 'ICO'); put('music/catalog.json', '{"tracks":[]}'); put('music/transition-grids.json','{"tracks":{}}');
   put('assets/index-ABC.js', 'hello'); put('assets/menu/mountains.svg', 'vector');
   put('icons/bitstream-192.png', 'fake-png');
   put('music/packs/huge/performance.json', 'not offline');
@@ -24,7 +24,7 @@ test('includes coherent app assets but excludes huge/optional/third party conten
   const inv = await createOfflineInventory(tmp);
   expect(inv.entries.map(x => x.path)).toEqual([
     '/assets/index-ABC.js', '/assets/menu/mountains.svg', '/favicon.ico', '/icons/bitstream-192.png',
-    '/index.html', '/manifest.webmanifest', '/music/catalog.json',
+    '/index.html', '/manifest.webmanifest', '/music/catalog.json', '/music/transition-grids.json',
   ]);
   expect(inv.entries.every(x => /^[0-9a-f]{64}$/.test(x.sha256))).toBe(true);
   expect(shouldPrecache('music/packs/foo/performance.json')).toBe(false);
