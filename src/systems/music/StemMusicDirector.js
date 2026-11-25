@@ -21,7 +21,9 @@ import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 import {normalizeTransitionGrids,planSongCrossfade,automateTransition,retargetEnvelope} from './SongCrossfade.js';
 
-const REMOTE_CATALOG = 'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json';
+const REMOTE_CATALOG = typeof __BB_MELODY_CATALOG_URL__ === 'string'
+	? __BB_MELODY_CATALOG_URL__
+	: 'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json';
 const LOCAL_CATALOG = 'music/catalog.json';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));

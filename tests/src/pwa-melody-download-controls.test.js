@@ -1,6 +1,8 @@
+import {jest} from '@jest/globals';
+jest.unstable_mockModule('../../src/data/index.js',()=>({content:{},loadContent:()=>({})}));
 import {MelodyDownloadControls} from '../../tools/pwa/melody-download-controls.mjs';
 const plan={format:'bb-melody-candidate-plan-v1',catalog:{},groups:[{quality:'lite'},{quality:'full'}]};
-function fixture(){const calls=[],ready={lite:false,full:false};let stop=true,fullAllowed=true;const c=new MelodyDownloadControls({plan,options:{},estimate:()=>{},isStopped:()=>stop,activate:async(p,q)=>calls.push('apply:'+q),createQueue:({plan})=>{const q=plan.groups[0].quality;return {refresh:async()=>({ready:ready[q],missingBytes:ready[q]?0:10,status:ready[q]?'ready':'download-required'}),start:async()=>{calls.push(q);if(q==='full'&&!fullAllowed)return {ready:false,status:'insufficient-storage',missingBytes:10};ready[q]=true;return {ready:true,status:'ready'};},cancel:()=>{}};}});return {c,calls,ready,setStopped:v=>stop=v,allowFull:v=>fullAllowed=v};}
+function fixture(){const calls=[],ready={lite:false,full:false};let stop=true,fullAllowed=true;const c=new MelodyDownloadControls({plan,options:{},estimate:()=>{},isStopped:()=>stop,activate:async(p,q)=>calls.push('apply:'+q),createQueue:({plan})=>{const q=plan.groups[0].quality;return {refresh:async()=>({ready:ready[q],missingBytes:ready[q]?0:10,status:ready[q]?'ready':'download-required'}),start:async()=>{calls.push(q);if(q==='full'&&!fullAllowed)return {ready:false,status:'insufficient-storage',missingBytes:10,availableBytes:5};ready[q]=true;return {ready:true,status:'ready'};},cancel:()=>{}};}});return {c,calls,ready,setStopped:v=>stop=v,allowFull:v=>fullAllowed=v};}
 test('mode selection and status never transfer; High stages Lite before Full, and applies only at stop',async()=>{const f=fixture();await f.c.refresh();await expect(f.c.start()).rejects.toThrow(/consent/);expect(f.calls).toEqual([]);await f.c.start({consent:true});expect(f.calls).toEqual(['lite','full']);f.setStopped(false);await expect(f.c.apply()).rejects.toThrow(/Stop music/);f.setStopped(true);await f.c.apply();expect(f.calls.at(-1)).toBe('apply:lite');await f.c.apply();expect(f.calls.at(-1)).toBe('apply:full');});
 test('Full quota failure retains Lite; Space Saver and No Music never stage Full',async()=>{const f=fixture();f.allowFull(false);expect((await f.c.start({consent:true})).status).toBe('lite-ready');await f.c.apply();expect(f.calls.at(-1)).toBe('apply:lite');await f.c.setMode('space-saver');await f.c.start({consent:true});expect(f.calls.at(-1)).toBe('lite');await f.c.setMode('no-music');const n=f.calls.length;await f.c.start({consent:true});expect(f.calls.length).toBe(n);await f.c.apply();expect(f.calls.at(-1)).toBe('apply:null');});
 
@@ -21,4 +23,9 @@ test('lookahead is explicit, idle-only, data-saver-aware, budgeted Lite-first an
  expect((await c.prefetch({consent:true,idle:true,maxBytes:21})).prefetchStatus).toBe('partial');expect(queues[0].plan.groups.map(g=>g.id)).toEqual(['a:lead:micro-mountain:lite','b:lead:micro-mountain:lite']);expect(queues[0].plan.groups.every(g=>g.priority==='required')).toBe(true);
  expect((await c.prefetch({consent:true,idle:true,maxBytes:64})).prefetchStatus).toBe('ready');expect(queues[1].plan.groups).toHaveLength(4);expect(seen).toEqual(['transfer','transfer']);
  c.mode='no-music';expect((await c.prefetch({consent:true,idle:true})).prefetchStatus).toBe('not-applicable');expect(seen).toHaveLength(2);
+});
+
+test('insufficient Full storage remains visible while verified Lite remains playable',async()=>{
+ const f=fixture();f.allowFull(false);const state=await f.c.start({consent:true});expect(state).toMatchObject({status:'lite-ready',liteReady:true,upgradeStatus:'insufficient-storage',upgradeMissingBytes:10,availableBytes:5});
+ const {downloadStatusText}=await import('../../src/ui/OfflineMusicView.js');expect(downloadStatusText(state)).toBe('LITE READY; FULL NEEDS 0.00 MB / 0.00 MB FREE');
 });
