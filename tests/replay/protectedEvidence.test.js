@@ -229,6 +229,69 @@ describe('protected local evidence references (#244)', () => {
     expect(rows).toEqual([{id:1},{id:2}]);
   });
 
+  test('overlapping puts in one tab retain the winning durable cache entry after conflict', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    const a=s.put(bundle(),{runId:'run-A'});
+    const b=s.put(bundle(),{runId:'run-B'});
+    const outcomes=await Promise.allSettled([a,b]);
+    expect(outcomes.filter(o=>o.status==='fulfilled')).toHaveLength(1);
+    expect(outcomes.filter(o=>o.status==='rejected').map(o=>o.reason.code)).toEqual(['run-id-conflict']);
+    const digest=bundleDigest(bundle());
+    expect(s.has(digest)).toBe(true);
+    expect(await s.get(digest)).toEqual(bundleBytes(bundle()));
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(s.list()[0].runId).toBe(re.list()[0].runId);
+  });
+
+  test('durable write follows persisted run binding when cached entry was deleted/replaced in another tab', async () => {
+    const idb=fakeIdb();
+    const a=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await a.put(bundle(),{runId:'old-run'});
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    await a.remove(digest);
+    const current=await new EvidenceStore({idb,storage:null}).init();
+    await current.put(bundle(),{runId:'new-run'});
+    expect(await stale.put(bundle(),{runId:'new-run'})).toBe(digest);
+    expect(await stale.put(bundle())).toBe(digest); // no explicit run ID: adopt persisted
+    expect(stale.list()[0].runId).toBe('new-run');
+    expect((await new EvidenceStore({idb,storage:null}).init()).list()[0].runId).toBe('new-run');
+  });
+
+  test('unresolved pending run conflict cannot block unrelated pending evidence flush', async () => {
+    const idb=fakeIdb();
+    const s=await new EvidenceStore({idb,storage:null}).init();
+    const changed=score=>({...bundle(),claims:{...bundle().claims,score}});
+    const p1=changed(11),p2=changed(22),p3=changed(33);
+    idb.hooks.failPut=new Error('disk busy');
+    await expect(s.put(p1,{runId:'pending-A'})).rejects.toMatchObject({code:'write-failed'});
+    await expect(s.put(p2,{runId:'pending-2'})).rejects.toMatchObject({code:'write-failed'});
+    expect(s.pending.size).toBe(2);
+    idb.hooks.failPut=null;
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    await other.put(p1,{runId:'persisted-B'});
+    await s.put(p3,{runId:'new-3'}); // retries both; the first conflict must not starve p2
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.has(bundleDigest(p2))).toBe(true);
+    expect(re.has(bundleDigest(p3))).toBe(true);
+    expect(re.list().find(v=>v.digest===bundleDigest(p1)).runId).toBe('persisted-B');
+    expect(s.pending.has(bundleDigest(p1))).toBe(true); // unresolved memory-only bytes are not silently lost
+    expect(s.pending.has(bundleDigest(p2))).toBe(false);
+    expect(s.durable).toBe(false);
+    expect(s.lastError.code).toBe('run-id-conflict');
+  });
+
+  test('versionchange closes connection and immediately marks store non-durable', async () => {
+    const {store,digest}=await seededStore();
+    expect(store.durable).toBe(true);
+    const db=store._db;
+    db.onversionchange();
+    expect(store.backend).toBe('memory');
+    expect(store.durable).toBe(false);
+    expect(store.lastError.code).toBe('read-failed');
+    await expect(store.protect(digest,{runId:RUN,role:'candidate'})).rejects.toMatchObject({code:'not-durable'});
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

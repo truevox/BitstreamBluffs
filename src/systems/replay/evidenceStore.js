@@ -108,7 +108,16 @@ export class EvidenceStore {
           req.onerror = () => refuse(req.error);
           req.onblocked = () => refuse(new Error('idb blocked'));
         });
-        db.onversionchange = () => db.close(); // other-tab upgrades must not be held hostage
+        let connectionClosed = false;
+        db.onversionchange = () => {
+          connectionClosed = true;
+          db.close(); // do not block upgrades and do not advertise a dead handle
+          if (this._db === db) {
+            this._db = null;
+            this.backend = 'memory';
+            this._report(new EvidenceStoreError('read-failed', 'IndexedDB version changed; reopen evidence archive before protecting'));
+          }
+        };
         const all = await req2p(db.transaction(EVIDENCE_INDEX, 'readonly').objectStore(EVIDENCE_INDEX).getAll());
         const refs = await req2p(db.transaction(EVIDENCE_REFS, 'readonly').objectStore(EVIDENCE_REFS).getAll());
         for (const r of all || []) {
@@ -117,6 +126,7 @@ export class EvidenceStore {
         for (const ref of refs || []) {
           if (ref && typeof ref.key === 'string') this.protections.set(ref.key, ref);
         }
+        if (connectionClosed) throw new Error('IndexedDB closed during initialization');
         this._db = db;
         this.backend = 'idb';
       }
@@ -183,9 +193,12 @@ export class EvidenceStore {
     const prior = this.index.get(digest);
     if (meta.runId !== undefined && meta.runId !== null && !validRunId(meta.runId))
       throw protectionError('invalid-run-id', 'runId must be a bounded local opaque identifier');
-    if (prior?.runId && meta.runId && prior.runId !== meta.runId)
+    // Only the memory-only backend relies on its cache. With IndexedDB,
+    // identity binding must be checked against the persisted record under lock.
+    if (!this._db && prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
-    const record = { digest, size: bytes.length, runId: prior?.runId || meta.runId || null, seq: prior ? prior.seq : ++this._seq };
+    const requestedRunId = meta.runId || (this.pending.has(digest) || !this._db ? prior?.runId : null) || null;
+    const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) { this.index.set(digest, record); this.pending.set(digest, bytes); return digest; }
     try {
@@ -193,11 +206,9 @@ export class EvidenceStore {
       this.index.set(digest, committed);
       this.pending.delete(digest);
     } catch (e) {
-      // Never poison the in-memory index with a conflicting tab's run ID.
-      if (e?.code === 'run-id-conflict') {
-        if (prior) this.index.set(digest, prior); else this.index.delete(digest);
-        throw e;
-      }
+      // We did not change the cache before the transaction. Another concurrent
+      // put may already have committed; never roll its winning entry back.
+      if (e?.code === 'run-id-conflict') throw e;
       this.index.set(digest, record);
       this.pending.set(digest, bytes);
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
@@ -215,7 +226,15 @@ export class EvidenceStore {
         const committed = await this._writeDurable(this.index.get(digest), bytes);
         this.index.set(digest, committed);
         this.pending.delete(digest);
-      } catch { return; }
+      } catch (e) {
+        if (e?.code === 'run-id-conflict') {
+          // One unrecoverable pending run binding must not starve independent
+          // bundles. Keep its session-only bytes visible and fail durability.
+          this._report(e);
+          continue;
+        }
+        return;
+      }
     }
   }
 
