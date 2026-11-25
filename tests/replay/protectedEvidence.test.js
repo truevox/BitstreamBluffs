@@ -292,6 +292,41 @@ describe('protected local evidence references (#244)', () => {
     await expect(store.protect(digest,{runId:RUN,role:'candidate'})).rejects.toMatchObject({code:'not-durable'});
   });
 
+  test('reinit after cleared browser storage drops stale indices and protected references', async () => {
+    const idb=fakeIdb();
+    const a=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await a.put(bundle(),{runId:RUN});
+    const ref=await a.protect(digest,{runId:RUN,role:'pinned'});
+    expect(a.has(digest)).toBe(true);
+    expect(a.protectedCount(digest)).toBe(1);
+    // IndexedDB's database deletion/clear is represented by a fresh factory
+    // when the old handle was already invalidated by versionchange.
+    a._db.onversionchange();
+    a._idb=fakeIdb();
+    await a.init();
+    expect(a.backend).toBe('idb');
+    expect(a.durable).toBe(true);
+    expect(a.has(digest)).toBe(false);
+    expect(a.listProtections()).toEqual([]);
+    expect(await a.getProtected(ref.key)).toBeNull();
+  });
+
+  test('a failed duplicate write with no runId retains a previously saved binding', async () => {
+    const {store,digest,idb}=await seededStore();
+    idb.hooks.failPut=Object.assign(new Error('quota'),{name:'QuotaExceededError'});
+    await expect(store.put(bundle())).rejects.toMatchObject({code:'quota-exceeded'});
+    expect(store.index.get(digest).runId).toBe(RUN);
+    expect(store.has(digest)).toBe(true);
+    idb.hooks.failPut=null;
+    const ref=await store.protect(digest,{runId:RUN,role:'pinned'}).catch(e=>e);
+    // A new successful write can flush the session-only duplicate before pinning.
+    if(ref instanceof Error){
+      expect(ref.code).toBe('not-durable');
+      await store.put(bundle(),{runId:RUN});
+      expect((await store.protect(digest,{runId:RUN,role:'pinned'})).count).toBe(1);
+    } else expect(ref.count).toBe(1);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

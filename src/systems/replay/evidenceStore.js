@@ -120,13 +120,33 @@ export class EvidenceStore {
         };
         const all = await req2p(db.transaction(EVIDENCE_INDEX, 'readonly').objectStore(EVIDENCE_INDEX).getAll());
         const refs = await req2p(db.transaction(EVIDENCE_REFS, 'readonly').objectStore(EVIDENCE_REFS).getAll());
-        for (const r of all || []) {
-          if (r && typeof r.digest === 'string') { this.index.set(r.digest, r); this._seq = Math.max(this._seq, r.seq || 0); }
-        }
-        for (const ref of refs || []) {
-          if (ref && typeof ref.key === 'string') this.protections.set(ref.key, ref);
-        }
         if (connectionClosed) throw new Error('IndexedDB closed during initialization');
+        // Reopening is a REPLACEMENT of the persisted snapshot, not a merge.
+        // Browser storage may have been cleared while the old tab remained open.
+        // Preserve only explicit pending session-only bytes across reopen.
+        const previous = this.index;
+        const loaded = new Map();
+        let latestSeq = 0;
+        for (const r of all || []) {
+          if (r && typeof r.digest === 'string') {
+            loaded.set(r.digest, r);
+            latestSeq = Math.max(latestSeq, r.seq || 0);
+          }
+        }
+        for (const digest of this.pending.keys()) {
+          if (!loaded.has(digest) && previous.has(digest)) {
+            const r = previous.get(digest);
+            loaded.set(digest, r);
+            latestSeq = Math.max(latestSeq, r.seq || 0);
+          }
+        }
+        const loadedRefs = new Map();
+        for (const ref of refs || []) {
+          if (ref && typeof ref.key === 'string') loadedRefs.set(ref.key, ref);
+        }
+        this.index = loaded;
+        this.protections = loadedRefs;
+        this._seq = latestSeq;
         this._db = db;
         this.backend = 'idb';
       }
@@ -209,7 +229,9 @@ export class EvidenceStore {
       // We did not change the cache before the transaction. Another concurrent
       // put may already have committed; never roll its winning entry back.
       if (e?.code === 'run-id-conflict') throw e;
-      this.index.set(digest, record);
+      // A failed duplicate write must not erase an already durable run binding
+      // (or a concurrent same-instance write that committed in the meantime).
+      if (!this.index.has(digest)) this.index.set(digest, prior || record);
       this.pending.set(digest, bytes);
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
       this._report(err);
