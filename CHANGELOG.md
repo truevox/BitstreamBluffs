@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — #245 dual-proof contract v1 (2026-11-25)
+
+- Add pure, separately versioned public-eligibility policy (`bb-dual-proof` v1) with independent replay, trusted entitlement and explicit publication-consent decisions. Free peer and paid hosted routes produce the same canonical verdict; payment cannot change competitive eligibility or rewards.
+- Reject forged wallets, changed tapes/scores, missing authoritative receipts, changed course/lane consent, incomplete verifier provenance and stateful programmatic claim objects. Include adversarial tests and stable canonical vectors.
+- **Disabled by design:** no public verifier service, authenticated receipt adapter, user upload, wallet mutation, account infrastructure, leaderboard publication, or reward grants. Parent #135 remains OPEN; #244 evidence integration is separate. No simulation/physics or existing local board changes.
+
 ## v2.21.2 — readable World Dance (2026-11-24)
 
 - #212: owner-approved scenery motion across the six auditioned biome motifs. Stronger visual-only accents, individual motif motion and accessible neutral settings.
