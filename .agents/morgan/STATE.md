@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 13:18 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
+Last verified: 2026-11-25 13:39 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -53,7 +53,10 @@ means resume this queue, not take over another lane or merge a draft.
    `eace461ce67d113215ee5d6f3e24346704461e36`, based on exact v2.20.1.
    Expect one test file only (blob `4d39e96421fcf42d2d5ff962ac166fc6c582b934`).
    [Fresh exact-head handoff](https://github.com/truevox/BitstreamBluffs/pull/287#issuecomment-7136664311)
-   supersedes the held-input wording in the original PR description. 159
+   is now reflected in the PR description, verified without changing the
+   head. Exact tracker/scorer/constants match main `8d9c124a`. Supplemental
+   ten-case rerun with native math passed; not dependency-backed Jest or a
+   new independent review. 159
    focused tests passed; five deliberate regressions caught and reverted.
    Genuine production-module control spends 240 at 400→160, stationary
    air earns none, one paid pulse awards 40, held/duplicate earn nothing.
@@ -259,8 +262,10 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   retry recovers the smaller current item and leaves older pending, while
   unscoped sweep recovers neither. Not a real browser quota or data-loss
   result. Separate #356 `493439fb` deletion protection is not in this stack;
-  review exact combined v1/v2 upgrade, concurrent tabs and quota recovery
-  when integrated. No shipping or broader restore/admission claim. #343 is an open pure #245
+  review exact combined upgrade, concurrent tabs and quota recovery.
+  #356 and #359 reached foundation #347 `9c2fa29d` only; top #352
+  `1f763198` still has v2 storage. Verify combined v3 and latest UI after
+  upper branches integrate. No shipping or broader restore/admission claim. #343 is an open pure #245
   contract, not public verified ranking, backend authority or a dependency
   unblock. Keep both lanes separate.
 - Gal/Home audio lane: #328 merged the #322 music code as v2.21.0,
