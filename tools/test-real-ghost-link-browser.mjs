@@ -104,11 +104,27 @@ try{
  await p.locator('textarea').fill(await p.evaluate(()=>window.__ghostCopies[0]));
  const filled=await p.evaluate(()=>({loaded:!!window.__bbGame.scene.getScene('TitleScene').view?.tape,field:document.querySelector('textarea')?.value.length}));
  if(filled.loaded||filled.field!==ui.copiedLength)throw Error('Filling input performed an implicit import '+JSON.stringify(filled));
- // Press the genuine on-screen PREVIEW button.
- const previewPoint=await clickPoint('previewBtn');
- await p.waitForTimeout(750);
- await p.mouse.click(previewPoint.x,previewPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
+ // Press the genuine on-screen PREVIEW button, accounting for Phaser's
+ // next-frame input dispatch and UI transitions on slower Chromium runners.
+ // Reacquire the CURRENT transformed hitzone before any bounded retry; do
+ // not treat a click as a preview until the decoded trace is actually drawn.
+ let previewPoint=null,previewReady=false;
+ for(let attempt=0;attempt<4;attempt++){
+  await p.waitForTimeout(420);
+  previewPoint=await clickPoint('previewBtn');
+  await p.mouse.click(previewPoint.x,previewPoint.y);
+  try {
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:3500});
+   previewReady=true;break;
+  }catch{
+   const state=await p.evaluate(()=>{const v=window.__bbGame.scene.getScene('TitleScene').view;
+    return {busy:v?.busy,loaded:!!v?.preview,status:v?.status?.main?.text||''};});
+   if(state.loaded){previewReady=true;break;}
+   if(state.busy)throw Error('Guest preview was still processing after click '+JSON.stringify(state));
+   if(/INVALID|INCOMPATIBLE|DAMAGED|TOO LARGE/.test(state.status))throw Error('Guest preview rejected valid source '+JSON.stringify(state));
+  }
+ }
+ if(!previewReady)throw Error('Preview button did not admit the valid copied guest link after genuine pointer attempts');
  const previewed=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,count:v.preview?.count,localCount:v.localPreview?.count,localRole:v.localRole,traceX:v.preview?.trace[0],status:v.status.main.text,

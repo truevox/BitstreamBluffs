@@ -317,7 +317,7 @@ describe('negative controls: remove a rule, or tamper, and it diverges or refuse
       noR3k: (await mutate('R3k', 'this.kodiaksOn = rp ? rp.kodiaksOn', 'this.kodiaksOn = false ? 0')).RunScene,
       noR3m: (await mutate('R3m', 'this.magnetsDrop = rp ? rp.magnetsDrop', 'this.magnetsDrop = false ? 0')).RunScene,
       noR3p: (await mutate('R3p', 'this.kodiakPackMode = rp ? rp.kodiakPackMode', 'this.kodiakPackMode = false ? 0')).RunScene,
-      noR4: (await mutate('R4', 'this.dailyOfficial = !replay && reg.get(REG.DAILY_OFFICIAL)', 'this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL)')).RunScene,
+      noR4: (await mutate('R4', 'this.dailyOfficial = !replay && !this.guestPractice && reg.get(REG.DAILY_OFFICIAL)', 'this.dailyOfficial = !this.guestPractice && reg.get(REG.DAILY_OFFICIAL)')).RunScene,
     };
   });
   // tolerates a killed worker: a leftover dir is in the OS temp dir, never in the repo
