@@ -81,6 +81,8 @@ export class EvidenceStore {
     this.pending = new Map();
     /** Failed-write run claims are NOT the persisted index. Keep them separate. */
     this.pendingMeta = new Map();
+    /** Deletion generation observed by the original attempted write; null = no deletion yet. */
+    this._pendingDeletionGeneration = new Map();
     /** Uncertain IDB reads: retain bytes for export, never auto-retry. */
     this._unsafePending = new Set();
     /** Explicit deletion wins over asynchronous retries for that digest. */
@@ -225,7 +227,7 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes, receipt = null, {retry=false}={}) {
+  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null}={}) {
     // A deletion tombstone and the bundle update share ONE IDB lock. Stale
     // tabs must not resurrect deliberately deleted bytes from pending RAM.
     const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX,EVIDENCE_DELETIONS], 'readwrite');
@@ -234,8 +236,12 @@ export class EvidenceStore {
     let actual = record;
     const checkDeletion=tx.objectStore(EVIDENCE_DELETIONS).get(record.digest);
     checkDeletion.onsuccess=()=>{
-      if(retry && checkDeletion.result){
-        problem=protectionError('deleted-evidence','a different tab explicitly deleted this digest; export session bytes instead');
+      const observed=checkDeletion.result?.generation ?? null;
+      if(receipt)receipt.deletionGeneration=observed;
+      // Only the generation visible to the INITIAL direct write authorizes a
+      // later retry. Deletion since that attempt always supersedes pending RAM.
+      if(retry && observed!==expectedDeletionGeneration){
+        problem=protectionError('deleted-evidence','a different tab explicitly deleted this digest after this write began; export session bytes instead');
         tx.abort();return;
       }
       const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
@@ -332,6 +338,7 @@ export class EvidenceStore {
       if (!olderClaim?.runId || committed.runId === olderClaim.runId) {
         this.pending.delete(digest);
         this.pendingMeta.delete(digest);
+        this._pendingDeletionGeneration.delete(digest);
         this._unsafePending.delete(digest);
       }
     } catch (e) {
@@ -343,6 +350,10 @@ export class EvidenceStore {
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
       if (writeReceipt.classification!=='duplicate') {
         this.pending.set(digest, bytes);
+        // Write classification and deletion generation come from the SAME
+        // transaction. Do not replace an older pending claim with a new fence.
+        if(!this._pendingDeletionGeneration.has(digest) && writeReceipt.classification!=='unknown')
+          this._pendingDeletionGeneration.set(digest,writeReceipt.deletionGeneration ?? null);
         // An IDB lookup error cannot distinguish a novel failed write from
         // an already-durable duplicate. Keep its bytes exportable but never
         // automatically resurrect them after another tab deletes the digest.
@@ -391,11 +402,13 @@ export class EvidenceStore {
         if(!record)continue;
         receipt.digests.add(digest);receipt.count++;
         try{
-          const committed=await this._writeDurable(record,bytes,null,{retry:true});
+          const committed=await this._writeDurable(record,bytes,null,{retry:true,
+            expectedDeletionGeneration:this._pendingDeletionGeneration.get(digest) ?? null});
           if(this.pending.get(digest)===bytes){
             this.index.set(digest,committed);
             this.pending.delete(digest);
             this.pendingMeta.delete(digest);
+            this._pendingDeletionGeneration.delete(digest);
             this._unsafePending.delete(digest);
           }
         }catch(e){
@@ -715,7 +728,7 @@ export class EvidenceStore {
             problem = protectionError('protected-evidence', 'another tab still protects this bundle');
             tx.abort(); return;
           }
-          tx.objectStore(EVIDENCE_DELETIONS).put({digest,deleted:true});
+          tx.objectStore(EVIDENCE_DELETIONS).put({digest,generation:newReferenceGeneration()});
           tx.objectStore(EVIDENCE_STORE).delete(digest);
           tx.objectStore(EVIDENCE_INDEX).delete(digest);
         };
@@ -729,6 +742,7 @@ export class EvidenceStore {
       this.index.delete(digest);
       this.pending.delete(digest);
       this.pendingMeta.delete(digest);
+      this._pendingDeletionGeneration.delete(digest);
       this._unsafePending.delete(digest);
       // Another tab may have released a role while our local cache was stale.
       // The persisted transaction proved there were no remaining protections.
