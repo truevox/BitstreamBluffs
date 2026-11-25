@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.22.8 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
+
+- Enforce compiled Chromium savestate capture→fresh restore→strict identical contact/hazard suffix checks on relevant PR source changes, after the source-bound Matter/recorder and fast CLI refusal tests. Retain the already proved native long-run and moving-hazard gate evidence.
+- Harmonize the child-process and Jest timeouts for fast negative tests so slow CI cannot falsely label a routine refusal as a test failure; unexpected spawn errors remain fatal.
+- Exempt only a browser-cancelled *optional* Apple touch icon (`net::ERR_ABORTED`) from offline-PWA release QA. Worker, JavaScript, manifest, audio and all other resource failures remain hard failures with dedicated negative tests.
+- Developer-only diagnostics and offline browser QA: **no** live player savestate UI, trusted suspend slot, public score acceptance, simulation physics, changed SIM_REVISION or automatic upload. Parent #119 and player-facing trusted savestates remain open. This is an isolated draft stacked after v2.22.7, awaiting independent exact-head review and coordinated deployment.
+
 ## v2.22.7 — #244 private protected replay evidence release candidate (2026-11-25)
 
 - Retain canonical full-run input evidence in a separate local IndexedDB v3 archive independent of the five visible ghost roles, with atomic run-ID/seed/biome binding, candidate/submitted/pinned references, explicit unpin, and corruption/quota fail-closed behavior.
