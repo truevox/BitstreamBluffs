@@ -46,6 +46,8 @@ export const REG = Object.freeze({
   GHOSTS: 'ghostLibrary',
   /** One-shot ghost tape for RunScene to replay instead of live input (verification / replay viewer). Additive. */
   GHOST_REPLAY: 'ghostReplay',
+  /** One-shot, untrusted, read-only trace opponent for a nonrewarding practice run. */
+  GUEST_PRACTICE: 'guestPracticeTape',
   /** @type {object|null} ghost tape of the run that just ended. Additive. */
   LAST_GHOST_TAPE: 'lastGhostTape',
   /** @type {import('./systems/InputRouter.js').InputRouter} */

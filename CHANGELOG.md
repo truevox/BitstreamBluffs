@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
+
+- After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.
+- Mark every practice run GUEST PRACTICE / UNRANKED, suppress ghost recording and mission completion/BSOD-Gym unlocks, never create a ranked RunRecord, mutate local/leaderboard/XP/shards or emit RUN_END, and return directly to Title after a practice crash via RUN_ABORT. Pause/Restart preserves the nonrewarding handoff; Quit clears it; the next normal run has its normal recorder.
+- The action is fully opt-in; direct URL-fragment arrival, preview, WATCH, and malformed/incompatible/Daily ghost data cannot launch practice. No public verifier, authenticated producer, hosted upload, wallet claims or saved guest-favorite import is introduced.
+- Practice is an unranked chase against a displayed historical trace, NOT full authoritative snapshot takeover, fair equipment parity or a trusted competitive verdict. Parent #69 remains open for hosted oversize fallback, physical Chromebook/Android and further practice UX audit.
+- SIM_REVISION 9/physics and ranked input/scoring rules remain unchanged; source tripwire updated with a reviewed no-causal-behavior-change attestation and updated build identity.
+
 ## v2.22.6 — #69 Ghost-in-a-Link unverified visual sharing (2026-11-25)
 
 - Share a versioned, SHA-integrity-stamped gzip Ghost Tape through a capped browser URL fragment, stripping private path/query and unsupported source fields. Export requires two deliberate Game Over confirmations disclosing inputs, movement, score and loadout; moving focus away cancels.
