@@ -32,6 +32,7 @@ describe('protected local evidence references (#244)', () => {
     expect(c.biomeMask).toBe(legacyTape().biomeMask);
     const c2=await store.protect(digest,{runId:RUN,role:'candidate'});
     expect(c2.key).toBe(c.key);
+    expect(c2.generation).toBe(c.generation);
     expect(store.protectedCount(digest)).toBe(1); // idempotent duplicate
     const submitted=await store.protect(digest,{runId:RUN,role:'submitted'});
     const pinned=await store.protect(digest,{runId:RUN,role:'pinned'});
@@ -607,6 +608,53 @@ describe('protected local evidence references (#244)', () => {
     expect(store._db).not.toBe(db);
     expect(idb.hooks.closeCount).toBe(before+1);
     expect(store.backend).toBe('idb');
+  });
+
+  test('recovering IndexedDB automatically flushes session-only evidence without waiting for another run',async()=>{
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb:{open(){throw new Error('blocked upgrade');}},storage:null}).init();
+    expect(store.backend).toBe('memory');
+    const digest=await store.put(bundle(),{runId:RUN});
+    expect(store.pending.has(digest)).toBe(true);
+    expect(store.durable).toBe(false);
+    store._idb=idb;
+    await store.init();
+    expect(store.backend).toBe('idb');
+    expect(store.pending.has(digest)).toBe(false);
+    expect(store.durable).toBe(true);
+    expect((await new EvidenceStore({idb,storage:null}).init()).index.get(digest).runId).toBe(RUN);
+    const held=await store.protect(digest,{runId:RUN,role:'pinned'});
+    expect(held.count).toBe(1);
+  });
+
+  test('stale tab cannot unpin a recreated same-digest and same-role reference (ABA)',async()=>{
+    const {store,digest,idb}=await seededStore();
+    const first=await store.protect(digest,{runId:RUN,role:'pinned'});
+    expect(first.generation).toMatch(/^[0-9a-f]{32}$/);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    await store.unprotect(first.key);
+    const recreated=await store.protect(digest,{runId:RUN,role:'pinned'});
+    expect(recreated.key).toBe(first.key);
+    expect(recreated.generation).not.toBe(first.generation);
+    await expect(stale.unprotect(first.key)).rejects.toMatchObject({code:'stale-protection'});
+    await expect(stale.getProtected(first.key)).rejects.toMatchObject({code:'stale-protection'});
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.protectedCount(digest)).toBe(1);
+    expect(re.listProtections()[0].generation).toBe(recreated.generation);
+    await expect(re.remove(digest)).rejects.toMatchObject({code:'protected-evidence'});
+  });
+
+  test('durable run binding is checked from persisted row rather than stale in-memory index',async()=>{
+    const {store,digest,idb}=await seededStore();
+    expect(await store.isBundleDurable(digest,{runId:RUN})).toBe(true);
+    expect(await store.isBundleDurable(digest,{runId:'forged-other'})).toBe(false);
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    await store.remove(digest);
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    await fresh.put(bundle(),{runId:'replacement-run'});
+    expect(stale.index.get(digest).runId).toBe(RUN); // stale cached run ID
+    expect(await stale.isBundleDurable(digest,{runId:RUN})).toBe(false);
+    expect(await stale.isBundleDurable(digest,{runId:'replacement-run'})).toBe(true);
   });
 
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {

@@ -53,3 +53,13 @@ Further exact-head reviewer corrections: pin-count receipts are computed within 
 ## Forced IDB closure and historical pin review corrections
 
 On unexpected browser `close` (without `versionchange`), the archive invalidates its connection and returns to memory-only status; the next explicit initialization may recover a real IDB backend. Reinitialization closes the previous connection rather than leaking handles. Historical, canonical evidence from a previously supported ruleset may be **pinned for local retention** after the current game resolver changes; this is structural SHA/canonical admission, never retrospective replay verification or reward authorization. Duplicate archive-only imports in memory fallback retain the original local run binding rather than overwriting it with an unbound index entry. Four regression tests exercise those independent-review findings.
+
+
+## Automatic recovery and local-reference ABA protection
+
+After a blocked v1→v2 upgrade clears, a successful `EvidenceStore.init()` now automatically retries session-only pending canonical bundles. Previously a newly open IDB connection could leave those captures stranded in memory until a *different run* was saved, risking loss on tab closure. Unresolved conflicts remain pending and visibly non-durable.
+
+Every newly created protected local reference now carries a random 128-bit `generation` token from Web Crypto's `getRandomValues` (never a wall-clock value, never a player-authentication signature). Idempotent protection retains the existing generation; explicit unpin followed by re-pin assigns a NEW token, even for an identical run/digest/role key. Stale tabs compare generations before releasing or reading a protected reference and refuse the ABA race. This remains local storage lifecycle hygiene, not evidence of honest play.
+
+
+An optional `runId` in `isBundleDurable(digest,{runId})` verifies the current **persisted** index binding and bundle SHA in one readonly transaction. This is necessary for Game Over to re-enable KEEP when a formerly quota-failed capture is later automatically flushed: a matching digest without the exact run ID is never enough to pin a player’s current run. The check remains local retention identity, not player authentication or competitive verification. A stale-tab deletion/reassignment negative case verifies it does not trust cached run identity.

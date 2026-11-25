@@ -52,6 +52,13 @@ const isQuota = (e) => Boolean(e && (e.name === 'QuotaExceededError' || e.code =
 const copy = (bytes) => Uint8Array.from(bytes);
 const validRunId = s => typeof s === 'string' && s.length > 0 && s.length <= 160 && !/[\u0000-\u001f\u007f]/.test(s);
 const refKey = (runId, seed, biomeMask, role) => JSON.stringify([runId, seed, biomeMask, role]);
+/** ABA-safe local role generation; NOT an authentication signature. No wall clock stored. */
+const newReferenceGeneration = () => {
+  if (!globalThis.crypto?.getRandomValues)
+    throw new EvidenceStoreError('randomness-unavailable', 'secure browser entropy required for a new protected reference');
+  const random = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(random, b => b.toString(16).padStart(2,'0')).join('');
+};
 const protectionError = (code, detail) => new EvidenceStoreError(code, detail);
 
 
@@ -173,6 +180,9 @@ export class EvidenceStore {
         if (previousDb && previousDb !== db) {
           try { previousDb.close(); } catch { /* obsolete connection */ }
         }
+        // Captures made during a blocked upgrade were session-only. Once IDB
+        // comes back, retry them immediately; keep any failures visible/pending.
+        await this._flushPending();
       }
     } catch (e) {
       if (openedDb) { try { openedDb.close(); } catch { /* best effort */ } }
@@ -326,7 +336,7 @@ export class EvidenceStore {
    * `durable`, unrelated session-only pending bundles do not make it false.
    * Recheck the persisted row/bytes in a single readonly transaction.
    */
-  async isBundleDurable(digest) {
+  async isBundleDurable(digest, { runId } = {}) {
     if (!this._db) return false;
     try {
       const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
@@ -335,7 +345,8 @@ export class EvidenceStore {
         req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
         txDone(tx),
       ]);
-      return Boolean(idx && bundle?.bytes && idx.digest===digest && digestOfBytes(bundle.bytes)===digest);
+      return Boolean(idx && bundle?.bytes && idx.digest===digest &&
+        (runId===undefined || idx.runId===runId) && digestOfBytes(bundle.bytes)===digest);
     } catch { return false; }
   }
 
@@ -423,7 +434,9 @@ export class EvidenceStore {
     const course = checked.manifest.causal.course;
     const { seed, biomeMask } = course;
     const key = refKey(runId, seed, biomeMask, role);
-    const ref = { key, runId, seed, biomeMask, digest, role };
+    const proposed = { key, runId, seed, biomeMask, digest, role,
+      generation: newReferenceGeneration() };
+    let committedRef = proposed;
     // The read and write share ONE IndexedDB transaction (no TOCTOU delete).
     const tx = this._db.transaction([EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
     const done = txDone(tx);
@@ -440,12 +453,14 @@ export class EvidenceStore {
           problem = protectionError('protection-conflict', 'same run/course/role already protects different evidence');
           tx.abort(); return;
         }
+        // An idempotent protect MUST keep the existing role generation, while
+        // a delete+recreate receives a fresh unpredictable generation.
+        committedRef = existing.result || proposed;
         const all=tx.objectStore(EVIDENCE_REFS).getAll();
         all.onsuccess=()=>{
-          // Compute the count in the SAME transaction as the committed put.
-          // A later read could fail after commit and falsely report failure.
+          // Compute count in the SAME transaction as the committed put.
           committedCount=(all.result||[]).filter(r=>r.digest===digest).length + (existing.result?0:1);
-          tx.objectStore(EVIDENCE_REFS).put(ref);
+          tx.objectStore(EVIDENCE_REFS).put(committedRef);
         };
       };
     };
@@ -454,8 +469,8 @@ export class EvidenceStore {
       const err = problem || new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e?.message, e);
       this._report(err); throw err;
     }
-    this.protections.set(key, ref);
-    return { ...ref, durable: true, count: committedCount };
+    this.protections.set(key, committedRef);
+    return { ...committedRef, durable: true, count: committedCount };
   }
 
   /** Explicit release of one role; the canonical bytes remain archived until a separate explicit remove. */
@@ -471,7 +486,8 @@ export class EvidenceStore {
       // Another tab may have replaced the reference after this instance loaded.
       // Never release somebody else's newly protected digest using a stale key.
       if (!current.result || current.result.digest !== expected.digest ||
-          current.result.runId !== expected.runId || current.result.role !== expected.role) {
+          current.result.runId !== expected.runId || current.result.role !== expected.role ||
+          current.result.generation !== expected.generation) {
         problem = protectionError('stale-protection', 'reference changed in another tab; reload before releasing');
         tx.abort(); return;
       }
@@ -495,14 +511,16 @@ export class EvidenceStore {
     req.onsuccess = () => {
       latest = req.result || null;
       if (!latest || latest.digest !== cached.digest || latest.runId !== cached.runId ||
-          latest.role !== cached.role || latest.seed !== cached.seed || latest.biomeMask !== cached.biomeMask) return;
+          latest.role !== cached.role || latest.seed !== cached.seed ||
+          latest.biomeMask !== cached.biomeMask || latest.generation !== cached.generation) return;
       const bundle = tx.objectStore(EVIDENCE_STORE).get(latest.digest);
       bundle.onsuccess = () => { bytes = bundle.result?.bytes || null; };
     };
     try { await done; }
     catch (e) { throw new EvidenceStoreError('read-failed', key, e); }
     if (!latest || latest.digest !== cached.digest || latest.runId !== cached.runId ||
-        latest.role !== cached.role || latest.seed !== cached.seed || latest.biomeMask !== cached.biomeMask)
+        latest.role !== cached.role || latest.seed !== cached.seed ||
+        latest.biomeMask !== cached.biomeMask || latest.generation !== cached.generation)
       throw protectionError('stale-protection', 'role changed or disappeared in another tab');
     if (!bytes || digestOfBytes(bytes) !== latest.digest)
       throw protectionError('corrupt-record', `${key}: referenced bundle missing or corrupted`);
