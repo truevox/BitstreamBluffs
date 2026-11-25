@@ -1,0 +1,49 @@
+# Developer-only capture/restore parity checks; not player save/load or ranking.
+name: Heavy savestate strict Chromium QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/heavy-savestate-qa.yml'
+      - 'package*.json'
+      - 'vite.config.*'
+      - 'jest*.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/entities/**'
+      - 'src/systems/**'
+      - 'src/data/**'
+      - 'src/constants.js'
+      - 'tests/determinism/**'
+      - 'tools/savestate-experiment/**'
+      - 'tools/ruleset/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: heavy-savestate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  strict-capture-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up locked Node version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Install matching Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify committed ruleset/build identity
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Verify focused diagnostic codec and CLI refusal tests
+        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-gate-cli.test.js tests/determinism/savestate-matter.test.js tests/determinism/savestate-recorder-prefix.test.js
+      - name: Run isolated production-build contact and hazard suffix gate
+        run: npm run gate:heavy
