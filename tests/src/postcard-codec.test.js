@@ -4,6 +4,9 @@
  * injected (node:zlib raw deflate); a separate block proves the CompressionStream path interoperates with it.
  */
 import zlib from 'node:zlib';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
+import { BOOSTS } from '../../src/systems/Boosts.js';
+import { UPGRADE_IDS, emptyUpgradeRanks } from '../../src/systems/PermanentUpgrades.js';
 import { tapeCompatible } from '../../src/systems/ghost/GhostLibrary.js';
 import { validateInputRows, tapeDigest } from '../../src/systems/replay/manifest.js';
 import { GhostRecorder, GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION } from '../../src/systems/ghost/GhostTape.js';
@@ -173,6 +176,19 @@ describe('privacy: only the causal allowlist crosses', () => {
       const r = createPostcard(baseArgs(makeTape({ header: { mode } })));
       expect(r).toMatchObject({ ok: false, reason: 'mode' });
     }
+  });
+});
+
+describe('real field shapes (the id regexes must not refuse a real tape)', () => {
+  test('every real boost id, daily rule id (and \'none\'), and upgrade id passes create, encode and decode', async () => {
+    const ranks = Object.fromEntries(UPGRADE_IDS.map((id, i) => [id, i + 1]));
+    expect(Object.keys(emptyUpgradeRanks()).length).toBeGreaterThan(5);
+    for (const dailyRuleId of [null, 'none', ...DailyPatch.RULES.map((r) => r.id)]) {
+      const t = makeTape({ header: { dailyRuleId, boosts: [...BOOSTS], upgradeRanks: ranks } });
+      const pc = must(createPostcard(baseArgs(t)));
+      expect((await decodePostcard(await encodePostcard(pc, OPTS), OPTS)).postcard).toEqual(pc);
+    }
+    expect(DailyPatch.RULES.length).toBeGreaterThan(3);
   });
 });
 
