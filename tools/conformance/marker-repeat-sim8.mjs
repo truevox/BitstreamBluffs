@@ -243,11 +243,24 @@ try {
       assert(b.marker.onscreen.best&&b.marker.onscreen.death,'both labels must intersect camera during genuine rendered frames');
       assert(b.marker.capturedFrame.best&&b.marker.capturedFrame.death,
         'both label text bounds must intersect camera ON THE FRAME BEING CAPTURED');
-      // Pixel proof of EACH label, not merely the gate poles. Hide only one
-      // Phaser text object at a time, re-render the SAME camera with zero
-      // simulation delta, and compare a tightly clipped text region. The
-      // marker pole and all other scenery remain unchanged; the tick must not
-      // advance. This catches visible-but-not-painted labels.
+      // Capture the genuine game first, BEFORE the isolated pixel-only test.
+      // The renderer then gets a blank world except the actual marker text;
+      // changing decorative scenery cannot poison exact restored text bytes.
+      const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
+      assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
+        createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with markers');
+      // Freeze scene update callbacks AFTER all causal/replay proofs. Keep
+      // every genuine game object visible for the real-scene occlusion gate.
+      await marked.p.evaluate(()=>{
+        const game=window.__bbGame,run=game.scene.getScene('RunScene');
+        const tick=run.simClock.tick;
+        for(const scene of game.scene.getScenes(true))scene.update=()=>{};
+        run.shakeAmp=0;run.updateCamera(0);
+        if(run.simClock.tick!==tick)throw Error('Raster stabilization advanced simulation');
+      });
+      // Pixel proof of EACH real marker label. After verifying genuine scene
+      // visibility, isolate only native Phaser text objects from unrelated
+      // decorative redraws; a zero-tick hide/restore must reproduce pixels.
       const clipRegions=await marked.p.evaluate(()=>{
         const g=window.__bbGame,run=g.scene.getScene('RunScene');
         const view=run.cameras.main.worldView;
@@ -273,8 +286,63 @@ try {
         g.step(g.loop.now,0);
         if(run.simClock.tick!==before)throw Error('Visibility-only raster test advanced simulation');
       },{label,visible});
+      // Occlusion proof in the REAL scene. The scene can still contain WebGL
+      // shader/presentation drift even when simulation and scene.update are
+      // frozen. Sample visible/hidden/visible pairs and subtract the observed
+      // within-group drift rather than requiring whole-scene byte equality.
+      const realSceneSignal=async(groups)=>marked.p.evaluate(async groups=>{
+        const decode=async b64=>{
+          const img=new Image();img.src='data:image/png;base64,'+b64;
+          await img.decode();
+          const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+          return Array.from(ctx.getImageData(0,0,img.width,img.height).data);
+        };
+        const [v1,v2,h1,h2,r1,r2]=await Promise.all(groups.map(decode));
+        let pixels=0,peak=0;
+        for(let i=0;i<v1.length;i+=4){
+          let signal=0,noise=0;
+          for(let c=0;c<3;c++){
+            const j=i+c;
+            const v=(v1[j]+v2[j])/2,r=(r1[j]+r2[j])/2,h=(h1[j]+h2[j])/2;
+            signal=Math.max(signal,Math.abs((v+r)/2-h));
+            noise=Math.max(noise,Math.abs(v1[j]-v2[j]),Math.abs(h1[j]-h2[j]),
+              Math.abs(r1[j]-r2[j]),Math.abs(v-r));
+          }
+          if(signal>noise+24){pixels++;peak=Math.max(peak,signal-noise);}
+        }
+        return {pixels,peak};
+      },groups.map(png=>png.toString('base64')));
+      const actualSceneLabelProof={};
+      for(const label of ['best','death']){
+        const clip=clipRegions[label],frames=[];
+        for(const [visible,repeats] of [[true,2],[false,2],[true,2]]){
+          for(let i=0;i<repeats;i++){
+            await renderWithoutSim(label,visible);
+            frames.push(await marked.p.screenshot({clip}));
+          }
+        }
+        const proof=await realSceneSignal(frames);
+        actualSceneLabelProof[label]=proof;
+        assert(proof.pixels>=12,`${label} text contributes no stable pixels to the real, potentially occluded scene (${JSON.stringify(proof)})`);
+      }
+      // Now isolate only the actual marker text for an exact per-label
+      // restored-pixel proof independent of unrelated decorative artwork.
+      await marked.p.evaluate(()=>{
+        const game=window.__bbGame,run=game.scene.getScene('RunScene');
+        const preserved=new Set([run.bestMarker.label,run.deathMarker.label]);
+        const tick=run.simClock.tick;
+        for(const scene of game.scene.getScenes(true))
+          for(const child of scene.children?.list||[])
+            if(!preserved.has(child))child.setVisible(false);
+        if(run.simClock.tick!==tick)throw Error('Text raster isolation advanced simulation');
+      });
       for(const label of ['best','death']){
         const clip=clipRegions[label];
+        // Establish the same zero-simulation-frame rendering baseline used
+        // for the hidden and restored captures. The bounded replay's final
+        // frame may precede Phaser camera/label presentation settlement.
+        await renderWithoutSim(label,true);
         const visiblePixels=await marked.p.screenshot({clip});
         await renderWithoutSim(label,false);
         const hiddenPixels=await marked.p.screenshot({clip});
@@ -289,15 +357,12 @@ try {
           fs.writeFileSync(`${process.env.RASTER_OUT}-${label}-hidden.png`,hiddenPixels,{flag:'wx'});
         }
       }
-      const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
-      assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
-        createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with both markers');
       if(process.env.RASTER_OUT){
         fs.writeFileSync(`${process.env.RASTER_OUT}-normal.png`,screenshotA,{flag:'wx'});
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
       }
       rasterEvidence={hz,maxTicks,executedJs:markedJs,markerOnscreen:b.marker.onscreen,
-        capturedFrame:b.marker.capturedFrame,labelPixelProof,
+        capturedFrame:b.marker.capturedFrame,labelPixelProof,actualSceneLabelProof,
         normalPngSha:createHash('sha256').update(screenshotA).digest('hex'),
         markerPngSha:createHash('sha256').update(screenshotB).digest('hex'),
         markerGeneratorReads:b.marker.generatorReads,markerCacheMutations:b.marker.cacheMutations};
