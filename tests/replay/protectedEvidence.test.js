@@ -657,6 +657,46 @@ describe('protected local evidence references (#244)', () => {
     expect(await stale.isBundleDurable(digest,{runId:'replacement-run'})).toBe(true);
   });
 
+  test('another tab can protect a newly saved run without trusting its stale index',async()=>{
+    const idb=fakeIdb();
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    const writer=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await writer.put(bundle(),{runId:'cross-tab-new-run'});
+    expect(stale.index.has(digest)).toBe(false);
+    const held=await stale.protect(digest,{runId:'cross-tab-new-run',role:'pinned'});
+    expect(held).toMatchObject({durable:true,count:1,runId:'cross-tab-new-run'});
+    expect(stale.index.get(digest).runId).toBe('cross-tab-new-run');
+    expect((await new EvidenceStore({idb,storage:null}).init()).protectedCount(digest)).toBe(1);
+  });
+
+  test('closed then cleared DB never recovers a stale run ID through archive-only import',async()=>{
+    const old=fakeIdb();
+    const store=await new EvidenceStore({idb:old,storage:null}).init();
+    const digest=await store.put(bundle(),{runId:'vanished-previous-run'});
+    store._db.onclose(); // forced close + browser storage cleared outside this tab
+    store._idb=fakeIdb();
+    await store.importBundle(bundleBytes(bundle()),{expectedDigest:digest});
+    expect(store.pendingMeta.get(digest)?.runId).toBeNull();
+    await store.init(); // automatic flush
+    expect((await new EvidenceStore({idb:store._idb,storage:null}).init()).index.get(digest).runId).toBeNull();
+    await expect(store.protect(digest,{runId:'vanished-previous-run',role:'pinned'})).rejects.toMatchObject({code:'run-id-mismatch'});
+  });
+
+  test('explicit UI generation snapshot refuses unpin after refreshed cache adopts replacement role',async()=>{
+    const idb=fakeIdb(),store=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await store.put(bundle(),{runId:RUN});
+    const original=await store.protect(digest,{runId:RUN,role:'pinned'});
+    const other=await new EvidenceStore({idb,storage:null}).init();
+    await other.unprotect(original.key);
+    const replacement=await other.protect(digest,{runId:RUN,role:'pinned'});
+    expect(replacement.generation).not.toBe(original.generation);
+    await store.persistedProtections(digest); // refresh cache, not displayed UI
+    expect(store.protections.get(original.key).generation).toBe(replacement.generation);
+    await expect(store.unprotect(original.key,{expectedGeneration:original.generation})).rejects.toMatchObject({code:'stale-protection'});
+    expect(await store.persistedProtectedCount(digest)).toBe(1);
+    expect((await new EvidenceStore({idb,storage:null}).init()).listProtections()[0].generation).toBe(replacement.generation);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

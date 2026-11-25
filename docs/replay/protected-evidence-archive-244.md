@@ -63,3 +63,7 @@ Every newly created protected local reference now carries a random 128-bit `gene
 
 
 An optional `runId` in `isBundleDurable(digest,{runId})` verifies the current **persisted** index binding and bundle SHA in one readonly transaction. This is necessary for Game Over to re-enable KEEP when a formerly quota-failed capture is later automatically flushed: a matching digest without the exact run ID is never enough to pin a player’s current run. The check remains local retention identity, not player authentication or competitive verification. A stale-tab deletion/reassignment negative case verifies it does not trust cached run identity.
+
+## Exact-head review: stale cross-tab binding and cleared-browser import
+
+`protect(digest,{runId})` no longer rejects because the current tab's in-memory index was loaded before another tab saved the bundle. The stored run ID and canonical bytes are read from one IndexedDB snapshot, and the role-commit transaction rechecks the persisted ID binding atomically. A separate negative test confirms the stale-tab cache cannot authorize a forged run ID. An archive-only import after this tab's prior durable DB was forcibly closed **never** inherits a stale run ID solely from the old cache; subsequent automatic flush keeps that import unbound. Finally, `unprotect(key,{expectedGeneration})` supports a UI-displayed generation snapshot so even a newer cache entry cannot silently redirect the user's Unpin intent to a replacement role created in another tab. These are local lifecycle protections, not public run verification.

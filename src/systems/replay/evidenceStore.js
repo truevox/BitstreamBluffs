@@ -259,7 +259,7 @@ export class EvidenceStore {
     if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.archiveOnly === true
-      ? (!this._db ? prior?.runId || pendingClaim?.runId || null : null)
+      ? (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) || null : null)
       : meta.runId || pendingClaim?.runId || (!this._db ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
@@ -423,10 +423,24 @@ export class EvidenceStore {
       throw protectionError('invalid-protection', 'valid local runId and candidate/submitted/pinned role required');
     if (!this._db || this.pending.has(digest))
       throw protectionError('not-durable', 'evidence must be durably saved before it can be protected');
-    if (!this.index.has(digest) || this.index.get(digest).runId !== runId)
-      throw protectionError('run-id-mismatch', 'runId must match the saved evidence index');
-    // `get` re-hashes stored bytes before a protection role can reference them.
-    const bytes = await this.get(digest);
+    // The in-memory index can be stale across tabs or a browser storage clear.
+    // Check the saved index and canonical bytes in ONE persisted snapshot.
+    const read=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
+    let sourceIndex, sourceBundle;
+    try {
+      [sourceIndex,sourceBundle]=await Promise.all([
+        req2p(read.objectStore(EVIDENCE_INDEX).get(digest)),
+        req2p(read.objectStore(EVIDENCE_STORE).get(digest)),
+        txDone(read),
+      ]);
+    } catch(e) { throw new EvidenceStoreError('read-failed',digest,e); }
+    if (!sourceIndex)
+      throw protectionError('not-durable','no matching persisted evidence index');
+    if (sourceIndex.runId !== runId)
+      throw protectionError('run-id-mismatch','runId must match persisted evidence index');
+    if (!sourceBundle?.bytes || digestOfBytes(sourceBundle.bytes)!==digest)
+      throw protectionError('corrupt-record','persisted evidence bytes missing or corrupted');
+    const bytes=copy(sourceBundle.bytes);
     // Local preservation is independent of the currently executing ruleset.
     // Structural SHA/manifest checks are not replay or entitlement verification.
     const checked = validateEvidenceBundle(bytes, null);
@@ -442,11 +456,13 @@ export class EvidenceStore {
     const done = txDone(tx);
     let problem = null;
     let committedCount = 0;
+    let committedIndex = sourceIndex;
     const current = tx.objectStore(EVIDENCE_INDEX).get(digest);
     current.onsuccess = () => {
       if (!current.result || current.result.runId !== runId) {
         problem = protectionError('run-id-mismatch', 'evidence was removed or rekeyed'); tx.abort(); return;
       }
+      committedIndex=current.result;
       const existing = tx.objectStore(EVIDENCE_REFS).get(key);
       existing.onsuccess = () => {
         if (existing.result && existing.result.digest !== digest) {
@@ -469,15 +485,20 @@ export class EvidenceStore {
       const err = problem || new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e?.message, e);
       this._report(err); throw err;
     }
+    this.index.set(digest,committedIndex);
     this.protections.set(key, committedRef);
     return { ...committedRef, durable: true, count: committedCount };
   }
 
   /** Explicit release of one role; the canonical bytes remain archived until a separate explicit remove. */
-  async unprotect(key) {
+  async unprotect(key, { expectedGeneration } = {}) {
     if (typeof key !== 'string' || !this.protections.has(key)) return false;
     if (!this._db) throw protectionError('not-durable', 'protection registry unavailable');
     const expected = this.protections.get(key);
+    // The UI must release the precise generation its button displayed. A
+    // later cache refresh must never silently retarget a deliberate UNPIN.
+    if (expectedGeneration !== undefined && expected.generation !== expectedGeneration)
+      throw protectionError('stale-protection', 'the displayed reference was replaced; refresh before unpinning');
     const tx = this._db.transaction(EVIDENCE_REFS, 'readwrite');
     const done = txDone(tx);
     let problem = null;
@@ -487,7 +508,8 @@ export class EvidenceStore {
       // Never release somebody else's newly protected digest using a stale key.
       if (!current.result || current.result.digest !== expected.digest ||
           current.result.runId !== expected.runId || current.result.role !== expected.role ||
-          current.result.generation !== expected.generation) {
+          current.result.generation !== expected.generation ||
+          (expectedGeneration !== undefined && current.result.generation !== expectedGeneration)) {
         problem = protectionError('stale-protection', 'reference changed in another tab; reload before releasing');
         tx.abort(); return;
       }
