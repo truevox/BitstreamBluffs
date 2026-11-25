@@ -2,7 +2,7 @@
  * Durable local replay evidence (Replay Contract v1.0, section 1.2; issue #116). NO Phaser imports. No network.
  *
  * A SEPARATE IndexedDB database (`bitstream-replay-evidence`), never an object store inside `bitstream-ghosts`, so
- * GhostLibrary._collect cannot touch it by construction. Schema v2 adds protectedRefs to the original two stores:
+ * GhostLibrary._collect cannot touch it by construction. Schema v2 adds protectedRefs; v3 adds durable deletionMarks to the original two stores:
  * `bundles` (`{digest, bytes}`: the canonical
  * `bb-replay-evidence` bytes keyed by their `bundleDigest`) and `index` (`{digest, size, runId, seq}`). Only the index is
  * loaded into memory; bytes are read on demand. `seq` is a local insertion sequence (no wall-clock values are stored, so
@@ -21,10 +21,11 @@ import { validateEvidenceBundle, bundleDigest, bundleBytes, bundleFilename } fro
 import { digestOfBytes } from './canonicalSha256.js';
 
 export const EVIDENCE_DB = 'bitstream-replay-evidence';
-export const EVIDENCE_DB_VERSION = 2;
+export const EVIDENCE_DB_VERSION = 3;
 export const EVIDENCE_STORE = 'bundles';
 export const EVIDENCE_INDEX = 'index';
 export const EVIDENCE_REFS = 'protectedRefs';
+export const EVIDENCE_DELETIONS = 'deletionMarks';
 export const PROTECTED_ROLES = Object.freeze(['candidate', 'submitted', 'pinned']);
 export const EVIDENCE_EXTENSION = '.bbreplay';
 const IDB_TIMEOUT_MS = 2500;
@@ -126,6 +127,7 @@ export class EvidenceStore {
             if (!d.objectStoreNames.contains(EVIDENCE_STORE)) d.createObjectStore(EVIDENCE_STORE, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_INDEX)) d.createObjectStore(EVIDENCE_INDEX, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_REFS)) d.createObjectStore(EVIDENCE_REFS, { keyPath: 'key' });
+            if (!d.objectStoreNames.contains(EVIDENCE_DELETIONS)) d.createObjectStore(EVIDENCE_DELETIONS, { keyPath: 'digest' });
           };
           req.onsuccess = () => {
             // `onblocked`/timeout cannot cancel an IDB open. Close its eventual
@@ -223,13 +225,21 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes, receipt = null) {
-    const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX], 'readwrite');
+  async _writeDurable(record, bytes, receipt = null, {retry=false}={}) {
+    // A deletion tombstone and the bundle update share ONE IDB lock. Stale
+    // tabs must not resurrect deliberately deleted bytes from pending RAM.
+    const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX,EVIDENCE_DELETIONS], 'readwrite');
     const done = txDone(tx);
     let problem = null;
     let actual = record;
-    const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
-    current.onsuccess = () => {
+    const checkDeletion=tx.objectStore(EVIDENCE_DELETIONS).get(record.digest);
+    checkDeletion.onsuccess=()=>{
+      if(retry && checkDeletion.result){
+        problem=protectionError('deleted-evidence','a different tab explicitly deleted this digest; export session bytes instead');
+        tx.abort();return;
+      }
+      const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
+      current.onsuccess = () => {
       const previous = current.result;
       // The database is authoritative, never the tab's possibly stale cache.
       if (previous?.runId && record.runId && previous.runId !== record.runId) {
@@ -262,6 +272,7 @@ export class EvidenceStore {
           else receipt.classification='unknown';
         } catch { receipt.classification='unknown'; }
         write();
+      };
       };
     };
     try { await done; } catch (e) { throw problem || e; }
@@ -380,7 +391,7 @@ export class EvidenceStore {
         if(!record)continue;
         receipt.digests.add(digest);receipt.count++;
         try{
-          const committed=await this._writeDurable(record,bytes);
+          const committed=await this._writeDurable(record,bytes,null,{retry:true});
           if(this.pending.get(digest)===bytes){
             this.index.set(digest,committed);
             this.pending.delete(digest);
@@ -388,8 +399,11 @@ export class EvidenceStore {
             this._unsafePending.delete(digest);
           }
         }catch(e){
-          if(e?.code==='run-id-conflict'){
-            // A failed binding must not prevent independent pending bundles.
+          if(e?.code==='run-id-conflict'||e?.code==='deleted-evidence'){
+            // Explicit delete and conflicting persisted bindings beat a stale
+            // tab's RAM retry. Preserve bytes for manual export, quarantine
+            // automatic recovery and keep processing other pending bundles.
+            if(e?.code==='deleted-evidence')this._unsafePending.add(digest);
             this._report(e);continue;
           }
           // Quota/write failure: do not retry this digest concurrently or
@@ -692,7 +706,7 @@ export class EvidenceStore {
     this._removing.add(digest);
     try {
       if (this._db) {
-        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
+        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS,EVIDENCE_DELETIONS], 'readwrite');
         const done = txDone(tx);
         let problem = null;
         const scan = tx.objectStore(EVIDENCE_REFS).getAll();
@@ -701,6 +715,7 @@ export class EvidenceStore {
             problem = protectionError('protected-evidence', 'another tab still protects this bundle');
             tx.abort(); return;
           }
+          tx.objectStore(EVIDENCE_DELETIONS).put({digest,deleted:true});
           tx.objectStore(EVIDENCE_STORE).delete(digest);
           tx.objectStore(EVIDENCE_INDEX).delete(digest);
         };
