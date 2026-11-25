@@ -249,28 +249,14 @@ try {
       const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
       assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
         createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with markers');
+      // Freeze scene update callbacks AFTER all causal/replay proofs. Keep
+      // every genuine game object visible for the real-scene occlusion gate.
       await marked.p.evaluate(()=>{
         const game=window.__bbGame,run=game.scene.getScene('RunScene');
-        const preserved=new Set([run.bestMarker.label,run.deathMarker.label]);
         const tick=run.simClock.tick;
-        for(const scene of game.scene.getScenes(true)){
-          scene.update=()=>{}; // cosmetic and physics update disabled after proof
-          for(const child of scene.children?.list||[]){
-            if(!preserved.has(child))child.setVisible(false);
-          }
-        }
-        if(run.simClock.tick!==tick)throw Error('Text raster isolation advanced simulation');
-      });
-      // Camera shake draws a NEW cosmetic RNG offset even for dt=0: an
-      // identical simulation tick may otherwise move the whole screenshot
-      // several pixels between visibility toggles. Stabilize ONLY the local
-      // test camera after all causal comparisons, never production physics.
-      await marked.p.evaluate(()=>{
-        const run=window.__bbGame.scene.getScene('RunScene');
-        const tick=run.simClock.tick;
-        run.shakeAmp=0;
-        run.updateCamera(0);
-        if(run.simClock.tick!==tick)throw Error('Raster camera stabilization advanced simulation');
+        for(const scene of game.scene.getScenes(true))scene.update=()=>{};
+        run.shakeAmp=0;run.updateCamera(0);
+        if(run.simClock.tick!==tick)throw Error('Raster stabilization advanced simulation');
       });
       // Pixel proof of EACH real marker label. After verifying genuine scene
       // visibility, isolate only native Phaser text objects from unrelated
@@ -300,6 +286,34 @@ try {
         g.step(g.loop.now,0);
         if(run.simClock.tick!==before)throw Error('Visibility-only raster test advanced simulation');
       },{label,visible});
+      // A label obscured by another game object must NOT pass just because its
+      // isolated text texture is valid. With the replay/camera frozen, prove
+      // hiding EACH label changes the full, unmodified scene raster.
+      for(const label of ['best','death']){
+        const clip=clipRegions[label];
+        await renderWithoutSim(label,true);
+        const first=await marked.p.screenshot({clip});
+        await renderWithoutSim(label,true);
+        const stable=await marked.p.screenshot({clip});
+        assert(first.equals(stable),`${label} real-scene raster was not stable at fixed simulation tick`);
+        await renderWithoutSim(label,false);
+        const hidden=await marked.p.screenshot({clip});
+        assert(!stable.equals(hidden),`${label} was hidden/occluded in the real scene`);
+        await renderWithoutSim(label,true);
+        const restored=await marked.p.screenshot({clip});
+        assert(stable.equals(restored),`${label} full-scene raster changed during visibility-only toggle`);
+      }
+      // Now isolate only the actual marker text for an exact per-label
+      // restored-pixel proof independent of unrelated decorative artwork.
+      await marked.p.evaluate(()=>{
+        const game=window.__bbGame,run=game.scene.getScene('RunScene');
+        const preserved=new Set([run.bestMarker.label,run.deathMarker.label]);
+        const tick=run.simClock.tick;
+        for(const scene of game.scene.getScenes(true))
+          for(const child of scene.children?.list||[])
+            if(!preserved.has(child))child.setVisible(false);
+        if(run.simClock.tick!==tick)throw Error('Text raster isolation advanced simulation');
+      });
       for(const label of ['best','death']){
         const clip=clipRegions[label];
         // Establish the same zero-simulation-frame rendering baseline used
