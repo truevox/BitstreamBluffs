@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 11:42 UTC. Main `9e2f36a2a528c6aeea07c1b93153ed8495109f60` (#350), v2.22.3/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) build/deploy succeeded; Gal's public Chromium receipt verifies AIR/GND BRAKE help and separate compiled Matter A/B verifies existing behavior. #348 offline recovery and #340 guard remain shipped; no new pause workaround check.
+Last verified: 2026-11-25 12:43 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -243,14 +243,14 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   #172 low-space follow-up: optional next-biome queue reports insufficient
   storage while UI shows only existing Lite readiness. Separate optional
   result from current readiness; do not auto-retry or transfer. Gal lane.
-- #244 Gal/Home local archive drafts: #352 `9bb3a5a1` on #349 `88f5be14`,
-  pinned to #347 `baed14b1`; #347 current head already advanced to `6be25c09`.
-  Exact #352 store retry fault injection: an older large quota-failed item
-  stops explicit Refresh before a smaller current item is attempted. Swap
-  order and the smaller item commits. Review candidate: digest-scoped
-  explicit retry plus two-pending-record Chromium test; leave background
-  sweep intact. No actual browser quota, data loss or live defect shown.
-  Recheck after the stack moves; no shipping or broader restore/admission claim. #343 is an open pure #245
+- #244 Gal/Home local archive: #347 `6afd2fae` → #349 `997acfeb` → #352
+  `e005b1db` stay drafts. Previous Refresh starvation fixed: exact UI passes
+  the current digest; exact two-record store injection proves prioritized
+  retry recovers the smaller current item and leaves older pending, while
+  unscoped sweep recovers neither. Not a real browser quota or data-loss
+  result. Separate #356 `493439fb` deletion protection is not in this stack;
+  review exact combined v1/v2 upgrade, concurrent tabs and quota recovery
+  when integrated. No shipping or broader restore/admission claim. #343 is an open pure #245
   contract, not public verified ranking, backend authority or a dependency
   unblock. Keep both lanes separate.
 - Gal/Home audio lane: #328 merged the #322 music code as v2.21.0,
