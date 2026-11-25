@@ -124,7 +124,7 @@ describe('#244 explicit local Keep/Unpin/Export/Import controls (no network or p
     const second=await new EvidenceStore({idb,storage:null}).init();
     await second.put(bundle(),{runId:'persisted-other'});
     const imported=await new LocalEvidenceActions(first).import(bytes(),{expectedDigest:digest()});
-    expect(imported).toMatchObject({ok:true,localDurable:true,protected:false});
+    expect(imported).toMatchObject({ok:true,localDurable:true,newlyProtected:false,publicRankEligible:false});
     expect(imported.publicRankEligible).toBe(false);
     expect(first.pendingMeta.get(digest()).runId).toBe('pending-first');
   });
