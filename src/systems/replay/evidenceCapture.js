@@ -15,6 +15,10 @@ import { FP_PREFIX } from './canonicalBinary.js';
 
 /** Registry key holding the status of the last evidence write: `{ok, digest?, durable?, code?, message?}`. */
 export const EVIDENCE_STATUS_KEY = 'lastEvidenceStatus';
+/** Bounded session-only status by run ID: older asynchronous writes cannot clobber newer runs. */
+export const EVIDENCE_STATUS_BY_RUN_KEY = 'evidenceStatusByRun';
+/** Run most recently scheduled for evidence capture, even before it finishes. */
+export const EVIDENCE_ACTIVE_RUN_KEY = 'activeEvidenceRunId';
 /** Optional registry key holding an EvidenceStore (tests, or a UI that created one); otherwise a shared lazy store is used. */
 export const EVIDENCE_STORE_KEY = 'evidenceStore';
 /** Registry key holding `{doc, rulesetId}`: the ruleset of this build (set by services.js). */
@@ -26,11 +30,11 @@ let sharedRetry = null;
  * the next live capture or explicit local archive action retries opening IDB.
  * Coalesce simultaneous retries instead of spawning competing open requests.
  */
-export function sharedEvidenceStore() {
-  if (!shared) return (shared = new EvidenceStore().init());
+export function sharedEvidenceStore({retryPending=true}={}) {
+  if (!shared) return (shared = new EvidenceStore().init({skipPendingFlush:!retryPending}));
   return shared.then(store => {
     if (store.backend === 'idb' || !store._idb) return store;
-    if (!sharedRetry) sharedRetry = store.init().finally(() => { sharedRetry = null; });
+    if (!sharedRetry) sharedRetry = store.init({skipPendingFlush:!retryPending}).finally(() => { sharedRetry = null; });
     return sharedRetry;
   });
 }
@@ -83,20 +87,43 @@ export async function saveRunEvidence(tape, recorder, opts) {
   const report = (status) => {
     if (!status.ok) console.warn(`[replay-evidence] not saved: ${status.code}: ${status.message}`); // eslint-disable-line no-console
     else if (!status.durable) console.warn('[replay-evidence] saved to memory only (no durable storage)'); // eslint-disable-line no-console
-    try { if (reg && typeof reg.set === 'function') reg.set(EVIDENCE_STATUS_KEY, status); } catch { /* signal is optional */ }
-    return status;
+    const tagged={...status,runId:tape?.runId || null};
+    // Evidence captures are asynchronous and may finish OUT OF ORDER. Keep
+    // each run's status separately; older completions cannot overwrite the
+    // current run's visible outcome. This is session memory, never uploaded.
+    try {
+      if (reg && typeof reg.set === 'function') {
+        const old=reg.get?.(EVIDENCE_STATUS_BY_RUN_KEY);
+        const byRun=old instanceof Map ? new Map(old) : new Map();
+        if (tagged.runId) {
+          byRun.delete(tagged.runId);
+          byRun.set(tagged.runId, tagged);
+          while(byRun.size>32)byRun.delete(byRun.keys().next().value);
+          reg.set(EVIDENCE_STATUS_BY_RUN_KEY,byRun);
+        }
+        const active=reg.get?.(EVIDENCE_ACTIVE_RUN_KEY);
+        if (!active || active===tagged.runId) reg.set(EVIDENCE_STATUS_KEY,tagged);
+      }
+    } catch { /* status publication is optional; never break archiving */ }
+    return tagged;
   };
+  let validatedDigest = null;
   try {
     const { bundle, rulesetId, ruleset, detail } = buildRunEvidence({ tape, recorder, ruleset: opts.ruleset, gameVersion: opts.gameVersion });
     const bytes = bundleBytes(bundle);
     const v = validateEvidenceBundle(bytes, (id) => (id === rulesetId ? ruleset : null)); // the only validation pass
     if (!v.ok) return report({ ok: false, code: v.code, message: `${v.pointer}${v.detail ? ` (${v.detail})` : ''}` });
+    validatedDigest = v.bundleDigest;
     const store = opts.store || (reg && reg.get && reg.get(EVIDENCE_STORE_KEY)) || await sharedEvidenceStore();
     store.rulesetResolver = (id) => (id === rulesetId ? ruleset : null);
     const digest = await store.put(bytes, { runId: tape.runId }, v);
     return report({ ok: true, digest, durable: store.durable, detail, outcome: v.outcome, reasons: v.reasons.map((r) => r.reason) });
   } catch (e) {
-    return report({ ok: false, code: (e && e.code) || 'error', message: String((e && e.message) || e) });
+    // The original exact digest remains useful after a QUOTA failure, since
+    // EvidenceStore retained the bytes in session memory for explicit export.
+    // It is NOT proof the bytes are saved; the UI must retrieve/rehash them.
+    return report({ ok: false, ...(validatedDigest ? {digest:validatedDigest} : {}),
+      code: (e && e.code) || 'error', message: String((e && e.message) || e) });
   }
 }
 
@@ -106,6 +133,9 @@ export async function saveRunEvidence(tape, recorder, opts) {
  * @returns {void}
  */
 export function scheduleRunEvidence(tape, recorder, opts) {
+  // Set the active run synchronously at scheduling time, but do NOT set the
+  // legacy result key until the deferred validation/write has completed.
+  try { opts?.registry?.set?.(EVIDENCE_ACTIVE_RUN_KEY,tape?.runId||null); } catch { /* optional */ }
   const run = () => { saveRunEvidence(tape, recorder, opts); };
   if (typeof setTimeout === 'function') setTimeout(run, 0); else Promise.resolve().then(run);
 }

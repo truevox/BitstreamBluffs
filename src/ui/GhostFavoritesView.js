@@ -24,6 +24,7 @@ export class GhostFavoritesView extends View {
     super(scene, theme, { w: 352, h: 194, title: 'COURSE GHOSTS', color: 'magenta', onClose: o.onClose,
       hints: [{ keys: ['↑', '↓'], label: 'ROW' }, { keys: ['←', '→'], label: 'SHOW' }, { keys: ['ENTER'], label: 'SELECT' }] });
     this.library = o.library;
+    this.onEvidence = o.onEvidence || null;
     this.tape = o.tape;
     // Preserve the existing G, Enter shortcut for pinning Favorite A.
     this.focus = GHOST_COURSE_ROWS.findIndex(({ slot }) => slot === 0);
@@ -50,7 +51,13 @@ export class GhostFavoritesView extends View {
       return { mark, info, detail, save, show };
     });
     text(12, 149, 'SHARED: DRAWS ONCE IF ANY ROLE CAN SHOW.');
-    text(12, 160, 'SETTINGS CAN HIDE BEST / LATEST.');
+    this.archiveButton = null;
+    if (this.onEvidence) {
+      const archive=new Button(scene,theme,{x:12,y:157,w:96,h:15,label:'LOCAL EVIDENCE',color:'cyan',onClick:()=>this.onEvidence()});
+      this.archiveButton = archive;
+      this.panel.add(archive);
+      text(115,160,'PRIVATE FILES — NO UPLOAD','cyan');
+    } else text(12, 160, 'SETTINGS CAN HIDE BEST / LATEST.');
     this.status = new NeonText(scene, theme, 12, this.h - 18, '', { color: 'lime', outline: 'none' });
     this.panel.add(this.status);
     this._markFocus();
@@ -61,6 +68,7 @@ export class GhostFavoritesView extends View {
 
   _markFocus() {
     this.rows.forEach(({ mark }, i) => mark.setVisible(i === this.focus));
+    this.archiveButton?.setHover(this.focus === this.rows.length);
   }
 
   _select(i, save) {
@@ -114,11 +122,14 @@ export class GhostFavoritesView extends View {
   handleAction(action) {
     if (action === 'cancel' || action === 'ghost') { this.close(); return true; }
     if (action === 'up' || action === 'down') {
-      this.focus = (this.focus + (action === 'up' ? -1 : 1) + this.rows.length) % this.rows.length;
+      const available = this.rows.length + (this.archiveButton ? 1 : 0);
+      this.focus = (this.focus + (action === 'up' ? -1 : 1) + available) % available;
       uiSfx(this.scene, 'uiMove');
       this._markFocus();
-    } else if (action === 'confirm') this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
-    else if (action === 'left' || action === 'right') this._toggle(this.focus);
+    } else if (action === 'confirm') {
+      if (this.archiveButton && this.focus === this.rows.length) this.onEvidence();
+      else this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
+    } else if ((action === 'left' || action === 'right') && this.focus < this.rows.length) this._toggle(this.focus);
     return true;
   }
 }
