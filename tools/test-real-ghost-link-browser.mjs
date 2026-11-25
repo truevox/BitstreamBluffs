@@ -180,8 +180,43 @@ try{
  if(!forged.position.includes('GAP +5M')||!forged.status.includes('UNVERIFIED')||
   forged.runs!==beforehand.runs||forged.tapes!==beforehand.tapes)
   throw Error('Forged guest score affected local evidence or compare rendering '+JSON.stringify(forged));
- // A malformed replacement cannot leave the previously valid guest selected.
+ // Typing in the paste field must IMMEDIATELY invalidate a previously
+ // accepted guest, even before the user presses PREVIEW again.
  await p.locator('textarea').fill('https://simulate.sledhead.ing/#bbghost=1.malformed');
+ const edited=await p.evaluate(()=>{
+  const v=window.__bbGame.scene.getScene('TitleScene').view;
+  return {loaded:!!v.tape,local:!!v.localPreview,playing:v.playing,
+   busy:v.busy,status:v.status.main.text};
+ });
+ if(edited.loaded||edited.local||edited.playing||edited.busy||!edited.status.includes('LINK CHANGED'))
+  throw Error('Edited untrusted field retained previous guest '+JSON.stringify(edited));
+ // Delay the optional local-library READ after successful parsing. Editing
+ // during this await must invalidate the generation and never resurrect the
+ // prior guest when the old async work finally resolves.
+ await p.evaluate(()=>{
+  const lib=window.__bbGame.registry.get('ghostLibrary');
+  window.__originalGuestLookup=lib.ghostsFor.bind(lib);
+  lib.ghostsFor=()=>new Promise(resolve=>{window.__guestLookupResolve=resolve;});
+ });
+ await p.locator('textarea').fill(ui.copy);
+ await p.keyboard.press('Control+Enter');
+ await p.waitForFunction(()=>typeof window.__guestLookupResolve==='function',null,{timeout:10000});
+ await p.locator('textarea').fill('https://simulate.sledhead.ing/#bbghost=1.malformed');
+ const pendingEdit=await p.evaluate(()=>{
+  const v=window.__bbGame.scene.getScene('TitleScene').view;
+  const lib=window.__bbGame.registry.get('ghostLibrary');
+  window.__guestLookupResolve([]);
+  lib.ghostsFor=window.__originalGuestLookup;
+  return {loaded:!!v.tape,busy:v.busy,preview:!!v.preview,status:v.status.main.text};
+ });
+ await p.waitForTimeout(150);
+ const stale=await p.evaluate(()=>{
+  const v=window.__bbGame.scene.getScene('TitleScene').view;
+  return {loaded:!!v.tape,preview:!!v.preview,status:v.status.main.text};
+ });
+ if(pendingEdit.busy||pendingEdit.loaded||stale.loaded||stale.preview||
+   !stale.status.includes('LINK CHANGED'))
+  throw Error('Stale async guest validation restored edited-away content '+JSON.stringify({pendingEdit,stale}));
  await p.mouse.click(previewPoint.x,previewPoint.y);
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.status?.main?.text?.includes('INCOMPATIBLE'),null,{timeout:10000});
  const invalid=await p.evaluate(()=>{
@@ -231,6 +266,6 @@ try{
  await recipient.close();await recipientCtx.close();
 
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,forged,invalid,landed,direct,accepted,errors,recipientErrors}));
+ console.log('PASS_REAL_GHOST_LINK_ROUNDTRIP',JSON.stringify({result,armed,cancelled,ui:{...ui,copy:undefined,trust:copiedCandidate.trust,credit:copiedCandidate.canCreditScore},keyboard,beforehand,filled,previewed,scrub,keyboardScrub,watching,paused,reduced,forged,edited,pendingEdit,stale,invalid,landed,direct,accepted,errors,recipientErrors}));
 }finally{if(browser)await browser.close();if(vite){if(typeof vite.close==='function')await vite.close();
 else if(vite.httpServer)await new Promise((r,j)=>vite.httpServer.close(e=>e?j(e):r()));}}

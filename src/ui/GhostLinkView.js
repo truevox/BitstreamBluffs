@@ -76,6 +76,7 @@ export class GhostLinkView extends View {
    x:this.panel.x+PLOT.x,y:this.panel.y+39,w:394,h:45,maxLength:GHOST_LINK_MAX_URL,
    multiline:true,value:o.initial||'',placeholder:'PASTE GHOST LINK HERE (CTRL+V)',
    color:'magenta',onSubmit:()=>this.inspect(),onCancel:()=>this.close(),
+   onChange:()=>this._inputChanged(),
    onShortcut:(e)=>{
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowRight'){this.scrub(1);return true;}
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowLeft'){this.scrub(-1);return true;}
@@ -105,6 +106,20 @@ export class GhostLinkView extends View {
   scene.events.on(Phaser.Scenes.Events.UPDATE,this._onUpdate);
   this._draw();
   scene.time.delayedCall(30,()=>this.alive&&this.box.focus());
+ }
+ /** An edit invalidates every prior candidate and any in-flight async read. */
+ _inputChanged(){
+  if(!this.alive)return;
+  ++this.token;
+  this.busy=false;
+  this.preview=null;this.localPreview=null;this.localRole=null;this.tape=null;
+  this.cursor=0;this.elapsedMs=0;this.playing=false;
+  this.previewBtn?.setDisabled(false);
+  this.playBtn?.setLabel('WATCH');
+  this.meta?.setText('NO GHOST LOADED');
+  this.position?.setText('PREVIEW ONLY. NOTHING WRITTEN.');
+  this.status?.setText('LINK CHANGED - PRESS PREVIEW');
+  this._draw();
  }
  async inspect(){
   if(!this.alive||this.busy)return;

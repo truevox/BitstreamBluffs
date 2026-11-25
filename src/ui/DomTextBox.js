@@ -13,7 +13,7 @@ export class DomTextBox {
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
    * @param {{x:number,y:number,w:number,h:number,multiline?:boolean,readOnly?:boolean,value?:string,maxLength?:number,
-   *          placeholder?:string,onSubmit?:function(string):void,onCancel?:function():void,onShortcut?:function(KeyboardEvent):boolean,color?:string}} o
+   *          placeholder?:string,onSubmit?:function(string):void,onCancel?:function():void,onShortcut?:function(KeyboardEvent):boolean,onChange?:function(string):void,color?:string}} o
    */
   constructor(scene, theme, o) {
     this.scene = scene;
@@ -47,6 +47,7 @@ export class DomTextBox {
         if (o.onSubmit) o.onSubmit(el.value);
       }
     });
+    if (o.onChange) el.addEventListener('input', () => o.onChange(el.value));
     el.addEventListener('keyup', (e) => e.stopPropagation());
     el.addEventListener('keypress', (e) => e.stopPropagation());
     el.addEventListener('focus', () => this._style(true));
