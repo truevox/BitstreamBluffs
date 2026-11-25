@@ -347,7 +347,12 @@ try {
   const changed={...current,claims:{...current.claims,score:current.claims.score+5}};
   const digest=bundleDigest(changed);
   const original=store._writeDurable;
-  store._writeDurable=async()=>{throw Object.assign(new Error('test quota exceeded'),{name:'QuotaExceededError'});};
+  store._writeDurable=async(_record,_bytes,receipt)=>{
+    // Model a quota fault AFTER the IDB read has classified a new digest.
+    // Unknown classification must deliberately stay export-only after recovery.
+    if(receipt)receipt.classification='new';
+    throw Object.assign(new Error('test quota exceeded'),{name:'QuotaExceededError'});
+  };
   let failed=false;
   try{await store.put(changed,{runId:'ui-smoke-run'});}catch(e){failed=e.code==='quota-exceeded';}
   scene.registry.set(statusKey,{ok:false,runId:'ui-smoke-run',digest,code:'quota-exceeded',durable:false});
@@ -377,7 +382,7 @@ try {
     await view._keepOrUnpin();
     return {durable,enabled,message,afterPin,afterUnpin:store.protectedCount(missingDigest)};
   }
-  return {durable,enabled,message};
+  return {durable,enabled,message,backend:store.backend,pending:store.pending.has(missingDigest),pendingCount:store.pending.size,unsafe:store._unsafePending.has(missingDigest),pendingMeta:store.pendingMeta.get(missingDigest),index:store.index.get(missingDigest),lastError:store.lastError?.code};
  },memory.digest);
  assert(recovered.durable && recovered.enabled && recovered.message.includes('RECOVERED'));
  assert.equal(recovered.afterPin,1);
@@ -391,7 +396,10 @@ try {
   const current={...base,claims:{...base.claims,score:base.claims.score+402}};
   const oldDigest=bundleDigest(older),currentDigest=bundleDigest(current);
   const priorStatus=scene.registry.get(statusKey),originalWrite=store._writeDurable;
-  store._writeDurable=async()=>{throw new Error('temporary simulated quota');};
+  store._writeDurable=async(_record,_bytes,receipt)=>{
+    if(receipt)receipt.classification='new'; // known-new write, safe to retry after quota clears
+    throw new Error('temporary simulated quota');
+  };
   try{
     await store.put(older,{runId:'older-pending'}).catch(()=>{});
     await store.put(current,{runId:'ui-smoke-run'}).catch(()=>{});
@@ -416,7 +424,34 @@ try {
  assert(priority.currentDurable && priority.olderPending && !priority.currentPending && priority.keepEnabled);
  record('Refresh prioritizes current run over older still-quota-blocked pending evidence');
 
-
+ const uncertainWrite=await p.evaluate(async()=>{
+  const {view,store,scene,statusKey,legacyTape}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape,bundleDigest}=await import('/src/systems/replay/manifest.js');
+  const base=evidenceBundle({manifest:legacyManifestFromTape(legacyTape),tape:legacyTape});
+  const altered={...base,claims:{...base.claims,score:base.claims.score+779}};
+  const digest=bundleDigest(altered),previous=scene.registry.get(statusKey);
+  const original=store._writeDurable;
+  store._writeDurable=async()=>{throw new Error('unknown IDB receipt before classification');};
+  try{await store.put(altered,{runId:'ui-smoke-run'}).catch(()=>{});}
+  finally{store._writeDurable=original;}
+  try{
+    scene.registry.set(statusKey,{ok:false,runId:'ui-smoke-run',digest,code:'write-failed',durable:false});
+    await view._refresh(); // UNKNOWN write must NOT automatically resurrect after cross-tab deletion
+    const exported=await store.exportBundle(digest);
+    return {pending:store.pending.has(digest),unsafe:store._unsafePending.has(digest),
+      durable:await store.isBundleDurable(digest,{runId:'ui-smoke-run'}),
+      keepDisabled:view.buttons[0].disabled,exportEnabled:!view.buttons[1].disabled,
+      message:view.status.main.text,bytes:exported.bytes.length};
+  }finally{
+    scene.registry.set(statusKey,previous);
+    store.pending.delete(digest);store.pendingMeta.delete(digest);store._unsafePending.delete(digest);
+    await view._refresh();
+  }
+ });
+ assert(uncertainWrite.pending && uncertainWrite.unsafe && !uncertainWrite.durable);
+ assert(uncertainWrite.keepDisabled && uncertainWrite.exportEnabled && uncertainWrite.bytes>2000);
+ assert(uncertainWrite.message.includes('EXPORT NOW'));
+ record('uncertain IDB write stays exportable but never silently retries or claims durable retention');
 
  const displayGeneration=await p.evaluate(async()=>{
   const {view,store,digest,scene,statusKey}=window.__qaEvidence;
