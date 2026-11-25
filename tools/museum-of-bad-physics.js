@@ -161,6 +161,12 @@ fileInput.addEventListener('change', () => {
   fileInput.value = ''; // Permits choosing the same file again.
   void handleFiles(files);
 });
+dropZone.addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    fileInput.click();
+  }
+});
 dropZone.addEventListener('dragover', event => { event.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', event => {
