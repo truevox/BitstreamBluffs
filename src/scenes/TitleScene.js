@@ -50,6 +50,7 @@ import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -540,6 +541,7 @@ export class TitleScene extends Phaser.Scene {
     const hasHash=typeof location!=='undefined'&&location.hash.startsWith('#bbghost=');
     this._openView(new GhostLinkView(this,this.theme,{
       initial:hasHash?location.href:'',onClose:()=>this._openSeed(),
+      onPractice:(tape)=>this.startRun(tape.seed,tape.biomeMask,{guestPractice:tape}),
     }));
   }
 
@@ -733,13 +735,20 @@ export class TitleScene extends Phaser.Scene {
    */
   startRun(seed, maskOverride, o) {
     if (this.starting) return;
+    const requestedPractice = o?.guestPractice !== undefined;
+    const guest = requestedPractice ? guestPracticeLaunch(o.guestPractice) : null;
+    // A malformed guest request must NEVER silently become a normal/ranked run.
+    if(requestedPractice&&!guest)return;
     this.starting = true;
     const biomeDefs = Object.values((this.registry.get(REG.CONTENT) || {}).biomes || {});
-    const parsed = parseSeedMask(seed, biomeDefs);
+    const parsed = guest?{seed:guest.seed,biomeMask:guest.biomeMask,hadSuffix:true}
+      :parseSeedMask(seed, biomeDefs);
+    if(guest)this.registry.set(REG.GUEST_PRACTICE,guest.tape);
+    else this.registry.remove?.(REG.GUEST_PRACTICE);
     this.registry.set(REG.SEED, parsed.seed || seed);
     // Decision 2: set on EVERY Title start, so a typed `daily-*` seed (ENTER SEED) is never official.
-    this.registry.set(REG.DAILY_OFFICIAL, !!(o && o.official === true));
-    const draft=o?.official===true&&o?.mode==='draft';
+    this.registry.set(REG.DAILY_OFFICIAL, !guest && !!(o && o.official === true));
+    const draft=!guest&&o?.official===true&&o?.mode==='draft';
     this.registry.set(REG.DAILY_MODE,draft?'draft':'classic');
     this.registry.set(REG.DAILY_DRAFT_RANKS,draft?
       {...(this.registry.get(REG.PROGRESSION)?.store?.profile?.dailyDraft?.ranks||{})}:{});
