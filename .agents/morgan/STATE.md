@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 12:43 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
+Last verified: 2026-11-25 13:18 UTC. Main `8d9c124a7a72c87fa866dd7c9211fb1face1cf1f` (#354), v2.22.3/SIM9; marker diagnostics only. #355 tracks same-render pixel attribution, not a reproduced live renderer defect. Prior [#350 exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) proved AIR/GND BRAKE help; #348 offline recovery and #340 guard remain shipped. No new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -64,8 +64,9 @@ means resume this queue, not take over another lane or merge a draft.
    exact-head independent review; resolve real feedback only. No merge.
    Independent exact test blob overlay on shipped v2.20.2 again passed
    159/159 across the same five suites; #320 has no test-file overlap.
-2. #168 and all 17 original open issues were rechecked on v2.21.2;
-   none closed. Keep checking source for actual dependency movement.
+2. #168: all 17 remaining issues rechecked on v2.22.3; four of the
+   original 21 closed. All four Morgan draft heads have green checks but
+   no current-head independent approval. No reviews or merges overnight. Keep checking source for actual dependency movement.
    [#338](https://github.com/truevox/BitstreamBluffs/pull/338) / #78 is now
    an open two-file developer-only draft at `fbc787a939446ac67ea4b7b25c12b35faf9b2836`,
    branch `morgan/issue-78-crash-brief-chain-smoke`, based on `044ebd4b`.
@@ -227,6 +228,15 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
+- #155 Pulp preflight on `8d9c124a`: shipped telegraph sim planning is
+  camera-independent, but current visual fits use an unrotated rect.
+  Exact GroundTelegraph in a graphics stub accepted a hop column at
+  (468, 36), and its right triangle vertex x478.5 projected to x487.542
+  after synthetic +6° center roll (480×270, zoom 1). This is a projected
+  geometry negative control, not live or real Chromium evidence. A future
+  100% Pulp pilot should test projected cue bounds and fallback badge under
+  both roll signs, with identical warn/hop timing and no physics changes.
+  No current Pulp runtime or verified Chromebook baseline shipped.
 - #350 closed #30: existing AirBrake doubles as ground brake; no binding,
   physics, replay change. Tricks Right A, Tricks Left ←, Classic ↑ or S on
   ground, gamepad X or B on ground, touch existing AirBrake. Public README
