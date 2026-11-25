@@ -235,7 +235,7 @@ export class EvidenceStore {
     if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.runId || pendingClaim?.runId ||
-      (this.pending.has(digest) || !this._db ? prior?.runId : null) || null;
+      (!this._db ? prior?.runId : null) || null;
     const record = { digest, size: bytes.length, runId: requestedRunId, seq: prior ? prior.seq : ++this._seq };
     // Memory-only backend: explicitly not durable, never grant a protected role.
     if (!this._db) {
@@ -265,7 +265,10 @@ export class EvidenceStore {
       this.pending.set(digest, bytes);
       // Preserve the caller's requested run ID even when the existing on-disk
       // entry had no binding. Retrying must NEVER silently drop that claim.
-      this.pendingMeta.set(digest, record);
+      // A failed overlapping unbound write cannot erase a stronger explicit
+      // run-ID claim left pending by another failed write for these bytes.
+      const established = this.pendingMeta.get(digest);
+      this.pendingMeta.set(digest, established?.runId ? established : record);
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
       this._report(err);
       throw err;
@@ -303,6 +306,24 @@ export class EvidenceStore {
   }
 
   has(digest) { return this.index.has(digest); }
+
+  /** Is THIS digest durable in the current IndexedDB snapshot? Unlike
+   * `durable`, unrelated session-only pending bundles do not make it false.
+   * Recheck the persisted row/bytes in a single readonly transaction.
+   */
+  async isBundleDurable(digest) {
+    if (!this._db || this.pending.has(digest)) return false;
+    try {
+      const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
+      const done=txDone(tx);
+      const [idx,bundle]=await Promise.all([
+        req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
+        req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
+      ]);
+      await done;
+      return Boolean(idx && bundle?.bytes && idx.digest===digest && digestOfBytes(bundle.bytes)===digest);
+    } catch { return false; }
+  }
 
   /** Local index (no bytes), in insertion order. */
   list() { return [...this.index.values()].sort((a, b) => a.seq - b.seq).map((r) => ({ digest: r.digest, runId: r.runId, size: r.size })); }
@@ -481,6 +502,11 @@ export class EvidenceStore {
       this.index.delete(digest);
       this.pending.delete(digest);
       this.pendingMeta.delete(digest);
+      // Another tab may have released a role while our local cache was stale.
+      // The persisted transaction proved there were no remaining protections.
+      for (const [key,ref] of this.protections) {
+        if (ref.digest === digest) this.protections.delete(key);
+      }
     } finally {
       this._removing.delete(digest);
     }

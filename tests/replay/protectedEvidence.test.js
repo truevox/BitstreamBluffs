@@ -433,6 +433,66 @@ describe('protected local evidence references (#244)', () => {
     expect(re.has(digest)).toBe(false);
   });
 
+  test('two failed overlapping writes preserve the one explicit pending run claim', async () => {
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    idb.hooks.failPut=new Error('offline');
+    const explicit=store.put(bundle(),{runId:'explicit-first'});
+    const unbound=store.put(bundle());
+    const outcomes=await Promise.allSettled([explicit,unbound]);
+    expect(outcomes.map(x=>x.status)).toEqual(['rejected','rejected']);
+    const digest=bundleDigest(bundle());
+    expect(store.pendingMeta.get(digest).runId).toBe('explicit-first');
+    idb.hooks.failPut=null;
+    const other={...bundle(),claims:{...bundle().claims,score:607}};
+    await store.put(other,{runId:'separate'});
+    expect((await new EvidenceStore({idb,storage:null}).init()).index.get(digest).runId).toBe('explicit-first');
+  });
+
+  test('unbound duplicate write trusts persisted run binding despite a stale cached pending record', async () => {
+    const idb=fakeIdb();
+    const old=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await old.put(bundle(),{runId:'stale-A'});
+    idb.hooks.failPut=new Error('quota');
+    await expect(old.put(bundle())).rejects.toMatchObject({code:'write-failed'});
+    expect(old.pendingMeta.get(digest).runId).toBeNull();
+    idb.hooks.failPut=null;
+    const fresh=await new EvidenceStore({idb,storage:null}).init();
+    await fresh.remove(digest);
+    await fresh.put(bundle(),{runId:'current-B'});
+    expect(await old.put(bundle())).toBe(digest);
+    expect(old.index.get(digest).runId).toBe('current-B');
+    expect((await new EvidenceStore({idb,storage:null}).init()).index.get(digest).runId).toBe('current-B');
+  });
+
+  test('successful durable deletion clears stale cached protection rows too', async () => {
+    const {store,digest,idb}=await seededStore();
+    const ref=await store.protect(digest,{runId:RUN,role:'pinned'});
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    expect(stale.protectedCount(digest)).toBe(1);
+    await store.unprotect(ref.key);
+    await stale.remove(digest);
+    expect(stale.protectedCount(digest)).toBe(0);
+    expect(stale.listProtections()).toEqual([]);
+    expect(stale.has(digest)).toBe(false);
+  });
+
+  test('per-bundle durability is independent of unrelated failed session-only writes', async () => {
+    const idb=fakeIdb();
+    const store=await new EvidenceStore({idb,storage:null}).init();
+    const persisted=await store.put(bundle(),{runId:RUN});
+    expect(await store.isBundleDurable(persisted)).toBe(true);
+    const different={...bundle(),claims:{...bundle().claims,score:802}};
+    const otherDigest=bundleDigest(different);
+    idb.hooks.failPut=new Error('disk full');
+    await expect(store.put(different,{runId:'failed-run'})).rejects.toMatchObject({code:'write-failed'});
+    expect(store.durable).toBe(false);
+    expect(await store.isBundleDurable(persisted)).toBe(true);
+    expect(await store.isBundleDurable(otherDigest)).toBe(false);
+    store._db.onversionchange();
+    expect(await store.isBundleDurable(persisted)).toBe(false);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{
