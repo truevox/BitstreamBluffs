@@ -19,6 +19,7 @@ export function downloadStatusText(state={}){
   case 'insufficient-storage':return 'NOT ENOUGH STORAGE: '+mb(state.availableBytes)+' FREE';
   case 'cancelled':return 'CANCELLED - VERIFIED FILES KEPT';
   case 'failed':return 'DOWNLOAD FAILED - RETRY TO REPAIR';
+  case 'tier-routing-unavailable':return 'VERIFIED RECORDINGS NOT ROUTED - TRY AGAIN';
   case 'no-music':return 'NO SELECTED MUSIC - NO DOWNLOAD';
   default:return 'CHECKING OFFLINE STATUS';
  }

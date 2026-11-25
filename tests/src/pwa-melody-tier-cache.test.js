@@ -1,10 +1,11 @@
 import {webcrypto,createHash} from 'node:crypto';
 import {TextEncoder} from 'node:util';
 import {Buffer} from 'node:buffer';
+import {MessageChannel} from 'node:worker_threads';
 import {MELODY_R2_BASE,downloadR2Group} from '../../tools/pwa/r2-cache.mjs';
-import {stagePublishedMelody,activatePublishedMelody} from '../../tools/pwa/melody-tier-cache.mjs';
+import {stagePublishedMelody,activatePublishedMelody,appendVerifiedMelodyGroups} from '../../tools/pwa/melody-tier-cache.mjs';
 import {renderOfflineWorker} from '../../tools/pwa/build-offline-worker.mjs';
-globalThis.TextEncoder=TextEncoder;
+globalThis.TextEncoder=TextEncoder;globalThis.MessageChannel=MessageChannel;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 class FakeResponse{constructor(body,opts={}){this.body=Buffer.from(body);this.ok=true;this.headers=new Map(Object.entries(opts.headers??{}));this.url=opts.url||'';this.type='basic';}clone(){return new FakeResponse(this.body,{url:this.url});}async arrayBuffer(){return Uint8Array.from(this.body).buffer;}async json(){return JSON.parse(this.body.toString());}}
 globalThis.Response=FakeResponse;
@@ -12,3 +13,10 @@ function fixture(){const payload=Buffer.from('real'),base=MELODY_R2_BASE;const e
 test('published tier downloads only with consent and activates only at a stopped verified boundary',async()=>{const f=fixture();await expect(stagePublishedMelody(f.plan,'lite',{...f.opts,consent:false})).rejects.toThrow(/consent/);expect(f.transfers()).toBe(0);await expect(activatePublishedMelody(f.plan,'lite',{...f.opts,stopped:true})).rejects.toThrow(/incomplete/);await stagePublishedMelody(f.plan,'lite',f.opts);expect(f.transfers()).toBe(2);await expect(activatePublishedMelody(f.plan,'lite',{...f.opts,stopped:false})).rejects.toThrow(/Stopped/);await activatePublishedMelody(f.plan,'lite',{...f.opts,stopped:true});const policy=[...f.maps.entries()].find(([n])=>n.startsWith('bb-melody-policy'));expect((await [...policy[1].values()][0].json()).quality).toBe('lite');await activatePublishedMelody(f.plan,null,{...f.opts,stopped:true});expect((await [...policy[1].values()][0].json()).quality).toBe(null);});
 test('rejects substituted physical paths and forbids staging unsupported quality',async()=>{const f=fixture();f.entry.url=f.entry.url.replace('/lite/','/full/');await expect(stagePublishedMelody(f.plan,'lite',f.opts)).rejects.toThrow(/Invalid melody mapping/);await expect(stagePublishedMelody(f.plan,'full',f.opts)).rejects.toThrow(/No required/);expect(f.transfers()).toBe(0);});
 test('generated preview router is opt-in and valid',()=>{const inv={base:'/game/',version:'x',entries:[]};const plain=renderOfflineWorker(inv),preview=renderOfflineWorker(inv,{melodyDev:true});expect(plain).not.toContain('melodyTierResponse');expect(preview).toContain('melodyTierResponse');expect(()=>new Function(preview)).not.toThrow();});
+
+test('active extension never sends an unverified group; verified additions use an acknowledged worker message',async()=>{
+ const f=fixture(),messages=[],worker={postMessage:(payload,ports)=>{messages.push(payload);ports[0].postMessage({ok:true,added:payload.groups.length});ports[0].close();}};
+ const skipped=await appendVerifiedMelodyGroups([f.group],{...f.opts,worker});expect(skipped).toEqual({added:0,groupIds:[]});expect(messages).toHaveLength(0);
+ await downloadR2Group(f.group,f.opts);
+ const result=await appendVerifiedMelodyGroups([f.group],{...f.opts,worker});expect(result).toEqual({added:1,groupIds:[f.group.id]});expect(messages).toHaveLength(1);expect(messages[0]).toMatchObject({type:'bb-melody-extend',groups:[f.group]});
+});

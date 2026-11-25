@@ -17,12 +17,12 @@ try{
   activate(title.menu,'SETTINGS');activate(title.view.menu,'MANAGE SOUND');const sound=title.view.soundView;activate(sound.menu,'OFFLINE MUSIC');const view=sound.offlineView;await wait(()=>!view.pending&&controller.state.status==='download-required');
   activate(view.menu,'DOWNLOAD / REPAIR');if(!view.armed||view.menu.items.find(i=>i.label==='CONFIRM DOWNLOAD').disabled)throw Error('Did not arm download');
   const firstNext=controller.plan.nextBiome,old=game.registry.get('profile');const next={...old,unlocked:{...old.unlocked,biomes:[...new Set([...(old.unlocked?.biomes||[]),firstNext])]}};
-  const rev=controller._planRevision;game.registry.set('profile',next);await wait(()=>controller._planRevision>rev&&!controller.replanning);
+  const rev=controller._planRevision;game.registry.set('profile',next);await wait(()=>controller._planRevision>rev&&!controller.replanning&&!controller._contextRefreshTicket);
   view._paint();if(view.armed||!view.menu.items.find(i=>i.label==='CONFIRM DOWNLOAD').disabled)throw Error('Stale download stayed armed');
   activate(view.menu,'CONFIRM DOWNLOAD');if(controller.running)throw Error('Stale download transferred');
   activate(view.menu,'PRELOAD NEXT BIOME');if(!view.armedPrefetch)throw Error('Next biome did not arm');
   const prefetchNext=controller.plan.nextBiome;const more={...next,unlocked:{...next.unlocked,biomes:[...new Set([...next.unlocked.biomes,prefetchNext])]}};
-  const rev2=controller._planRevision;game.registry.set('profile',more);await wait(()=>controller._planRevision>rev2&&!controller.replanning);view._paint();
+  const rev2=controller._planRevision;game.registry.set('profile',more);await wait(()=>controller._planRevision>rev2&&!controller.replanning&&!controller._contextRefreshTicket);view._paint();
   if(view.armedPrefetch||!view.menu.items.find(i=>i.label==='CONFIRM PREFETCH').disabled)throw Error('Stale prefetch stayed armed');activate(view.menu,'CONFIRM PREFETCH');if(controller.running)throw Error('Stale prefetch transferred');
   return {initialNextBiome:firstNext,changedNextBiome:prefetchNext,newNextBiome:controller.plan.nextBiome,revision:controller._planRevision,ready:controller.state.ready,oldDownloadRejected:true,oldPrefetchRejected:true};
  });

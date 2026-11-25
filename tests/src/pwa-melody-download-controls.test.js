@@ -29,3 +29,35 @@ test('insufficient Full storage remains visible while verified Lite remains play
  const f=fixture();f.allowFull(false);const state=await f.c.start({consent:true});expect(state).toMatchObject({status:'lite-ready',liteReady:true,upgradeStatus:'insufficient-storage',upgradeMissingBytes:10,availableBytes:5});
  const {downloadStatusText}=await import('../../src/ui/OfflineMusicView.js');expect(downloadStatusText(state)).toBe('LITE READY; FULL NEEDS 0.00 MB / 0.00 MB FREE');
 });
+
+test('a source event invalidates old consent synchronously while hashes are pending',async()=>{
+ const f=fixture(),c=f.c;const oldRevision=c._planRevision;
+ const ticket=c.markContextChanged();expect(c._planRevision).toBe(oldRevision+1);
+ await expect(c.start({consent:true})).rejects.toThrow(/refreshing/);
+ await expect(c.prefetch({consent:true,idle:true})).rejects.toThrow(/refresh/);
+ const unchanged={...plan,groups:plan.groups.map(g=>({...g}))};
+ await c.replan(unchanged,{contextTicket:ticket});expect(c.plan).toBe(plan);expect(c._contextRefreshTicket).toBeNull();
+});
+
+test('irrelevant profile writes do not cancel an active explicitly consented download',async()=>{
+ let release,signalReceived;const calls=[];
+ const gate=new Promise(r=>release=r),begun=new Promise(r=>signalReceived=r);
+ const c=new MelodyDownloadControls({plan,options:{},estimate:()=>{},isStopped:()=>true,createQueue:({plan:subset})=>({
+  refresh:async()=>({ready:false,status:'download-required',missingBytes:10}),
+  start:async()=>{signalReceived();await gate;calls.push('finished');return {ready:true,status:'ready'};},cancel:()=>{calls.push('cancel');},
+ })});
+ const downloading=c.start({consent:true});await begun;const revision=c.markContextChanged();
+ await c.replan({...plan,groups:plan.groups.map(g=>({...g}))},{contextTicket:revision});
+ expect(c.running).toBe(downloading);expect(calls).toEqual([]);release();await downloading;
+ expect(calls).toEqual(['finished','finished']);expect(c.state.status).toBe('ready');
+});
+
+test('a verified biome lead is appended at the active quality without stopping a playing track',async()=>{
+ const base={id:'a:base:lite',originalId:'a:base',quality:'lite',priority:'required',version:'a'},lead={id:'a:lead:garbage-dump-glacier:lite',originalId:'a:lead:garbage-dump-glacier',quality:'lite',priority:'required',version:'b'};
+ const old={...plan,groups:[base],nextBiome:'garbage-dump-glacier'},calls=[];
+ const c=new MelodyDownloadControls({plan:old,mode:'space-saver',options:{worker:{id:'worker'}},estimate:()=>{},isStopped:()=>false,createQueue:()=>({refresh:async()=>({ready:true,status:'ready',missingBytes:0})}),append:async(groups)=>{calls.push(groups.map(g=>g.id));return {added:groups.length,groupIds:groups.map(g=>g.id)};}});
+ c.quality='lite';c._appliedGroupIds=new Set([base.id]);
+ const updated={...old,nextBiome:'pyramid-peak',groups:[base,lead]};await c.replan(updated);
+ expect(c.plan).toBe(updated);expect(c.quality).toBe('lite');expect(c.state.ready).toBe(true);expect(calls).toEqual([[lead.id]]);expect(c._appliedGroupIds.has(lead.id)).toBe(true);
+ await c._extendActiveTier();expect(calls).toHaveLength(1);
+});

@@ -39,14 +39,15 @@ export async function installOfflinePreview(game){
  // implicit download, no forced transport restart and no cache deletion.
  let live=true,revision=0;
  const update=()=>{
-  const ticket=++revision;
+  const ticket=++revision,contextTicket=controller.markContextChanged();
   Promise.resolve().then(async()=>{
    if(!live)return;
    const context=offlinePreviewContext(game);
    if(!context)return;
    const fresh=await expandOfflineRuntimePlan(index,context);
-   if(live&&ticket===revision)await controller.replan(fresh);
-  }).catch(e=>{if(live)console.warn('[offline-preview] plan refresh failed: '+(e?.message||e));});
+   if(live&&ticket===revision)await controller.replan(fresh,{contextTicket});
+  }).catch(e=>{if(live)console.warn('[offline-preview] plan refresh failed: '+(e?.message||e));})
+   .finally(()=>controller.finishContextCheck(contextTicket));
  };
  const onSetting=p=>{if(p?.key==='musicEnabledSongs')update();};
  const onProfile=()=>update();

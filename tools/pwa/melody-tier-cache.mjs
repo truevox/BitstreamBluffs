@@ -19,6 +19,24 @@ export async function activatePublishedMelody(plan,quality,opts){
  // Explicit legacy developer fixture only; production must use a controlled worker.
  const cache=await storage.open(melodyPolicyName(scope));await cache.put(melodyPolicyUrl(origin,scope),new Response(JSON.stringify(selection),{headers:{'Content-Type':'application/json'}}));
 }
+/** Append only fully verified newly-required recordings to THIS controlled
+ * client's current quality. Never switch tier, pause, remove a recording,
+ * or fetch a missing file. Safe while the existing soundtrack is playing. */
+export async function appendVerifiedMelodyGroups(groups,opts){
+ if(!groups?.length||!opts.worker)return {added:0,groupIds:[]};
+ const knownCacheNames=typeof opts.storage?.keys==='function'?new Set(await opts.storage.keys()):null,ready=[];
+ for(const g of groups){
+  if(g.priority!=='required'||!['lite','full'].includes(g.quality))throw Error('Invalid melody tier extension');
+  if((await inspectR2Group(g,{...opts,knownCacheNames})).ready)ready.push(g);
+ }
+ if(!ready.length)return {added:0,groupIds:[]};
+ const ack=await new Promise((resolve,reject)=>{
+  const channel=new MessageChannel(),timer=setTimeout(()=>{channel.port1.close();reject(Error('Melody extension acknowledgement timed out'));},15000);
+  channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();e.data?.ok?resolve(e.data):reject(Error(e.data?.error||'Melody extension rejected'));};
+  opts.worker.postMessage({type:'bb-melody-extend',groups:ready},[channel.port2]);
+ });
+ return {added:ack.added??ready.length,groupIds:ready.map(g=>g.id)};
+}
 export function renderMelodyTierRouter(){return `
 const MELODY_POLICY=${JSON.stringify(MELODY_POLICY)};
 ${[melodyPolicyName,melodyPolicyUrl,melodyEntry].map(f=>f.toString()).join('\n')}
@@ -38,9 +56,41 @@ async function melodyReadClient(clientId){return melodySerial(async()=>{
  else revision=await melodyDefault(cache);
  if(!revision)return null;const record=await cache.match(melodyRevisionUrl(revision));return record?record.json():{quality:null,groups:[]};
  });}
+async function melodyExtend(source,groups){
+ if(!source?.id||!source.url||new URL(source.url).origin!==self.location.origin||!new URL(source.url).pathname.startsWith(BASE)||!Array.isArray(groups)||groups.length>200)throw Error('Invalid melody extension sender');
+ const policy=await caches.open(melodyPolicyName(BASE)),pin=await policy.match(melodyClientUrl(source.id));
+ const oldRevision=pin?(await pin.json()).revision:await melodyDefault(policy);
+ if(typeof oldRevision!=='string')throw Error('No active melody tier');
+ const priorRecord=await policy.match(melodyRevisionUrl(oldRevision));if(!priorRecord)throw Error('Missing melody tier revision');
+ const prior=await priorRecord.json();if(!['lite','full'].includes(prior.quality)||!Array.isArray(prior.groups))throw Error('Not an active melody tier');
+ const ids=new Map(prior.groups.map(g=>[g.id,g])),urls=new Set(prior.groups.flatMap(g=>g.entries.map(e=>e.logicalUrl)));
+ const names=new Set(await caches.keys()),verified=[];
+ for(const g of groups){
+  if(g.quality!==prior.quality||g.priority!=='required')throw Error('Extension would change current tier');
+  await groupCheck(g,crypto.subtle);
+  if(ids.has(g.id)){if(JSON.stringify(ids.get(g.id))!==JSON.stringify(g))throw Error('Conflicting existing melody group');continue;}
+  const name=groupName(g,BASE);if(!names.has(name))throw Error('Uncached melody extension');
+  const recordings=await caches.open(name),marker=await recordings.match(markerUrl(g,self.location.origin,BASE));if(!marker?.ok)throw Error('Unverified melody extension');
+  const saved=await marker.json();if(saved.id!==g.id||saved.version!==g.version||JSON.stringify(saved.entries)!==JSON.stringify(g.entries))throw Error('Mismatched melody group marker');
+  for(const entry of g.entries){
+   if(urls.has(entry.logicalUrl))throw Error('Extension overlaps existing playback');
+   if(entry.logicalUrl.endsWith('.ogg'))melodyEntry(entry,prior.quality);
+   else if(entry.url!==entry.logicalUrl||!entry.url.startsWith(MELODY_R2_BASE))throw Error('Invalid extension metadata');
+   if(!await verifiedResponse(recordings,entry,crypto.subtle))throw Error('Incomplete melody extension');
+   urls.add(entry.logicalUrl);
+  }
+  ids.set(g.id,g);verified.push(g);
+ }
+ if(!verified.length)return {added:0};
+ const updated={quality:prior.quality,groups:[...prior.groups,...verified]},revision=await digest(new TextEncoder().encode(JSON.stringify(updated)),crypto.subtle);
+ await policy.put(melodyRevisionUrl(revision),melodyJSON(updated));await melodyPin(policy,source.id,revision);
+ if(await melodyDefault(policy)===oldRevision)await policy.put(melodyPolicyUrl(self.location.origin,BASE),melodyJSON({revision}));
+ return {added:verified.length};
+}
 self.addEventListener('message',event=>{
- if(event.data?.type!=='bb-melody-select')return;const port=event.ports[0];
+ if(event.data?.type!=='bb-melody-select'&&event.data?.type!=='bb-melody-extend')return;const port=event.ports[0];
  event.waitUntil(melodySerial(async()=>{
+  if(event.data.type==='bb-melody-extend')return melodyExtend(event.source,event.data.groups);
   const source=event.source,selection=event.data.selection;
   if(!source?.id||!source.url||new URL(source.url).origin!==self.location.origin||!new URL(source.url).pathname.startsWith(BASE)||!selection||![null,'lite','full'].includes(selection.quality)||!Array.isArray(selection.groups))throw Error('Invalid melody selection client');
   if(selection.quality===null&&selection.groups.length)throw Error('Invalid silent selection');
@@ -52,7 +102,7 @@ self.addEventListener('message',event=>{
   const revision=await digest(new TextEncoder().encode(JSON.stringify(selection)),crypto.subtle);await cache.put(melodyRevisionUrl(revision),melodyJSON(selection));await melodyPin(cache,source.id,revision);await cache.put(melodyPolicyUrl(self.location.origin,BASE),melodyJSON({revision}));
   // Only obsolete client pointers are removed; cached recordings are retained.
   const prefix=melodyPolicyUrl(self.location.origin,BASE)+'/client/';for(const key of await cache.keys())if(key.url.startsWith(prefix)&&!live.has(decodeURIComponent(key.url.slice(prefix.length)))&&key.url!==melodyClientUrl(source.id))await cache.delete(key);
- }).then(()=>port?.postMessage({ok:true}),e=>port?.postMessage({ok:false,error:String(e.message||e)})));
+ }).then(result=>port?.postMessage({ok:true,...result}),e=>port?.postMessage({ok:false,error:String(e.message||e)})));
 });
 async function melodyTierResponse(url,clientId){
  if(!url.startsWith(MELODY_R2_BASE+'packs/')||!url.endsWith('.ogg'))return undefined;
