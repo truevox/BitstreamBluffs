@@ -27,3 +27,21 @@ test.each([
  ['page error',r=>r.pageErrors.push('error')],
  ['source error',r=>r.httpErrors.push({status:404})],
 ])('fails closed: %s',(_,mutate)=>{const r=fixture();mutate(r);expect(()=>verifyCase(r,0,tracks)).toThrow();});
+
+test('public R2 capture requires exact pack, requested biome, and time-based fallback',()=>{
+ const r=fixture(0);
+ const publicTracks=tracks.map((t,i)=>({...t,manifest:'packs/song-'+i+'/pack.json'}));
+ r.publicR2=true;r.biome='vertigo-vents';r.expected.biome=r.biome;
+ r.expected.packBase='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/packs/song-0/pack.json';
+ r.expected.gridCount=0;r.observed.fade.beatAligned=false;
+ expect(verifyCase(r,0,publicTracks)).toMatchObject({index:0,beatAligned:false});
+ for(const mutate of [
+  x=>x.expected.packBase='https://example.org/packs/song-0/',
+  x=>x.expected.biome='debutmont',
+  x=>x.expected.gridCount=33,
+  x=>x.observed.fade.beatAligned=true
+ ]){
+  const bad=JSON.parse(JSON.stringify(r));mutate(bad);
+  expect(()=>verifyCase(bad,0,publicTracks)).toThrow();
+ }
+});

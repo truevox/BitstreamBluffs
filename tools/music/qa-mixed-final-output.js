@@ -1,3 +1,4 @@
+import {planSongCrossfade,automateTransition} from '../../src/systems/music/SongCrossfade.js';
 /**
  * Source-bound final-master OFFLINE Chromium audio evidence.
  * Reuses *production* AudioSynth._buildGraph(), production AudioSynth
@@ -23,7 +24,8 @@ const FXS=Object.freeze({
 	garbage:'garbage-dump-glacier',
 	vertigo:'vertigo-vents',
 	crystal:'crystal-cavern',
-	arcade:'bitstream-bluffs'
+	arcade:'bitstream-bluffs',
+	candy:'candy-cane-canyon'
 });
 const EVENTS=[
 	{at:.38,action:'bsod-wind',note:'real AudioSynth._onBsodState, normalized relative air >=1'},
@@ -34,11 +36,16 @@ const EVENTS=[
 	{at:2.82,action:'fatal-crash-sfx',note:'real AudioSynth.playSfx crash (not complete count-in)'},
 ];
 const db=x=>20*Math.log10(Math.max(1e-12,x));
-async function decodeOriginals(pack,segmentIndex,biome){
+// A fixed, immutable public release only; default QA remains local/private.
+const R2_RELEASE='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/';
+async function decodeOriginals(pack,segmentIndex,biome,manifestUrl=null){
 	if(!/^[\w-]{1,100}$/.test(pack)||!Number.isInteger(segmentIndex)||
-		segmentIndex<0||segmentIndex>30||!Object.values(FXS).includes(biome))
+		segmentIndex<0||!Object.values(FXS).includes(biome))
 		throw Error('Untrusted pack, segment or biome');
-	const packBase=new URL('/music/packs/'+pack+'/',location.origin).href;
+	const publishedManifest=R2_RELEASE+'packs/'+pack+'/pack.json';
+	const packBase=manifestUrl===null?new URL('/music/packs/'+pack+'/',location.origin).href:
+		manifestUrl===publishedManifest?new URL('.',manifestUrl).href:null;
+	if(!packBase)throw Error('Manifest outside pinned public R2 release');
 	const manifestResponse=await fetch(packBase+'pack.json');
 	if(!manifestResponse.ok)throw Error('Original manifest unavailable');
 	const manifest=await manifestResponse.json();
@@ -50,7 +57,7 @@ async function decodeOriginals(pack,segmentIndex,biome){
 	const ctx=new OfflineAudioContext(2,1,RATE);
 	const sources=new Map(),hashes={};
 	try{
-		for(const role of roles){
+		await Promise.all(roles.map(async role=>{
 			const rel=segment.sources[role];
 			if(!rel)throw Error('Missing authentic source: '+role);
 			const {response}=await fetchMusicAssetResponse(packBase,rel);
@@ -59,9 +66,9 @@ async function decodeOriginals(pack,segmentIndex,biome){
 			const digest=await crypto.subtle.digest('SHA-256',bytes);
 			hashes[role]=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
 			sources.set(role,await ctx.decodeAudioData(bytes));
-		}
+		}));
 	}finally{ /* OfflineAudioContext has no close(); it never starts. */ }
-	return {manifest,segment,segmentIndex,biome,sources,hashes,
+	return {manifest,segment,segmentIndex,biome,sources,hashes:Object.fromEntries(roles.map(role=>[role,hashes[role]])),packBase,
 		originalSourceVerified:true,roles};
 }
 function actualAudioSynthGraph(ctx){
@@ -90,7 +97,7 @@ function actualAudioSynthGraph(ctx){
 	a.nodes.sfxBus.gain.value=.9;
 	return a;
 }
-function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
+function setOriginalSourceMix(ctx,a,originals,{biome,mode,offsetFrames=0}){
 	const mixer=new StemFXMixer(ctx,a.nodes.musicFilter,{roomQuality:'standard'});
 	mixer.selectBiome(biome);
 	a._stemMusic.mixer=mixer;
@@ -111,23 +118,110 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
 		const playback=ctx.createBufferSource();
 		playback.buffer=source;
 		playback.connect(input);
-		playback.start(START);
+		playback.start(START,offsetFrames/RATE);
 	}
 	return mixer;
 }
+function installPairedGuards(ctx,a,{knee=.78,ceiling=.88}={}){
+	if(!Number.isFinite(knee)||!Number.isFinite(ceiling)||knee<.6||ceiling>.9||ceiling-knee<.02)throw Error('Invalid candidate curve');
+	const candidate=ctx.createWaveShaper();
+	const curve=new Float32Array(8193);
+	for(let i=0;i<curve.length;i++){
+		const v=2*i/(curve.length-1)-1,m=Math.abs(v),span=ceiling-knee,t=(m-knee)/span;
+		curve[i]=m<=knee?v:Math.sign(v)*(knee+span*(1-1/(1+t+t*t/2+t*t*t/6)));
+	}
+	candidate.curve=curve;candidate.oversample='2x';
+	a.nodes.comp.connect(candidate);
+	a.nodes.peakGuard.disconnect(ctx.destination);
+	const merge=ctx.createChannelMerger(4);
+	for(const [index,node] of [a.nodes.peakGuard,candidate].entries()){
+		const split=ctx.createChannelSplitter(2);
+		node.connect(split);split.connect(merge,0,index*2);split.connect(merge,1,index*2+1);
+	}
+	merge.connect(ctx.destination);
+}
+// Complementary source-backed offline overlap, not a live transport capture.
+async function renderPairedCrossfade({from,to,biome,candidateKnee=.78,candidateCeiling=.88}){
+ const manifest=async track=>{
+  if(!/^packs\/[\w-]+\/pack\.json$/.test(track.manifest))throw Error('Invalid manifest');
+  const url=R2_RELEASE+track.manifest;
+  const response=await fetch(url);if(!response.ok)throw Error('Manifest HTTP '+response.status);
+  const m=await response.json();if(m.id!==track.id||m.sampleRate!==RATE)throw Error('Manifest identity or rate');
+  return {m,url,pack:track.manifest.split('/')[1]};
+ };
+ const [out,inc]=await Promise.all([manifest(from),manifest(to)]);
+ const plan=planSongCrossfade(out.m.frameCount/RATE,null,null);
+ const overlapFrames=Math.round(plan.duration*RATE),leadFrames=RATE,tailFrames=RATE;
+ const fadeStart=START+leadFrames/RATE,fadeEnd=fadeStart+overlapFrames/RATE;
+ const renderFrames=Math.round(START*RATE)+leadFrames+overlapFrames+tailFrames+12000;
+ const ctx=new OfflineAudioContext(4,renderFrames,RATE);
+ seedCosmeticRandom(QA_COSMETIC_SEED);
+ const a=actualAudioSynthGraph(ctx);installPairedGuards(ctx,a,{knee:candidateKnee,ceiling:candidateCeiling});
+ const mixer=new StemFXMixer(ctx,a.nodes.musicFilter,{roomQuality:'standard'});
+ mixer.selectBiome(biome);a._stemMusic.mixer=mixer;
+ const roles=[...ALL_ROLES,'voice:'+biome],inputs=new Map();
+ // Freeze the outgoing pack vocal FX/room sends across the overlap. Native
+ // shared mixer, production envelope knots; no live transport effect retarget.
+ for(const role of roles){
+  const effects=role==='vocals'?(out.m.effects?.[role]||[]):role.startsWith('voice:')?melodyPreset(biome):[...sourceOnlyExtras(biome,role),...orchestraPreset(biome,role)];
+  inputs.set(role,mixer.addSource(role,{gain:role.startsWith('voice:')?.18:1,effects}));
+  if(role==='vocals'||role.startsWith('voice:'))mixer.setRoomSend(role,out.m.roomSends?.[role]??null);
+ }
+ const receipts=[];
+ async function schedule(track,lo,hi,at,direction){
+  let cursor=lo;
+  for(const [i,segment] of track.m.segments.entries()){
+   const first=Math.max(lo,segment.startFrame),last=Math.min(hi,segment.startFrame+segment.frames);
+   if(last<=first)continue;
+   if(first!==cursor)throw Error('Segment coverage gap');cursor=last;
+   const decoded=await decodeOriginals(track.pack,i,biome,track.url);
+   const when=at+(first-lo)/RATE,duration=(last-first)/RATE,offset=(first-segment.startFrame)/RATE;
+   for(const role of roles){
+    const buffer=decoded.sources.get(role);
+    if(buffer.length!==segment.frames)throw Error('Decoded source frame count mismatch');
+    const src=ctx.createBufferSource();src.buffer=buffer;
+    const env=ctx.createGain();src.connect(env);env.connect(inputs.get(role));
+    automateTransition(env.gain,role,direction,fadeStart,fadeEnd,when);
+    src.start(when,offset,duration);
+   }
+   receipts.push({id:track.m.id,manifestUrl:track.url,segment:i,first,last,hashes:decoded.hashes});
+  }
+  if(cursor!==hi)throw Error('Missing segment coverage');
+ }
+ const outgoingStart=out.m.frameCount-overlapFrames-leadFrames;
+ const incomingEnd=overlapFrames+tailFrames;
+ if(outgoingStart<0||incomingEnd>inc.m.frameCount)throw Error('Song too short');
+ await schedule(out,outgoingStart,out.m.frameCount,START,'out');
+ await schedule(inc,0,incomingEnd,fadeStart,'in');
+ const pcm=await ctx.startRendering();
+ const bounds={startFrame:Math.round(START*RATE),endFrame:Math.round(fadeEnd*RATE)+tailFrames};
+ const metrics=offset=>measureFourTimesTruePeak({length:pcm.length,sampleRate:RATE,numberOfChannels:2,getChannelData:i=>pcm.getChannelData(offset+i)},bounds);
+ const baseline=metrics(0),candidate=metrics(2);
+ mixer.destroy();
+ return {from:out.m.id,to:inc.m.id,biome,candidateSpec:{knee:candidateKnee,ceiling:candidateCeiling},plan,fadeStart,fadeEnd,receipts,baseline,candidate,deltaDb:candidate.estimatedTruePeakDbTp4x-baseline.estimatedTruePeakDbTp4x,rmsDeltaDb:20*Math.log10(candidate.rms/baseline.rms),limitations:'offline, frozen outgoing vocal FX/room sends, fixed source gains, no live transport or gameplay SFX'};
+}
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
-	profile='standard'}){
+	profile='standard',manifestUrl=null,windowPosition='legacy',pairedHeadroom=false,candidateKnee=.78,candidateCeiling=.88}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
 		throw Error('Unknown QA scenario');
 	if(!['standard','crash-static-overlap'].includes(profile))throw Error('Invalid QA profile');
-	const original=await decodeOriginals(pack,segmentIndex,biome);
-	const ctx=new OfflineAudioContext(2,Math.round(RENDER_SECONDS*RATE),RATE);
+	const original=await decodeOriginals(pack,segmentIndex,biome,manifestUrl);
+	if(!['legacy','opening','ending'].includes(windowPosition))throw Error('Invalid source window');
+	// Capture the exact final source frame inside the measured window;
+	// leave room after the source ends for the native effect tails.
+	const offsetFrames=windowPosition==='ending'?Math.max(0,original.segment.frames-Math.round(3.5*RATE)):0;
+	if(windowPosition!=='legacy'){
+		for(const source of original.sources.values())
+			if(source.length!==original.segment.frames)throw Error('Decoded source frame count mismatch');
+	}
+	const ctx=new OfflineAudioContext(pairedHeadroom?4:2,Math.round(RENDER_SECONDS*RATE),RATE);
 	// Pin only the presentational wind/SFX noise for repeatable source QA.
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
 	seedCosmeticRandom(QA_COSMETIC_SEED);
 	const a=actualAudioSynthGraph(ctx);
+	if(pairedHeadroom)installPairedGuards(ctx,a,{knee:candidateKnee,ceiling:candidateCeiling});
 	const mixer=scenario==='sfx-wind-only'?null:setOriginalSourceMix(ctx,a,original,
-		{biome,mode:scenario});
+		{biome,mode:scenario,offsetFrames});
 	let installedAudioSources=original.roles.length;
 	if(scenario==='sfx-wind-only')installedAudioSources=0;
 	const sent=[];
@@ -162,13 +256,17 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	]);
 	const rejected=eventResults.find(x=>x.status==='rejected');
 	if(rejected)throw rejected.reason;
-	const window=measureFourTimesTruePeak(pcm,{
-		startFrame:Math.floor(.20*RATE),
+	const stereo=offset=>({length:pcm.length,sampleRate:pcm.sampleRate,numberOfChannels:2,getChannelData:i=>pcm.getChannelData(i+offset)});
+	const bounds={
+		startFrame:Math.floor((windowPosition==='legacy'?.20:START)*RATE),
 		endFrame:Math.floor(3.85*RATE),
-	});
+	};
+	const window=measureFourTimesTruePeak(stereo(0),bounds);
+	const paired=pairedHeadroom?{method:'same offline native compressor PCM, two parallel 2x shapers',knee:candidateKnee,ceiling:candidateCeiling,
+		metrics:measureFourTimesTruePeak(stereo(2),bounds)}:null;
 	mixer?.destroy();
 	return {pack,trackId:original.manifest.id,sourceSegment:segmentIndex,
-		sourceFrameStart:original.segment.startFrame,biome,scenario,
+		sourceFrameStart:original.segment.startFrame,sourceSegmentFrames:original.segment.frames,sourceOffsetFrames:offsetFrames,sourceWindowPosition:windowPosition,sourcePlaybackStartFrame:Math.round(START*RATE),sourceManifestUrl:original.packBase+'pack.json',biome,scenario,
 		sourceHashes:original.hashes,sourceRoles:original.roles,
 		originalSourceCount:installedAudioSources,
 		originalVocalFxAndRoomSendsFromPack:true,
@@ -184,13 +282,13 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 			// the original AudioSynth._buildGraph() above owns connections.
 			postCompressorGuardNodeActive:a.nodes.peakGuard?.numberOfOutputs===1,
 		},
-		test:{profile,qaCosmeticSeed:QA_COSMETIC_SEED,renderSeconds:RENDER_SECONDS,windowSeconds:3.65,sampleRate:RATE,
+		test:{profile,qaCosmeticSeed:QA_COSMETIC_SEED,renderSeconds:RENDER_SECONDS,windowSeconds:(window.windowEndFrame-window.windowStartFrame)/RATE,sampleRate:RATE,
 			master:1,music:scenario==='sfx-wind-only'?0:1,
 			sfx:scenario==='music-only'?0:1,wind:scenario==='music-only'?0:1,
 			originalVocals:true,originalMelodyWithVocalsGain:.18,
 			eventOrigin:'scripted OFFLINE stress timeline, not authoritative physics/replay',
 			events:sent},
-		...window,sourceFingerprintInputs:Object.keys(original.hashes).length,
+		...window,pairedHeadroom:paired,sourceFingerprintInputs:Object.keys(original.hashes).length,
 	};
 }
 
@@ -399,4 +497,4 @@ async function compareOriginalFatal(args={}){
 		countInVsRealOriginalNoCountIn:windows};
 }
 window.__mixedFinalAudioQA=Object.freeze({
-	render,renderOriginalFatal,compareOriginalFatal,measureFourTimesTruePeak,EVENTS,FXS,FATAL_EVENTS});
+	render,renderPairedCrossfade,renderOriginalFatal,compareOriginalFatal,measureFourTimesTruePeak,EVENTS,FXS,FATAL_EVENTS});
