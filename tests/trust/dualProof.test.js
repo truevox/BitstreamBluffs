@@ -14,14 +14,14 @@ const request = () => ({
   endTick: 200, loadoutDigest: d('d'), assistance: 'human', intent: 'verified-public', challengeId: 'nonce-01',
 });
 const simulation = (r = request()) => ({
-  kind: 'trusted-replay-execution', runId: r.runId, buildId: r.buildId, verifierBuildId:d('e'), score: r.score,
+  kind: 'trusted-replay-execution', runId: r.runId, buildId: r.buildId, verifierBuildId:d('e'), verifiedCourse:{seed:r.seed,biomeMask:r.biomeMask,lane:r.lane,loadoutDigest:r.loadoutDigest}, score: r.score,
   endTick: r.endTick, tapeComplete: true, assistanceObserved: 'human',
   record: {outcome: 'match', verifiedUnder: r.rulesetId, verifierId: 'in-game', tapeDigest: r.tapeDigest, manifestDigest: r.manifestDigest},
 });
 const authorization = (r = request()) => ({
   kind: 'trusted-eligibility-receipt', status: 'authorized', runId: r.runId, buildId: r.buildId,
   rulesetId: r.rulesetId, seed: r.seed, biomeMask: r.biomeMask, lane: r.lane,
-  loadoutDigest: r.loadoutDigest, challengeId: r.challengeId,
+  loadoutDigest: r.loadoutDigest, manifestDigest:r.manifestDigest, challengeId: r.challengeId,
   challengeStatus: 'fresh', economyStatus: 'authorized', equipmentStatus: 'authorized', modeStatus: 'allowed', pinnedVerifierBuildId:d('e'),
 });
 const consent = (r = request()) => ({
@@ -118,11 +118,46 @@ describe('canonical dual-proof decision contract (#245)', () => {
     expect(missing.proof.reason).toBe('malformed-input');NO_RANK(missing);
   });
 
+  test('replayed manifest course/loadout are matched to entitlement, not claimed separately', () => {
+    for(const field of ['seed','biomeMask','lane','loadoutDigest']){
+      const altered={...simulation(),verifiedCourse:{...simulation().verifiedCourse,
+        [field]:field==='biomeMask'?2:field==='lane'?'modded':field==='loadoutDigest'?d('f'):'other-seed'}};
+      const verdict=run({simulation:altered});
+      expect(verdict.proof.reason).toBe('replayed-course-or-loadout-mismatch');NO_RANK(verdict);
+    }
+    const forged=run({authorization:{...authorization(),manifestDigest:d('f')}});
+    expect(forged.eligibility.reason).toBe('eligibility-identity-mismatch');NO_RANK(forged);
+  });
+
+  test('foreign inconclusive/refused reports cannot authorize provisional public publication', () => {
+    const r={...request(),intent:'provisional-public'};
+    for(const outcome of ['refused','consistent-with','inconclusive-legacy']){
+      const s=simulation(r);
+      s.record=outcome==='refused'
+        ? {outcome,verifiedUnder:null,verifierId:null,tapeDigest:d('f'),manifestDigest:r.manifestDigest,reason:'unknown-ruleset'}
+        : {...s.record,outcome,tapeDigest:d('f')};
+      const v=adjudicateDualProof({...good(r),simulation:s,allowProvisional:true});
+      expect(v.proof.status).toBe('invalid');expect(v.publication).toBe('none');NO_RANK(v);
+    }
+    const denied=simulation(r);denied.runId='other-run';denied.record.outcome='refused';
+    denied.record.verifiedUnder=null;denied.record.verifierId=null;denied.record.reason='unknown-ruleset';
+    const v=adjudicateDualProof({...good(r),simulation:denied,allowProvisional:true});
+    expect(v.proof.status).toBe('invalid');NO_RANK(v);
+  });
+
+  test('pending entitlement with a mismatched verifier pin is invalid, not provisional', () => {
+    const r={...request(),intent:'provisional-public'};
+    const auth={...authorization(r),status:'pending',pinnedVerifierBuildId:d('f')};
+    const v=adjudicateDualProof({...good(r),authorization:auth,allowProvisional:true});
+    expect(v.eligibility.reason).toBe('pinned-verifier-build-mismatch');
+    expect(v.competitiveness.status).toBe('invalid');expect(v.publication).toBe('none');NO_RANK(v);
+  });
+
   test('client edits cannot fabricate a signed entitlement or bypass a trusted challenge', () => {
     for(const [field,mut] of [
       ['runId','another-run'],['buildId','stale-build'],['rulesetId',d('f')],
       ['seed','another-seed'],['biomeMask',65535],['lane','modded'],
-      ['loadoutDigest',d('e')],['challengeId','old-nonce']
+      ['loadoutDigest',d('e')],['manifestDigest',d('e')],['challengeId','old-nonce']
     ]){
       const r={...request(),[field]:mut};
       const v=adjudicateDualProof({...good(),request:r});

@@ -50,19 +50,33 @@ function validRequest(r) {
 
 function simulationVerdict(request, s) {
   if (s === null || s === undefined) return TRUST.missing;
-  if (!keys(s, ['kind', 'runId', 'buildId', 'verifierBuildId', 'score', 'endTick', 'tapeComplete', 'assistanceObserved', 'record']) ||
+  if (!keys(s, ['kind', 'runId', 'buildId', 'verifierBuildId', 'verifiedCourse', 'score', 'endTick', 'tapeComplete', 'assistanceObserved', 'record']) ||
       s.kind !== 'trusted-replay-execution' || !bounded(s.runId) || !bounded(s.buildId) ||
       !isDigest(s.verifierBuildId) || !integer(s.score) || !integer(s.endTick) || typeof s.tapeComplete !== 'boolean' ||
       !ASSISTANCE.includes(s.assistanceObserved)) return TRUST.malformed;
   try { validateOutcomeRecord(s.record); } catch { return TRUST.malformed; }
+  // These identity fields exist even for a refusal or legacy verdict. A
+  // refusal from some OTHER submission cannot trigger provisional publishing.
+  if (s.runId !== request.runId || s.buildId !== request.buildId ||
+      s.record.manifestDigest !== request.manifestDigest ||
+      s.record.tapeDigest !== request.tapeDigest)
+    return value('invalid', 'simulation-identity-mismatch');
+  if (s.record.outcome !== 'refused' && s.record.verifiedUnder !== request.rulesetId)
+    return value('invalid', 'simulation-ruleset-mismatch');
   if (s.record.outcome === 'refused') return value('inconclusive', 'verifier-refused');
   if (s.record.outcome === 'consistent-with' || s.record.outcome === 'inconclusive-legacy')
     return value('inconclusive', 'legacy-not-independent-proof');
   if (s.record.outcome === 'diverged') return value('invalid', 'simulation-diverged');
-  if (s.runId !== request.runId || s.buildId !== request.buildId ||
-      s.record.verifiedUnder !== request.rulesetId ||
-      s.record.manifestDigest !== request.manifestDigest ||
-      s.record.tapeDigest !== request.tapeDigest) return value('invalid', 'simulation-identity-mismatch');
+  // This is verified-manifest data from the replay executor, not the
+  // request's separately claimed course or loadout. An authorizer cannot
+  // approve arbitrary claimed gear for a replayed different manifest.
+  if (!keys(s.verifiedCourse, ['seed','biomeMask','lane','loadoutDigest']) ||
+      !bounded(s.verifiedCourse.seed) || !integer(s.verifiedCourse.biomeMask) ||
+      !LANES.includes(s.verifiedCourse.lane) || !isDigest(s.verifiedCourse.loadoutDigest))
+    return TRUST.malformed;
+  for (const field of ['seed','biomeMask','lane','loadoutDigest'])
+    if (s.verifiedCourse[field] !== request[field])
+      return value('invalid', 'replayed-course-or-loadout-mismatch');
   if (!s.tapeComplete) return value('invalid', 'missing-complete-input-tape');
   if (s.score !== request.score || s.endTick !== request.endTick)
     return value('invalid', 'outcome-claim-mismatch');
@@ -75,17 +89,17 @@ function simulationVerdict(request, s) {
 function eligibilityVerdict(request, a) {
   if (a === null || a === undefined) return TRUST.missing;
   const req = ['kind', 'status', 'runId', 'buildId', 'rulesetId', 'seed', 'biomeMask', 'lane',
-    'loadoutDigest', 'challengeId', 'challengeStatus', 'economyStatus', 'equipmentStatus', 'modeStatus', 'pinnedVerifierBuildId'];
+    'loadoutDigest', 'manifestDigest', 'challengeId', 'challengeStatus', 'economyStatus', 'equipmentStatus', 'modeStatus', 'pinnedVerifierBuildId'];
   if (!keys(a, req) || a.kind !== 'trusted-eligibility-receipt' ||
       !['authorized', 'denied', 'pending'].includes(a.status) ||
       !bounded(a.runId) || !bounded(a.buildId) || !isDigest(a.rulesetId) || !bounded(a.seed) ||
-      !integer(a.biomeMask) || !LANES.includes(a.lane) || !isDigest(a.loadoutDigest) ||
+      !integer(a.biomeMask) || !LANES.includes(a.lane) || !isDigest(a.loadoutDigest) || !isDigest(a.manifestDigest) ||
       !(a.challengeId === null || bounded(a.challengeId)) ||
       !['fresh', 'expired', 'reused', 'missing'].includes(a.challengeStatus) ||
       !['authorized', 'rejected', 'missing'].includes(a.economyStatus) ||
       !['authorized', 'rejected', 'missing'].includes(a.equipmentStatus) ||
       !['allowed', 'denied', 'missing'].includes(a.modeStatus) || !isDigest(a.pinnedVerifierBuildId)) return TRUST.malformed;
-  for (const key of ['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','challengeId'])
+  for (const key of ['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','manifestDigest','challengeId'])
     if (a[key] !== request[key]) return value('invalid', 'eligibility-identity-mismatch');
   if (a.status === 'denied' || a.economyStatus === 'rejected' ||
       a.equipmentStatus === 'rejected' || a.modeStatus === 'denied')
@@ -128,7 +142,9 @@ export function adjudicateDualProof(input = {}) {
   let eligible = requestOk ? eligibilityVerdict(request, authorization) : TRUST.malformed;
   // Independent source receipts must agree on the exact executable verifier.
   // Never infer this from the claimed game's buildId or client manifest.
-  if (sim.status === 'valid' && eligible.status === 'valid' &&
+  if (sim.status !== 'invalid' && sim.status !== 'unverified' &&
+      eligible.status !== 'invalid' && simulation && authorization &&
+      isDigest(simulation.verifierBuildId) && isDigest(authorization.pinnedVerifierBuildId) &&
       simulation.verifierBuildId !== authorization.pinnedVerifierBuildId)
     eligible = value('invalid', 'pinned-verifier-build-mismatch');
   const privacy = requestOk ? privacyVerdict(request, consent) : TRUST.malformed;
