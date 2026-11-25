@@ -27,6 +27,9 @@ try{
  await p.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene')._openGhosts());
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView?.shareBtn,null,{timeout:12000});
  await p.waitForTimeout(450);
+ // Source could be opened with an untrusted path/query; sharing must never
+ // copy either into the URL sent to a friend.
+ await p.evaluate(()=>history.replaceState(null,'',location.pathname+'my-private-route/?session=secret-session-token'));
  const target=await p.evaluate(()=>{
   const g=window.__bbGame,scene=g.scene.getScene('GameOverScene'),v=scene.ghostView,z=v.shareBtn.zone;
   const pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),rect=document.querySelector('canvas').getBoundingClientRect();
@@ -49,6 +52,10 @@ try{
  await p.mouse.click(target.x,target.y);
  await p.waitForFunction(()=>window.__ghostCopies.length===1,null,{timeout:8000});
  const ui=await p.evaluate(()=>{const v=window.__bbGame.scene.getScene('GameOverScene').ghostView,copy=window.__ghostCopies[0];return{copiedLength:copy.length,copies:window.__ghostCopies.length,armed:v._shareArmed,notice:v.status.main.text,copy};});
+ const sharedAddress=new URL(ui.copy);
+ if(sharedAddress.pathname!==base||sharedAddress.search||sharedAddress.href.includes('private-route')||
+    sharedAddress.href.includes('secret-session-token'))
+   throw Error('Public share link exposed current private path/query '+sharedAddress.href.slice(0,120));
  const copiedCandidate=await parseGhostLink(ui.copy);
  if(ui.copies!==1||ui.armed||copiedCandidate.trust!=='unverified-local-practice'||copiedCandidate.canCreditScore)throw Error('Explicit copy did not safely complete '+JSON.stringify(ui));
  // Genuine keyboard navigation also reaches SHARE, but no clipboard write

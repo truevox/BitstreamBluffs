@@ -103,7 +103,11 @@ export class GhostFavoritesView extends View {
       this.shareBtn.setDisabled(true);
       this.status.setText('PREPARING PRIVATE GHOST LINK');
       try {
-        const link = await createGhostLink(this.tape, location.href);
+        // Never propagate current-path route parameters or private path
+        // tokens. Sharing must go to the build's public base, not the
+        // possibly user-specific address currently in the omnibox.
+        const publicBase = new URL(import.meta.env.BASE_URL, location.origin).href;
+        const link = await createGhostLink(this.tape, publicBase);
         if (!this.alive || epoch !== this._shareEpoch) return;
         this._shareArmed = true;
         this._shareLink = link;
