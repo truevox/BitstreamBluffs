@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.22.6 — #69 Ghost-in-a-Link unverified visual sharing (2026-11-25)
+
+- Share a versioned, SHA-integrity-stamped gzip Ghost Tape through a capped browser URL fragment, stripping private path/query and unsupported source fields. Export requires two deliberate Game Over confirmations disclosing inputs, movement, score and loadout; moving focus away cancels.
+- On Title → Enter Seed → Open Ghost Link, paste and explicitly PREVIEW an unverified read-only guest trace; scrub/watch with keyboard, gamepad or pointer and reduce-motion safeguards. Direct fragment arrival never auto-decodes, starts gameplay, saves a run or credits rewards.
+- When exact seed/mask/SIM and mode/daily rules match, draw an optional local Best/Latest/Favorite comparison trace with visual-only signed gap. Forged guests remain unranked. Stale asynchronous lookups are cancelled on text edits; invalid/oversize/unsupported input fails closed.
+- **Scope:** a safe visual-sharing slice, NOT an authenticated official replay, playable takeover/race, R2 hosted fallback for long links, or an automatic import into the five-ghost cache. #69 remains OPEN for those separately gated features and physical-device acceptance; public trust #135 stays disabled.
+- Reconciled on v2.22.5 atomic ghost-library course isolation; production build and actual compiled desktop/mobile Chromium export/import-preview gates checked. No changes to SIM9 physics, scoring, wallet or save-store policy.
+
 ## v2.22.5 — #56 exact-course ghost isolation (2026-11-25)
 
 - Refuse favorite assignments from other seed/biome-mask courses and reject foreign-course run-ID collisions before changing a local course's tape or role.
