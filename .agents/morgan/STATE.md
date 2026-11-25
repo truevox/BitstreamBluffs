@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 04:46 UTC. Main `9e2f36a2a528c6aeea07c1b93153ed8495109f60` (#350), v2.22.3/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) build/deploy succeeded; Gal's public Chromium receipt verifies AIR/GND BRAKE help and separate compiled Matter A/B verifies existing behavior. #348 offline recovery and #340 guard remain shipped; no new pause workaround check.
+Last verified: 2026-11-25 05:50 UTC. Main `9e2f36a2a528c6aeea07c1b93153ed8495109f60` (#350), v2.22.3/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45543839113) build/deploy succeeded; Gal's public Chromium receipt verifies AIR/GND BRAKE help and separate compiled Matter A/B verifies existing behavior. #348 offline recovery and #340 guard remain shipped; no new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -215,7 +215,12 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - #82 historical native put→abort established the scope for shipped #320.
   Broader phase still needs atomic run + provenance completion and reopen
   proof for a durable cohort. Do not count memory-only scores as durable.
-- #85 private scripted recapture candidate, not player footage: SIM6
+- #85 / Gal's [#353](https://github.com/truevox/BitstreamBluffs/pull/353) local Museum draft `82893e93`: exact checks green; independent review incomplete.
+  Exact DOM handler reproduces a stale Remove accessible name after rename
+  or clearing. In an authorized review, synchronize title, alt and Remove
+  name. SVGs fit independently; use sourced measurements for cross-card
+  comparisons. Accepts GhostTape JSON, not MP4; matching tapes unverified.
+  No approval, publication, or lane takeover. Private scripted recapture, not player footage: SIM6
   `22b6ade` reached 180s cutoff under stock level 1 neutral canopyHop
   on two seeds; SIM7 `d3e80fa` actual BSOD at 84.42/80.62s.
   Do not attribute the whole difference to the wall alone.
