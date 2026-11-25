@@ -39,6 +39,21 @@ export async function inspectR2Group(group,{storage,origin,scope,subtle,knownCac
   for(const e of group.entries){if(await verifiedResponse(cache,e,subtle))verifiedBytes+=e.bytes;else missingBytes+=e.bytes;}
   return {ready:complete&&missingBytes===0,missingBytes,verifiedBytes};
 }
+/** Playback-start admission: inspect the signed-by-version completion marker and
+ * cache key inventory only. This never reads/hashes full media bodies; each
+ * served recording is independently SHA-256 verified inside the worker.
+ * Download and user-visible Repair still use the full integrity inspector. */
+export async function inspectR2GroupFast(group,{storage,origin,scope,subtle,knownCacheNames=null}){
+ await groupCheck(group,subtle);
+ const name=groupName(group,scope);
+ if(knownCacheNames&&!knownCacheNames.has(name))return {ready:false};
+ const cache=await storage.open(name),marker=await cache.match(markerUrl(group,origin,scope));
+ if(!marker?.ok)return {ready:false};
+ let saved;try{saved=await marker.json();}catch{return {ready:false};}
+ if(saved.id!==group.id||saved.version!==group.version||JSON.stringify(saved.entries)!==JSON.stringify(group.entries))return {ready:false};
+ const keys=new Set((await cache.keys()).map(k=>k.url));
+ return {ready:group.entries.every(e=>keys.has(e.url))};
+}
 export async function downloadR2Group(group,{storage,origin,scope,subtle,fetcher,consent=false,signal,onProgress=()=>{},concurrency=4}){
   if(consent!==true)throw Error('Explicit download consent required');
   scopePath(scope);await groupCheck(group,subtle);

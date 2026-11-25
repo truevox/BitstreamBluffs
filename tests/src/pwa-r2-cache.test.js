@@ -1,13 +1,13 @@
 import {webcrypto,createHash} from 'node:crypto';
 import {TextEncoder} from 'node:util';
 import {Buffer} from 'node:buffer';
-import {downloadR2Group,catalogCacheGroup,R2_BASE,renderR2RouteWorker} from '../../tools/pwa/r2-cache.mjs';
+import {downloadR2Group,inspectR2Group,inspectR2GroupFast,catalogCacheGroup,R2_BASE,renderR2RouteWorker} from '../../tools/pwa/r2-cache.mjs';
 globalThis.TextEncoder=TextEncoder;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const payload=Buffer.from('original');
 class FakeResponse {constructor(body,opts={}){this.body=Buffer.from(body);this.ok=true;this.headers=new Map(Object.entries(opts.headers??{}));this.type='basic';this.url=opts.url||'';}clone(){return new FakeResponse(this.body,{url:this.url});}async arrayBuffer(){return Uint8Array.from(this.body).buffer;}async json(){return JSON.parse(this.body.toString());} }
 globalThis.Response=FakeResponse;
-function fixture(){const entries=[{url:R2_BASE+'packs/a/drums.ogg',bytes:payload.length,sha256:sha(payload)}];const group={id:'a:base',version:sha(JSON.stringify(entries)).slice(0,20),entries};const maps=new Map();let calls=0;const opts={origin:'https://game.example',scope:'/game/',subtle:webcrypto.subtle,consent:true,storage:{open:async name=>{if(!maps.has(name))maps.set(name,new Map());const m=maps.get(name);return {match:async k=>m.get(k),delete:async k=>m.delete(k),put:async(k,v)=>m.set(k,v)};}},fetcher:async(url,options)=>{calls++;expect(options.credentials).toBe('omit');expect(options.mode).toBe('cors');return new FakeResponse(payload,{url});}};return {group,opts,maps,calls:()=>calls};}
+function fixture(){const entries=[{url:R2_BASE+'packs/a/drums.ogg',bytes:payload.length,sha256:sha(payload)}];const group={id:'a:base',version:sha(JSON.stringify(entries)).slice(0,20),entries};const maps=new Map();let calls=0;const opts={origin:'https://game.example',scope:'/game/',subtle:webcrypto.subtle,consent:true,storage:{open:async name=>{if(!maps.has(name))maps.set(name,new Map());const m=maps.get(name);return {match:async k=>m.get(k),delete:async k=>m.delete(k),put:async(k,v)=>m.set(k,v),keys:async()=>[...m.keys()].map(url=>({url}))};}},fetcher:async(url,options)=>{calls++;expect(options.credentials).toBe('omit');expect(options.mode).toBe('cors');return new FakeResponse(payload,{url});}};return {group,opts,maps,calls:()=>calls};}
 test('requires consent, verifies bytes and scope, resumes without downloading again',async()=>{const f=fixture();await expect(downloadR2Group(f.group,{...f.opts,consent:false})).rejects.toThrow(/consent/);expect(f.maps.size).toBe(0);await downloadR2Group(f.group,f.opts);expect(f.calls()).toBe(1);await downloadR2Group(f.group,f.opts);expect(f.calls()).toBe(1);expect([...f.maps.keys()][0]).toContain('%2Fgame%2F');expect([...f.maps.values()][0].size).toBe(2);await downloadR2Group(f.group,{...f.opts,scope:'/'});expect(f.calls()).toBe(2);});
 test('refuses corrupt bytes, untrusted URL, wrong version, opaque and redirected response',async()=>{const f=fixture();const invalid={...f.group,entries:[{...f.group.entries[0],url:'https://evil.example/packs/a/drums.ogg'}]};await expect(downloadR2Group(invalid,f.opts)).rejects.toThrow(/Invalid R2 entry/);await expect(downloadR2Group({...f.group,version:'0'.repeat(20)},f.opts)).rejects.toThrow(/version mismatch/);await expect(downloadR2Group(f.group,{...f.opts,fetcher:async url=>new FakeResponse('bad',{url})})).rejects.toThrow(/integrity mismatch/);expect([...f.maps.values()][0].size).toBe(0);await expect(downloadR2Group(f.group,{...f.opts,fetcher:async()=>new FakeResponse(payload,{url:'https://other.example/'})})).rejects.toThrow(/CORS/);await expect(downloadR2Group(f.group,{...f.opts,fetcher:async url=>Object.assign(new FakeResponse(payload,{url}),{type:'opaque'})})).rejects.toThrow(/CORS/);});
 test('catalog group is independently content bound and router is syntactically valid',async()=>{const e={url:R2_BASE+'catalog.json',bytes:payload.length,sha256:sha(payload)};const g=await catalogCacheGroup(e,webcrypto.subtle);expect(g.version).toBe(sha(JSON.stringify([e])).slice(0,20));expect(()=>new Function(renderR2RouteWorker())).not.toThrow();});
@@ -17,4 +17,13 @@ test('already verified groups retain completion markers through repair and pre-a
  const before=cache.get(marker);const abort=new AbortController();abort.abort();
  await expect(downloadR2Group(f.group,{...f.opts,signal:abort.signal})).rejects.toThrow(/aborted/);expect(cache.get(marker)).toBe(before);
  await downloadR2Group(f.group,f.opts);expect(f.calls()).toBe(1);expect(cache.get(marker)).toBe(before);
+});
+
+test('fast playback admission is marker/key-only; full repair still detects corrupted bytes',async()=>{
+ const f=fixture();await downloadR2Group(f.group,f.opts);
+ expect((await inspectR2GroupFast(f.group,f.opts)).ready).toBe(true);
+ const cache=[...f.maps.values()][0],e=f.group.entries[0];cache.set(e.url,new FakeResponse(Buffer.from('corrupt!'),{url:e.url}));
+ expect((await inspectR2GroupFast(f.group,f.opts)).ready).toBe(true);
+ expect((await inspectR2Group(f.group,f.opts)).ready).toBe(false);
+ cache.delete(e.url);expect((await inspectR2GroupFast(f.group,f.opts)).ready).toBe(false);
 });

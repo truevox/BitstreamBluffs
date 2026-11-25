@@ -1,6 +1,6 @@
 /** Consent-first original-quality download controller. UI/transport integration is separate.
  * Never starts on construction, preference selection, or readiness inspection. */
-import {downloadR2Group,inspectR2Group,catalogCacheGroup} from './r2-cache.mjs';
+import {downloadR2Group,inspectR2Group,inspectR2GroupFast,catalogCacheGroup} from './r2-cache.mjs';
 export class R2DownloadControls {
  constructor({plan,storage,origin,scope,subtle,fetcher,estimate,onState=()=>{},download=downloadR2Group,inspect=inspectR2Group}){
   if(plan?.format!=='bb-published-music-plan-v1'||!Array.isArray(plan.groups)||!plan.catalog||typeof estimate!=='function')throw Error('Expected published recording plan and quota estimator');
@@ -13,6 +13,15 @@ export class R2DownloadControls {
     ?new Set(await this.opts.storage.keys()):null;
   const states=await Promise.all(groups.map(g=>this.inspect(g,{...this.opts,knownCacheNames})));
   return {ready:states.every(x=>x.ready),missingBytes:states.reduce((n,x)=>n+x.missingBytes,0)};
+ }
+ /** Short stopped-to-play admission; cannot claim deep integrity. The worker
+  * validates SHA-256 for every audio file it actually serves. */
+ async quickReady(){
+  if(!this.plan.groups.some(g=>g.priority==='required'))return false;
+  const groups=await this._groups(),knownCacheNames=typeof this.opts.storage?.keys==='function'
+    ?new Set(await this.opts.storage.keys()):null;
+  const results=await Promise.all(groups.map(g=>inspectR2GroupFast(g,{...this.opts,knownCacheNames})));
+  return results.every(r=>r.ready);
  }
  async refresh(){if(this.running)return this.state;if(!this.plan.groups.some(g=>g.priority==='required')){this._set({status:'no-music',ready:false,missingBytes:0});return this.state;}const x=await this._check(await this._groups());if(!this.running)this._set({...x,status:x.ready?'ready':'download-required'});return this.state;}
  start({consent=false,includeBonus=false}={}){

@@ -112,3 +112,13 @@ A fresh independent code review of `5076d11b` found three remaining P2 integrati
 - The real compiled preview browser test passes with menu music **still playing** across explicit next-biome prefetch and Garbage Dump Glacier unlock. The original playback generation/token and `clockStart` remain unchanged; fetching the newly required biome lead through the controlled worker returns the exact **Lite derivative SHA-256**, not a 503 or the wrong original. Zero additional media downloads or page errors; cold offline playback remains intact. The integrity check includes real worker delivery, not merely a 'ready' flag.
 
 All of these are opt-in preview behaviors; normal game builds still register no service worker. Physical-device and natural crossfade quality-switch certification remain separate release gates.
+
+### Third independent review: cancel visibility and bounded playback admission
+
+The third read-only review found three additional P2 cases, corrected in the next candidate:
+
+- **Cancel while promoting:** The High-mode path rechecks `cancelled` immediately after asynchronous active-Lite group extension and before starting the Full transfer. A deterministic deferred-ack test verifies Cancel prevents any Full request even after the Lite stage completed.
+- **Prefetch cancellation in a reopened menu:** The Cancel control now uses the controller's actual `running` state and `prefetchStatus`, not only local view `pending` or the regular-download status. Closing and reopening the offline menu leaves the in-flight transfer cancellable.
+- **Fast, fail-closed playback admission:** `R2DownloadControls.quickReady()` checks the SHA-versioned completion marker and the cached object-key inventory without reading whole media payloads; `MelodyDownloadControls.apply()` chooses the tier using that bounded check, and `activatePublishedMelody()` similarly uses the fast gate only for a controlled preview worker. User-facing download/repair still deep-hashes every source, and the service worker deep-hashes each actual served recording on every request. A real Chromium corruption gate passed: Lite activation took 23.6 ms, an intentionally damaged 11,296-byte recording was never served (HTTP 503), the full repair checker identified all 11,296 bad bytes, and no procedural audio started. The full live prefetch, unlock, exact lead hash, uninterrupted music clock, and cold offline recording browser gate also passed unchanged. Complete compiled preview shell remains below the 8 MiB cap.
+
+All changes remain in the opt-in candidate. Native device tests and natural uninterrupted crossfade tier switching are not certified by these checks; no public deployment or Netlify builds.

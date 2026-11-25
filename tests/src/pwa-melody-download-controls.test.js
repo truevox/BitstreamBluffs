@@ -61,3 +61,13 @@ test('a verified biome lead is appended at the active quality without stopping a
  expect(c.plan).toBe(updated);expect(c.quality).toBe('lite');expect(c.state.ready).toBe(true);expect(calls).toEqual([[lead.id]]);expect(c._appliedGroupIds.has(lead.id)).toBe(true);
  await c._extendActiveTier();expect(calls).toHaveLength(1);
 });
+
+test('cancel during asynchronous Lite extension never starts the Full queue',async()=>{
+ let release,notify;const gate=new Promise(r=>release=r),started=new Promise(r=>notify=r),calls=[];
+ const lite={id:'a:base:lite',quality:'lite',priority:'required',version:'v1'};
+ const c=new MelodyDownloadControls({plan:{...plan,groups:[lite]},mode:'high',options:{worker:{}},estimate:async()=>({quota:1e9,usage:0}),isStopped:()=>false,
+  createQueue:({plan:p})=>({refresh:async()=>({ready:true,missingBytes:0}),start:async()=>{calls.push(p.groups[0]?.quality);return {ready:true,status:'ready'};},cancel:()=>calls.push('cancel:'+p.groups[0]?.quality)}),
+  append:async()=>{notify();await gate;return{added:1,groupIds:[lite.id]};}});
+ c.quality='lite';const pending=c.start({consent:true});await started;c.cancel();release();const result=await pending;
+ expect(result.status).toBe('cancelled');expect(calls).toEqual(['lite','cancel:lite']);
+});

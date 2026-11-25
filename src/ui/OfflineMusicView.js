@@ -47,7 +47,7 @@ export class OfflineMusicView extends View {
  _staleConfirmation(){this.armed=false;this.armedPrefetch=false;this._downloadTicket=null;this._prefetchTicket=null;this.localError='DOWNLOAD PLAN CHANGED - CONFIRM AGAIN';this._paint();}
  _paint(){if(!this.alive)return;
   if((this.armed&&!this._ticketCurrent(this._downloadTicket))||(this.armedPrefetch&&!this._ticketCurrent(this._prefetchTicket))){this.armed=false;this.armedPrefetch=false;this.localError='DOWNLOAD PLAN CHANGED - CONFIRM AGAIN';}
-  const s=this.controller.state||{},busy=this.pending||s.status==='checking'||s.status==='downloading';
+  const s=this.controller.state||{},busy=this.pending||!!this.controller.running||s.status==='checking'||s.status==='downloading'||s.prefetchStatus==='checking'||s.prefetchStatus==='downloading';
   const key=JSON.stringify([s.status,s.missingBytes,s.completedBytes,s.totalBytes,s.availableBytes,s.mode,s.quality,s.liteReady,s.fullReady,s.upgradeStatus,s.upgradeMissingBytes,s.prefetchStatus,s.prefetchBytes,s.nextBiome,this.armed,this.armedPrefetch,busy,this.localError]);if(key===this._lastPaint)return;this._lastPaint=key;
   this.status.setText(this.localError?(typeof this.localError==='string'?this.localError:'STATUS CHECK FAILED - RETRY'):downloadStatusText(s));
   this.note.setText(this.armedPrefetch?'CONFIRM OPTIONAL PREFETCH / MAX 32 MB':this.armed?'CONFIRM TO DOWNLOAD '+mb(s.missingBytes)+' OF MUSIC':this.tiered?(s.prefetchStatus==='ready'||s.prefetchStatus==='partial'?'NEXT BIOME '+s.prefetchStatus.toUpperCase()+' '+s.prefetchGroups+'/'+s.prefetchTotalGroups:'ACTIVE: '+(s.quality?.toUpperCase()||'NONE')+' / NO AUTO DOWNLOAD'):'ORIGINAL QUALITY PREVIEW - NO AUTO DOWNLOAD');

@@ -1,6 +1,6 @@
 /** Preview-only published melody tiers; byte integrity is delegated to R2 group storage.
  * Controlled clients pin their own tier; the last explicit selection becomes the next-client default. */
-import {MELODY_R2_BASE,downloadR2Group,inspectR2Group,catalogCacheGroup} from './r2-cache.mjs';
+import {MELODY_R2_BASE,downloadR2Group,inspectR2Group,inspectR2GroupFast,catalogCacheGroup} from './r2-cache.mjs';
 const MELODY_POLICY='bb-melody-policy-v1-';
 function melodyPolicyName(scope){if(typeof scope!=='string'||!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(scope))throw Error('Invalid melody scope');return MELODY_POLICY+encodeURIComponent(scope);}
 function melodyPolicyUrl(origin,scope){return new URL(scope+'.bitstream/melody-policy',origin).href;}
@@ -13,7 +13,12 @@ function requiredGroups(plan,quality){if(plan?.release!==MELODY_R2_BASE||!['lite
 export async function stagePublishedMelody(plan,quality,opts){if(opts.consent!==true)throw Error('Explicit melody download consent required');const groups=requiredGroups(plan,quality);const catalog=await catalogCacheGroup(plan.catalog,opts.subtle);for(const g of [catalog,...groups])await downloadR2Group(g,opts);return {groups:groups.length,bytes:groups.reduce((n,g)=>n+g.bytes,0)};}
 export async function activatePublishedMelody(plan,quality,opts){
  if(opts.stopped!==true)throw Error('Stopped transport required');const {storage,origin,scope,worker}=opts;let groups=[];
- if(quality!==null){groups=requiredGroups(plan,quality);const catalog=await catalogCacheGroup(plan.catalog,opts.subtle);for(const g of [catalog,...groups])if(!(await inspectR2Group(g,opts)).ready)throw Error('Melody tier incomplete');}
+ if(quality!==null){
+  groups=requiredGroups(plan,quality);const catalog=await catalogCacheGroup(plan.catalog,opts.subtle);
+  const inspect=worker&&opts.fast===true?inspectR2GroupFast:inspectR2Group;
+  const knownCacheNames=worker&&opts.fast===true&&typeof storage?.keys==='function'?new Set(await storage.keys()):null;
+  for(const g of [catalog,...groups])if(!(await inspect(g,{...opts,knownCacheNames})).ready)throw Error('Melody tier incomplete');
+ }
  const selection={quality,groups};
  if(worker){await new Promise((resolve,reject)=>{const channel=new MessageChannel();const timer=setTimeout(()=>{channel.port1.close();reject(Error('Tier activation acknowledgement timed out'));},15000);channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();e.data?.ok?resolve():reject(Error(e.data?.error||'Tier activation rejected'));};worker.postMessage({type:'bb-melody-select',selection},[channel.port2]);});return;}
  // Explicit legacy developer fixture only; production must use a controlled worker.
