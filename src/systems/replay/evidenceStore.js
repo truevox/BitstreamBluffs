@@ -2,7 +2,8 @@
  * Durable local replay evidence (Replay Contract v1.0, section 1.2; issue #116). NO Phaser imports. No network.
  *
  * A SEPARATE IndexedDB database (`bitstream-replay-evidence`), never an object store inside `bitstream-ghosts`, so
- * GhostLibrary._collect cannot touch it by construction. Two object stores: `bundles` (`{digest, bytes}`: the canonical
+ * GhostLibrary._collect cannot touch it by construction. Schema v2 adds protectedRefs to the original two stores:
+ * `bundles` (`{digest, bytes}`: the canonical
  * `bb-replay-evidence` bytes keyed by their `bundleDigest`) and `index` (`{digest, size, runId, seq}`). Only the index is
  * loaded into memory; bytes are read on demand. `seq` is a local insertion sequence (no wall-clock values are stored, so
  * nothing in the database or in an export reveals when a run was played). No auto-eviction; deletion only through
@@ -20,9 +21,11 @@ import { validateEvidenceBundle, bundleDigest, bundleBytes, bundleFilename } fro
 import { digestOfBytes } from './canonicalSha256.js';
 
 export const EVIDENCE_DB = 'bitstream-replay-evidence';
-export const EVIDENCE_DB_VERSION = 1;
+export const EVIDENCE_DB_VERSION = 2;
 export const EVIDENCE_STORE = 'bundles';
 export const EVIDENCE_INDEX = 'index';
+export const EVIDENCE_REFS = 'protectedRefs';
+export const PROTECTED_ROLES = Object.freeze(['candidate', 'submitted', 'pinned']);
 export const EVIDENCE_EXTENSION = '.bbreplay';
 const IDB_TIMEOUT_MS = 2500;
 
@@ -47,6 +50,10 @@ const txDone = (tx) => new Promise((resolve, reject) => {
 });
 const isQuota = (e) => Boolean(e && (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED'));
 const copy = (bytes) => Uint8Array.from(bytes);
+const validRunId = s => typeof s === 'string' && s.length > 0 && s.length <= 160 && !/[\u0000-\u001f\u007f]/.test(s);
+const refKey = (runId, seed, biomeMask, role) => JSON.stringify([runId, seed, biomeMask, role]);
+const protectionError = (code, detail) => new EvidenceStoreError(code, detail);
+
 
 export class EvidenceStore {
   /**
@@ -60,6 +67,8 @@ export class EvidenceStore {
     this.onError = typeof opts.onError === 'function' ? opts.onError : null;
     /** @type {Map<string, {digest:string, size:number, runId:string|null, seq:number}>} index only, no bytes */
     this.index = new Map();
+    /** Protected local references (never the five visible ghost roles), one per run/course/role. */
+    this.protections = new Map();
     /** @type {Map<string, Uint8Array>} bytes that exist only in memory (no IndexedDB, or a write failed) */
     this.pending = new Map();
     this.backend = 'memory';
@@ -83,14 +92,20 @@ export class EvidenceStore {
             const d = req.result;
             if (!d.objectStoreNames.contains(EVIDENCE_STORE)) d.createObjectStore(EVIDENCE_STORE, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_INDEX)) d.createObjectStore(EVIDENCE_INDEX, { keyPath: 'digest' });
+            if (!d.objectStoreNames.contains(EVIDENCE_REFS)) d.createObjectStore(EVIDENCE_REFS, { keyPath: 'key' });
           };
           req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
           req.onerror = () => { clearTimeout(timer); reject(req.error); };
           req.onblocked = () => { clearTimeout(timer); reject(new Error('idb blocked')); };
         });
+        db.onversionchange = () => db.close(); // other-tab upgrades must not be held hostage
         const all = await req2p(db.transaction(EVIDENCE_INDEX, 'readonly').objectStore(EVIDENCE_INDEX).getAll());
+        const refs = await req2p(db.transaction(EVIDENCE_REFS, 'readonly').objectStore(EVIDENCE_REFS).getAll());
         for (const r of all || []) {
           if (r && typeof r.digest === 'string') { this.index.set(r.digest, r); this._seq = Math.max(this._seq, r.seq || 0); }
+        }
+        for (const ref of refs || []) {
+          if (ref && typeof ref.key === 'string') this.protections.set(ref.key, ref);
         }
         this._db = db;
         this.backend = 'idb';
@@ -142,7 +157,11 @@ export class EvidenceStore {
       digest = res.bundleDigest;
     }
     const prior = this.index.get(digest);
-    const record = { digest, size: bytes.length, runId: meta.runId || (prior && prior.runId) || null, seq: prior ? prior.seq : ++this._seq };
+    if (meta.runId !== undefined && meta.runId !== null && !validRunId(meta.runId))
+      throw protectionError('invalid-run-id', 'runId must be a bounded local opaque identifier');
+    if (prior?.runId && meta.runId && prior.runId !== meta.runId)
+      throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
+    const record = { digest, size: bytes.length, runId: prior?.runId || meta.runId || null, seq: prior ? prior.seq : ++this._seq };
     this.index.set(digest, record);
     // Memory-only backend (no IndexedDB): the caller sees `durable === false` (init() also reported it once).
     if (!this._db) { this.pending.set(digest, bytes); return digest; }
@@ -206,22 +225,119 @@ export class EvidenceStore {
     return this.put(bytes, { runId });
   }
 
-  /** Explicit user deletion. Nothing else ever removes evidence. */
+  /** Durable protected evidence refs, independent of ghost display roles and cosmetic trace retention. */
+  listProtections() { return [...this.protections.values()].map(r => ({ ...r })).sort((a, b) => a.key.localeCompare(b.key)); }
+
+  /** Number of distinct local roles holding this exact canonical evidence bundle. */
+  protectedCount(digest) { return [...this.protections.values()].filter(r => r.digest === digest).length; }
+
+  /**
+   * Protect one ALREADY DURABLE canonical evidence bundle under a local role.
+   * No server submission occurs: `submitted` is strictly a local lifecycle label.
+   * Course/seed/mask are extracted from the verified manifest, not caller claims.
+   * The runId is a local indexing handle, never player authentication.
+   * The transaction commits the role atomically, or leaves prior refs intact.
+   */
+  async protect(digest, { runId, role } = {}) {
+    if (!validRunId(runId) || !PROTECTED_ROLES.includes(role))
+      throw protectionError('invalid-protection', 'valid local runId and candidate/submitted/pinned role required');
+    if (!this._db || this.pending.has(digest))
+      throw protectionError('not-durable', 'evidence must be durably saved before it can be protected');
+    if (!this.index.has(digest) || this.index.get(digest).runId !== runId)
+      throw protectionError('run-id-mismatch', 'runId must match the saved evidence index');
+    // `get` re-hashes stored bytes before a protection role can reference them.
+    const bytes = await this.get(digest);
+    const checked = validateEvidenceBundle(bytes, this.rulesetResolver);
+    if (!checked.ok) throw protectionError('invalid-bundle', `${checked.code} at ${checked.pointer}`);
+    const course = checked.manifest.causal.course;
+    const { seed, biomeMask } = course;
+    const key = refKey(runId, seed, biomeMask, role);
+    const ref = { key, runId, seed, biomeMask, digest, role };
+    // The read and write share ONE IndexedDB transaction (no TOCTOU delete).
+    const tx = this._db.transaction([EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
+    const done = txDone(tx);
+    let problem = null;
+    const current = tx.objectStore(EVIDENCE_INDEX).get(digest);
+    current.onsuccess = () => {
+      if (!current.result || current.result.runId !== runId) {
+        problem = protectionError('run-id-mismatch', 'evidence was removed or rekeyed'); tx.abort(); return;
+      }
+      const existing = tx.objectStore(EVIDENCE_REFS).get(key);
+      existing.onsuccess = () => {
+        if (existing.result && existing.result.digest !== digest) {
+          problem = protectionError('protection-conflict', 'same run/course/role already protects different evidence');
+          tx.abort(); return;
+        }
+        tx.objectStore(EVIDENCE_REFS).put(ref);
+      };
+    };
+    try { await done; }
+    catch (e) {
+      const err = problem || new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e?.message, e);
+      this._report(err); throw err;
+    }
+    this.protections.set(key, ref);
+    return { ...ref, durable: true, count: this.protectedCount(digest) };
+  }
+
+  /** Explicit release of one role; the canonical bytes remain archived until a separate explicit remove. */
+  async unprotect(key) {
+    if (typeof key !== 'string' || !this.protections.has(key)) return false;
+    if (!this._db) throw protectionError('not-durable', 'protection registry unavailable');
+    const expected = this.protections.get(key);
+    const tx = this._db.transaction(EVIDENCE_REFS, 'readwrite');
+    const done = txDone(tx);
+    let problem = null;
+    const current = tx.objectStore(EVIDENCE_REFS).get(key);
+    current.onsuccess = () => {
+      // Another tab may have replaced the reference after this instance loaded.
+      // Never release somebody else's newly protected digest using a stale key.
+      if (!current.result || current.result.digest !== expected.digest ||
+          current.result.runId !== expected.runId || current.result.role !== expected.role) {
+        problem = protectionError('stale-protection', 'reference changed in another tab; reload before releasing');
+        tx.abort(); return;
+      }
+      tx.objectStore(EVIDENCE_REFS).delete(key);
+    };
+    try { await done; }
+    catch (e) { const err = problem || new EvidenceStoreError('write-failed', e?.message, e); this._report(err); throw err; }
+    this.protections.delete(key);
+    return true;
+  }
+
+  /** Read exact saved evidence for a protected role; checks its indexed bytes against their digest. */
+  async getProtected(key) {
+    const ref = this.protections.get(key);
+    if (!ref) return null;
+    const bytes = await this.get(ref.digest);
+    if (!bytes) throw protectionError('corrupt-record', `${key}: referenced bundle missing`);
+    return { reference: { ...ref }, bytes };
+  }
+
+  /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
-    this.index.delete(digest);
-    this.pending.delete(digest);
+    if (this.protectedCount(digest)) throw protectionError('protected-evidence', 'release all local roles first');
     if (this._db) {
-      try {
-        const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX], 'readwrite');
-        const done = txDone(tx);
+      const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
+      const done = txDone(tx);
+      let problem = null;
+      const scan = tx.objectStore(EVIDENCE_REFS).getAll();
+      scan.onsuccess = () => {
+        if ((scan.result || []).some(r => r.digest === digest)) {
+          problem = protectionError('protected-evidence', 'another tab still protects this bundle');
+          tx.abort(); return;
+        }
         tx.objectStore(EVIDENCE_STORE).delete(digest);
         tx.objectStore(EVIDENCE_INDEX).delete(digest);
-        await done;
-      } catch (e) {
-        const err = new EvidenceStoreError('write-failed', e && e.message, e);
-        this._report(err);
-        throw err;
+      };
+      try { await done; }
+      catch (e) {
+        const err = problem || new EvidenceStoreError('write-failed', e?.message, e);
+        this._report(err); throw err;
       }
     }
+    // Remove the index only AFTER the transaction completed successfully.
+    this.index.delete(digest);
+    this.pending.delete(digest);
   }
 }
