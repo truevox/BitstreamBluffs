@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 03:11 UTC. Main `716679d4f9e46fcab9758ee19683bf62bdeab199` (#344), v2.22.0/SIM9 integrates #335/#337. The [exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45537959438) was still running; live endpoint last served v2.21.2 `main-JieFBNnP.js` during the transition, so check actual served build and worker before treating the PWA as live. Physical Chromebook/Android remain follow-ups. #340 v2 audio guard was verified shipped separately (same v2.21.2 label). No new pause/crossfade workaround check.
+Last verified: 2026-11-25 03:46 UTC. Main `3b843edc0e5ceea6cfe1b91156f5a6975b4c9e8a` (#348), v2.22.2/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45540909235) build and deploy succeeded; Gal's public-host Chromium receipt covers first-tab reopen and actual cold offline Lite audio/physics. #344 v2.22.0 integrated #335/#337, #346 v2.22.1 enabled cancel before confirmation, #348 adds click-only persistence, partial quota recovery and reopen hint. Physical devices and natural mid-crossfade promotion remain #172 follow-ups. #340 guard was verified separately on v2.21.2; no new pause workaround check.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -222,10 +222,17 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
-- Gal/Home PWA #335 remains preview-only: natural offline SIM9 crash at 166m,
-  committed ledger and ghost survived a cold offline reopen, same-course
-  visible ghost, and a two-build/two-tab upgrade retained actual Lite audio.
-  These do not authorize production activation or certify physical devices.
+- Gal/Home PWA #335/#337 integrated via #344 and updated through #348. Prior
+  Chromium previews proved cold-offline committed ledger/ghost reopen after
+  natural 166m SIM9 crash, visible same-course ghost, and a two-build upgrade
+  retaining actual Lite audio; not physical device or trusted mid-run restore.
+  #172 low-space follow-up: optional next-biome queue reports insufficient
+  storage while UI shows only existing Lite readiness. Separate optional
+  result from current readiness; do not auto-retry or transfer. Gal lane.
+- #347 is Gal/Home's open #244 protected local evidence-ref draft, no
+  shipping or broader restore/admission claim. #343 is an open pure #245
+  contract, not public verified ranking, backend authority or a dependency
+  unblock. Keep both lanes separate.
 - Gal/Home audio lane: #328 merged the #322 music code as v2.21.0,
   main `69a6fb4674335d2496a801ddd7dcaabcb0a4a8bd`; #322 closed superseded.
   [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45461734705)
