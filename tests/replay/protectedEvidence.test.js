@@ -163,6 +163,72 @@ describe('protected local evidence references (#244)', () => {
     expect(cleared.durable).toBe(true); // EMPTY database can be durable; NOT a proof of surviving browser storage clear
   });
 
+  test('concurrent tabs cannot rebind one digest to another run after protection', async () => {
+    const idb=fakeIdb();
+    const first=await new EvidenceStore({idb,storage:null}).init();
+    const second=await new EvidenceStore({idb,storage:null}).init(); // stale index, loaded before the write
+    const digest=await first.put(bundle(),{runId:'true-local-run'});
+    const held=await first.protect(digest,{runId:'true-local-run',role:'pinned'});
+    await expect(second.put(bundle(),{runId:'different-local-run'})).rejects.toMatchObject({code:'run-id-conflict'});
+    expect(second.has(digest)).toBe(false); // losing write does not poison local index
+    const re=await new EvidenceStore({idb,storage:null}).init();
+    expect(re.list()[0].runId).toBe('true-local-run');
+    expect(re.protectedCount(digest)).toBe(1);
+    expect((await re.getProtected(held.key)).reference.runId).toBe('true-local-run');
+  });
+
+  test('stale cache cannot permanently block an already unpinned durable bundle deletion', async () => {
+    const {store,digest,idb}=await seededStore();
+    const held=await store.protect(digest,{runId:RUN,role:'candidate'});
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    await store.unprotect(held.key);
+    expect(stale.protectedCount(digest)).toBe(1); // known stale cache
+    await stale.remove(digest); // persisted refs, not stale cache, decide
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('stale-tab getProtected fails closed rather than returning an obsolete unpinned role', async () => {
+    const {store,digest,idb}=await seededStore();
+    const held=await store.protect(digest,{runId:RUN,role:'candidate'});
+    const stale=await new EvidenceStore({idb,storage:null}).init();
+    await store.unprotect(held.key);
+    expect(await store.get(digest)).not.toBeNull();
+    await expect(stale.getProtected(held.key)).rejects.toMatchObject({code:'stale-protection'});
+    expect((await new EvidenceStore({idb,storage:null}).init()).listProtections()).toEqual([]);
+  });
+
+  test('blocked upgrade closes a late success connection after memory fallback', async () => {
+    let req;
+    let closed=0;
+    const blocked={open(){req={}; Promise.resolve().then(()=>req.onblocked()); return req;}};
+    const s=await new EvidenceStore({idb:blocked,storage:null}).init();
+    expect(s.backend).toBe('memory');
+    expect(s.lastError.code).toBe('read-failed');
+    req.result={close(){closed++}};
+    req.onsuccess();
+    expect(closed).toBe(1);
+  });
+
+  test('transactional fake IDB serializes simultaneous writes to the same store', async () => {
+    const idb=fakeIdb();
+    const db=await req2p(idb.open('serialized-check',1));
+    // Open a fresh test DB with the correct schema via a second explicit upgrade.
+    const upgraded=await new Promise((resolve,reject)=>{
+      const r=idb.open('serialized-check',2);
+      r.onupgradeneeded=()=>r.result.createObjectStore('rows',{keyPath:'id'});
+      r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+    });
+    expect(db).toBeDefined();
+    const a=upgraded.transaction('rows','readwrite');
+    const b=upgraded.transaction('rows','readwrite');
+    const ad=transactionDone(a),bd=transactionDone(b);
+    a.objectStore('rows').put({id:1});b.objectStore('rows').put({id:2});
+    await Promise.all([ad,bd]);
+    const rd=upgraded.transaction('rows','readonly');
+    const rows=await req2p(rd.objectStore('rows').getAll());
+    expect(rows).toEqual([{id:1},{id:2}]);
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

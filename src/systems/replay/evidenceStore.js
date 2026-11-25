@@ -86,7 +86,12 @@ export class EvidenceStore {
     try {
       if (this._idb) {
         const db = await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('idb open timeout')), IDB_TIMEOUT_MS);
+          let settled = false;
+          const refuse = e => {
+            if (settled) return;
+            settled = true; clearTimeout(timer); reject(e);
+          };
+          const timer = setTimeout(() => refuse(new Error('idb open timeout')), IDB_TIMEOUT_MS);
           const req = this._idb.open(EVIDENCE_DB, EVIDENCE_DB_VERSION);
           req.onupgradeneeded = () => {
             const d = req.result;
@@ -94,9 +99,14 @@ export class EvidenceStore {
             if (!d.objectStoreNames.contains(EVIDENCE_INDEX)) d.createObjectStore(EVIDENCE_INDEX, { keyPath: 'digest' });
             if (!d.objectStoreNames.contains(EVIDENCE_REFS)) d.createObjectStore(EVIDENCE_REFS, { keyPath: 'key' });
           };
-          req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
-          req.onerror = () => { clearTimeout(timer); reject(req.error); };
-          req.onblocked = () => { clearTimeout(timer); reject(new Error('idb blocked')); };
+          req.onsuccess = () => {
+            // `onblocked`/timeout cannot cancel an IDB open. Close its eventual
+            // connection so an abandoned upgrade cannot block a later one.
+            if (settled) { req.result?.close(); return; }
+            settled = true; clearTimeout(timer); resolve(req.result);
+          };
+          req.onerror = () => refuse(req.error);
+          req.onblocked = () => refuse(new Error('idb blocked'));
         });
         db.onversionchange = () => db.close(); // other-tab upgrades must not be held hostage
         const all = await req2p(db.transaction(EVIDENCE_INDEX, 'readonly').objectStore(EVIDENCE_INDEX).getAll());
@@ -134,9 +144,23 @@ export class EvidenceStore {
   async _writeDurable(record, bytes) {
     const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX], 'readwrite');
     const done = txDone(tx);
-    tx.objectStore(EVIDENCE_STORE).put({ digest: record.digest, bytes });
-    tx.objectStore(EVIDENCE_INDEX).put(record);
-    await done;
+    let problem = null;
+    let actual = record;
+    const current = tx.objectStore(EVIDENCE_INDEX).get(record.digest);
+    current.onsuccess = () => {
+      const previous = current.result;
+      // The database is authoritative, never the tab's possibly stale cache.
+      if (previous?.runId && record.runId && previous.runId !== record.runId) {
+        problem = protectionError('run-id-conflict', 'persisted digest belongs to a different local run');
+        tx.abort(); return;
+      }
+      actual = { ...record, runId: previous?.runId || record.runId,
+        seq: previous?.seq || record.seq };
+      tx.objectStore(EVIDENCE_STORE).put({ digest: record.digest, bytes });
+      tx.objectStore(EVIDENCE_INDEX).put(actual);
+    };
+    try { await done; } catch (e) { throw problem || e; }
+    return actual;
   }
 
   /**
@@ -162,13 +186,19 @@ export class EvidenceStore {
     if (prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
     const record = { digest, size: bytes.length, runId: prior?.runId || meta.runId || null, seq: prior ? prior.seq : ++this._seq };
-    this.index.set(digest, record);
-    // Memory-only backend (no IndexedDB): the caller sees `durable === false` (init() also reported it once).
-    if (!this._db) { this.pending.set(digest, bytes); return digest; }
+    // Memory-only backend: explicitly not durable, never grant a protected role.
+    if (!this._db) { this.index.set(digest, record); this.pending.set(digest, bytes); return digest; }
     try {
-      await this._writeDurable(record, bytes);
+      const committed = await this._writeDurable(record, bytes);
+      this.index.set(digest, committed);
       this.pending.delete(digest);
     } catch (e) {
+      // Never poison the in-memory index with a conflicting tab's run ID.
+      if (e?.code === 'run-id-conflict') {
+        if (prior) this.index.set(digest, prior); else this.index.delete(digest);
+        throw e;
+      }
+      this.index.set(digest, record);
       this.pending.set(digest, bytes);
       const err = new EvidenceStoreError(isQuota(e) ? 'quota-exceeded' : 'write-failed', e && e.message, e);
       this._report(err);
@@ -181,7 +211,11 @@ export class EvidenceStore {
   /** Retry bundles that are still memory-only. Failures stay pending and are not reported again. */
   async _flushPending() {
     for (const [digest, bytes] of [...this.pending]) {
-      try { await this._writeDurable(this.index.get(digest), bytes); this.pending.delete(digest); } catch { return; }
+      try {
+        const committed = await this._writeDurable(this.index.get(digest), bytes);
+        this.index.set(digest, committed);
+        this.pending.delete(digest);
+      } catch { return; }
     }
   }
 
@@ -305,18 +339,35 @@ export class EvidenceStore {
     return true;
   }
 
-  /** Read exact saved evidence for a protected role; checks its indexed bytes against their digest. */
+  /** Read a protected role and its bytes in ONE transaction, rejecting stale-tab role changes. */
   async getProtected(key) {
-    const ref = this.protections.get(key);
-    if (!ref) return null;
-    const bytes = await this.get(ref.digest);
-    if (!bytes) throw protectionError('corrupt-record', `${key}: referenced bundle missing`);
-    return { reference: { ...ref }, bytes };
+    const cached = this.protections.get(key);
+    if (!cached) return null;
+    if (!this._db) throw protectionError('not-durable', 'protected evidence storage unavailable');
+    const tx = this._db.transaction([EVIDENCE_REFS, EVIDENCE_STORE], 'readonly');
+    const done = txDone(tx);
+    let latest = null, bytes = null;
+    const req = tx.objectStore(EVIDENCE_REFS).get(key);
+    req.onsuccess = () => {
+      latest = req.result || null;
+      if (!latest || latest.digest !== cached.digest || latest.runId !== cached.runId ||
+          latest.role !== cached.role || latest.seed !== cached.seed || latest.biomeMask !== cached.biomeMask) return;
+      const bundle = tx.objectStore(EVIDENCE_STORE).get(latest.digest);
+      bundle.onsuccess = () => { bytes = bundle.result?.bytes || null; };
+    };
+    try { await done; }
+    catch (e) { throw new EvidenceStoreError('read-failed', key, e); }
+    if (!latest || latest.digest !== cached.digest || latest.runId !== cached.runId ||
+        latest.role !== cached.role || latest.seed !== cached.seed || latest.biomeMask !== cached.biomeMask)
+      throw protectionError('stale-protection', 'role changed or disappeared in another tab');
+    if (!bytes || digestOfBytes(bytes) !== latest.digest)
+      throw protectionError('corrupt-record', `${key}: referenced bundle missing or corrupted`);
+    return { reference: { ...latest }, bytes: copy(bytes) };
   }
 
   /** Explicit user deletion. A protected canonical input tape can NEVER be deleted by ghost role cleanup. */
   async remove(digest) {
-    if (this.protectedCount(digest)) throw protectionError('protected-evidence', 'release all local roles first');
+    if (!this._db && this.protectedCount(digest)) throw protectionError('protected-evidence', 'release all local roles first');
     if (this._db) {
       const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX, EVIDENCE_REFS], 'readwrite');
       const done = txDone(tx);
