@@ -227,7 +227,7 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null}={}) {
+  async _writeDurable(record, bytes, receipt = null, {retry=false,expectedDeletionGeneration=null,priorPendingRunId=null,priorPendingGeneration=null}={}) {
     // A deletion tombstone and the bundle update share ONE IDB lock. Stale
     // tabs must not resurrect deliberately deleted bytes from pending RAM.
     const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX,EVIDENCE_DELETIONS], 'readwrite');
@@ -238,6 +238,13 @@ export class EvidenceStore {
     checkDeletion.onsuccess=()=>{
       const observed=checkDeletion.result?.generation ?? null;
       if(receipt)receipt.deletionGeneration=observed;
+      // A different run cannot overwrite an existing session-only run claim
+      // unless an ACTUAL newer explicit delete is observed under this lock.
+      if(!retry && priorPendingRunId && record.runId &&
+          priorPendingRunId!==record.runId && observed===priorPendingGeneration){
+        problem=protectionError('run-id-conflict','pending digest belongs to another run and was not deleted');
+        tx.abort();return;
+      }
       // Only the generation visible to the INITIAL direct write authorizes a
       // later retry. Deletion since that attempt always supersedes pending RAM.
       if(retry && observed!==expectedDeletionGeneration){
@@ -312,7 +319,7 @@ export class EvidenceStore {
     if (!this._db && !this._everDurable && prior?.runId && meta.runId && prior.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'an existing evidence digest cannot be reassigned to another run');
     const pendingClaim = this.pendingMeta.get(digest);
-    if (pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
+    if (!this._db && pendingClaim?.runId && meta.runId && pendingClaim.runId !== meta.runId)
       throw protectionError('run-id-conflict', 'session-only evidence was recorded under another run ID');
     const requestedRunId = meta.archiveOnly === true
       ? (!this._db ? pendingClaim?.runId || (!this._everDurable ? prior?.runId : null) || null : null)
@@ -327,15 +334,18 @@ export class EvidenceStore {
     }
     // Receipt is set by the SAME atomic transaction that tries to write;
     // a cross-tab saved row might be absent from this tab's stale index.
+    const priorPendingGeneration=this._pendingDeletionGeneration.get(digest) ?? null;
     const writeReceipt = { classification:'unknown' };
     try {
-      const committed = await this._writeDurable(record, bytes, writeReceipt);
+      const committed = await this._writeDurable(record, bytes, writeReceipt,{
+        priorPendingRunId:pendingClaim?.runId || null,priorPendingGeneration});
       this.index.set(digest, committed);
       const olderClaim = this.pendingMeta.get(digest);
       // A second overlapping unbound write may succeed while an earlier
       // explicit run-ID write is still pending. Do not discard the latter's
       // session-only bytes until the persisted binding actually matches.
-      if (!olderClaim?.runId || committed.runId === olderClaim.runId) {
+      if (!olderClaim?.runId || committed.runId === olderClaim.runId ||
+          writeReceipt.deletionGeneration!==priorPendingGeneration) {
         this.pending.delete(digest);
         this.pendingMeta.delete(digest);
         this._pendingDeletionGeneration.delete(digest);
@@ -352,7 +362,10 @@ export class EvidenceStore {
         this.pending.set(digest, bytes);
         // Write classification and deletion generation come from the SAME
         // transaction. Do not replace an older pending claim with a new fence.
-        if(!this._pendingDeletionGeneration.has(digest) && writeReceipt.classification!=='unknown')
+        const newerDelete=writeReceipt.classification!=='unknown' &&
+          writeReceipt.deletionGeneration!==priorPendingGeneration;
+        if(writeReceipt.classification!=='unknown' &&
+           (!this._pendingDeletionGeneration.has(digest)||newerDelete))
           this._pendingDeletionGeneration.set(digest,writeReceipt.deletionGeneration ?? null);
         // An IDB lookup error cannot distinguish a novel failed write from
         // an already-durable duplicate. Keep its bytes exportable but never
@@ -360,7 +373,7 @@ export class EvidenceStore {
         if (writeReceipt.classification==='unknown') this._unsafePending.add(digest);
         else this._unsafePending.delete(digest);
         const established = this.pendingMeta.get(digest);
-        this.pendingMeta.set(digest, established?.runId ? established : record);
+        this.pendingMeta.set(digest, newerDelete ? record : established?.runId ? established : record);
       }
       // A redundant update of already saved identical bytes is still a
       // reported failure, but not an instruction to resurrect deleted proof.
