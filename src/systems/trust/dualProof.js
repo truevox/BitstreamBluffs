@@ -55,6 +55,9 @@ function validRequest(r) {
 }
 
 function simulationVerdict(request, s) {
+  // All public lanes in v1 are HUMAN; an admission cannot use a provisional
+  // label to sneak in a self-declared AI or tool-assisted run.
+  if (request.assistance !== 'human') return value('invalid', 'nonhuman-on-human-board');
   if (s === null || s === undefined) return TRUST.missing;
   if (!keys(s, ['kind', 'runId', 'buildId', 'verifierBuildId', 'verifiedCourse', 'score', 'endTick', 'tapeComplete', 'assistanceObserved', 'record']) ||
       s.kind !== 'trusted-replay-execution' || !bounded(s.runId) || !bounded(s.buildId) ||
@@ -69,8 +72,8 @@ function simulationVerdict(request, s) {
     return value('invalid', 'simulation-identity-mismatch');
   if (s.record.outcome !== 'refused' && s.record.verifiedUnder !== request.rulesetId)
     return value('invalid', 'simulation-ruleset-mismatch');
-  if (s.record.outcome === 'refused' && s.record.claimedRulesetId !== undefined &&
-      s.record.claimedRulesetId !== request.rulesetId)
+  if (s.record.outcome === 'refused' &&
+      (!OWN(s.record, 'claimedRulesetId') || s.record.claimedRulesetId !== request.rulesetId))
     return value('invalid', 'simulation-ruleset-mismatch');
   // Independently observed assistance and parsed course identity are known
   // facts even when a verifier CANNOT run. Inconclusive ≠ permission to

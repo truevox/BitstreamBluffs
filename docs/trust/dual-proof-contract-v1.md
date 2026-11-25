@@ -35,3 +35,5 @@ No actual historical tape execution/compatibility is enabled before public relea
 ## Negative-control semantics after independent review
 
 A refused replay is **inconclusive only** for `unknown-ruleset` or `historical-verifier-required` (verifier unavailable); a refusal for malformed manifest, inconsistent ruleset, etc. is **invalid evidence** and cannot appear even as provisional. Run/build/tape/manifest identity, replayed course/loadout and independently observed human-vs-assisted classification must match **before** any inconclusive result can be considered. Even pending authorizations must match the exact verifier executable pin. These checks specifically prevent a known-invalid report being downgraded to an apparently harmless Unverified provisional entry.
+
+The v1 public competition is strictly human-lane-only, including provisional labels: a self-declared AI/tool-assisted run cannot use missing replay evidence to enter the public human board. A verifier-unavailable refusal also must carry the exact `claimedRulesetId` matching the request; absence is an invalid identity, not inconclusive evidence. Both rules are asserted by adversarial tests.

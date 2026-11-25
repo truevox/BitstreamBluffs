@@ -158,14 +158,14 @@ describe('canonical dual-proof decision contract (#245)', () => {
     for(const reason of ['malformed-manifest','ruleset-field-mismatch','malformed-ruleset-id','null-ruleset-not-legacy','other-rejected']){
       const v=adjudicateDualProof({...good(r),allowProvisional:true,simulation:{...simulation(r),record:{
         outcome:'refused',verifiedUnder:null,verifierId:null,manifestDigest:r.manifestDigest,
-        tapeDigest:r.tapeDigest,reason}}});
+        tapeDigest:r.tapeDigest,reason,claimedRulesetId:r.rulesetId}}});
       expect(v.proof.reason).toBe('verifier-rejected-evidence');
       expect(v.publication).toBe('none');NO_RANK(v);
     }
     for(const reason of ['unknown-ruleset','historical-verifier-required']){
       const v=adjudicateDualProof({...good(r),allowProvisional:true,simulation:{...simulation(r),record:{
         outcome:'refused',verifiedUnder:null,verifierId:null,manifestDigest:r.manifestDigest,
-        tapeDigest:r.tapeDigest,reason}}});
+        tapeDigest:r.tapeDigest,reason,claimedRulesetId:r.rulesetId}}});
       expect(v.proof).toMatchObject({status:'inconclusive',reason:'verifier-unavailable'});
       expect(v.publication).toBe('provisional-unverified');NO_RANK(v);
     }
@@ -185,7 +185,7 @@ describe('canonical dual-proof decision contract (#245)', () => {
   test('known missing tape, changed score, and claimed ruleset mismatch block unavailable-verifier fallback', () => {
     const r={...request(),intent:'provisional-public'};
     const base={...simulation(r),record:{outcome:'refused',verifiedUnder:null,verifierId:null,
-      manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,reason:'unknown-ruleset'}};
+      manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,reason:'unknown-ruleset',claimedRulesetId:r.rulesetId}};
     for(const bad of [
       {...base,tapeComplete:false},
       {...base,score:r.score+1},
@@ -194,6 +194,31 @@ describe('canonical dual-proof decision contract (#245)', () => {
     ]){
       const v=adjudicateDualProof({...good(r),simulation:bad,allowProvisional:true});
       expect(v.proof.status).toBe('invalid');
+      expect(v.publication).toBe('none');NO_RANK(v);
+    }
+  });
+
+  test('an unavailable verifier refusal must explicitly name this exact ruleset', () => {
+    const r={...request(),intent:'provisional-public'};
+    const source=simulation(r);
+    const rec={outcome:'refused',verifiedUnder:null,verifierId:null,
+      manifestDigest:r.manifestDigest,tapeDigest:r.tapeDigest,reason:'unknown-ruleset'};
+    for(const bad of [rec,{...rec,claimedRulesetId:d('f')},{...rec,claimedRulesetId:null}]){
+      const v=adjudicateDualProof({...good(r),simulation:{...source,record:bad},allowProvisional:true});
+      expect(v.proof.status).toBe('invalid');expect(v.publication).toBe('none');NO_RANK(v);
+    }
+    for (const reason of ['unknown-ruleset','historical-verifier-required']){
+      const v=adjudicateDualProof({...good(r),simulation:{...source,record:{...rec,reason,claimedRulesetId:r.rulesetId}},allowProvisional:true});
+      expect(v.proof.status).toBe('inconclusive');
+      expect(v.publication).toBe('provisional-unverified');NO_RANK(v);
+    }
+  });
+
+  test('self-declared nonhuman assistance never reaches a provisional human board even with no replay', () => {
+    for (const assistance of ['ai','tool-assisted']){
+      const r={...request(),intent:'provisional-public',assistance};
+      const v=adjudicateDualProof({...good(r),simulation:null,allowProvisional:true});
+      expect(v.proof).toMatchObject({status:'invalid',reason:'nonhuman-on-human-board'});
       expect(v.publication).toBe('none');NO_RANK(v);
     }
   });
@@ -255,7 +280,7 @@ describe('canonical dual-proof decision contract (#245)', () => {
       expect(v.proof.status).toBe('inconclusive');
     }
     const s=simulation();s.record={outcome:'refused',verifiedUnder:null,verifierId:null,
-      tapeDigest:request().tapeDigest,manifestDigest:request().manifestDigest,reason:'unknown-ruleset'};
+      tapeDigest:request().tapeDigest,manifestDigest:request().manifestDigest,reason:'unknown-ruleset',claimedRulesetId:request().rulesetId};
     const v=run({simulation:s});NO_RANK(v);expect(v.proof.status).toBe('inconclusive');
   });
 
@@ -274,7 +299,7 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const v=run({simulation:s});expect(v.proof.reason).toBe('assistance-misrepresented');NO_RANK(v);
     const r={...request(),assistance:'ai'};
     const v2=adjudicateDualProof(good(r));
-    NO_RANK(v2);expect(v2.proof.reason).toBe('assistance-misrepresented');
+    NO_RANK(v2);expect(v2.proof.reason).toBe('nonhuman-on-human-board');
     const s3={...simulation(r),assistanceObserved:'ai'};
     const v3=adjudicateDualProof({...good(r),simulation:s3});
     NO_RANK(v3);expect(v3.proof.reason).toBe('nonhuman-on-human-board');
