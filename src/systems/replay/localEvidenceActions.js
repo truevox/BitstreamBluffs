@@ -6,6 +6,7 @@
  */
 import { EvidenceStoreError } from './evidenceStore.js';
 import { validateEvidenceBundle, bundleDigest } from './manifest.js';
+import { MAX_OUTPUT_BYTES } from './canonicalJson.js';
 
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
 const safeId = s => typeof s === 'string' && DIGEST.test(s);
@@ -14,9 +15,10 @@ const freeze = o => Object.freeze(o);
 /** Inspect canonical input without writing or claiming a verified game run. */
 export function inspectLocalEvidenceImport(bytes, { expectedDigest, currentRulesetId = null } = {}) {
   // Typed arrays may cross JS realms (e.g., Buffer in Node tests).
-  if (!ArrayBuffer.isView(bytes) || bytes.BYTES_PER_ELEMENT !== 1 || !Number.isSafeInteger(bytes.length))
+  if (!ArrayBuffer.isView(bytes) || Object.prototype.toString.call(bytes) !== '[object Uint8Array]')
     return freeze({ok:false,code:'invalid-bytes'});
   if (!safeId(expectedDigest)) return freeze({ok:false,code:'digest-required'});
+  if (bytes.length > MAX_OUTPUT_BYTES) return freeze({ok:false,code:'too-large'});
   const actual = bundleDigest(bytes);
   if (actual !== expectedDigest) return freeze({ok:false,code:'digest-mismatch'});
   const parsed = validateEvidenceBundle(bytes); // integrity and grammar, not historical ruleset execution
@@ -77,7 +79,10 @@ export class LocalEvidenceActions {
     const inspection=this.inspectImport(bytes,{expectedDigest});
     if (!inspection.ok) throw new EvidenceStoreError(inspection.code,inspection.location);
     const digest=await this.store.importBundle(bytes,{expectedDigest}); // no forged original run ID
-    return freeze({ok:true,digest,inspection,localDurable:this.store.durable,
-      protected:false,publicRankEligible:false,status:'IMPORTED LOCAL EVIDENCE — UNVERIFIED'});
+    const localDurable = await this.store.isBundleDurable(digest);
+    const protectionCount = this.store.protectedCount(digest);
+    return freeze({ok:true,digest,inspection,localDurable,
+      newlyProtected:false,protectionCount,alreadyProtected:protectionCount>0,
+      publicRankEligible:false,status:'IMPORTED LOCAL EVIDENCE — UNVERIFIED'});
   }
 }
