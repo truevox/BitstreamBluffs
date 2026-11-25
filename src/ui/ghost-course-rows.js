@@ -22,7 +22,7 @@ function savedRunLabel(tape) {
 
 /** Read the existing roles of this exact seed and biome mask; no writes or replay checks. */
 export async function readGhostCourseRows(library, current, settings = {}) {
-  const course = library.course(current.seed, current.biomeMask);
+  const course = await library.freshCourse(current.seed, current.biomeMask);
   const ids = GHOST_COURSE_ROWS.map(({ role, slot }) =>
     (slot === undefined ? course?.[role] : course?.favorites?.[slot]) || null);
   const tapes = new Map(await Promise.all([...new Set(ids.filter(Boolean))].map(async (id) =>

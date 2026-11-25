@@ -88,6 +88,114 @@ export class GhostLibrary {
 
   course(seed, biomeMask = 0) { return this.courses.get(courseKey(seed, biomeMask)) || null; }
 
+  /** One atomic IndexedDB transaction for the whole role mutation.
+   * No awaits inside a live transaction: every dependent get/put is scheduled
+   * from request callbacks. Other tabs' readwrite transactions serialize on
+   * both stores, so a pending favorite can't be overwritten by stale Latest.
+   * Returns null on refusal, quota or transaction failure (no false durable
+   * success); the memory-only backend retains its legacy behavior.
+   */
+  async _idbChange(kind, { tape, seed, biomeMask, slot, runId, role, on } = {}) {
+    const key = kind === 'save' ? courseKey(tape.seed, tape.biomeMask) : courseKey(seed, biomeMask);
+    return new Promise((resolve) => {
+      let tx;
+      try { tx = this._db.transaction(['courses', 'tapes'], 'readwrite'); }
+      catch { resolve(null); return; }
+      const courses = tx.objectStore('courses');
+      const tapes = tx.objectStore('tapes');
+      let updated = null;
+      let writtenTape = null;
+      const deletedTapes = [];
+      const reject = () => { try { tx.abort(); } catch { /* already complete */ } };
+      const safely = (fn) => (ev) => { try { fn(ev.target.result); } catch { reject(); } };
+      tx.oncomplete = () => {
+        if (updated) {
+          this.courses.set(key, updated);
+          if (writtenTape) this.tapes.set(writtenTape.runId, writtenTape);
+          for (const id of deletedTapes) this.tapes.delete(id);
+        }
+        resolve(updated);
+      };
+      tx.onabort = () => resolve(null);
+      // An error aborts the entire transaction, including the tape and role.
+      tx.onerror = () => {};
+      const reclaim = (prior, next, revision) => {
+        const after = new Set(courseGhostRuns(next).map((r) => r.runId));
+        const displaced = courseGhostRuns(prior).map((r) => r.runId).filter((id) => !after.has(id));
+        if (!displaced.length) return;
+        courses.getAll().onsuccess = safely((all) => {
+          const referenced = new Set((all || []).flatMap((c) => courseGhostRuns(c).map((r) => r.runId)));
+          for (const id of displaced) {
+            if (referenced.has(id)) continue;
+            tapes.get(id).onsuccess = safely((oldTape) => {
+              // Retain historical tapes from other terrain revisions for
+              // explicit replay, exactly like the original saveRun path.
+              if (revision && oldTape && oldTape.simRevision !== revision) return;
+              tapes.delete(id);
+              deletedTapes.push(id);
+            });
+          }
+        });
+      };
+      const courseReq = courses.get(key);
+      courseReq.onsuccess = safely((onDisk) => {
+        if (kind === 'save') {
+          tapes.get(tape.runId).onsuccess = safely((existing) => {
+            if (existing && courseKey(existing.seed, existing.biomeMask) !== key) { reject(); return; }
+            const prior = onDisk || emptyCourse(key, tape);
+            const next = { ...prior, favorites: [...(prior.favorites || Array(FAVORITE_SLOTS).fill(null))] };
+            const finalize = (oldBest) => {
+              next.latest = tape.runId;
+              const newerRevision = Number.isSafeInteger(tape.simRevision) && tape.simRevision > 0 &&
+                next.best && oldBest?.simRevision !== tape.simRevision;
+              if (newerRevision || tape.distanceM > next.bestDistanceM) {
+                next.best = tape.runId;
+                next.bestDistanceM = tape.distanceM;
+              }
+              next.lastPlayedAt = tape.endedAt || Date.now();
+              tapes.put(tape);
+              courses.put(next);
+              updated = next;
+              writtenTape = tape;
+              reclaim(prior, next, tape.simRevision);
+            };
+            if (next.best) tapes.get(next.best).onsuccess = safely(finalize);
+            else finalize(null);
+          });
+        } else if (kind === 'favorite') {
+          if (!onDisk || !Number.isInteger(slot) || slot < 0 || slot >= FAVORITE_SLOTS) { reject(); return; }
+          const update = (selected) => {
+            if (runId && (!selected || courseKey(selected.seed, selected.biomeMask) !== key)) { reject(); return; }
+            const next = { ...onDisk, favorites: [...onDisk.favorites] };
+            next.favorites[slot] = runId || null;
+            courses.put(next);
+            updated = next;
+            reclaim(onDisk, next, null);
+          };
+          if (runId) tapes.get(runId).onsuccess = safely(update);
+          else update(null);
+        } else if (kind === 'show') {
+          if (!onDisk || !GHOST_ROLES.includes(role)) { reject(); return; }
+          const next = { ...onDisk, show: { ...(onDisk.show || {}), [role]: on !== false } };
+          courses.put(next);
+          updated = next;
+        } else reject();
+      });
+    });
+  }
+
+  /** Refresh course metadata from disk before displaying roles from other tabs. */
+  async freshCourse(seed, biomeMask = 0) {
+    const key = courseKey(seed, biomeMask);
+    if (!this._db) return this.courses.get(key) || null;
+    try {
+      const course = await req2p(this._db.transaction('courses', 'readonly').objectStore('courses').get(key));
+      if (course) this.courses.set(key, course);
+      else this.courses.delete(key);
+      return course || null;
+    } catch { return null; } // failure must not display stale role data
+  }
+
   /**
    * Store a finished run's tape and update its course's Latest and Best.
    * Best is the furthest distance; a tie keeps the earlier run.
@@ -95,6 +203,7 @@ export class GhostLibrary {
    */
   async saveRun(tape) {
     if (!tape?.runId || tape.mode === 'gym') return null;
+    if (this._db) return this._idbChange('save', { tape });
     const key = courseKey(tape.seed, tape.biomeMask);
     // Stable run IDs are global tape identities. A same-ID import from another
     // course must never overwrite a retained or favorite local recording.
@@ -133,6 +242,7 @@ export class GhostLibrary {
 
   /** Pin (or with runId null, clear) Favorite slot 0..2 of a course. */
   async setFavorite(seed, biomeMask, slot, runId) {
+    if (this._db) return this._idbChange('favorite', { seed, biomeMask, slot, runId });
     const key = courseKey(seed, biomeMask);
     const old = this.courses.get(key);
     if (!old || !Number.isInteger(slot) || slot < 0 || slot >= FAVORITE_SLOTS) return null;
@@ -152,6 +262,7 @@ export class GhostLibrary {
 
   /** Per-course on/off switch for one ghost role (used for Favorites A/B/C). */
   async setShow(seed, biomeMask, role, on) {
+    if (this._db) return this._idbChange('show', { seed, biomeMask, role, on });
     const old = this.courses.get(courseKey(seed, biomeMask));
     if (!old || !GHOST_ROLES.includes(role)) return null;
     const course = { ...old, show: { ...(old.show || {}), [role]: on !== false } };
@@ -170,7 +281,7 @@ export class GhostLibrary {
   async ghostsFor(seed, biomeMask = 0, show = {}, { simRevision } = {}) {
     const out = [];
     if (simRevision !== undefined && (!Number.isSafeInteger(simRevision) || simRevision < 1)) return out;
-    const course = this.course(seed, biomeMask);
+    const course = await this.freshCourse(seed, biomeMask);
     // A role shows when both the player's global switch (`show`) and the course's own switch allow it.
     const visible = (r) => show[r] !== false && course?.show?.[r] !== false;
     for (const g of courseGhostRuns(course)) {
@@ -187,11 +298,13 @@ export class GhostLibrary {
   }
 
   async getTape(runId) {
-    if (this.tapes.has(runId)) return this.tapes.get(runId);
-    if (!this._db) return null;
+    // The IDB record wins over this tab's possibly stale read cache. A tape
+    // deleted by another tab must not continue drawing from old memory.
+    if (!this._db) return this.tapes.get(runId) || null;
     try {
       const tape = await req2p(this._db.transaction('tapes', 'readonly').objectStore('tapes').get(runId));
       if (tape) this.tapes.set(runId, tape);
+      else this.tapes.delete(runId);
       return tape || null;
     } catch { return null; }
   }
