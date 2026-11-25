@@ -112,17 +112,20 @@ export class ReplayEvidenceView extends View {
     try {
       const control=await this._getActions();
       if (!live() || this._captureStatus()!==status) return;
-      const bytes=await control.store.get(capture.digest);
+      // An IDB backend can retain a quota-failed bundle in session RAM even
+      // after space comes back. An EXPLICIT Refresh retries those pending bytes.
+      if (control.store.pending.has(capture.digest)) await control.store.retryPending();
       if (!live() || this._captureStatus()!==status) return;
-      if (!bytes) throw new Error('canonical evidence bytes not available');
-      // Export only needs rehashed bytes; a broken reference-index read MUST
-      // NOT prevent someone from saving those bytes to their own file.
+      // One persisted snapshot / digest check establishes readable bytes,
+      // durability and the exact run binding. Do not hash 16 MiB three times.
+      const inspection=await control.store.inspectBundle(capture.digest,{runId:this.tape.runId});
+      if (!live() || this._captureStatus()!==status) return;
+      if (!inspection.readable) throw new Error('canonical evidence bytes not available');
+      // Even if pin-index lookup fails, verified readable bytes remain
+      // exportable on an explicit click (which hashes again at download time).
       this.buttons[1].setDisabled(false);
-      const persisted=await control.store.isBundleDurable(capture.digest);
-      // Quota-failed captures may have been automatically flushed after IDB
-      // recovery. Check the persisted run-ID, not the old capture.ok flag.
-      const boundToCurrentRun=persisted && await control.store.isBundleDurable(capture.digest,{runId:this.tape.runId});
-      if (!live() || this._captureStatus()!==status) return;
+      const persisted=inspection.durable;
+      const boundToCurrentRun=inspection.runBound;
       let held=false;
       try {
         const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
