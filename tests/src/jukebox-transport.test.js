@@ -123,3 +123,10 @@ describe('Jukebox: one shared music director, reliable paused and skipped intent
 		}
 	});
 });
+
+describe('offline quality cold-start boundary',()=>{
+ const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
+ function cold(){const d=bare();d.stop();d._ensureRunning=StemMusicDirector.prototype._ensureRunning.bind(d);d._beginTrack=jest.fn(()=>Promise.resolve());d._timer=setInterval(()=>{},100000);return d;}
+ test('blocks decoding until acknowledgement, deduplicates starts and never interrupts live playback',async()=>{const d=cold();let release;const hook=jest.fn(()=>d.withPlaybackBoundary(()=>new Promise(r=>release=r)));d.setPlaybackBoundary(hook);try{d.start();d.start();await flush();expect(hook).toHaveBeenCalledTimes(1);expect(d._beginTrack).not.toHaveBeenCalled();expect(d.isPlaybackBoundary()).toBe(true);release();await flush();expect(d._beginTrack).toHaveBeenCalledTimes(1);expect(d.isPlaybackBoundary()).toBe(false);}finally{d.stop();}});
+ test('late acknowledgement cannot restart stopped transport; new intent waits for old flight then rechecks',async()=>{const d=cold();const releases=[];d.setPlaybackBoundary(()=>new Promise(r=>releases.push(r)));try{d.start();await flush();d.stop();releases.shift()();await flush();expect(d._beginTrack).not.toHaveBeenCalled();d.start();await flush();d.stop();d.start();await flush();expect(releases).toHaveLength(1);releases.shift()();await flush();expect(d._beginTrack).not.toHaveBeenCalled();expect(releases).toHaveLength(1);releases.shift()();await flush();expect(d._beginTrack).toHaveBeenCalledTimes(1);}finally{d.stop();}});
+});
