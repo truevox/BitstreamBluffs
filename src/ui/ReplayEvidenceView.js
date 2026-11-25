@@ -203,11 +203,15 @@ export class ReplayEvidenceView extends View {
             const archiveWarning=this.status.main.text;
             // The screen's detail line is pixel-width limited: concise and
             // lead with both safety facts rather than truncating the error.
-            const shortWarning=archiveWarning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
+            const needsRunExport=archiveWarning.includes('EXPORT NOW') || archiveWarning.includes('EXPORT ONLY');
+            const shortWarning=needsRunExport?'EXPORT RUN NOW':
+              archiveWarning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
               archiveWarning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':
               archiveWarning.includes('RUN ID')?'RUN BINDING UNKNOWN':
               'ARCHIVE STATUS UNKNOWN';
-            this._show('KEEP ORIGINAL FILE',`IMPORT UNSAVED; ${shortWarning}`);
+            // The import may have committed before its confirmation read
+            // failed: never claim either durable success or definite loss.
+            this._show('KEEP ORIGINAL FILE',`IMPORT UNCONFIRMED; ${shortWarning}`);
           }
         }
       }
