@@ -80,7 +80,9 @@ export class LocalEvidenceActions {
     if (!inspection.ok) throw new EvidenceStoreError(inspection.code,inspection.location);
     const digest=await this.store.importBundle(bytes,{expectedDigest}); // no forged original run ID
     const localDurable = await this.store.isBundleDurable(digest);
-    const protectionCount = this.store.protectedCount(digest);
+    // A second browser tab may have pinned/unpinned after this Store was
+    // opened. The persisted references, not the cached Map, are authoritative.
+    const protectionCount = localDurable ? await this.store.persistedProtectedCount(digest) : 0;
     return freeze({ok:true,digest,inspection,localDurable,
       newlyProtected:false,protectionCount,alreadyProtected:protectionCount>0,
       publicRankEligible:false,status:'IMPORTED LOCAL EVIDENCE — UNVERIFIED'});
