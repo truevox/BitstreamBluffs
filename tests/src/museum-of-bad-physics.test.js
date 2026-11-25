@@ -1,3 +1,4 @@
+import { SIM_REVISION } from "../../src/systems/replay/ruleset.js";
 import {openMuseumEntry} from '../../src/systems/museum-of-bad-physics.js';
 import {MAX_GALLERY_FILES, MAX_GALLERY_BYTES, MAX_GALLERY_FILE_BYTES} from '../../src/systems/museum-of-bad-physics.js';
 
@@ -100,4 +101,9 @@ test("does not claim an authenticated score for a local tape", () => {
   expect(result).not.toHaveProperty("score");
   expect(result).not.toHaveProperty("rank");
   expect(result.commentary).not.toMatch(/\d+|score|rank|leaderboard/);
+});
+
+test("gallery default revision tracks the authoritative simulation revision", () => {
+  const tape = JSON.stringify({format:"bb-ghost-tape",version:1,simTickHz:120,trace:Buffer.from(new Float32Array([0,1,0,2,3,0]).buffer).toString("base64"),simRevision:SIM_REVISION});
+  expect(openMuseumEntry(tape).classification).toBe("current-claim");
 });

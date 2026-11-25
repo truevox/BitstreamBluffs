@@ -1,5 +1,7 @@
 import {openDownhillRunTrace} from "./downhill-run-strip.js";
-import {SIM_REVISION} from "./replay/ruleset.js";
+// Static browser-safe snapshot of SIM_REVISION in replay/ruleset.js.
+// Its parity is enforced by tests; do not import the game engine into this local tool.
+const SIM_REVISION = 9;
 
 export const MAX_GALLERY_FILES = 8;
 export const MAX_GALLERY_BYTES = 8 * 1024 * 1024;
@@ -18,12 +20,16 @@ function boundedCommentary() {
 }
 
 export function openMuseumEntry(json, {name = "Untitled", currentRevision = SIM_REVISION} = {}) {
-  const bytes = new TextEncoder().encode(json).length;
   if (typeof json !== "string") {
     throw new TypeError("Museum entry must be a JSON text file");
   }
+  // UTF-8 length cannot be smaller than JS string length: reject giant input before allocation.
+  if (json.length > MAX_GALLERY_FILE_BYTES) {
+    throw new RangeError("Museum entry exceeds 2 MiB");
+  }
+  const bytes = new TextEncoder().encode(json).length;
   if (bytes > MAX_GALLERY_FILE_BYTES) {
-    throw new RangeError(`Museum entry exceeds ${MAX_GALLERY_FILE_BYTES / 1024 / 1024} KiB`);
+    throw new RangeError(`Museum entry exceeds ${MAX_GALLERY_FILE_BYTES / 1024 / 1024} MiB`);
   }
 
   let tape;
