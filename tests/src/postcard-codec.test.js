@@ -176,6 +176,32 @@ describe('privacy: only the causal allowlist crosses', () => {
   });
 });
 
+describe('privacy: nested allowlists', () => {
+  test('an extra key inside header.random is dropped on create (an extra key inside bsod is refused); a re-signed forgery carrying one is refused on decode', async () => {
+    const t = makeTape({ header: { random: { ...REAL_HEADER().random, deviceId: 4242 } } });
+    const pc = must(createPostcard(baseArgs(t)));
+    expect(Object.keys(pc.header.random).sort()).toEqual(['version', ...Object.keys(RUN_STREAMS)].sort());
+    expect(JSON.stringify(pc)).not.toContain('deviceId');
+    expect(JSON.stringify(t)).toContain('deviceId'); // control: it was on the source tape
+    const wire = postcardWire(pc); wire.header.random.deviceId = 4242;
+    const { digest, ...rest } = wire; wire.digest = digestOf(rest);
+    const forged = POSTCARD_PREFIX + Buffer.from(await zlibCodec.deflate(canonicalBytes(wire))).toString('base64url');
+    expect(await decodePostcard(forged, OPTS)).toMatchObject({ ok: false, reason: 'invalid-field' });
+  });
+
+  test('a tape whose bsod carries an extra key is refused (fail closed)', () => {
+    const b = REAL_HEADER().bsod;
+    expect(createPostcard(baseArgs(makeTape({ header: { bsod: { ...b, playerId: 'p-1' } } }))).ok).toBe(false);
+    expect(createPostcard(baseArgs(makeTape({ header: { bsod: { ...b, initial: { ...b.initial, deviceId: 7 } } } }))).ok).toBe(false);
+  });
+
+  test('a tape missing a stream, or with a wrong RNG version, is refused', () => {
+    const { visualFx, ...fewer } = REAL_HEADER().random;
+    expect(createPostcard(baseArgs(makeTape({ header: { random: fewer } }))).ok).toBe(false);
+    expect(createPostcard(baseArgs(makeTape({ header: { random: { ...REAL_HEADER().random, version: RUN_RANDOM_VERSION + 1 } } }))).ok).toBe(false);
+  });
+});
+
 describe('window and startTick bounds', () => {
   const tape = makeTape({ ticks: 3600 });
 

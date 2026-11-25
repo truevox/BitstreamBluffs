@@ -19,6 +19,7 @@
  */
 import { GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION } from '../ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../SimClock.js';
+import { RUN_STREAMS } from '../RunRandom.js';
 import { canonicalBytes, parseCanonical, f64Encode, f64Decode, CJSONError } from './canonicalJson.js';
 import { digestOf } from './canonicalSha256.js';
 import { validateInputRows } from './manifest.js';
@@ -83,6 +84,7 @@ export const HEADER_FIELDS = Object.freeze([
   'seed', 'biomeMask', 'simRevision', 'rulesetId', 'buildId', 'mode', 'dailyRuleId', 'dailyRuleSource', 'syncLevel',
   'bsod', 'boosts', 'upgradeRanks', 'magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'kodiakVersion', 'startPose', 'random',
 ]);
+const RANDOM_KEYS = ['version', ...Object.keys(RUN_STREAMS)];
 const TOP_FIELDS = ['kind', 'v', 'gameVersion', 'simRevision', 'rulesetId', 'buildId', 'header', 'prefix', 'startTick', 'windowTicks',
   'fingerprintAtStart', 'challenge', 'digest'];
 const CHALLENGE_FIELDS = ['speedPxS', 'angVel', 'parachuteFuel', 'hazardPhase', 'bsodGapPx'];
@@ -163,8 +165,8 @@ function headerProblem(h) {
   if (!Array.isArray(h.startPose) || h.startPose.length !== 6 || !h.startPose.every(isFin)) return 'startPose';
   const r = h.random;
   if (!isObj(r) || !isInt(r.version)) return 'random';
-  const rk = Object.keys(r).filter((k) => k !== 'version');
-  if (rk.length < 1 || rk.length > 16 || !rk.every((k) => SAFE_ID.test(k) && isU32(r[k]))) return 'random';
+  // Exact key set, like Ghost-in-a-Link: version plus the build's own stream names, nothing else may ride along.
+  if (r.version !== h.runRandomVersion || !exactKeys(r, RANDOM_KEYS) || !RANDOM_KEYS.every((k) => hasOwn(r, k) && (k === 'version' || isU32(r[k])))) return 'random';
   return null;
 }
 
@@ -172,6 +174,8 @@ function headerProblem(h) {
 function pickHeader(tape) {
   const h = {};
   for (const k of HEADER_FIELDS) if (hasOwn(tape, k)) h[k] = clone(tape[k]);
+  // Nested allowlist: `random` is rebuilt from the known stream names so an extra key can never ride along.
+  if (isObj(tape.random)) { h.random = {}; for (const k of RANDOM_KEYS) if (hasOwn(tape.random, k)) h.random[k] = tape.random[k]; }
   // The identity stamps may be absent (older tapes) or null (stamped before the build id was known): left absent -> refused later.
   return h;
 }
