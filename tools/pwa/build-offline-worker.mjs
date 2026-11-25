@@ -115,7 +115,7 @@ renderR2RouteWorker() +
 `  const url = new URL(request.url);\n` +
 `  if (request.mode === 'cors' && releaseUrl(url.href) && !request.headers.has('Range')) {\n` +
 `    event.respondWith((async()=>{` +
-(melodyDev ? `const melody=await melodyTierResponse(url.href);if(melody!==undefined)return melody;` : '') +
+(melodyDev ? `const melody=await melodyTierResponse(url.href,event.clientId);if(melody!==undefined)return melody;` : '') +
 (monoDev ? `if(url.pathname.endsWith('.ogg')){const candidate=await monoDevResponse(url.href);if(candidate!==undefined)return candidate;}` : '') +
 `const stored=await cachedR2(url.href);if(stored)return stored;try{return await fetch(request);}catch{return new Response('Original music download required when online.',{status:503});}})());return;\n` +
 `  }\n` +
