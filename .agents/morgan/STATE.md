@@ -1,13 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-25 14:41 UTC. Main `c09074cf9f0be605603b492945efe49cdb5038a0` (#360), v2.22.4/SIM9; seeded cosmetic RNG audit merged, no authority/restore unblock. #355 remains a diagnostic follow-up; #350 #30, #348 offline recovery and #340 audio guard were previously shipped. No new live playback check.
+Last verified: 2026-11-25 20:58 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **Exact-head Gal review handoffs posted Nov 25:** [#287](https://github.com/truevox/BitstreamBluffs/pull/287#issuecomment-7165631762), [#341](https://github.com/truevox/BitstreamBluffs/pull/341#issuecomment-7165639493), [#345](https://github.com/truevox/BitstreamBluffs/pull/345#issuecomment-7165640675). Drafts unchanged, review requests only. Do not repost absent new evidence/head. #338 independently awaits strict cutoff playback precondition.
+- **Gal exact-head source reviews Nov 25:** [#287](https://github.com/truevox/BitstreamBluffs/pull/287#pullrequestreview-6064814459) (10 tests), [#341](https://github.com/truevox/BitstreamBluffs/pull/341#pullrequestreview-6064815049) (42), [#345](https://github.com/truevox/BitstreamBluffs/pull/345#pullrequestreview-6064815358) (29) had no blocking findings in developer scope; still drafts, not release approvals. #338 prior-head review requested clean cutoff playback; updated proof and handoff below.
 
 - **Requested #339/#340 reviews completed (Gal/Home audio lane):**
   #339 `43d4daf467133e40c50daafe07e49d57f27f53a7`: hold QA-only merge for two
@@ -65,31 +65,21 @@ means resume this queue, not take over another lane or merge a draft.
    Test isolates immediate credit, matched 89/95 combined utility, pending
    vs. banked, short/no-bonus settlement, canopy, combo and earned Flow.
    No coefficient or runtime change. Exact lifecycle `45429825491` and
-   identity `45429825825` green; only old-head review observed. Await fresh
-   exact-head independent review; resolve real feedback only. No merge.
+   identity `45429825825` green; only old-head review observed. Exact-head source review now nonblocking in scope; release gate unchanged.
    Independent exact test blob overlay on shipped v2.20.2 again passed
    159/159 across the same five suites; #320 has no test-file overlap.
 2. #168: all 17 remaining issues rechecked on v2.22.3; four of the
    original 21 closed. All four Morgan draft heads have green checks but
-   no current-head independent approval. No reviews or merges overnight. Keep checking source for actual dependency movement.
+   no release approval. Exact-head review outcomes above. Keep checking source for actual dependency movement.
    [#338](https://github.com/truevox/BitstreamBluffs/pull/338) / #78 is now
-   an open two-file developer-only draft at `fbc787a939446ac67ea4b7b25c12b35faf9b2836`,
-   branch `morgan/issue-78-crash-brief-chain-smoke`, based on `044ebd4b`.
-   Normal production asset matches v2.21.2. Two fresh strict playbacks
-   of natural terrain fatal tick937 checked 7/7 checkpoints; a complete
-   shaped cutoff is refused with exit 1 and empty stdout. Review gap:
-   missing-fatal gate precedes checkpoint assertion, so desynced nonfatal
-   gives the same error as a clean cutoff (exact gate mock reproduced).
-   PR description now distinguishes refusal from diagnostic proof. On
-   browser availability use strict `--airtime-build` on the same cutoff
-   through tick464 (3/3 checks, no drops/desync/save), retain CLI refusal,
-   and separately observe no fatal at 465 if needed. Keep exact build pin.
-   Unchanged comparator returned 0 vs itself and 2 vs historical Packet
-   Spike brief. 102 focused tests, identity and closed-loop browser smoke
-   passed. A longer experimental hazard playback hit the existing 60s
-   wall limit and is not in the draft. No raw tapes, profile data, game
-   behavior, deployment, or issue closure. Await exact-head review;
-   lifecycle `45502797485` and identity `45502797488` green. No merge.
+   an open two-file developer-only draft at `0accd2786ef7971346ec311285021bd8a56e288a`,
+   branch `morgan/issue-78-crash-brief-chain-smoke`, pinned to `044ebd4b`.
+   Chromium on exact index/entry: natural terrain fatal tick937 replayed
+   2x7; same cutoff bytes replay cleanly 2x3 through tick464 with matched
+   per-tick state and no drops/desync or saves; then refused at crash-brief
+   gate with exit 1 and empty stdout. No tick465 proof claimed. Comparator
+   0/2, identity, build and 81 focused Jest tests passed. [Updated Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/338#issuecomment-7174428665).
+   No player data or runtime change; stay draft.
    #79 replay annotation QA (independent prior slice):
    Exact public normal v2.20.2 entry and shipped SIM9 identity: four
    fresh Chromium contexts, positive record+replay and cutoff record+replay.
@@ -123,7 +113,7 @@ means resume this queue, not take over another lane or merge a draft.
    fail closed; existing classic CLI/Daily outputs byte-identical.
    91 focused tests, green local identity and 4,880 exact build files
    unchanged. No raw evidence or scoring/player/physics changes.
-   Await independent exact-head review; no merge or preview.
+   Exact-head source review nonblocking; still draft. No merge or preview.
 4. **#79 / #345**: four-file open draft `morgan/issue-79-find-stored-tick`
    @ `81786116d7fb41b54eb75a07eb8b80710c847288`. Local dev inspector locates actual stored
    pose from a nominal tick, exact or nearest; ties earlier, refuses out of
@@ -134,7 +124,7 @@ means resume this queue, not take over another lane or merge a draft.
    zero external requests. 42 focused tests and same smoke passed on
    original `116141235` and isolated exact `716679d4` overlay; v2.21.2 and
    v2.22.0 production builds unchanged across 4,880 and 4,882 files
-   respectively; original local identity passed. Await exact-head review;
+   respectively; original local identity passed. Exact-head source review nonblocking;
    no merge, preview, release or issue closure.
 5. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
@@ -239,15 +229,15 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
-- #155 Pulp preflight on `8d9c124a`: shipped telegraph sim planning is
-  camera-independent, but current visual fits use an unrotated rect.
-  Exact GroundTelegraph in a graphics stub accepted a hop column at
-  (468, 36), and its right triangle vertex x478.5 projected to x487.542
-  after synthetic +6° center roll (480×270, zoom 1). This is a projected
-  geometry negative control, not live or real Chromium evidence. A future
-  100% Pulp pilot should test projected cue bounds and fallback badge under
-  both roll signs, with identical warn/hop timing and no physics changes.
-  No current Pulp runtime or verified Chromebook baseline shipped.
+- #155 Pulp preflight: compiled v2.22.7/SIM9 in two fresh Chromium contexts,
+  `main-CnvlsBaW.js` SHA256 `c733706b6fe810c335ac3966b009a16ed34bc84409db4a739b3543d0b985f41c`.
+  Scratch adaptation of hop-cue harness: freeze `sim-11` tick120, stable
+  synthetic hazard, zoom1, world cx mapped x468, high/low y36/230.
+  0° triangle right x476.25; +6° high x485.30 and −6° low x484.89,
+  cue pixels 130→97 and 139→113. All selected column; warn 800 ms,
+  hop 1000 ms, sampled sim/score fixed. Synthetic future risk, not live
+  bug. In a future roll pilot require projected cue bounds, visible fallback
+  and full causal plus Chromebook performance gates.
 - #350 closed #30: existing AirBrake doubles as ground brake; no binding,
   physics, replay change. Tricks Right A, Tricks Left ←, Classic ↑ or S on
   ground, gamepad X or B on ground, touch existing AirBrake. Public README
