@@ -49,3 +49,35 @@ fixed-tick input rows. Both must reproduce the observations and terminal result.
 Only playback-only planner counters and wall time are excluded from the
 applicable comparison. No changes to scoring, storage, live physics, or
 leaderboards are made.
+
+## Compare fatigue against a matched classic panel
+
+Produce a second verified panel on the same checkout and browser, with the
+same course and reaction seeds, profiles, distance/time limits, biome mask,
+movement rule and hop lead. Change only the fatigue switch:
+
+```sh
+build=$(git rev-parse HEAD)
+node tools/sim/run.mjs --verify --policy hop --seeds sim-01,sim-02,sim-03 \
+  --noiseProfiles ideal,steady,distracted --noiseSeed bb-noise-1 --maxM 500 --maxSec 25 \
+  --out /tmp/bb-classic.json
+node tools/sim/run.mjs --verify --policy hop --seeds sim-01,sim-02,sim-03 \
+  --noiseProfiles ideal,steady,distracted --noiseSeed bb-noise-1 --maxM 500 --maxSec 25 \
+  --fatigue --out /tmp/bb-fatigue.json
+node tools/sim/compare-noise-seeds.mjs --fatigue-pair --build "$build" \
+  --panel /tmp/bb-classic.json --panel /tmp/bb-fatigue.json
+```
+
+The first panel must be classic v1 and the second fatigue v2. The comparator
+rechecks the complete matched matrices, exact fatigue ramp, bounded counters
+and the recorded unaffected ideal controls. Only their format version and the
+validated zeroed fatigue counters are ignored during the ideal comparison.
+It counts both-pass, classic-only, fatigue-only, and neither-pass per profile,
+and lists courses that changed sides. Different kinds of non-pass do not count
+as a change. Two regular UTF-8 JSON files, at most 4 MiB each, are accepted.
+The output includes hashes of the exact input bytes, simple IDs and aggregate
+results, not paths, scores, traces, or input rows. The producing Git commit is
+caller-asserted and runner verification flags are not authenticated or replayed
+by this command. The report is descriptive synthetic QA, not an inference
+about players or course fairness. The default reaction-seed comparison still
+refuses fatigue input. The Daily shortlist never accepts it.
