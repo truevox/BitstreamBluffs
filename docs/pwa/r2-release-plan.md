@@ -126,3 +126,7 @@ All changes remain in the opt-in candidate. Native device tests and natural unin
 ### Chromium installability manifest audit
 
 `node tools/pwa/test-installability-browser.mjs <built-dist> /BitstreamBluffs/` used Chromium DevTools Protocol `Page.getAppManifest` / `Page.getInstallabilityErrors` against a real controlled preview build. The manifest's resolved `start_url`, scope and service-worker script path all pointed under `/BitstreamBluffs/`; all three icons were declared, no manifest parse errors and no page errors. The only installability error was `in-incognito`, attributable to the automation's incognito-equivalent temporary browser context, not a malformed manifest. This is a browser installability *metadata* gate, not physical installation, display-mode or Android/ChromeOS device certification. Public activation remains disabled.
+
+### Persistent-profile Chromium installability
+
+`node tools/pwa/test-installability-persistent-browser.mjs <built-dist> /BitstreamBluffs/` tests the opt-in build in a normal temporary **persistent** Chromium browser profile instead of the default incognito-like automation context. CDP `Page.getAppManifest` and `Page.getInstallabilityErrors` report the correct scoped manifest, start URL, 3 icons, controlled service worker, **zero manifest errors and zero installability errors**, with no page errors. The ephemeral profile is removed after the run. Actual installed-app launch and native ChromeOS/Android devices still require direct QA.
