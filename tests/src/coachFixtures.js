@@ -1,6 +1,7 @@
 // Shared fixtures for the #66 crash-coach tests. Tapes are recorded through the REAL GhostRecorder, so the rows have
 // exactly the shape (every-tick edge rows, dedup of unchanged ticks) a live run produces.
 import { GhostRecorder } from '../../src/systems/ghost/GhostTape.js';
+import { lastInputEdges } from '../../src/systems/coach/Perturb.js';
 
 /**
  * @param {object} o
@@ -39,3 +40,34 @@ export function standardTape(extra = {}) {
 
 /** Words the coach must never use: it never claims its search is optimal or exhaustive. */
 export const BANNED = /optimal|best possible|only way|guaranteed/i;
+
+/**
+ * A deterministic fake simulator. A candidate "survives" iff some hop press lands in [winLo, winHi]. It records its calls
+ * so tests can check re-validation uses a fresh tape object. `flaky` makes it lie on the second call for a given tape.
+ */
+export function fakeSimulator({ winLo, winHi, crashTick = 1000, flaky = null, throwFor = null } = {}) {
+  const calls = [];
+  const seen = new Map();
+  const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h.toString(16); };
+  const simulate = async (tape, { untilTick }) => {
+    const key = JSON.stringify(tape.inputs);
+    const n = (seen.get(key) || 0) + 1;
+    seen.set(key, n);
+    calls.push({ tape, untilTick, n });
+    if (throwFor && throwFor(tape)) throw new Error('sim blew up');
+    const presses = lastInputEdgesFor(tape, crashTick);
+    let survived = presses.some((t) => t >= winLo && t <= winHi);
+    let fp = hash(key + (survived ? 'S' : 'C'));
+    if (survived && flaky === 'outcome' && n >= 2) survived = false;
+    if (survived && flaky === 'fingerprint' && n >= 2) fp = `${fp}-other`;
+    return {
+      survived, crashTick: survived ? null : crashTick, cause: survived ? null : 'hazard',
+      fingerprintAt: { [untilTick]: fp }, divergenceAt: presses.length ? Math.min(...presses) : null,
+    };
+  };
+  return { simulate, calls };
+}
+
+function lastInputEdgesFor(tape, crashTick) {
+  return lastInputEdges(tape, crashTick, 400).filter((e) => e.kind === 'hop' && e.action === 'press').map((e) => e.tick);
+}
