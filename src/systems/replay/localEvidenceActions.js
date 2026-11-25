@@ -60,7 +60,9 @@ export class LocalEvidenceActions {
   /** Only releases retention; does NOT remove the underlying canonical bytes. */
   async unpin(key) {
     const changed=await this.store.unprotect(key);
-    return freeze({ok:changed,retainedBytes:true,publicRankEligible:false});
+    // Only confirm the ref was released. Another tab may delete the bytes as
+    // soon as the final pin is gone; no retained-byte claim is made here.
+    return freeze({ok:changed,publicRankEligible:false});
   }
 
   /** Explicit download-data preparation. The host UI chooses whether to download. */
