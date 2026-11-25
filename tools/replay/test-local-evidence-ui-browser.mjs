@@ -53,6 +53,61 @@ try {
  assert.equal(noImplicitRetry.attempted,0);
  assert(noImplicitRetry.viewAlive);
  record('opening local archive and exporting never implicitly retry pending evidence');
+ const importIsolation=await p.evaluate(async()=>{
+  const {view,store,legacyTape}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape,bundleDigest,bundleBytes}=await import('/src/systems/replay/manifest.js');
+  const baseline=evidenceBundle({manifest:legacyManifestFromTape(legacyTape),tape:legacyTape});
+  const pendingBundle={...baseline,claims:{...baseline.claims,score:baseline.claims.score+910}};
+  const importedBundle={...baseline,claims:{...baseline.claims,score:baseline.claims.score+911}};
+  const pendingDigest=bundleDigest(pendingBundle),importDigest=bundleDigest(importedBundle);
+  const bytes=bundleBytes(importedBundle),original=store._writeDurable;
+  store._writeDurable=async(_record,_bytes,receipt)=>{
+    if(receipt)receipt.classification='new';
+    throw new Error('temporary pending write');
+  };
+  try{await store.put(pendingBundle,{runId:'unrelated-pending'}).catch(()=>{});}
+  finally{store._writeDurable=original;}
+  const pendingBefore=store.pending.has(pendingDigest);
+  const attempts=[];
+  store._writeDurable=async(record,...args)=>{
+    attempts.push(record.digest);
+    return original.call(store,record,...args);
+  };
+  try{
+    await view._processImportFile({name:`${importDigest.slice(7)}.bbreplay`,size:bytes.length,
+      arrayBuffer:async()=>bytes.slice().buffer});
+    const pendingAfter=store.pending.has(pendingDigest);
+    const imported=await store.isBundleDurable(importDigest);
+    return {pendingBefore,pendingAfter,imported,attempts,importMessage:view.status.main.text};
+  }finally{
+    store._writeDurable=original;
+    store.pending.delete(pendingDigest);store.pendingMeta.delete(pendingDigest);
+    store._unsafePending.delete(pendingDigest);
+    await view._refresh({retryPending:false});
+  }
+ });
+ assert(importIsolation.pendingBefore && importIsolation.pendingAfter && importIsolation.imported);
+ assert.deepEqual(importIsolation.attempts.length,1);
+ assert(importIsolation.importMessage.includes('IMPORTED'));
+ record('Import saves only selected file without flushing unrelated pending replay');
+ const importReconnect=await p.evaluate(async()=>{
+  const {view,store,legacyTape}=window.__qaEvidence;
+  const {evidenceBundle,legacyManifestFromTape,bundleDigest,bundleBytes}=await import('/src/systems/replay/manifest.js');
+  const base=evidenceBundle({manifest:legacyManifestFromTape(legacyTape),tape:legacyTape});
+  const bundle={...base,claims:{...base.claims,score:base.claims.score+912}};
+  const digest=bundleDigest(bundle),bytes=bundleBytes(bundle);
+  const saved=view.actions.store;
+  view.actions.store={backend:'memory'}; // previously blocked upgrade recovered in shared store
+  try{
+    await view._processImportFile({name:`${digest.slice(7)}.bbreplay`,size:bytes.length,
+      arrayBuffer:async()=>bytes.slice().buffer});
+    return {backend:view.actions.store.backend,durable:await store.isBundleDurable(digest),
+      feedback:view.status.main.text};
+  }finally{view.actions.store=saved;await view._refresh({retryPending:false});}
+ });
+ assert.equal(importReconnect.backend,'idb');
+ assert(importReconnect.durable && importReconnect.feedback.includes('IMPORTED'));
+ record('Import reconnects formerly memory-only archive without retrying other bundles');
  const keep=await p.evaluate(async()=>{
   const {view,store,digest}=window.__qaEvidence;
   await view._keepOrUnpin();

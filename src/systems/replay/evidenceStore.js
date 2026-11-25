@@ -408,7 +408,7 @@ export class EvidenceStore {
       this._report(err);
       throw err;
     }
-    await this._flushPending();
+    if (!meta.skipPendingFlush) await this._flushPending();
     return digest;
   }
 
@@ -584,7 +584,10 @@ export class EvidenceStore {
     if (typeof expectedDigest !== 'string' || !expectedDigest) throw new EvidenceStoreError('digest-required', 'importBundle needs the expected bundle digest');
     const actual = bundleDigest(bytes);
     if (expectedDigest !== actual) throw new EvidenceStoreError('digest-mismatch', `expected ${expectedDigest}, got ${actual}`);
-    return runId === undefined ? this.put(bytes, {archiveOnly:true}) : this.put(bytes, {runId});
+    // Import is an explicit write of THIS file, not consent to retry other
+    // session-only captures. Refresh is the explicit retry action in the UI.
+    return runId === undefined ? this.put(bytes, {archiveOnly:true,skipPendingFlush:true})
+      : this.put(bytes, {runId,skipPendingFlush:true});
   }
 
   /** Durable protected evidence refs, independent of ghost display roles and cosmetic trace retention. */
