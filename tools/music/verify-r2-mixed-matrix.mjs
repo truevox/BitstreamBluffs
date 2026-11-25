@@ -55,6 +55,18 @@ for(let i=0;i<33;i++){
  assert.equal(result.edgeFramesNotInterpolated,0);
  assert.ok(Math.abs(result.estimatedTruePeakDbTp4x-20*Math.log10(Math.max(1e-12,result.estimatedTruePeak4x)))<1e-8);
 
+ if(report.candidateSpec){
+  const candidate=result.pairedHeadroom;
+  assert.equal(candidate?.knee,report.candidateSpec.knee);
+  assert.equal(candidate?.ceiling,report.candidateSpec.ceiling);
+  assertMixedQaMetrics(candidate.metrics);
+  assert.equal(candidate.metrics.sampleRate,48000);
+  assert.equal(candidate.metrics.channels,2);
+  assert.equal(candidate.metrics.windowStartFrame,result.windowStartFrame);
+  assert.equal(candidate.metrics.windowEndFrame,result.windowEndFrame);
+  assert.equal(candidate.metrics.samplesPerChannel,result.samplesPerChannel);
+  if(process.env.QA_REQUIRE_MINUS_1==='1')assert.ok(candidate.metrics.estimatedTruePeakDbTp4x<=-1,'Candidate target miss '+i);
+ }
  assert.equal(result.productionGraph.productionPeakGuard,true);
  assert.equal(result.test.master,1);
  assert.equal(result.test.music,1);
@@ -94,6 +106,13 @@ for(let i=0;i<33;i++){
 assert.equal(report.status,'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE');
 assert.equal(report.summary.songs,33);
 assert.equal(report.summary.mixedCases,33);
+if(report.candidateSpec){
+ assert.equal(report.candidateReview.sampledCases,33);
+ assert.equal(report.candidateReview.clips,0);
+ assert.equal(report.candidateReview.estimatedOvers,0);
+ assert.equal(report.candidateReview.targetMisses,report.scenarios.filter(r=>r.pairedHeadroom.metrics.estimatedTruePeakDbTp4x>-1).length);
+ if(process.env.QA_REQUIRE_MINUS_1==='1')assert.equal(report.candidateReview.targetMisses,0);
+}
 assert.equal(report.summary.totalHashedSourceInputs,231);
 for(const key of ['overUnityAllSamples','overUnityAllTruePeak4xFrames','pageErrors','httpErrors'])assert.equal(report.summary[key],0);
 assert.equal(verified,231);

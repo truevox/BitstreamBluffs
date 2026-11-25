@@ -9,6 +9,12 @@ const base=(process.env.QA_URL||'http://127.0.0.1:8220').replace(/\/+$/,'');
 const dest=process.env.REPORT_OUT;
 if(!dest||existsSync(dest))throw Error('Unique REPORT_OUT required; no existing evidence overwrite');
 const published=process.env.QA_R2==='1';
+const paired=process.env.QA_R2_PAIRED_GUARD==='1';
+assert.ok(!paired||published,'Paired guard mode requires pinned public R2 release');
+const candidateKnee=Number(process.env.QA_KNEE??'.74');
+const candidateCeiling=Number(process.env.QA_CEILING??'.82');
+if(paired)assert.ok(Number.isFinite(candidateKnee)&&Number.isFinite(candidateCeiling)&&candidateKnee>=.6&&candidateCeiling<=.9&&candidateCeiling-candidateKnee>=.02);
+
 const catalogUrl=published?'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json':'/music/catalog.json';
 const highRisk=['candy-cane-canyon','garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs'];
 const phase=process.env.QA_R2_PHASE||'middle';
@@ -41,7 +47,7 @@ const scenarios=overlap?
 if(!scenarios.length)throw Error('No source scenario selected');
 const results=[],errors=[],httpErrors=[];
 const report={format:'bitstream-sim8-original-mixed-output-4x-estimate-v1',
-	referenceUrl:base,catalogUrl,sourceMode:published?'pinned-public-r2':'local-private',matrixPhase:published?phase:null,startedAt:new Date().toISOString(),
+	referenceUrl:base,catalogUrl,sourceMode:published?'pinned-public-r2':'local-private',matrixPhase:published?phase:null,candidateSpec:paired?{knee:candidateKnee,ceiling:candidateCeiling}:null,startedAt:new Date().toISOString(),
 	scenarios:results,method:'Actual AudioSynth._buildGraph, SFX/wind/static APIs, real original source stems, full post-compressor peak guard; cosmetic noise seeded to fixed 0x2912026 for repeatability; 48kHz OfflineAudioContext, 48-tap 4x intersample estimate',
 	limitations:[
 		'Scripted stress SFX event schedule; NOT actual terrain traversal or replay',
@@ -90,10 +96,17 @@ try{
 		console.log('MIXED_SOURCE_START',i+1,'/',scenarios.length,
 			song.title,task.biome,task.scenario,'segment',task.segment);
 		const r=await page.evaluate(args=>window.__mixedFinalAudioQA.render(args),{
-			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard',manifestUrl:published?song.manifestUrl:null,windowPosition:published&&phase!=='middle'?phase:'legacy'});
+			pack:song.pack,segmentIndex:task.segment,biome:task.biome,scenario:task.scenario,profile:task.profile||'standard',manifestUrl:published?song.manifestUrl:null,windowPosition:published&&phase!=='middle'?phase:'legacy',pairedHeadroom:paired,candidateKnee,candidateCeiling});
 		assert.equal(r.trackId,song.id);
 		if(published)assert.equal(r.sourceManifestUrl,song.manifestUrl);
 		assert.equal(r.productionGraph.productionPeakGuard,true);
+		if(paired){
+			assert.equal(r.pairedHeadroom?.knee,candidateKnee);
+			assert.equal(r.pairedHeadroom?.ceiling,candidateCeiling);
+			assert.equal(r.pairedHeadroom.metrics.sampleRate,48000);
+			assert.equal(r.pairedHeadroom.metrics.channels,2);
+			assert.equal(r.pairedHeadroom.metrics.nonfiniteSamples,0);
+		}
 		assert.equal(r.originalSourceCount,task.scenario==='sfx-wind-only'?0:7);
 		assert.equal(r.nonfiniteSamples,0);
 		assert.equal(r.test.qaCosmeticSeed,0x2912026);
@@ -127,7 +140,19 @@ try{
         results.some(x=>!Number.isFinite(x.estimatedTruePeak4x)||x.estimatedTruePeak4x>=1)?'FAILED_ESTIMATED_4X_TRUE_PEAK':
         'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
 	report.browserErrors=errors;report.httpErrors=httpErrors;
-	process.exitCode=auditVerdictExitCode(report.status);
+	if(paired){
+		const cand=results.map(r=>r.pairedHeadroom.metrics);
+		report.candidateReview={
+			kind:'same-input offline parallel native 2x post-compressor shaper',
+			sampledCases:cand.length,
+			targetMisses:cand.filter(m=>!Number.isFinite(m.estimatedTruePeakDbTp4x)||m.estimatedTruePeakDbTp4x>-1).length,
+			clips:cand.reduce((s,m)=>s+m.sampleClips,0),
+			estimatedOvers:cand.reduce((s,m)=>s+m.estimatedTrueClips4x,0),
+			maxEstimatedDbtp:Math.max(...cand.map(m=>m.estimatedTruePeakDbTp4x)),
+			maxAbsRmsDeltaDb:Math.max(...results.map(r=>Math.abs(20*Math.log10(r.pairedHeadroom.metrics.rms/r.rms))))
+		};
+	}
+	process.exitCode=auditVerdictExitCode(report.status)||(paired&&(report.candidateReview.targetMisses||report.candidateReview.clips||report.candidateReview.estimatedOvers)?1:0);
 	console.log('MIXED_OUTPUT_AUDIT',report.status,JSON.stringify(report.summary),
 		'max_dBTP',report.highestMixed.estimatedTruePeakDbTp4x.toFixed(2));
 }catch(error){

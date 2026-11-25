@@ -120,3 +120,57 @@ Complementary offline comparison uses exact R2 outgoing last 3.8s and incoming f
 | 31 | Vertigo | -.546 | -1.223 |
 
 5/5 offline overlap cases below -1dBTP with candidate, 24s measured, max absolute RMS change .020144dB, zero measured clips/overs in either arm. Worst candidate only .0186dB below preferred target; do not imply a robust calibrated safety margin. Private report SHA-256 1a5a35f77a0a861287818bac7b481e2047d31edc7f40918ebda302e41a8ab8b0. All five hot-ending comparisons reproduced after helper refactor; 81/81 focused tests pass. No source/production changes. Next: actual candidate live postguard comparison or different audio environment, independent review, human listening and device acceptance; do not claim exact same-input live crossfade comparison.
+
+## 33-transition candidate sweep and revised headroom target (2026-11-24)
+
+The initial candidate from experimental PR #321 (.78 soft knee, .88 ceiling) was **not** sufficient for the full published playlist. Extended from five targeted transitions to all 33 consecutive catalog handoffs (including the last-to-first wrap), source-bound to the immutable R2 inventory, with the five earlier hot biome assignments preserved and remaining transitions stratified across Candy/Garbage/Vertigo/Crystal/Arcade. Each paired offline render includes the final 3.8s of outgoing audio and first 3.8s of incoming audio; exactly 2.8s time-based fade and 4.8s measured per transition. The original seven audio roles and every segment intersection were hashed against publication inventory objects. The native production compressor feeds the original guard and one candidate guard in parallel in the same render. This is a **controlled offline reconstruction**, not a live transport/device capture or proof across all 12 biome identities.
+
+| Parameter or metric | Current release | Candidate v1 | Candidate v2 |
+|---|---:|---:|---:|
+| Soft knee | 0.86 | 0.78 | 0.74 |
+| Soft ceiling | 0.965 | 0.88 | 0.82 |
+| Transitions at or below -1 dBTP | 23/33 | 32/33 | **33/33** |
+| Worst estimated peak | -0.222 dBTP | -0.799 dBTP | **-1.268 dBTP** |
+
+Both candidate versions had zero sampled clips/estimated intersample overs in these 33 windows. Candidate v2's maximum absolute RMS difference from the current release was **0.041844 dB**. The stronger candidate was selected for further testing because it retains approximately 0.268dB margin beneath the preferred -1 dBTP line in this offline matrix, whereas v1 missed that line. A small RMS difference **does not** establish that short transients sound identical.
+
+The v2 report was independently verified against the original catalog and 33 SHA-256-checked pack manifests, 504 decoded OGG hash checks, all source frame intervals, 33 distinct ordered transitions, paired window/peak math, and negative tamper controls. The report verification can be rerun with:
+
+```sh
+QA_REQUIRE_MINUS_1=1 node tools/music/verify-r2-crossfade-paired-report.mjs \
+  /path/to/all33-offline-paired-74-82.json /path/to/publication-330-inventory.json
+```
+
+Candidate v1 full-33 report SHA-256: `c3b5de7dc276f4c7089c0f1f825450ddd56bd85f78ee9fed9ba7aca734e3e857`.
+Candidate v2 full-33 report SHA-256: `68c1ef6d694f66309aa8c081c55477943006e85f804068f183b3bc22750676c1`.
+
+### Independent 99-window mixed SFX validation — candidate v2
+
+The v2 knee/ceiling were then applied in **parallel with unchanged production output** for all 33 opening, middle, and ending sampled windows (99 cases; 363.99 seconds measured). Actual published original OGGs and melody derivatives, native AudioSynth compressor/wind/SFX/BSOD/glitch/hard landing/crash methods, and exact production mixer were used. Every one of the 693 source-hash checks matched publication inventory. A second verifier compared each production baseline to the previously accepted independent production report (same track, source hashes, event schedule, output sample/peak/RMS within 2e-5). The strongest candidate got:
+
+- **99/99** candidate 4x estimated true peaks at or below **-1 dBTP**, worst **-1.743671 dBTP** (One More Run / Vertigo / ending);
+- zero sampled clips, estimated 4x intersample overs, nonfinite samples, page errors, or HTTP errors;
+- maximum absolute candidate-versus-production RMS change **0.019861 dB**;
+- all three independent R2 verifiers passed, plus combined 99-window baseline/candidate verifier and tampered-report negative controls.
+
+The additional reports were accepted with:
+
+```sh
+for phase in opening middle ending; do
+  QA_REQUIRE_MINUS_1=1 node tools/music/verify-r2-mixed-matrix.mjs \
+    "/path/to/${phase}-paired-74-82.json" /path/to/publication-330-inventory.json
+done
+QA_REQUIRE_MINUS_1=1 node tools/music/verify-r2-paired-99.mjs /path/to/report-directory
+```
+
+Report SHA-256 values: opening `e574c3f349eb868d22dc897f216deb230df6d1266afbf590e143052367c77229`, middle `335781c49bc6999a8610c5cfd29cd43d73a4d6252106082162785201a74af3cc`, ending `27640a624f2f9d85dec13c4a1606cbc1c11a7a545fbef4adb74bf2c3452caea4`.
+
+**Combined controlled sampled evidence:** 132/132 independent windows below the preferred -1 dBTP estimate with candidate v2; 1197 source-hash checks (repeated OGG objects can be counted more than once), no measured clipping. This is not certification for every sample of every complete song, every biome, or physical device/browser implementation.
+
+### Listening approval and release distinction
+
+Created **six blind, matched 4.8-second 24-bit FLAC A/B pairs**, baseline vs candidate v2, including catalog index 0 (the v1 miss) and all five earlier targeted high-risk handoffs. Audio is source-bound to the accepted 33-transition report and regenerated without loudness normalization. Owner-only temporary Tailnet preview: `http://100.115.120.66:18249/` (server subject to expiry). Version 1 preview on port 18248 represents the *older, insufficient .78/.88 candidate* and must not be confused with v2.
+
+The existing isolated candidate build and draft PR #321 still represent **v1 (.78/.88)**, not v2. In that isolated build, four of five targeted live post-guard crossfade captures qualified with no clipping; index 1 failed strict continuity twice. **No v2 live output has been certified.** Repeated -128-frame timestamp failures in preguard tap experiments are preserved as invalid instrumentation, not filtered out or assumed to represent actual speaker glitches.
+
+**Remaining release gates:** owner blind listening feedback, independent code/QA review, direct v2 live-device/browser output capture (or an explicitly accepted substitute with accurate limitations), and a decision on acceptable sound and target margin. No production guard or approved biome mix has changed; no Netlify deployment requested. Issue #291 and QA-only PR #339 remain open/draft.

@@ -122,12 +122,13 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode,offsetFrames=0}){
 	}
 	return mixer;
 }
-function installPairedGuards(ctx,a){
+function installPairedGuards(ctx,a,{knee=.78,ceiling=.88}={}){
+	if(!Number.isFinite(knee)||!Number.isFinite(ceiling)||knee<.6||ceiling>.9||ceiling-knee<.02)throw Error('Invalid candidate curve');
 	const candidate=ctx.createWaveShaper();
 	const curve=new Float32Array(8193);
 	for(let i=0;i<curve.length;i++){
-		const v=2*i/(curve.length-1)-1,m=Math.abs(v),t=(m-.78)/.10;
-		curve[i]=m<=.78?v:Math.sign(v)*(.78+.10*(1-1/(1+t+t*t/2+t*t*t/6)));
+		const v=2*i/(curve.length-1)-1,m=Math.abs(v),span=ceiling-knee,t=(m-knee)/span;
+		curve[i]=m<=knee?v:Math.sign(v)*(knee+span*(1-1/(1+t+t*t/2+t*t*t/6)));
 	}
 	candidate.curve=curve;candidate.oversample='2x';
 	a.nodes.comp.connect(candidate);
@@ -140,7 +141,7 @@ function installPairedGuards(ctx,a){
 	merge.connect(ctx.destination);
 }
 // Complementary source-backed offline overlap, not a live transport capture.
-async function renderPairedCrossfade({from,to,biome}){
+async function renderPairedCrossfade({from,to,biome,candidateKnee=.78,candidateCeiling=.88}){
  const manifest=async track=>{
   if(!/^packs\/[\w-]+\/pack\.json$/.test(track.manifest))throw Error('Invalid manifest');
   const url=R2_RELEASE+track.manifest;
@@ -155,7 +156,7 @@ async function renderPairedCrossfade({from,to,biome}){
  const renderFrames=Math.round(START*RATE)+leadFrames+overlapFrames+tailFrames+12000;
  const ctx=new OfflineAudioContext(4,renderFrames,RATE);
  seedCosmeticRandom(QA_COSMETIC_SEED);
- const a=actualAudioSynthGraph(ctx);installPairedGuards(ctx,a);
+ const a=actualAudioSynthGraph(ctx);installPairedGuards(ctx,a,{knee:candidateKnee,ceiling:candidateCeiling});
  const mixer=new StemFXMixer(ctx,a.nodes.musicFilter,{roomQuality:'standard'});
  mixer.selectBiome(biome);a._stemMusic.mixer=mixer;
  const roles=[...ALL_ROLES,'voice:'+biome],inputs=new Map();
@@ -197,10 +198,10 @@ async function renderPairedCrossfade({from,to,biome}){
  const metrics=offset=>measureFourTimesTruePeak({length:pcm.length,sampleRate:RATE,numberOfChannels:2,getChannelData:i=>pcm.getChannelData(offset+i)},bounds);
  const baseline=metrics(0),candidate=metrics(2);
  mixer.destroy();
- return {from:out.m.id,to:inc.m.id,biome,plan,fadeStart,fadeEnd,receipts,baseline,candidate,deltaDb:candidate.estimatedTruePeakDbTp4x-baseline.estimatedTruePeakDbTp4x,rmsDeltaDb:20*Math.log10(candidate.rms/baseline.rms),limitations:'offline, frozen outgoing vocal FX/room sends, fixed source gains, no live transport or gameplay SFX'};
+ return {from:out.m.id,to:inc.m.id,biome,candidateSpec:{knee:candidateKnee,ceiling:candidateCeiling},plan,fadeStart,fadeEnd,receipts,baseline,candidate,deltaDb:candidate.estimatedTruePeakDbTp4x-baseline.estimatedTruePeakDbTp4x,rmsDeltaDb:20*Math.log10(candidate.rms/baseline.rms),limitations:'offline, frozen outgoing vocal FX/room sends, fixed source gains, no live transport or gameplay SFX'};
 }
 async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
-	profile='standard',manifestUrl=null,windowPosition='legacy',pairedHeadroom=false}){
+	profile='standard',manifestUrl=null,windowPosition='legacy',pairedHeadroom=false,candidateKnee=.78,candidateCeiling=.88}){
 	if(!['mixed-game-stress','music-only','sfx-wind-only'].includes(scenario))
 		throw Error('Unknown QA scenario');
 	if(!['standard','crash-static-overlap'].includes(profile))throw Error('Invalid QA profile');
@@ -218,7 +219,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	// Does not seed or advance gameplay RNG or touch normal game sessions.
 	seedCosmeticRandom(QA_COSMETIC_SEED);
 	const a=actualAudioSynthGraph(ctx);
-	if(pairedHeadroom)installPairedGuards(ctx,a);
+	if(pairedHeadroom)installPairedGuards(ctx,a,{knee:candidateKnee,ceiling:candidateCeiling});
 	const mixer=scenario==='sfx-wind-only'?null:setOriginalSourceMix(ctx,a,original,
 		{biome,mode:scenario,offsetFrames});
 	let installedAudioSources=original.roles.length;
@@ -261,7 +262,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 		endFrame:Math.floor(3.85*RATE),
 	};
 	const window=measureFourTimesTruePeak(stereo(0),bounds);
-	const paired=pairedHeadroom?{method:'same offline native compressor PCM, two parallel 2x shapers',knee:.78,ceiling:.88,
+	const paired=pairedHeadroom?{method:'same offline native compressor PCM, two parallel 2x shapers',knee:candidateKnee,ceiling:candidateCeiling,
 		metrics:measureFourTimesTruePeak(stereo(2),bounds)}:null;
 	mixer?.destroy();
 	return {pack,trackId:original.manifest.id,sourceSegment:segmentIndex,
