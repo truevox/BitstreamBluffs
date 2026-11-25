@@ -1,8 +1,13 @@
 /** Explicit-consent, developer-only verified cache for the immutable #333 release. */
 export const R2_BASE='https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/';
+export const MELODY_R2_BASE='https://bsb-audio.bearcave.win/releases/20261124-melody-only-748a0670/';
 const PREFIX='bb-r2-recordings-v1-';
 function releaseUrl(url){
-  return typeof url==='string'&&url.startsWith(R2_BASE)&&/^(?:catalog\.json|packs\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.\/-]+)$/.test(url.slice(R2_BASE.length))&&!url.slice(R2_BASE.length).split('/').some(p=>!p||p==='.'||p==='..');
+  if(typeof url!=='string')return false;
+  const base=[R2_BASE,MELODY_R2_BASE].find(b=>url.startsWith(b));if(!base)return false;
+  const key=url.slice(base.length);
+  return (/^(?:catalog\.json|packs\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.\/-]+)$/.test(key)||
+    (base===MELODY_R2_BASE&&/^music-variants\/(?:lite|full)\/packs\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.\/-]+\.ogg$/.test(key)))&&!key.split('/').some(p=>!p||p==='.'||p==='..');
 }
 function scopePath(scope){if(typeof scope!=='string'||!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(scope))throw Error('Invalid cache scope');return scope;}
 function cachePrefix(scope){return PREFIX+encodeURIComponent(scopePath(scope))+'-';}
@@ -52,6 +57,7 @@ export async function downloadR2Group(group,{storage,origin,scope,subtle,fetcher
 /** Deliberately separate namespace from the legacy same-origin music caches. */
 export function renderR2RouteWorker(){return `
 const R2_BASE=${JSON.stringify(R2_BASE)};
+const MELODY_R2_BASE=${JSON.stringify(MELODY_R2_BASE)};
 const PREFIX=${JSON.stringify(PREFIX)};
 ${[releaseUrl,scopePath,cachePrefix,groupShape,digest,groupCheck,groupName,markerUrl,verifiedResponse].map(f=>f.toString()).join('\n')}
 const R2_VERIFIED=new Set();

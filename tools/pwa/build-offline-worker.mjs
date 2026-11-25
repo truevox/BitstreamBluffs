@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { renderMusicRouteWorker } from './music-route-worker.mjs';
 import { renderR2RouteWorker } from './r2-cache.mjs';
 import { renderMonoDevRouter } from './r2-mono-dev-cache.mjs';
+import { renderMelodyTierRouter } from './melody-tier-cache.mjs';
 
 export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
@@ -70,7 +71,7 @@ export async function createOfflineInventory(distDir, base = '/') {
   return { version, base, totalBytes: total, entries };
 }
 
-export function renderOfflineWorker(inventory, {monoDev=false} = {}) {
+export function renderOfflineWorker(inventory, {monoDev=false,melodyDev=false} = {}) {
   const base = checkedBase(inventory.base);
   const cacheToken = '__BB_SHELL_CACHE_ID__';
   const paths = inventory.entries.map(x => [x.path, x.sha256]);
@@ -84,6 +85,7 @@ export function renderOfflineWorker(inventory, {monoDev=false} = {}) {
 (base === '/' ? renderMusicRouteWorker() : '') +
 renderR2RouteWorker() +
 (monoDev ? renderMonoDevRouter() : '') +
+(melodyDev ? renderMelodyTierRouter() : '') +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
@@ -113,6 +115,7 @@ renderR2RouteWorker() +
 `  const url = new URL(request.url);\n` +
 `  if (request.mode === 'cors' && releaseUrl(url.href) && !request.headers.has('Range')) {\n` +
 `    event.respondWith((async()=>{` +
+(melodyDev ? `const melody=await melodyTierResponse(url.href);if(melody!==undefined)return melody;` : '') +
 (monoDev ? `if(url.pathname.endsWith('.ogg')){const candidate=await monoDevResponse(url.href);if(candidate!==undefined)return candidate;}` : '') +
 `const stored=await cachedR2(url.href);if(stored)return stored;try{return await fetch(request);}catch{return new Response('Original music download required when online.',{status:503});}})());return;\n` +
 `  }\n` +
