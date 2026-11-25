@@ -271,7 +271,7 @@ describe('HowToPlayLayout', () => {
 
   test('the trick layouts teach exactly the keys ControlLayouts binds in a run', () => {
     const glyph = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D' };
-    const label = { tiltForward: 'TILT FWD', tiltBack: 'TILT BACK', heliRight: 'HELI SPIN', corkscrew: 'CORKSCREW', parachute: 'CHUTE', airBrake: 'AIR BRAKE', divebomb: 'DIVEBOMB', tuck: 'TUCK' };
+    const label = { tiltForward: 'TILT FWD', tiltBack: 'TILT BACK', heliRight: 'HELI SPIN', corkscrew: 'CORKSCREW', parachute: 'CHUTE', airBrake: 'AIR/GND BRAKE', divebomb: 'DIVEBOMB', tuck: 'TUCK' };
     for (const [layout, table] of [['tricksRight', TRICK_KEYS_RIGHT], ['tricksLeft', TRICK_KEYS_LEFT]]) {
       const rows = keyboardRows(layout);
       for (const [code, pad] of Object.entries(table)) {
@@ -279,6 +279,13 @@ describe('HowToPlayLayout', () => {
         expect([layout, pad, row && row.keys]).toEqual([layout, pad, [glyph[code]]]);
       }
     }
+  });
+
+  test('every keyboard map explicitly teaches owner-approved ground brake on its AirBrake key', () => {
+    expect(keyboardRows('tricksRight').find(r=>r.label==='AIR/GND BRAKE')?.keys).toEqual(['A']);
+    expect(keyboardRows('tricksLeft').find(r=>r.label==='AIR/GND BRAKE')?.keys).toEqual(['←']);
+    expect(keyboardRows('classic').find(r=>r.label==='AIR/GND BRAKE')?.keys).toEqual(['↑']);
+    expect(GAMEPAD_ROWS.find(r=>r.label==='AIR/GND BRAKE')?.glyphs.map(g=>g.text)).toEqual(['X']);
   });
 
   test('every layout keeps HOP, RESET and PAUSE, and an unknown layout falls back to the default', () => {
