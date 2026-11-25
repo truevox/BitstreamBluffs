@@ -114,7 +114,8 @@ export class ReplayEvidenceView extends View {
       if (!live() || this._captureStatus()!==status) return;
       // An IDB backend can retain a quota-failed bundle in session RAM even
       // after space comes back. An EXPLICIT Refresh retries those pending bytes.
-      if (control.store.pending.has(capture.digest)) await control.store.retryPending();
+      if (control.store.pending.has(capture.digest))
+        await control.store.retryPending({digest:capture.digest}); // prioritize the run on screen
       if (!live() || this._captureStatus()!==status) return;
       // One persisted snapshot / digest check establishes readable bytes,
       // durability and the exact run binding. Do not hash 16 MiB three times.

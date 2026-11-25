@@ -1,5 +1,7 @@
 /** Pure rules for the local archive UI. No browser APIs, network or identity claims. */
-const DIGEST_FILE=/^([0-9a-f]{64})\.bbreplay$/i;
+// Chromium, Firefox and downloads managers can add ' (1)' to a duplicate.
+// The 64-hex expected digest is still REQUIRED and matched to actual bytes.
+const DIGEST_FILE=/^([0-9a-f]{64})(?: \([1-9][0-9]{0,5}\))?\.bbreplay$/i;
 const DIGEST=/^sha256:[0-9a-f]{64}$/;
 
 export function digestFromLocalReplayFilename(filename) {

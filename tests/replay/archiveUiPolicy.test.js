@@ -4,8 +4,12 @@ const d='sha256:'+'a'.repeat(64);
 describe('Game Over archive local-only UI policy (#244)',()=>{
   test('strict filename requires exact hex digest and .bbreplay extension',()=>{
     expect(digestFromLocalReplayFilename(`${'A'.repeat(64)}.BBREPLAY`)).toBe(d);
+    expect(digestFromLocalReplayFilename(`${'a'.repeat(64)} (1).bbreplay`)).toBe(d);
+    expect(digestFromLocalReplayFilename(`${'A'.repeat(64)} (293).BBREPLAY`)).toBe(d);
     for(const invalid of ['run.bbreplay',`../${'a'.repeat(64)}.bbreplay`,
       ` ${'a'.repeat(64)}.bbreplay`,`${'a'.repeat(64)}.bbreplay.exe`,
+      `${'a'.repeat(64)} (0).bbreplay`,`${'a'.repeat(64)} (-2).bbreplay`,
+      `${'a'.repeat(64)} (2).bbreplay.exe`,`${'a'.repeat(64)} (0002).bbreplay`,
       `${'g'.repeat(64)}.bbreplay`,null,{},''])
       expect(digestFromLocalReplayFilename(invalid)).toBeNull();
   });
