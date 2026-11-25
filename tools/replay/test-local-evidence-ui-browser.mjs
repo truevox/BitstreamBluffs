@@ -60,6 +60,19 @@ try {
  assert.equal(foreignPin.afterPin,'UNPIN');
  assert.equal(foreignPin.afterUnpin,'KEEP');
  results.push('Refresh follows persisted pin/unpin from another browser tab');
+ const oneHash=await p.evaluate(async()=>{
+  const {view,store}=window.__qaEvidence;
+  const get=store.get, oldDurable=store.isBundleDurable;
+  store.get=async()=>{throw new Error('Refresh must not call full-byte get');};
+  store.isBundleDurable=async()=>{throw new Error('Refresh must not repeat durability hashing');};
+  try{
+    await view._refresh();
+    return {exportEnabled:view.buttons[1].disabled===false,keepEnabled:view.buttons[0].disabled===false};
+  }finally{store.get=get;store.isBundleDurable=oldDurable;await view._refresh();}
+ });
+ assert(oneHash.exportEnabled && oneHash.keepEnabled);
+ results.push('Refresh uses one atomic replay inspection instead of repeated full-bundle hashing');
+
  const failedRefs=await p.evaluate(async()=>{
   const {view,store}=window.__qaEvidence;
   const original=store.persistedProtections;
@@ -161,12 +174,7 @@ try {
  results.push('quota-failed memory-only canonical input remains explicitly exportable but cannot be pinned');
  const recovered=await p.evaluate(async missingDigest=>{
   const {view,store}=window.__qaEvidence;
-  const {evidenceBundle,legacyManifestFromTape}=await import('/src/systems/replay/manifest.js');
-  const tape=window.__qaEvidence.legacyTape;
-  const base=evidenceBundle({manifest:legacyManifestFromTape(tape),tape});
-  const different={...base,claims:{...base.claims,score:base.claims.score+6}};
-  await store.put(different,{runId:'unrelated-success'}); // flush previous failed write
-  await view._refresh();
+  await view._refresh(); // NO unrelated new run should be needed to retry quota bytes
   const durable=await store.isBundleDurable(missingDigest,{runId:'ui-smoke-run'});
   const enabled=view.buttons[0].disabled===false;
   const message=view.status.main.text;
@@ -181,7 +189,7 @@ try {
  assert(recovered.durable && recovered.enabled && recovered.message.includes('RECOVERED'));
  assert.equal(recovered.afterPin,1);
  assert.equal(recovered.afterUnpin,0);
- results.push('once quota-failed capture becomes durable under exact run ID, Refresh enables Keep/Unpin');
+ results.push('Refresh alone retries quota-failed bytes and enables run-bound Keep/Unpin');
 
 
  const displayGeneration=await p.evaluate(async()=>{
