@@ -29,6 +29,7 @@ export class ReplayEvidenceView extends View {
     this.displayedPin=null; // immutable UI generation snapshot; never retarget Unpin from a newer cache
     this._operationVersion=0; // reject stale async refresh after a user action
     this._refreshPending=0; // only reconcile if a user action interrupts an actual Refresh
+    this._reconcileRequested=false; // stale Unpin needs immediate read-only pin-state reconciliation
     const text=(x,y,v,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,v,{color,outline:'none'}));
     text(12,24,'PRIVATE TO THIS DEVICE. NEVER UPLOADED.','cyan');
     text(12,38,'A CHECKSUM DOES NOT PROVE WHO PLAYED.','amber');
@@ -113,7 +114,10 @@ export class ReplayEvidenceView extends View {
     }
     this.digestText.setText(`SHA256: ${capture.digest.slice(7,31).toUpperCase()}...`);
     try {
-      const control=await this._getActions();
+      // Action-triggered reconciliation must never reopen IndexedDB or flush
+      // pending bytes. Only an explicitly selected Refresh may do that.
+      const control=retryPending ? await this._getActions() : this.actions;
+      if(!control){this._show('ARCHIVE STATUS UNAVAILABLE','SELECT REFRESH TO RECONNECT STORAGE');return false;}
       if (!live() || this._captureStatus()!==status) return;
       // An IDB backend can retain a quota-failed bundle in session RAM even
       // after space comes back. An EXPLICIT Refresh retries those pending bytes.
@@ -179,7 +183,8 @@ export class ReplayEvidenceView extends View {
     finally{
       this.busy=false;
       if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
-      if(this.alive && interruptedRefresh){
+      if(this.alive && (interruptedRefresh || this._reconcileRequested)){
+        this._reconcileRequested=false;
         // Only an action that superseded an in-flight Refresh needs to undo
         // its disabled controls. This is a read-only reconciliation: explicit
         // player Refresh is the sole UI gesture that retries pending writes.
@@ -187,9 +192,17 @@ export class ReplayEvidenceView extends View {
         const reconcile=this._refresh({retryPending:false});
         const refreshVersion=this._operationVersion;
         const healthy=await reconcile;
-        if(healthy && this.alive && !this.busy && this._operationVersion===refreshVersion){
-          this.status.setText(message);
-          this.detail.setText(details);
+        if(this.alive && !this.busy && this._operationVersion===refreshVersion){
+          const keepOriginal=String(message).includes('KEEP ORIGINAL FILE') || String(details).includes('KEEP ORIGINAL FILE');
+          if(healthy){
+            this.status.setText(message);
+            this.detail.setText(details);
+          }else if(keepOriginal){
+            // Preserving a selected file is more urgent than the current-run
+            // archive read, but show BOTH warnings, not stale success.
+            const archiveWarning=this.status.main.text;
+            this._show('KEEP ORIGINAL FILE',`${details} — ${archiveWarning}`);
+          }
         }
       }
     }
@@ -213,7 +226,8 @@ export class ReplayEvidenceView extends View {
       if (!displayed?.generation) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
       const result=await control.unpin(displayed.key,{expectedGeneration:displayed.generation});
       if(!result.ok){
-        this._show('PIN STATUS CHANGED','ANOTHER TAB MAY HAVE REMOVED IT — REFRESHED BELOW');
+        this._reconcileRequested=true;
+        this._show('PIN STATUS CHANGED','ANOTHER TAB MAY HAVE REMOVED IT — RECHECKING');
         return;
       }
       this.displayedPin=null;
