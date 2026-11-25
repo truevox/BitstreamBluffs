@@ -775,6 +775,45 @@ describe('protected local evidence references (#244)', () => {
     expect(await s.isBundleDurable(digest,{runId:'incorrect'})).toBe(false);
   });
 
+  test('failed duplicate from stale tab with no cached index never resurrects cross-tab deletion',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const writer=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await writer.put(bundle(),{runId:RUN});
+    expect(stale.has(digest)).toBe(false);
+    idb.hooks.failPut=new Error('write of stale-tab duplicate failed');
+    await expect(stale.put(bundle(),{runId:RUN})).rejects.toMatchObject({code:'write-failed'});
+    expect(stale.pending.has(digest)).toBe(false);
+    idb.hooks.failPut=null;
+    await writer.remove(digest);
+    await stale.init();
+    expect(stale.has(digest)).toBe(false);
+    expect((await new EvidenceStore({idb,storage:null}).init()).has(digest)).toBe(false);
+  });
+
+  test('a stale tab can export inspected persisted evidence without an initial local index entry',async()=>{
+    const idb=fakeIdb(),stale=await new EvidenceStore({idb,storage:null}).init();
+    const writer=await new EvidenceStore({idb,storage:null}).init();
+    const digest=await writer.put(bundle(),{runId:RUN});
+    expect(stale.has(digest)).toBe(false);
+    expect(await stale.inspectBundle(digest,{runId:RUN})).toEqual({readable:true,durable:true,runBound:true});
+    const exported=await stale.exportBundle(digest);
+    expect(exported.digest).toBe(digest);
+    expect(exported.bytes).toEqual(bundleBytes(bundle()));
+    expect(stale.index.get(digest).runId).toBe(RUN);
+  });
+
+  test('archive inspection reads durability and protected count in one atomic IDB snapshot',async()=>{
+    const {store,digest,idb}=await seededStore();
+    const pinned=await store.protect(digest,{runId:RUN,role:'pinned'});
+    const events=[];idb.hooks.onTransaction=(names,mode)=>events.push({names,mode});
+    expect(await store.inspectBundle(digest,{runId:RUN,withProtections:true})).toEqual({readable:true,durable:true,runBound:true,protectionCount:1});
+    expect(events.filter(x=>x.mode==='readonly')).toEqual([{names:['index','bundles','protectedRefs'],mode:'readonly'}]);
+    idb.hooks.onTransaction=null;
+    await store.unprotect(pinned.key);
+    await store.remove(digest);
+    expect(await store.inspectBundle(digest,{withProtections:true})).toEqual({readable:false,durable:false,runBound:false,protectionCount:0});
+  });
+
   test('v1 database upgrades in place to v2 without overwriting existing index/bundle', async () => {
     const idb=fakeIdb();
     const old=await new Promise((resolve,reject)=>{

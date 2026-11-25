@@ -209,7 +209,7 @@ export class EvidenceStore {
     if (this.onError) { try { this.onError(err); } catch { /* a UI callback must not break the store */ } }
   }
 
-  async _writeDurable(record, bytes) {
+  async _writeDurable(record, bytes, receipt = null) {
     const tx = this._db.transaction([EVIDENCE_STORE, EVIDENCE_INDEX], 'readwrite');
     const done = txDone(tx);
     let problem = null;
@@ -222,10 +222,26 @@ export class EvidenceStore {
         problem = protectionError('run-id-conflict', 'persisted digest belongs to a different local run');
         tx.abort(); return;
       }
-      actual = { ...record, runId: previous?.runId || record.runId,
-        seq: previous?.seq || record.seq };
-      tx.objectStore(EVIDENCE_STORE).put({ digest: record.digest, bytes });
-      tx.objectStore(EVIDENCE_INDEX).put(actual);
+      const write = () => {
+        actual = { ...record, runId: previous?.runId || record.runId,
+          seq: previous?.seq || record.seq };
+        tx.objectStore(EVIDENCE_STORE).put({ digest: record.digest, bytes });
+        tx.objectStore(EVIDENCE_INDEX).put(actual);
+      };
+      if (!receipt || !previous) { write(); return; }
+      // In the SAME transaction as the attempted write, classify whether
+      // these exact canonical bytes/binding ALREADY existed. A stale tab may
+      // have no `prior` cache; failed duplicates must not later resurrect a
+      // bundle another tab expressly deleted.
+      const old = tx.objectStore(EVIDENCE_STORE).get(record.digest);
+      old.onsuccess = () => {
+        try {
+          receipt.previouslyDurable = Boolean(old.result?.bytes &&
+            (!record.runId || previous.runId === record.runId) &&
+            digestOfBytes(old.result.bytes) === record.digest);
+        } catch { receipt.previouslyDurable = false; }
+        write();
+      };
     };
     try { await done; } catch (e) { throw problem || e; }
     return actual;
@@ -271,15 +287,11 @@ export class EvidenceStore {
       if (!meta.archiveOnly || !this.pendingMeta.has(digest)) this.pendingMeta.set(digest, record);
       return digest;
     }
-    // If these very same bytes AND their desired run binding were already
-    // durable before this redundant write, a failed update must NOT be queued
-    // for automatic retry: another tab may intentionally delete the evidence.
-    // A stale cached index alone is not proof; verify the persisted digest.
-    const wasPersistedDuplicate = prior && !this.pending.has(digest)
-      ? await this.isBundleDurable(digest,record.runId ? {runId:record.runId} : {})
-      : false;
+    // Receipt is set by the SAME atomic transaction that tries to write;
+    // a cross-tab saved row might be absent from this tab's stale index.
+    const writeReceipt = { previouslyDurable:false };
     try {
-      const committed = await this._writeDurable(record, bytes);
+      const committed = await this._writeDurable(record, bytes, writeReceipt);
       this.index.set(digest, committed);
       const olderClaim = this.pendingMeta.get(digest);
       // A second overlapping unbound write may succeed while an earlier
@@ -296,7 +308,7 @@ export class EvidenceStore {
       // A failed duplicate write must not erase an already durable run binding
       // (or a concurrent same-instance write that committed in the meantime).
       if (!this.index.has(digest)) this.index.set(digest, prior || record);
-      if (!wasPersistedDuplicate) {
+      if (!writeReceipt.previouslyDurable) {
         this.pending.set(digest, bytes);
         // Preserve explicit pending run claims. Never overwrite a stronger
         // prior claim with a failed overlapping unbound write.
@@ -351,37 +363,47 @@ export class EvidenceStore {
   }
 
   /** One digest verification per Refresh, with an atomic persisted snapshot.
-   * Provides integrity/durability/run binding, NOT proof of honest play.
-   * Memory-only pending bytes may be readable but never count as durable.
+   * Optional protectionCount is from that SAME transaction; local cache and
+   * two sequential IDB reads could mix pre/post deletion states.
+   * This checks byte integrity and local run binding, NOT honest play.
    */
-  async inspectBundle(digest, {runId} = {}) {
+  async inspectBundle(digest, {runId, withProtections=false} = {}) {
     const pending=this.pending.get(digest);
     const pendingReadable=()=>{
       if (!pending)return false;
       if (digestOfBytes(pending)!==digest)throw new EvidenceStoreError('corrupt-record',digest);
       return true;
     };
+    const result=(readable,durable,runBound,count=null)=>({
+      readable,durable,runBound,...(withProtections?{protectionCount:count}:{})
+    });
     if (this._db) {
-      let idx,row;
+      let idx,row,refs=null;
       try {
-        const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
-        [idx,row]=await Promise.all([
+        const names=[EVIDENCE_INDEX,EVIDENCE_STORE,...(withProtections?[EVIDENCE_REFS]:[])];
+        const tx=this._db.transaction(names,'readonly');
+        const reqs=[
           req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
           req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
-          txDone(tx),
-        ]);
+        ];
+        if (withProtections) reqs.push(req2p(tx.objectStore(EVIDENCE_REFS).getAll()));
+        const values=await Promise.all([...reqs,txDone(tx)]);
+        [idx,row]=values;
+        if (withProtections) refs=values[2];
       } catch (e) {
-        if (pendingReadable()) return {readable:true,durable:false,runBound:false};
+        if (pendingReadable()) return result(true,false,false,null);
         throw new EvidenceStoreError('read-failed',digest,e);
       }
+      const count=refs ? refs.filter(ref=>ref.digest===digest).length : null;
       if (idx && row?.bytes) {
         if (idx.digest!==digest || digestOfBytes(row.bytes)!==digest)
           throw new EvidenceStoreError('corrupt-record',digest);
-        return {readable:true,durable:true,runBound:runId!==undefined && idx.runId===runId};
+        return result(true,true,runId!==undefined && idx.runId===runId,count);
       }
       if (idx || row) throw new EvidenceStoreError('corrupt-record',`${digest}: incomplete persisted evidence`);
+      return result(pendingReadable(),false,false,count);
     }
-    return {readable:pendingReadable(),durable:false,runBound:false};
+    return result(pendingReadable(),false,false,null);
   }
 
   /** Exact bundle durability; false also represents unavailable storage. */
@@ -395,18 +417,34 @@ export class EvidenceStore {
   /** Local index (no bytes), in insertion order. */
   list() { return [...this.index.values()].sort((a, b) => a.seq - b.seq).map((r) => ({ digest: r.digest, runId: r.runId, size: r.size })); }
 
-  /** Canonical bytes of a stored bundle, read on demand and re-hashed against their key; null when absent. */
+  /** Canonical bytes of a stored bundle; always re-hashed. The local index
+   * may be stale: an IDB saved by ANOTHER tab is still exportable here.
+   */
   async get(digest) {
-    if (!this.index.has(digest)) return null;
-    let bytes = this.pending.get(digest);
+    let bytes=this.pending.get(digest);
     if (!bytes && this._db) {
+      let idx,row;
       try {
-        const row = await req2p(this._db.transaction(EVIDENCE_STORE, 'readonly').objectStore(EVIDENCE_STORE).get(digest));
-        bytes = row && row.bytes;
-      } catch (e) { throw new EvidenceStoreError('read-failed', digest, e); }
+        const tx=this._db.transaction([EVIDENCE_INDEX,EVIDENCE_STORE],'readonly');
+        [idx,row]=await Promise.all([
+          req2p(tx.objectStore(EVIDENCE_INDEX).get(digest)),
+          req2p(tx.objectStore(EVIDENCE_STORE).get(digest)),
+          txDone(tx),
+        ]);
+      } catch (e) { throw new EvidenceStoreError('read-failed',digest,e); }
+      if (!idx && !row) { this.index.delete(digest); return null; }
+      if (!idx || !row?.bytes || idx.digest!==digest)
+        throw new EvidenceStoreError('corrupt-record',`${digest}: incomplete persisted evidence`);
+      bytes=row.bytes;
+      if (digestOfBytes(bytes)!==digest) throw new EvidenceStoreError('corrupt-record',digest);
+      this.index.set(digest,idx); // reconcile only AFTER verifying stored bytes
+      return copy(bytes);
     }
-    if (!bytes) throw new EvidenceStoreError('corrupt-record', `${digest}: indexed but no bytes`);
-    if (digestOfBytes(bytes) !== digest) throw new EvidenceStoreError('corrupt-record', digest);
+    if (!bytes) {
+      if (this.index.has(digest)) throw new EvidenceStoreError('corrupt-record',`${digest}: indexed but no bytes`);
+      return null;
+    }
+    if (digestOfBytes(bytes)!==digest) throw new EvidenceStoreError('corrupt-record',digest);
     return copy(bytes);
   }
 
