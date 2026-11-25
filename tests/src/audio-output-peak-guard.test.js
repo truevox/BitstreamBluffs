@@ -5,9 +5,16 @@ import {
 } from '../../src/systems/music/OutputPeakGuard.js';
 
 describe('final original-music/SFX output soft peak backstop',()=>{
+	test('draft v2 constants are the exact reviewed candidate, not v1',()=>{
+		expect(PEAK_GUARD_KNEE).toBe(.74);
+		expect(PEAK_GUARD_CEILING).toBe(.82);
+		expect(peakGuardTransfer(.70)).toBe(.70);
+		expect(peakGuardTransfer(.80)).toBeLessThan(.80);
+		expect(peakGuardTransfer(1)).toBeLessThan(.82);
+	});
 	test('the entire normal music band is EXACTLY transparent, including sign',()=>{
 		for(const value of [0,-0,1e-8,-1e-8,.125,-.125,.33,-.33,
-			.5,-.5,.75,-.75,PEAK_GUARD_KNEE,-PEAK_GUARD_KNEE])
+			.5,-.5,.73,-.73,PEAK_GUARD_KNEE,-PEAK_GUARD_KNEE])
 			expect(peakGuardTransfer(value)).toBe(value);
 	});
 	test('continuous symmetric C1 soft knee, bounded at digital full scale',()=>{
