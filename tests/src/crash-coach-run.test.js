@@ -138,6 +138,57 @@ describe('runCoach', () => {
   });
 });
 
+describe('runCoach: wiring options for the real engine', () => {
+  it('passes the branch, crash and reference tape to simulate', async () => {
+    const seen = [];
+    const simulate = async (t, o) => { seen.push(o); return { survived: false, crashTick: 1000, fingerprintAt: {} }; };
+    await runCoach({ ...base, simulate, budget: 2 });
+    expect(seen[0]).toEqual({ untilTick: 1240, branchTick: 640, crashTick: 1000, referenceTape: tape });
+  });
+  it('reports progress after every candidate, with a running tally', async () => {
+    const sim = fakeSimulator({ winLo: 842, winHi: 846 });
+    const ticks = [];
+    await run(sim, { budget: 30, onProgress: (p) => ticks.push(p) });
+    expect(ticks).toHaveLength(30);
+    expect(ticks[0]).toMatchObject({ searched: 1, planned: 30, survivors: 0, unstable: 0 });
+    expect(ticks.at(-1).searched).toBe(30);
+    expect(ticks.at(-1).survivors).toBeGreaterThan(0);
+    expect(typeof ticks[0].label).toBe('string');
+  });
+  it('shouldStop ends the search at the next candidate and says so', async () => {
+    const sim = fakeSimulator({ winLo: 9000, winHi: 9001 });
+    let n = 0;
+    const out = await run(sim, { shouldStop: () => n++ >= 3 });
+    expect(out.searched).toBe(3);
+    expect(out.cancelled).toBe(true);
+    expect(out.summary).toContain('Search was cancelled.');
+  });
+  it('a CoachCancelled thrown by simulate cancels instead of counting an error', async () => {
+    let n = 0;
+    const simulate = async () => { if (++n > 2) { const e = new Error('x'); e.name = 'CoachCancelled'; throw e; } return { survived: false, crashTick: 1000, fingerprintAt: {} }; };
+    const out = await runCoach({ ...base, simulate });
+    expect(out.cancelled).toBe(true);
+    expect(out.errors).toBe(0);
+    expect(out.searched).toBe(2);
+  });
+  it('states how long the search took when it has a clock', async () => {
+    let t = 0;
+    const now = () => { t += 1000; return t; };
+    const none = await run(fakeSimulator({ winLo: 9000, winHi: 9001 }), { budget: 3, now });
+    expect(none.elapsedMs).toBeGreaterThan(0);
+    expect(none.summary).toMatch(/^Searched 3 nearby input variations in \d+(\.\d)? s; none survived\. This search is not exhaustive\./);
+    const some = await run(fakeSimulator({ winLo: 842, winHi: 846 }), { now: () => 0 });
+    expect(some.summary).toMatch(/^Searched \d+ nearby input variations; 5 survived\.$/);
+    expect(some.elapsedMs).toBe(0);
+  });
+  it('keeps the survivor pose trace from its validating run', async () => {
+    const base0 = fakeSimulator({ winLo: 842, winHi: 846 });
+    const simulate = async (t, o) => ({ ...(await base0.simulate(t, o)), poseTrace: { fromTick: 640, every: 4, xy: [1, 2] } });
+    const out = await runCoach({ ...base, simulate });
+    expect(out.survivors[0].poseTrace).toEqual({ fromTick: 640, every: 4, xy: [1, 2] });
+  });
+});
+
 describe('butterflyData', () => {
   const r = (kind, offsetTicks, outcome, label = 'hop 2 ticks earlier', divergenceAt = null) => ({ id: `${kind}:${offsetTicks}`, kind, label, offsetTicks, outcome, divergenceAt });
   it('names the smallest shift that changed the outcome', () => {

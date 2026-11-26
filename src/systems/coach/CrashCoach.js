@@ -44,11 +44,15 @@ const finalFingerprint = (fp) => {
 /** A result counts as survived only if it says so and reports no crash inside the judged span. */
 const survivedAll = (res, untilTick) => !!res && res.survived === true && !(isInt(res.crashTick) && res.crashTick <= untilTick);
 
-function summaryOf({ searched, survivors, unstable, errors, budgetExhausted, unsupported }) {
+const seconds = (ms) => `${ms < 10000 ? (ms / 1000).toFixed(1) : Math.round(ms / 1000)} s`;
+
+function summaryOf({ searched, survivors, unstable, errors, budgetExhausted, unsupported, cancelled, elapsedMs }) {
   const noun = searched === 1 ? 'variation' : 'variations';
+  const took = elapsedMs > 0 ? ` in ${seconds(elapsedMs)}` : '';
   let s = survivors.length
-    ? `Searched ${searched} nearby input ${noun}; ${survivors.length} survived.`
-    : `Searched ${searched} nearby input ${noun}; none survived. This search is not exhaustive.`;
+    ? `Searched ${searched} nearby input ${noun}${took}; ${survivors.length} survived.`
+    : `Searched ${searched} nearby input ${noun}${took}; none survived. This search is not exhaustive.`;
+  if (cancelled) s += ' Search was cancelled.';
   if (unstable) s += ` ${unstable} ${unstable === 1 ? 'was' : 'were'} dropped because the result did not repeat.`;
   if (errors) s += ` ${errors} could not be simulated.`;
   if (budgetExhausted) s += ' Search stopped at its budget.';
@@ -69,10 +73,14 @@ function summaryOf({ searched, survivors, unstable, errors, budgetExhausted, uns
  * @param {number} [o.marginTicks] survival is judged through crashTick + marginTicks
  * @param {number} [o.maxShift] largest timing shift tried, in ticks
  * @param {object|number[]} [o.sledAtCrash] sled pose at the crash, for the explanation
+ * @param {(p:{searched:number, planned:number, survivors:number, unstable:number, errors:number, label:string, elapsedMs:number})=>void} [o.onProgress]
+ *   called after every candidate
+ * @param {() => boolean} [o.shouldStop] polled before every candidate; true ends the search (result.cancelled)
  */
 export async function runCoach({
   tape, crashTick, lastCrash, simulate, budget = DEFAULT_BUDGET, timeBudgetMs = null, now = null,
   branchBackTicks = DEFAULT_BRANCH_BACK_TICKS, marginTicks = DEFAULT_MARGIN_TICKS, maxShift = DEFAULT_MAX_SHIFT, sledAtCrash,
+  onProgress = null, shouldStop = null,
 } = {}) {
   if (typeof simulate !== 'function') throw new TypeError('runCoach needs an injected simulate(tape, {untilTick}) function');
   const cause = explainCrash({ lastCrash, crashTick, tape, sledAtCrash });
@@ -86,8 +94,10 @@ export async function runCoach({
   const candidates = listed.slice(0, cap);
   let budgetExhausted = listed.length > cap;
 
-  const useClock = isInt(timeBudgetMs) && typeof now === 'function';
-  const t0 = useClock ? now() : 0;
+  const hasClock = typeof now === 'function';
+  const useClock = isInt(timeBudgetMs) && hasClock;
+  const t0 = hasClock ? now() : 0;
+  let cancelled = false;
   const survivors = [];
   const results = [];
   let searched = 0;
@@ -95,35 +105,43 @@ export async function runCoach({
   let errors = 0;
 
   for (const c of candidates) {
+    if (shouldStop && shouldStop()) { cancelled = true; break; }
     if (useClock && now() - t0 >= timeBudgetMs) { budgetExhausted = true; break; }
     searched++;
     const rec = { id: c.id, kind: c.kind, label: c.label, offsetTicks: c.offsetTicks, outcome: 'crashed', divergenceAt: null };
     results.push(rec);
     try {
       const candidateTape = applyCandidate(tape, c);
-      const first = await simulate(candidateTape, { untilTick });
+      const first = await simulate(candidateTape, { untilTick, branchTick, crashTick, referenceTape: tape });
       rec.divergenceAt = Number.isFinite(first && first.divergenceAt) ? first.divergenceAt : null;
-      if (!survivedAll(first, untilTick)) continue;
-      // Re-validate with a FRESH tape object and a fresh simulate call.
-      const second = await simulate(applyCandidate(tape, c), { untilTick });
-      if (survivedAll(second, untilTick) && sameFingerprints(first.fingerprintAt, second.fingerprintAt)) {
-        rec.outcome = 'survived';
-        survivors.push({ id: c.id, kind: c.kind, label: c.label, offsetTicks: c.offsetTicks, branchTick, validated: true,
-          divergenceAt: rec.divergenceAt, finalFingerprint: finalFingerprint(second.fingerprintAt), tape: candidateTape });
-      } else {
-        rec.outcome = 'unstable';
-        unstable++;
+      if (survivedAll(first, untilTick)) {
+        // Re-validate with a FRESH tape object and a fresh simulate call.
+        const second = await simulate(applyCandidate(tape, c), { untilTick, branchTick, crashTick, referenceTape: tape });
+        if (survivedAll(second, untilTick) && sameFingerprints(first.fingerprintAt, second.fingerprintAt)) {
+          rec.outcome = 'survived';
+          survivors.push({ id: c.id, kind: c.kind, label: c.label, offsetTicks: c.offsetTicks, branchTick, validated: true,
+            divergenceAt: rec.divergenceAt, finalFingerprint: finalFingerprint(second.fingerprintAt), tape: candidateTape,
+            ...(second.poseTrace ? { poseTrace: second.poseTrace } : {}) });
+        } else {
+          rec.outcome = 'unstable';
+          unstable++;
+        }
       }
-    } catch {
+    } catch (e) {
+      if (e && e.name === 'CoachCancelled') { cancelled = true; searched--; results.pop(); break; }
       rec.outcome = 'error';
       errors++;
     }
+    if (onProgress) {
+      try { onProgress({ searched, planned: candidates.length, survivors: survivors.length, unstable, errors, label: c.label, elapsedMs: hasClock ? now() - t0 : 0 }); } catch (e) { /* a progress view must never end the search */ }
+    }
   }
+  const elapsedMs = hasClock ? now() - t0 : 0;
 
   const unsupported = support.ok ? null : support.reason;
   return {
-    cause, searched, survivors, unstable, errors, budgetExhausted, unsupported, branchTick, untilTick,
-    summary: summaryOf({ searched, survivors, unstable, errors, budgetExhausted, unsupported }),
+    cause, searched, survivors, unstable, errors, budgetExhausted, unsupported, cancelled, elapsedMs, branchTick, untilTick,
+    summary: summaryOf({ searched, survivors, unstable, errors, budgetExhausted, unsupported, cancelled, elapsedMs }),
     sensitivity: butterflyData(results, { branchTick }),
   };
 }
