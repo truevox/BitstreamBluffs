@@ -1,6 +1,9 @@
 import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { canonicalBytes, parseCanonical } from '../../src/systems/replay/canonicalJson.js';
+import {initWallet,checkEquipment,persistEquipment,readEquipment,equipmentProjection,equipmentDigest} from './publicWallet.mjs';
+import {prepareReplayEvidence} from './replayEvidence.mjs';
+import {digestOf} from '../../src/systems/replay/canonicalSha256.js';
 import { adjudicateDualProof } from '../../src/systems/trust/dualProof.js';
 
 // Server-only reference boundary. Never import from browser code.
@@ -40,7 +43,9 @@ function trustedKeys(entries) {
 function verifyReceipt(envelope, role, context, registry, now) {
   if (!keys(envelope,['body','signature'])) return null;
   const b = envelope.body;
-  if (!keys(b,['format','version','role','keyId','accountId','challengeId','claimDigest','issuedAt','expiresAt','payload']) ||
+  const fields=['format','version','role','keyId','accountId','challengeId','claimDigest','issuedAt','expiresAt','payload'];
+  if(context.evidenceDigest!==null)fields.push('evidenceDigest');
+  if (!keys(b,fields) || (context.evidenceDigest!==null&&b.evidenceDigest!==context.evidenceDigest) ||
       b.format!=='bb-authority-receipt' || b.version!==1 || b.role!==role || !id(b.keyId) ||
       b.accountId!==context.accountId || b.challengeId!==context.challengeId || b.claimDigest!==context.claimDigest ||
       !integer(b.issuedAt) || !integer(b.expiresAt) || b.issuedAt<context.createdAt || b.issuedAt>now ||
@@ -58,9 +63,10 @@ function verifyReceipt(envelope, role, context, registry, now) {
  * authenticatedAccount comes from transport authentication; issueChallenge's
  * course comes from server policy. No public API or private signing keys here.
  */
-export function openAdmissionLedger({databasePath, issuers, clock=Date.now, challengeTtlMs=15*60*1000}) {
+export function openAdmissionLedger({databasePath, issuers, clock=Date.now, challengeTtlMs=15*60*1000, trustedRuleset=null, allowUnboundTestClaims=false}) {
   if (typeof databasePath!=='string' || !databasePath || !integer(challengeTtlMs) ||
       challengeTtlMs===0 || challengeTtlMs>24*60*60*1000) throw Error('invalid ledger configuration');
+  if(!allowUnboundTestClaims&&(!trustedRuleset||digestOf(trustedRuleset.ruleset)!==trustedRuleset.rulesetId))throw Error('trusted ruleset required');
   const registry=trustedKeys(issuers);
   const db=new DatabaseSync(databasePath);
   db.exec(`
@@ -75,16 +81,17 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
     CREATE TABLE IF NOT EXISTS admissions(
       challenge TEXT PRIMARY KEY REFERENCES challenges(id),
       account TEXT NOT NULL, run TEXT NOT NULL UNIQUE, claim TEXT NOT NULL,
-      tape TEXT NOT NULL UNIQUE, accepted INTEGER NOT NULL, verdict TEXT NOT NULL, receipt_audit TEXT NOT NULL
+      tape TEXT NOT NULL UNIQUE, accepted INTEGER NOT NULL, verdict TEXT NOT NULL, receipt_audit TEXT NOT NULL, evidence_digest TEXT
     ) STRICT;
   `);
+  initWallet(db);
   const nowOf=()=>{const now=clock();if(!integer(now))throw Error('invalid server clock');return now;};
   const transaction=fn=>{
     db.exec('BEGIN IMMEDIATE');
     try { const result=fn(); db.exec('COMMIT'); return result; }
     catch(e){db.exec('ROLLBACK');throw e;}
   };
-  function issueChallenge(authenticatedAccount, courseBytes, pinnedVerifierBuildId) {
+  function issueChallenge(authenticatedAccount, courseBytes, pinnedVerifierBuildId, loadoutBytes) {
     if (!id(authenticatedAccount) || !digest(pinnedVerifierBuildId)) throw Error('invalid challenge identity');
     const course=read(courseBytes);
     if (!keys(course,COURSE)) throw Error('invalid course shape');
@@ -93,14 +100,19 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
       tapeDigest:pinnedVerifierBuildId,score:0,endTick:0,intent:'verified-public',challengeId:null};
     if (adjudicateDualProof({request:probe}).proof.reason!=='trusted-evidence-missing')
       throw Error('invalid or nonhuman course');
+    return transaction(()=>{
+    const equipment=allowUnboundTestClaims?null:checkEquipment(db,authenticatedAccount,course,loadoutBytes);
+    if(!allowUnboundTestClaims&&(course.rulesetId!==trustedRuleset.rulesetId||!equipment.ok))throw Error('equipment refused: '+(equipment?.reason??'ruleset'));
     const now=nowOf(), expires=now+challengeTtlMs;
     if (!integer(expires)) throw Error('invalid expiry');
     const challengeId=randomUUID();
     db.prepare('INSERT INTO challenges VALUES (?,?,?,?,?,?)').run(challengeId,authenticatedAccount,
       Buffer.from(canonicalBytes(course)).toString('utf8'),pinnedVerifierBuildId,now,expires);
+    if(equipment)persistEquipment(db,challengeId,authenticatedAccount,equipment);
     return {challengeId,createdAt:now,expiresAt:expires};
+    });
   }
-  function admit(authenticatedAccount, bundleBytes) {
+  function admit(authenticatedAccount, bundleBytes, evidenceBytes) {
     if (!id(authenticatedAccount)) return fail('account-required');
     let bundle;
     try {bundle=read(bundleBytes);} catch {return fail('malformed-bundle');}
@@ -110,16 +122,26 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
         adjudicateDualProof({request:r}).proof.reason!=='trusted-evidence-missing')
       return fail('invalid-request');
     const claimDigest=hash(canonicalBytes(r));
+    // Validate and derive identity before opening a write transaction.
+    const evidence=allowUnboundTestClaims?null:prepareReplayEvidence(evidenceBytes,trustedRuleset);
+    if(!allowUnboundTestClaims&&(!evidence.ok||evidence.identity.manifestDigest!==r.manifestDigest||
+      evidence.identity.tapeDigest!==r.tapeDigest||evidence.identity.rulesetId!==r.rulesetId||
+      evidence.tape.seed!==r.seed||evidence.tape.biomeMask!==r.biomeMask||evidence.expected.score!==r.score||
+      evidence.expected.endTick!==r.endTick||equipmentDigest(equipmentProjection(evidence.causal))!==r.loadoutDigest))return fail('evidence-identity-mismatch');
     return transaction(()=>{
       const now=nowOf();
       const challenge=db.prepare('SELECT * FROM challenges WHERE id=?').get(r.challengeId);
       if (!challenge || challenge.account!==authenticatedAccount) return fail('challenge-not-owned');
       if (now<challenge.created || now>=challenge.expires) return fail('challenge-expired');
       if (challenge.course!==Buffer.from(canonicalBytes(courseOf(r))).toString('utf8')) return fail('challenge-course-mismatch');
+      if(!allowUnboundTestClaims){
+        const frozen=readEquipment(db,r.challengeId,authenticatedAccount);
+        if(!frozen||frozen.digest!==r.loadoutDigest||equipmentDigest(frozen.loadout)!==frozen.digest)return fail('equipment-not-pinned');
+      }
       if (db.prepare('SELECT 1 FROM admissions WHERE challenge=? OR run=? OR tape=?').get(r.challengeId,r.runId,r.tapeDigest))
         return fail('already-admitted');
       const context={accountId:authenticatedAccount,challengeId:r.challengeId,claimDigest,
-        createdAt:challenge.created,expiresAt:challenge.expires};
+        createdAt:challenge.created,expiresAt:challenge.expires,evidenceDigest:evidence?.identity.bundleDigest??null};
       const proofs={};
       for(const role of ROLES){
         const payload=verifyReceipt(bundle.receipts[role],role,context,registry,now);
@@ -132,9 +154,9 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
       const verdict=adjudicateDualProof({request:r,...proofs});
       if (!verdict.verifiedRankEligible || !verdict.publicRewardEligible) return {admitted:false,reason:'policy-denied',verdict};
       const audit=ROLES.map(role=>({role,keyId:bundle.receipts[role].body.keyId,receiptDigest:hash(canonicalBytes(bundle.receipts[role]))}));
-      db.prepare('INSERT INTO admissions VALUES (?,?,?,?,?,?,?,?)').run(r.challengeId,authenticatedAccount,
+      db.prepare('INSERT INTO admissions VALUES (?,?,?,?,?,?,?,?,?)').run(r.challengeId,authenticatedAccount,
         r.runId,claimDigest,r.tapeDigest,now,Buffer.from(canonicalBytes(verdict)).toString('utf8'),
-        Buffer.from(canonicalBytes(audit)).toString('utf8'));
+        Buffer.from(canonicalBytes(audit)).toString('utf8'),context.evidenceDigest);
       return {admitted:true,verdict};
     });
   }

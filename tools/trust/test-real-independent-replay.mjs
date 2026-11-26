@@ -9,6 +9,7 @@ import {boot,recordRun,freshPage,closeHarness} from '../test-takeover-browser.mj
 import {validateEvidenceBundle} from '../../src/systems/replay/manifest.js';
 import {canonicalBytes} from '../../src/systems/replay/canonicalJson.js';
 
+import {exerciseBoundAdmission} from './boundAdmissionFixture.mjs';
 import {prepareReplayEvidence,compareReplayObservation} from '../../server/trust/replayEvidence.mjs';
 
 const current=JSON.parse(readFileSync(new URL('../../tools/ruleset/current.json',import.meta.url),'utf8'));
@@ -75,4 +76,5 @@ try{
  const badInput=structuredClone(checked.bundle);badInput.inputs[0][1]^=1;
  assert.equal((await replay(canonicalBytes(badInput))).reason,'invalid-evidence');
  console.log('PASS_REAL_REPLAY_NEGATIVES');
+ exerciseBoundAdmission(bytes,{rulesetId:current.rulesetId,ruleset},info.tape.buildId);
 }finally{await closeHarness();}

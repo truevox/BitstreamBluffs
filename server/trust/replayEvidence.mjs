@@ -24,7 +24,7 @@ export function prepareReplayEvidence(bytes,{rulesetId,ruleset}){
     syncLevel:c.bsod.syncLevel,magnetsDrop:c.loadout.magnetsDrop,kodiaksOn:c.kodiak.enabled,
     kodiakPackMode:c.kodiak.packMode,upgradeRanks:c.loadout.upgradeRanks,boosts:c.loadout.boosts,
     inputs:b.inputs,checkpoints:b.exact.sled.map(r=>[r[0],...decodePose(r.slice(1,7)),r[7]])};
- return {ok:true,tape,expected:{startPose:c.start.pose,physicsScramble:c.rng.physicsScramble,
+ return {ok:true,tape,causal:c,identity:{bundleDigest:v.bundleDigest,manifestDigest:v.manifestDigest,tapeDigest:c.input.tapeDigest,rulesetId:c.sim.rulesetId},expected:{startPose:c.start.pose,physicsScramble:c.rng.physicsScramble,
     initial:[c.bsod.leftEdgeX,c.bsod.initial.wallX,c.bsod.initial.wallSpeedPxS,c.bsod.initial.accelerationPxS2],
     checkpoints:b.checkpoints,endTick:b.claims.endTick,score:b.claims.score,distanceM:b.claims.distanceM}};
 }
