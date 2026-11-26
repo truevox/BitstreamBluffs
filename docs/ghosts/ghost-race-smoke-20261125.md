@@ -58,3 +58,15 @@ No game source, ranking, persistence, consent or SIM rules changed.
 The existing subsequent no-save, restart/quit, and normal-run
 positive controls remain. This test-only follow-up must pass exact
 head Pages smoke; historical green checks are not a substitute.
+
+## Reconciliation with shipped v2.25.1
+
+Main advanced to `6647a294` (#394) while #396 was under review.
+That patch documented an independent #393 observation of a stale
+coordinate hitting the modal dim layer and added a 320 ms scene-time
+guard plus settled-panel checks. This follow-up retains that guard
+and the shipped version/changelog, adds the deliberate Back-overlap
+negative control, and replaces repeated arming attempts with exactly
+one first click. The two observed failure modes share the opening
+animation timing hazard. This is additional QA hardening, not
+another change to gameplay or consent logic.

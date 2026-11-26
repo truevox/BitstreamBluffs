@@ -388,7 +388,7 @@ try{
     }finally{t.tweens.timeScale=0;}
     return {seekMs,scale,alpha:v.panel.alpha,stale:{x:stale.x,y:stale.y},back:{x:back.x,y:back.y},staleHitsBack};
    });
-   if(!(held.scale>0&&held.scale<1)||!held.staleHitsBack)
+   if(!(held.scale>0&&held.scale<1)||held.alpha!==1||!held.staleHitsBack)
     throw Error('Slow-open control did not reproduce stale Race -> BACK geometry '+JSON.stringify(held));
    console.log('RACE_SLOW_OPEN_CONTROL',JSON.stringify(held));
   }
@@ -401,16 +401,22 @@ try{
     scaleY:v?.panel?.scaleY,panelY:v?.panel?.y,
     running:g.scene.isActive('RunScene'),starting:t.starting===true,trace:window.__racePointerTrace};
   });
+  // Retain #394's shipped scene-time guard as well as our explicit
+  // settled geometry and consecutive frame checks.
+  const openingCheckedAt=await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').time.now);
   const practicePoint=async()=>{
-   // Check consecutive rendered frames, not elapsed wall-clock time. Slow
+   // Check consecutive rendered frames, not just elapsed time. Slow
    // Chromium may take much longer than the 260 ms animation duration.
    await recipient.evaluate(()=>{window.__raceStable={key:null,frames:0,blocked:0};});
-   await recipient.waitForFunction(()=>{
+   await recipient.waitForFunction(openingCheckedAt=>{
     const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view,z=v?.practiceBtn?.zone,panel=v?.panel;
     if(v!==window.__raceView||!v?.alive||!z?.scene||t.starting||g.scene.isActive('RunScene'))
      throw Error('Guest preview replaced before explicit consent');
     if(v.busy||v.practiceBtn.disabled||panel.alpha!==1||panel.scaleX!==1||panel.scaleY!==1||panel.y!==18){
      window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked+1};return false;
+    }
+    if(t.time.now-openingCheckedAt<320){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked};return false;
     }
     const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=g.canvas.getBoundingClientRect();
     const point={x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
@@ -421,7 +427,7 @@ try{
     const old=window.__raceStable;
     window.__raceStable={key,frames:old.key===key?old.frames+1:1,point,blocked:old.blocked};
     return window.__raceStable.frames>=3;
-   },null,{timeout:15000,polling:'raf'}).catch(async e=>{
+   },openingCheckedAt,{timeout:15000,polling:'raf'}).catch(async e=>{
     throw Error('Race Guest never became a stable rendered target '+JSON.stringify(await raceState()),{cause:e});
    });
    return recipient.evaluate(()=>window.__raceStable.point);

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.25.1 — #69 real mobile Guest Race browser QA stability (2026-11-25)
+
+- Prevent the compiled Pages browser acceptance test from clicking the RACE GUEST button while the CRT modal is still opening. The test waits for real Phaser scene time and a fully expanded, visible panel before sending the first genuine pointer activation. A real diagnostic recorded the panel at scaleY 1 during coordinate sampling but scaleY 0.108 at pointerdown, which struck the modal dim background instead of the Race Guest hitzone.
+- The second explicit click still remains mandatory for unranked Guest Practice; the QA script continues to reject missing/destroyed hitzones, unexpected early launches and accidental saves. **Test-only fix:** no runtime/gameplay, physics, score, consent, Shards, upload or public trust code changes; no physical-device acceptance is claimed.
+
 ## v2.25.0 — #66 Crash Coach and Butterfly Meter (2026-11-25)
 
 - Game Over C opens Crash Coach, explaining the recorded crash with evidence and testing nearby input variations through the real engine. The search is bounded, not exhaustive; alternatives require a second matching replay.
