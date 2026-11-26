@@ -235,6 +235,28 @@ function adjudicateDualProofCore(input = {}) {
  */
 const MAX_TRUST_BYTES = 256 * 1024;
 
+// Some native objects retain non-JSON internal slots after their prototype is
+// replaced with Object.prototype (or null). A prototype-only plain-object
+// test would silently turn a Map, Date or typed array into an ordinary {}.
+// Native brand probes bypass user methods/accessors and do not mutate values.
+const TRUST_BRAND_PROBES = Object.freeze([
+  o=>Date.prototype.getTime.call(o),
+  o=>Map.prototype.has.call(o,null),
+  o=>Set.prototype.has.call(o,null),
+  o=>WeakMap.prototype.has.call(o,o),
+  o=>WeakSet.prototype.has.call(o,o),
+  o=>Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get.call(o),
+  ...(typeof SharedArrayBuffer==='function'
+    ? [o=>Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype,'byteLength').get.call(o)] : []),
+]);
+const isNativeExotic=o=>{
+  if(ArrayBuffer.isView(o))return true;
+  for(const probe of TRUST_BRAND_PROBES){
+    try{probe(o);return true;}catch{/* ordinary JSON object has no native slots */}
+  }
+  return false;
+};
+
 function snapshotInput(input){
   const ancestors=new WeakSet();
   let budget=0, remaining=MAX_TRUST_BYTES;
@@ -280,7 +302,7 @@ function snapshotInput(input){
     // subclasses or prototype-swizzled arrays bypass the object check.
     if(array){
       if(Object.getPrototypeOf(v)!==Array.prototype)throw new TypeError('exotic trust array');
-    }else if(!isObj(v))throw new TypeError('exotic trust input');
+    }else if(!isObj(v)||isNativeExotic(v))throw new TypeError('exotic trust input');
     ancestors.add(v);
     try{
       const keys=Reflect.ownKeys(v);

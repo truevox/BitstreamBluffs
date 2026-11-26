@@ -537,6 +537,15 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const changedPrototype=[1];
     Object.setPrototypeOf(changedPrototype,Object.create(Array.prototype));
     invalid.push({...evidence,garbage:changedPrototype});
+    // An object with Object.prototype may still carry hidden native slots.
+    // JSON.parse cannot construct a Map/Date/typed-array with forged prototype.
+    for(const branded of [new Map([['x',1]]),new Set([1]),new Date(),
+      new WeakMap(),new WeakSet(),new Uint8Array(2),
+      new DataView(new ArrayBuffer(2)),new ArrayBuffer(2),
+      ...(typeof SharedArrayBuffer==='function'?[new SharedArrayBuffer(2)]:[])]){
+      Object.setPrototypeOf(branded,Object.prototype);
+      invalid.push({...evidence,garbage:branded});
+    }
     const symbols={...evidence};symbols[Symbol('hidden')]='untrusted';
     invalid.push(symbols);
     const hidden={...evidence};Object.defineProperty(hidden,'invisible',{value:1,enumerable:false});
