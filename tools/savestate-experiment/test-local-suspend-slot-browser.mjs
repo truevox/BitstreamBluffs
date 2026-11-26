@@ -71,6 +71,21 @@ try{
  })));
  assert(results.filter(x=>x.ok).length===1,JSON.stringify(results));
  const winner=results[0].ok?A:B,loser=results[0].ok?B:A;
+ const heldToken=results.find(x=>x.ok).token;
+ // A browser reload must NEVER reset a claimed slot to ready. The original
+ // JS owner handle and token have been lost; a fresh module instance can see
+ // the hold, but cannot claim or clear it without the original token.
+ await winner.reload({waitUntil:'domcontentloaded'});
+ await winner.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});
+ const heldAfterReload=await winner.evaluate(async()=>{
+  const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+  const slot=new LocalSuspendSlot();
+  return {claim:await slot.claim(null,null),clear:await slot.clearReady(),
+   staleRelease:await slot.release('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')};
+ });
+ assert(heldAfterReload.claim.code==='slot-claimed'&&
+  heldAfterReload.clear.code==='slot-claimed'&&
+  heldAfterReload.staleRelease.code==='claim-mismatch',JSON.stringify(heldAfterReload));
  const blocked=await loser.evaluate(async()=>{
   const s=window.__slotQa.slot;
   return {claim:await s.claim(window.__slotQa.identity,window.__slotQa.layout),
@@ -78,7 +93,12 @@ try{
  });
  assert(blocked.claim.code==='slot-claimed'&&blocked.clear.code==='slot-claimed'&&
   blocked.wrongConsume.code==='claim-mismatch',JSON.stringify(blocked));
- const released=await winner.evaluate(async()=>window.__slotQa.slot.release(window.__claimedToken));
+ // The harness retained the prior token out-of-band solely to finish the
+ // synthetic transaction test. The reloaded browser itself did not recover it.
+ const released=await winner.evaluate(async token=>{
+  const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+  return new LocalSuspendSlot().release(token);
+ },heldToken);
  assert(released.ok&&released.released);
  const second=await loser.evaluate(async()=>{
   const q=window.__slotQa,r=await q.slot.claim(q.identity,q.layout);
@@ -86,17 +106,20 @@ try{
   return {ok:r.ok,admission:r.admission,tick:r.tick,runId:r.runId};
  });
  assert(second.ok&&second.admission==='envelope-only'&&second.tick===240,JSON.stringify(second));
- const stale=await winner.evaluate(async()=>window.__slotQa.slot.consume(window.__claimedToken));
+ const stale=await winner.evaluate(async token=>{
+  const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+  return new LocalSuspendSlot().consume(token);
+ },heldToken);
  assert(stale.code==='claim-mismatch',JSON.stringify(stale));
  const consumed=await loser.evaluate(async()=>window.__slotQa.slot.consume(window.__claimedToken));
  assert(consumed.ok&&consumed.consumed);
- const empty=await A.evaluate(async()=>window.__slotQa.slot.claim(window.__slotQa.identity,window.__slotQa.layout));
+ const empty=await loser.evaluate(async()=>window.__slotQa.slot.claim(window.__slotQa.identity,window.__slotQa.layout));
  assert(empty.code==='empty',JSON.stringify(empty));
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
  console.log('PASS_SINGLE_USE_SLOT_REAL_CHROMIUM',JSON.stringify({
   saved,wrongIdentity,claims:results.map(({token,...rest})=>rest),
-  blocked,released,second,stale,consumed,empty,
-  afterPageReload:true,errors,writes,
+  blocked,heldAfterReload,released,second,stale,consumed,empty,
+  afterPageReload:true,claimedTabReloadHeld:true,errors,writes,
   admission:'envelope-only',realMatterRestore:false,scoreAuth:false,
  }));
  await ctx.close();

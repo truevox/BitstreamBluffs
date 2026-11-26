@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.2 — #119 inert single-use local suspend-slot foundation (2026-11-25)
+
+- Introduces a private IndexedDB suspend-slot protocol with exact-build and registered-layout envelope admission, atomic cross-tab claim, owner-token-gated release/consume, reload-persistent claimed state and bounded 16 MiB input. An occupied/claimed slot cannot be overwritten by another tab.
+- The protocol is intentionally inert: there is **no registered production Matter savestate layout, real game restore or recorder continuation, player save/load UI, trust claim, score/ranking credit or upload**. A claim still means `envelope-only` validation. Browser crashes leave claims locked rather than granting an unsafe second resume; full player-facing recovery requires future policy and runtime work.
+- Developer tests prove rejected corrupt/incompatible envelopes, two real Chromium tabs competing for one claim, persistence across reload, failed-storage denial, stale-token rejection and zero HTTP writes; no physics/replay revision changed.
+
 ## v2.25.1 — #69 real mobile Guest Race browser QA stability (2026-11-25)
 
 - Prevent the compiled Pages browser acceptance test from clicking the RACE GUEST button while the CRT modal is still opening. The test waits for real Phaser scene time and a fully expanded, visible panel before sending the first genuine pointer activation. A real diagnostic recorded the panel at scaleY 1 during coordinate sampling but scaleY 0.108 at pointerdown, which struck the modal dim background instead of the Race Guest hitzone.
