@@ -39,7 +39,9 @@
   const CONFIG = ['seed', 'biomeMask', 'dailyOfficial', 'dailyRuleId', 'dailyMode', 'dailyMods', 'bsodGym', 'loadout',
     'unlockedBoosts', 'upgradeRun', 'upgradeFx', 'magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'gymSetup', 'startX',
     'gymStartX', 'boostFx', 'modded', 'appliedBoosts', 'opening', 'content', 'settings', 'bestM', 'tuner',
-    '_replayTape'];
+    // #69: one-shot registry guest mode cannot be reconstructed from seed alone.
+    // We explicitly REFUSE guest practice capture/restore below; only false is admitted.
+    '_replayTape', 'guestPractice'];
   // METADATA: wall-clock or recording state; not simulation (but a resumed run's ghost tape needs it, see doc).
   // #72/#69: guestPractice, guestPracticeTape, takeover and unrankedPractice select the unranked write policy; _seeking only
   // gates presentation during a takeover re-simulation. None is simulation state.
@@ -52,7 +54,10 @@
     'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake',
     // SIM9: bridge look/veil and cached span are visual; marker height reads joined mesh,
     // not speculative terrain. Matches the shipped RunScene fingerprint exclusions.
-    '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn'];
+    '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn',
+    // #69: the untrusted imported tape only paints a noncolliding ghost.
+    // It is never restored as authoritative input, and its mode is refused.
+    'guestPracticeTape'];
   // INFRA: Phaser scene systems, handlers, services.
   const INFRA = ['add', 'anims', 'cache', 'cameras', 'children', 'data', 'events', 'game', 'input', 'lights', 'load',
     'make', 'matter', 'plugins', 'registry', 'renderer', 'scale', 'scene', 'sound', 'sys', 'textures', 'time', 'tweens',
@@ -294,6 +299,11 @@
    * @returns {{ghost:Array, game:object, matter:object, camera:object, meshOrder:number[], pool:Array, classes:object, audit:string[], skipped:number}}
    */
   function capture(run, opt = {}) {
+    // The consumed one-shot guest trace has no safe fresh-world reconstruction.
+    // Even a valid unranked race is NOT a trusted suspend snapshot. Reject it
+    // before accessing/mutating the Matter world or reading capture fields.
+    if (run.guestPractice === true || run.guestPracticeTape != null)
+      throw new Error('capture: unranked guest practice is not savestate-admitted');
     const ix = bodyIndex(run);
     const classes = classifyScene(run);
     const audit = [];
@@ -339,6 +349,11 @@
     const L = LV.indexOf(level);
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== 'bb-runscene-diagnostic-snapshot' || snap.version !== 1) throw new Error('restore: bad snapshot kind/version');
+    // Same fail-closed rule for the DESTINATION and any claimed guest-mode
+    // snapshot. Never reinterpret an untrusted ghost as normal ranked state.
+    if (run.guestPractice === true || run.guestPracticeTape != null ||
+        (snap.config && Object.prototype.hasOwnProperty.call(snap.config, 'guestPractice') && snap.config.guestPractice !== 'false'))
+      throw new Error('restore: unranked guest practice is not savestate-admitted');
     if (L > 0 && opt.strict !== false && snap.audit.length) throw new Error(`restore: snapshot is incomplete: ${snap.audit.join(' | ')}`);
     // Validate the entire recorder section before touching the fresh world.
     const preparedRecorder = global.__ssCanonical
