@@ -18,24 +18,7 @@ const TAPE = REC.tape;
 const ORIGINAL_CRASH = REC.scene.registry.get(H.REG.LAST_CRASH);
 const TOKEN = 'tok-1';
 
-function coachScene(tape, { before } = {}) {
-  class C extends H.RunScene {
-    create() {
-      this.__events = [];
-      const emit = this.game.events.emit.bind(this.game.events);
-      this.game.events.emit = (e, ...a) => { this.__events.push([e, ...a]); return emit(e, ...a); };
-      this.__calls = { launch: [], start: [], stop: [] };
-      this.scene.launch = (...a) => this.__calls.launch.push(a);
-      this.scene.start = (...a) => this.__calls.start.push(a);
-      this.scene.stop = (...a) => this.__calls.stop.push(a);
-      this.registry.set(H.RULESET_KEY, H.RULESET);
-      this.registry.set(H.REG.COACH_SIM, { kind: 'bb-coach-sim', tape, token: TOKEN });
-      if (before) before(this);
-      super.create();
-    }
-  }
-  return H.createRun(C, H.REG, { seed: 'WRONG-SEED-IGNORED' });
-}
+const coachScene = (tape, o) => H.coachSceneFor(tape, { token: TOKEN, ...(o || {}) });
 
 describe('the recording used by these tests', () => {
   test('is a real crashing run whose crash tick is endTick + 1 (the crash tick records no checkpoint)', () => {
