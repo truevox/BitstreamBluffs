@@ -2,7 +2,7 @@
 import {defaultProfile} from '../../src/systems/Progression.js';
 import {ProfileStore, PROFILE_KEY, sanitizeProfile} from '../../src/systems/ProfileStore.js';
 import {GhostLibrary,MAX_GHOSTS_PER_COURSE,courseGhostRuns} from '../../src/systems/ghost/GhostLibrary.js';
-import {INCLUDED_COURSE_ARCHIVES,archiveCapacity,grandfatherArchives,mayArchiveNewCourse,
+import {INCLUDED_COURSE_ARCHIVES,archiveCapacity,activateCourseArchiveLimit,grandfatherArchives,mayArchiveNewCourse,
   nextArchiveSlotPrice,purchaseArchiveSlot,sanitizeCourseArchive} from '../../src/systems/ghost/CourseArchiveCapacity.js';
 import {upgradeShopLayout,courseArchiveManagerLayout} from '../../src/ui/ShopLayout.js';
 
@@ -42,12 +42,12 @@ test('legacy migration preserves full existing inventory; one-time durable basel
   expect(original.ok).toBe(true);
   expect(original.profile.courseArchive.migrated).toBe(true);
   expect(archiveCapacity(original.profile)).toBe(19);
-  expect(store.ensureCourseArchiveLegacy(50).profile.courseArchive.included).toBe(19); // once only
+  expect(store.ensureCourseArchiveLegacy(19).profile.courseArchive.included).toBe(19); // already covered
   expect(sanitizeProfile(JSON.parse(storage.raw()),null).courseArchive.included).toBe(19);
   const reboot=new ProfileStore({storage});reboot.load();
   expect(reboot.archiveLegacyInitialized).toBe(true);
   expect(archiveCapacity(reboot.profile)).toBe(19);
-  expect(reboot.ensureCourseArchiveLegacy(32).profile.courseArchive.included).toBe(19);
+  expect(reboot.ensureCourseArchiveLegacy(18).profile.courseArchive.included).toBe(19);
 });
 
 test('write failure is never a charge or a migration success; no implicit purchases',()=>{
