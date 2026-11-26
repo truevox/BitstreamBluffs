@@ -43,7 +43,9 @@ test('production normal URL records automatically, no UI, opt-out persists', () 
   handlers.get(EVT.RUN_END)({record:{score:12}});
   expect(win.__bbPlaytest.snapshot().segments[0].events.map(e=>e.type)).toEqual(['recording_start','runStart','run_end']);
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).not.toBeNull();
+  localStorage.setItem('bb.playtest.geo.v1','cached');
   win.__bbPlaytest.stop();
+  expect(localStorage.getItem('bb.playtest.geo.v1')).toBeNull();
   expect(localStorage.getItem('bb.playtest.player.v1')).toBeNull();
   handlers.get(EVT.RUN_END)({record:{score:13}});
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).toBeNull();

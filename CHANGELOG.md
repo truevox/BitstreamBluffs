@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.17 — coarse pre-alpha geography (2026-11-26)
+
+- On the playtest host only, optionally resolve country/region through ipapi.co once per browser per day, with a 2.5-second timeout, no referrer or credentials, and no raw IP retained. Failure does not block telemetry. Opt-out aborts lookup and deletes the cache. Inform testers that the external lookup provider sees their IP; revisit before launch.
+
 ## v2.25.16 — returning playtest browsers (2026-11-26)
 
 - Attach a random persistent browser UUID to new telemetry batches while retaining a separate page-session UUID. Opt-out erases the browser UUID and unsent local data. No IP addresses, fingerprints or account identifiers are collected by game code. Storage-denied browsers remain session-only. Earlier batches cannot be linked retroactively.

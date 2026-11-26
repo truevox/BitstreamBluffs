@@ -2,6 +2,8 @@
 import { EVT } from '../events.js';
 import { createPlaytestUpload, QUEUE_KEY, PLAYER_KEY } from './PlaytestUpload.js';
 
+import { GEO_KEY } from './PlaytestGeo.js';
+
 const fields = {
   [EVT.RUN_START]: 'dailyOfficial dailyMode gym practice takeover',
   [EVT.RUN_ABORT]: 'reason practice takeover cause',
@@ -92,7 +94,7 @@ export function installPlaytestTelemetry(game, version, win = window) {
   const mode = new URLSearchParams(win.location.search).get('playtest');
   const erasePending = () => {
     try { win.sessionStorage.removeItem(storageKey); win.sessionStorage.removeItem(QUEUE_KEY); } catch {}
-    try { win.localStorage.removeItem(PLAYER_KEY); } catch {}
+    try { win.localStorage.removeItem(PLAYER_KEY); win.localStorage.removeItem(GEO_KEY); } catch {}
   };
   if (mode === '0') {
     try { win.localStorage.setItem(optOutKey, '1'); } catch {}
@@ -115,7 +117,7 @@ export function installPlaytestTelemetry(game, version, win = window) {
     return;
   }
   let upload;
-  try { upload = createPlaytestUpload(win, version); } catch {}
+  try { upload = createPlaytestUpload(win, version, undefined, {geoLookup: win.location.hostname === DEFAULT_PLAYTEST_HOST}); } catch {}
   const recorder = createPlaytestRecorder({version, onEvent: event => upload?.add(event)});
   recorder.start();
   // Keep previous reload segments, within a strict total bound. Never merge raw save data.

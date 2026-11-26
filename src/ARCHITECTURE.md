@@ -2733,6 +2733,11 @@ Same-tab manual JSON export
 remains a fallback. No raw keys, seeds, device IDs, error messages, or account
 data. Network and local buffers are bounded; tab closure/offline can lose data.
 Inform adult testers before playing, including the persistent pseudonymous browser ID.
+Since v2.25.17 the production test host also attempts a best-effort ipapi.co
+country/region lookup once per browser per day (including failed attempts). Only
+validated country and region codes persist or upload; the external provider sees
+the IP but BsB does not retain it. No coordinates, city, raw IP or fingerprint.
+Opt-out cancels lookup and clears the cache. Inform testers of this provider.
 Remove the production-host default before public launch.
 
 ### Cooperative PWA updates (v2.25.15)

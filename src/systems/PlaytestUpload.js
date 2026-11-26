@@ -1,4 +1,5 @@
-// Write-only collector; no credentials, no fingerprints. Random browser and page-session IDs only.
+// Write-only collector; no credentials, no fingerprints. Random IDs and optional coarse geography.
+import { startPlaytestGeo } from './PlaytestGeo.js';
 export const DRIVE_COLLECTOR = 'https://script.google.com/macros/s/AKfycbzjTVdaWFYiZcxKU9n3YgynZp4qTARbtBkfqY1tECQU0NUgq_1JbSQj0dJwhfcxKhOJag/exec';
 export const QUEUE_KEY = 'bb.playtest.upload.v1';
 export const PLAYER_KEY = 'bb.playtest.player.v1';
@@ -18,9 +19,11 @@ function browserPlayer(win) {
   } catch { return null; }
 }
 
-export function createPlaytestUpload(win, version, endpoint = DRIVE_COLLECTOR) {
+export function createPlaytestUpload(win, version, endpoint = DRIVE_COLLECTOR, { geoLookup = false } = {}) {
   const session = win.crypto.randomUUID();
   const player = browserPlayer(win);
+  let geo = null;
+  const stopGeo = geoLookup ? startPlaytestGeo(win, value => { geo = value; }) : () => {};
   let batch = 0, staged = [], stagedSize = 0, queue = [], busy = false, stopped = false, dropped = 0;
   try {
     const saved = JSON.parse(win.sessionStorage.getItem(QUEUE_KEY) || '[]');
@@ -29,7 +32,7 @@ export function createPlaytestUpload(win, version, endpoint = DRIVE_COLLECTOR) {
   const save = () => { try { win.sessionStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch {} };
   function seal() {
     if (!staged.length) return;
-    const body = JSON.stringify({schema:1, version, session, ...(player ? {player} : {}), batch:batch++, events:staged, dropped});
+    const body = JSON.stringify({schema:1, version, session, ...(player ? {player} : {}), ...(geo ? {geo} : {}), batch:batch++, events:staged, dropped});
     staged = []; stagedSize = 0;
     if (queue.length >= 20) { queue.shift(); dropped++; }
     queue.push(body);
@@ -63,7 +66,7 @@ export function createPlaytestUpload(win, version, endpoint = DRIVE_COLLECTOR) {
     finally { busy = false; }
   }
   return {add, flush, stop() {
-    stopped = true; staged = []; stagedSize = 0; queue = [];
+    stopped = true; stopGeo(); staged = []; stagedSize = 0; queue = [];
     try { win.sessionStorage.removeItem(QUEUE_KEY); } catch {}
   }, status() { return {queued:queue.length, staged:staged.length, droppedBatches:dropped}; }};
 }
