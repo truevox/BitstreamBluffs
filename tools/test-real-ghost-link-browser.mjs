@@ -346,6 +346,22 @@ try{
   });
   const allowed=await recipient.evaluate(()=>({disabled:window.__bbGame.scene.getScene('TitleScene').view.practiceBtn.disabled}));
   if(allowed.disabled)throw Error('Eligible NORMAL guest was refused by practice policy');
+  // The CRT opening tween initially leaves the panel at scaleY=1, then
+  // collapses/unfolds it on its FIRST animation update. A coordinate sampled
+  // at that initial 1 may be stale by the genuine pointerdown (observed in
+  // #393: scaleY 1 -> 0.108 and Phaser hit the dim layer, not RACE GUEST).
+  // Wait for >260ms of *scene* time AND full visual geometry, instead of
+  // clicking invisible/moving controls or retrying absent hit zones. This
+  // neither arms consent nor simulates a pointer event.
+  const openingCheckedAt=await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').time.now);
+  await recipient.waitForFunction(start=>{
+   const g=window.__bbGame,s=g?.scene?.getScene('TitleScene'),v=s?.view,
+    panel=v?.panel,z=v?.practiceBtn?.zone;
+   return g.scene.isActive('TitleScene')&&v?.alive&&z?.scene&&
+    v.practiceBtn.disabled===false&&panel?.scene&&
+    s.time.now-start>=320&&Math.abs(panel.scaleY-1)<1e-3&&
+    panel.alpha>=0.999&&Math.abs(panel.y-18)<1;
+  },openingCheckedAt,{timeout:12000});
   let armAttempts=0,armedRace=null;
   const raceState=()=>recipient.evaluate(()=>{
    const g=window.__bbGame,v=g.scene.getScene('TitleScene')?.view;
