@@ -103,7 +103,7 @@ export function openPublicWallet({databasePath,rewardPublicKey,allowUnboundTestC
   return transaction(db,()=>{
    const a=db.prepare('SELECT account,claim FROM admissions WHERE run=?').get(b.runId);
    if(!a||a.account!==account||a.claim!==b.claimDigest)return deny('admission-required');
-   if(!allowUnboundTestClaims&&!db.prepare('SELECT 1 FROM admissions a JOIN public_equipment e ON e.challenge=a.challenge AND e.account=a.account WHERE a.run=?').get(b.runId))return deny('equipment-not-pinned');
+   if(!allowUnboundTestClaims&&!db.prepare('SELECT 1 FROM admissions a JOIN public_equipment e ON e.challenge=a.challenge AND e.account=a.account WHERE a.run=? AND a.evidence_digest IS NOT NULL').get(b.runId))return deny('equipment-not-pinned');
    const previous=db.prepare('SELECT receipt FROM public_rewards WHERE run=?').get(b.runId);
    const receipt=hash(canonicalBytes(r));
    if(previous)return deny(previous.receipt===receipt?'already-settled':'settlement-conflict');

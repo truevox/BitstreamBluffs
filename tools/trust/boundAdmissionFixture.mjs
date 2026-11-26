@@ -35,7 +35,7 @@ export function exerciseBoundAdmission(bytes,trustedRuleset,buildId){
     authorization:{kind:'trusted-eligibility-receipt',status:'authorized',...Object.fromEntries(['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','manifestDigest','tapeDigest','score','endTick','challengeId'].map(k=>[k,q[k]])),challengeStatus:'fresh',economyStatus:'authorized',equipmentStatus:'authorized',modeStatus:'allowed',pinnedVerifierBuildId:pin},
     consent:{kind:'trusted-consent-receipt',status:'granted',...Object.fromEntries(['runId','manifestDigest','tapeDigest','score','endTick','seed','biomeMask','lane','loadoutDigest','intent'].map(k=>[k,q[k]])),scope:'score-only',audienceGate:'passed'}
    };
-   return canonicalBytes({request:q,receipts:Object.fromEntries(roles.map(role=>[role,seal({format:'bb-authority-receipt',version:1,role,keyId:role+'-test',accountId:account,challengeId:q.challengeId,claimDigest:digest(q),issuedAt:now,expiresAt:challenge.expiresAt,payload:payloads[role]},keys[role].privateKey)]))});
+   return canonicalBytes({request:q,receipts:Object.fromEntries(roles.map(role=>[role,seal({format:'bb-authority-receipt',version:1,role,keyId:role+'-test',accountId:account,challengeId:q.challengeId,claimDigest:digest(q),evidenceDigest:p.identity.bundleDigest,issuedAt:now,expiresAt:challenge.expiresAt,payload:payloads[role]},keys[role].privateKey)]))});
   }
   const unowned={...loadout,upgradeRanks:{speed:1000000}};
   assert.throws(()=>ledger.issueChallenge(account,canonicalBytes({...course,lane:'modded',loadoutDigest:equipmentDigest(unowned)}),pin,canonicalBytes(unowned)),/unowned-upgrade/);
@@ -43,6 +43,9 @@ export function exerciseBoundAdmission(bytes,trustedRuleset,buildId){
   assert.equal(ledger.admit(account,bundle(forged),bytes).reason,'evidence-identity-mismatch');
   assert.equal(ledger.admit(account,bundle({...r,score:r.score+1}),bytes).reason,'evidence-identity-mismatch');
   assert.equal(ledger.admit('other-account',bundle(r),bytes).reason,'challenge-not-owned');
+  const altered=JSON.parse(Buffer.from(bytes).toString('utf8'));
+  altered.checkpoints[0][1]='0'.repeat(16);
+  assert.equal(ledger.admit(account,bundle(r),canonicalBytes(altered)).reason,'unauthenticated-simulation');
   const accepted=ledger.admit(account,bundle(r),bytes);
   assert.equal(accepted.admitted,true,JSON.stringify(accepted));
   assert.equal(ledger.admit(account,bundle(r),bytes).reason,'already-admitted');
