@@ -1,0 +1,335 @@
+{
+  "sled": {
+    "__id": 580,
+    "__c": "Sled",
+    "__obj": {
+      "scene": {
+        "__skip": "scene"
+      },
+      "world": {
+        "__skip": "matterworld"
+      },
+      "palette": {
+        "__skip": "presentation-field"
+      },
+      "look": {
+        "__skip": "presentation-field"
+      },
+      "random": {
+        "__alias": 1
+      },
+      "x": 3232.375574672888,
+      "y": 1114.548990368101,
+      "vx": 429.51892733595736,
+      "vy": 94.89162497027792,
+      "destroyed": false,
+      "inWorld": true,
+      "msSinceContact": 0,
+      "_contactFlag": false,
+      "groundAngleDeg": 12.262533655306294,
+      "airtimeMs": 0,
+      "hopBufferMs": 0,
+      "_playerHopActive": false,
+      "_playerHopElapsedMs": 0,
+      "pushCooldownMs": 0,
+      "parachuteMs": 0,
+      "parachuteFuelMs": 880,
+      "chuteUsed": false,
+      "tucked": false,
+      "airBrakeActive": false,
+      "airBrakePressPending": false,
+      "airBrakeKickUsed": false,
+      "airBrakeLiftProtected": false,
+      "_protectedHopExtraVyPxS": 0,
+      "airBrakeKickPulse": 0,
+      "heliInput": 0,
+      "corkscrewActive": false,
+      "heliPhase": 0,
+      "heliVel": 0,
+      "shield": false,
+      "scrambled": false,
+      "invulnerableMs": 0,
+      "hidden": false,
+      "_lastPad": {
+        "__id": 581,
+        "__c": null,
+        "__obj": {
+          "push": false,
+          "tilt": 0,
+          "variableHop": true,
+          "noAutoNudge": true,
+          "divebomb": false,
+          "corkscrew": false,
+          "tuck": false,
+          "brake": false,
+          "brakeHeld": false,
+          "hop": false,
+          "reset": false,
+          "heli": 0,
+          "airBrake": false,
+          "parachute": false,
+          "pause": false,
+          "pressed": {
+            "__id": 582,
+            "__c": null,
+            "__obj": {
+              "hop": false,
+              "reset": false,
+              "pause": false,
+              "airBrake": false,
+              "parachute": false,
+              "confirm": false
+            }
+          },
+          "lastSource": "keyboard"
+        }
+      },
+      "_time": 7800.00000000021,
+      "_lastTilt": 0,
+      "pose": {
+        "__id": 583,
+        "__c": null,
+        "__obj": {
+          "phi": 8.000000000000007,
+          "chute": 0,
+          "brake": 0,
+          "tuck": 0
+        }
+      },
+      "boostMs": 0,
+      "squash": 0,
+      "airEtaMs": {
+        "__num": "Infinity"
+      },
+      "airSlopeDeg": null,
+      "dropAheadDeg": -1.9707522724890953,
+      "_groundRunMs": 3762.4999999999527,
+      "_sinceLaunchMs": 7800.00000000021,
+      "_landSettleMs": 0,
+      "body": {
+        "__body": "sled"
+      },
+      "off": {
+        "__id": 584,
+        "__c": null,
+        "__obj": {
+          "x": -1.5899910705240856,
+          "y": -1.8901307932729976
+        }
+      },
+      "gfx": {
+        "__skip": "presentation-field"
+      },
+      "lastRiderShape": "default",
+      "drone": null,
+      "windPomAnchor": {
+        "__id": 585,
+        "__c": null,
+        "__obj": {
+          "x": 3236.46502956163,
+          "y": 1092.031828191848
+        }
+      },
+      "touchdownVx": 306.8522809862951,
+      "touchdownVy": 501.1926906615135,
+      "canopyFuelFullMs": 880,
+      "geyserCooldownMs": 0,
+      "_crawlMs": 0,
+      "_nudging": false,
+      "_preVx": 428.30830830590344,
+      "_preVy": 98.4553273713496,
+      "hopPulse": 0,
+      "pushPulse": 0,
+      "snapSteps": 758
+    }
+  },
+  "hazards": {
+    "__id": 563,
+    "__map": [
+      [
+        1,
+        {
+          "__id": 564,
+          "__arr": [
+            {
+              "__id": 565,
+              "__c": "Hazard",
+              "__obj": {
+                "scene": {
+                  "__skip": "scene"
+                },
+                "world": {
+                  "__skip": "matterworld"
+                },
+                "def": {
+                  "__content": "/hazards/packetSpike"
+                },
+                "spawn": {
+                  "__alias": 192
+                },
+                "palette": {
+                  "__skip": "presentation-field"
+                },
+                "hit": false,
+                "destroyed": false,
+                "color": {
+                  "__skip": "presentation-field"
+                },
+                "drawKind": "spike",
+                "w": 20,
+                "h": 20,
+                "_crashy": true,
+                "cx": 3406.9449636754284,
+                "cy": 1144.8982040651042,
+                "body": {
+                  "__body": "hazard:1:0"
+                },
+                "gfx": {
+                  "__skip": "presentation-field"
+                },
+                "seed": 52.36197419290174,
+                "motion": null,
+                "x0": 3406,
+                "phase": 0,
+                "roll": {
+                  "__id": 566,
+                  "__c": null,
+                  "__obj": {
+                    "activeAtMs": null,
+                    "offsetPx": 0,
+                    "vPxS": 0,
+                    "simMs": 0,
+                    "simDist": 0,
+                    "simV": 0
+                  }
+                },
+                "rolling": false,
+                "rollDir": 0,
+                "spin": 0,
+                "open": false,
+                "alert": false,
+                "_lastDraw": 7749.999999999897,
+                "hid": "1:0",
+                "simStepped": true,
+                "_side": -1,
+                "teleAtMs": 5724.999999999971
+              }
+            }
+          ]
+        }
+      ]
+    ]
+  },
+  "powerups": {
+    "__id": 567,
+    "__map": []
+  },
+  "shardField": {
+    "__id": 568,
+    "__c": "ShardField",
+    "__obj": {
+      "scene": {
+        "__skip": "scene"
+      },
+      "palette": {
+        "__skip": "presentation-field"
+      },
+      "byChunk": {
+        "__id": 569,
+        "__map": [
+          [
+            2,
+            {
+              "__id": 570,
+              "__arr": [
+                {
+                  "__id": 571,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-0",
+                    "x": 5596,
+                    "y": 1717
+                  }
+                },
+                {
+                  "__id": 572,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-1",
+                    "x": 5607,
+                    "y": 1719
+                  }
+                },
+                {
+                  "__id": 573,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-2",
+                    "x": 5640,
+                    "y": 1731
+                  }
+                },
+                {
+                  "__id": 574,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-3",
+                    "x": 5674,
+                    "y": 1750
+                  }
+                },
+                {
+                  "__id": 575,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-4",
+                    "x": 5700,
+                    "y": 1770
+                  }
+                },
+                {
+                  "__id": 576,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-5",
+                    "x": 5730,
+                    "y": 1798
+                  }
+                },
+                {
+                  "__id": 577,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-6",
+                    "x": 5748,
+                    "y": 1819
+                  }
+                },
+                {
+                  "__id": 578,
+                  "__c": null,
+                  "__obj": {
+                    "id": "s2-7",
+                    "x": 5771,
+                    "y": 1846
+                  }
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      "collected": {
+        "__id": 579,
+        "__set": []
+      },
+      "gfx": {
+        "__skip": "presentation-field"
+      }
+    }
+  },
+  "collectedPowerups": {
+    "__id": 561,
+    "__set": []
+  }
+}
