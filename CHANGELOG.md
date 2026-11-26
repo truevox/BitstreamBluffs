@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.6 — #119 native GhostRecorder prefix continuity (2026-11-25)
+
+- Add developer-only strict, complete native `GhostRecorder` tick-zero input/history checkpoint section codec. Actual game recorder is captured through bounded canonical bytes with F64-exact trace/checkpoints; decode checks current exact source build/ruleset, run/tick identity, input cursors (including repeated edge ticks), full trace/checkpoint/fingerprint coverage and source-sorted setup. A fresh matching recorder is restored as a **separate detached instance**, not a trusted gameplay or official-board authority.
+- Tests include 28/28 dedicated native recorders, a real Chromium production game at tick 481 continuing to natural fatal tick 977 with **identical final tape, record, fingerprint and zero JS errors** and 3 additional distinct review-only real stock/upgraded/boosted header acceptance cases. Validation and restoration refuse hostile, missing or inconsistent data without changing the fresh recorder.
+- **Not player Save/Resume:** no production Matter/RunScene total-world snapshot registry, full atomic world restore, UI, ranking/entitlements, replay authority or physics/SIM revision changes. The v2.25.3 local single-use slot is still inert; the v2.25.5 RNG/clock adapters remain separate until an integrated causal-world restore is proven.
+
 ## v2.25.5 — #119 strict causal RNG/clock primitive adapters (2026-11-25)
 
 - Add developer-only explicit state adapters for the *actual* RunRandom four named streams and fixed-tick SimClock. Restore only into fresh, seed-state-matched instances; validate every own field and reject unknown fields, truncated streams, pending inputs, incompatible versions/configuration, aliasing and read-only targets **before modifying the target**.
