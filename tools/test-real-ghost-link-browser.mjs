@@ -92,10 +92,23 @@ try{
    pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),rect=document.querySelector('canvas').getBoundingClientRect();
   return {x:rect.left+pt.x/g.scale.gameSize.width*rect.width,y:rect.top+pt.y/g.scale.gameSize.height*rect.height};
  },which);
- const openPoint=await clickPoint('ghostLinkBtn');
- await p.waitForTimeout(500);
- await p.mouse.click(openPoint.x,openPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
+ // The title menu uses an entrance tween. A click can hit the prior
+ // translucent scene on a slower runner. Reacquire the real active button
+ // center and observe the destination before ANY retry, never issuing extra
+ // pointer events after it opens.
+ let openedGuest=false;
+ for(let attempt=0;attempt<4;attempt++){
+  await p.waitForTimeout(420);
+  const openPoint=await clickPoint('ghostLinkBtn');
+  await p.mouse.click(openPoint.x,openPoint.y);
+  try{
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:2500});
+   openedGuest=true;break;
+  }catch{
+   if(await p.evaluate(()=>Boolean(window.__bbGame.scene.getScene('TitleScene').view?.previewBtn))){openedGuest=true;break;}
+  }
+ }
+ if(!openedGuest)throw Error('Open Ghost Link did not respond after genuine pointer attempts');
  const beforehand=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,preview:!!v.preview,courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};

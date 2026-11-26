@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.22.11 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
+
+- When a Ghost Link exceeds the 8,192-character URL limit, offer an explicitly disclosed, two-step **SAVE FILE** local `.bbghost` download; do not silently upload or expose any user credentials, profile, original run ID or account data. Short URL links keep their existing behavior.
+- The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations.
+- Integrates on top of the v2.22.8 replay archive, v2.22.9 Heavy diagnostic gate and v2.22.10 Cemetery Montage without changing SIM9 or authoritative replay semantics. This is a **draft** candidate: independent review, physical Chromebook/Android acceptance and optional hosted oversize fallback remain outstanding; #69 is not closed.
+
 ## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
 
 - **Owner-approved local attempt history** (Marvin, #68, 2026-11-25): a separate IndexedDB store `bitstream-attempt-history` keeps each finished ordinary run's 30 Hz pose trace plus compatibility metadata only (no inputs, checkpoints, fingerprints or ledger data). **Default 5 per course**, Settings → PAST ATTEMPTS → *PAST ATTEMPTS TO KEEP* 0..40 (0 keeps none; the maximum is shown). FIFO eviction of this store only, ≤ 256 KB per attempt and ≤ 12 MB overall, quota recovery from its own oldest rows, damaged rows dropped, two-press CLEAR HISTORY. Lowering trims at once; raising cannot restore. Never uploaded.
