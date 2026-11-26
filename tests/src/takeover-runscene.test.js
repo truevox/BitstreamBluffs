@@ -392,6 +392,21 @@ describe('UNRANKED at every write site (each with a negative control)', () => {
     expect(run(true)).toEqual([]);
   });
 
+  test('guest practice (#69) tutorial / tuck-hint writes are EXACTLY as on main: still written (control: takeover skips them)', () => {
+    const guestTape = JSON.parse(JSON.stringify(TAPE));
+    const st = spyStorage();
+    try {
+      class G extends H.RunScene { create() { this.registry.set(H.REG.GUEST_PRACTICE, guestTape); super.create(); } }
+      const guest = H.createRun(G, H.REG, { seed: SEED });
+      expect(guest.guestPractice).toBe(true);
+      expect(guest.unrankedPractice).toBe(true);
+      expect(guest.takeover).toBeNull();
+      guest.tutDone = new Set(); guest.tuckShows = 0;
+      guest.tutDoneId('push'); guest.applyHintEvents([{ id: 'tuck', show: true }]);
+      expect(st.calls.map((c) => c[1])).toEqual(expect.arrayContaining(['bb.tutorialDone', 'bb.tuckShows']));
+    } finally { st.restore(); }
+  });
+
   test('a BSOD bluff never reaches the progression store in a takeover (control: it does in an ordinary run)', () => {
     const run = (takeover) => {
       const calls = [];

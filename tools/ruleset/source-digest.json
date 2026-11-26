@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: #72 takeover READY frame holds the camera shake still (takeover-only presentation branch)",
+  "attestation": "no-behavior-change: #72 tutorial/tuck-hint writes skip only takeover (guest practice restored to main behavior)",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
@@ -14,7 +14,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:07322a1c765bf2211e546196d34636eb7dced3d5ef8a0c719fcb609c28921463",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
-    "src/scenes/RunScene.js": "sha256:0cc8a0092971c6170815d7d66c7eea653ce4c487144fcd1f7314faca753f93a1",
+    "src/scenes/RunScene.js": "sha256:84cff3c399b576e68d2b7d01d547d44edb9efb92e92f162f1c8f8ff4a76eab6b",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:5f24e720a35b949b68d8e14062d4abab397c2e094598542f9ecebfcbf3cf27c3",
