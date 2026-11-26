@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.11 — #413 one-ledger UNVERIFIED provisional submission reference (2026-11-26)
+
+- Add a **server-only**, opt-in provisional submission adapter that reuses the *same* #411 signed challenge, account and frozen equipment tables, rather than inventing a competing public Shard balance. Require canonical `provisional-public` request bytes, authenticated account, independently trusted consent/audience, exact pinned course/equipment, server clock and one-use SQLite publication. No live HTTP endpoint or upload is enabled.
+- New SQL constraints permanently label entries UNVERIFIED and prohibit Verified rank/reward values. The public projection excludes account, tape, manifest and verifier-identifying details. Negative tests prove forged local billion-Shards/paid/Verified flags, wrong account, changed course, expired challenge, malformed bytes and repeated publication cannot mint eligible rank or currency.
+- Separate combined Node22 checks prove five new provisional cases alongside 15 existing real signed admission/wallet tests; pure free/paid verdict policy and compiled source/browser isolation remain unchanged. No physics/SIM, game settings, Shards, real server accounts or player-facing controls change.
+- **Not an active public verifier:** no authenticated production API, actual independent issuer/peer scheduler, evidence retention, Verified promotion, reward settlement policy, database migration or public-service privacy rollout. Parent #135 remains OPEN. The separate #410 competing wallet must never be merged. [skip netlify]
+
 ## v2.25.10 — #135 signed evidence-bound server Shard and entitlement reference (2026-11-26)
 
 - Non-force preserve the original later #406 wallet/evidence-authority commits after the merged v2.25.9 canonical Matter section. Introduce private server-only `publicWallet` with zero public Shards initially, signed award settlement tied to prior authenticated admission, once-only per-run rewards, atomic server-catalogue upgrades and account-owned equipment frozen at challenge issuance.
