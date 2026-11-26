@@ -34,7 +34,7 @@ const readObject=(n,nodes)=>obj(resolve(n,nodes));
 
 /** Validate references against the independently generated early projection.
  * Never accept a same-shaped but different chunk/spawn alias. */
-export function validateSectionBindings(game,matter,meshOrder){
+export function validateSectionBindings(game,matter,meshOrder,telegraph){
  const nodes=indexSectionNodes(game);
  const terrain=readObject(game.terrain,nodes);
  const active=readMap(terrain?.active,nodes);
@@ -90,6 +90,33 @@ export function validateSectionBindings(game,matter,meshOrder){
    const v=readObject(s,nodes),original=byId.get(v.id);
    need(original&&(v.pulled===true||(Object.is(v.x,original.x)&&Object.is(v.y,original.y))),'shard-spawn');
   }
+ }
+ // Residual section aliases have specific semantic destinations, not just
+ // existing graph IDs. Preserve source identity through native regeneration.
+ const hazards=new Map();
+ for(const [,list] of readMap(game.hazards,nodes)??[])for(const h of readArray(list,nodes)??[]){
+  const n=resolve(h,nodes);hazards.set(n.__obj.hid,n);
+ }
+ const hazardNodes=new Set(hazards.values());
+ if(telegraph!==undefined){
+  need(Array.isArray(telegraph.hazards),'tracker-rows');
+  for(const [id,warned] of telegraph.hazards){
+   const h=hazards.get(id)?.__obj;
+   need(h&&(warned===null||Object.is(h.teleAtMs,warned)),'tracker-hazard');
+  }
+ }
+ for(const mark of readArray(game._teleMarks,nodes)??[])
+  need(hazardNodes.has(resolve(readObject(mark,nodes)?.ref,nodes)),'mark-hazard');
+ if(game._crashHazard!=null)need(hazardNodes.has(resolve(game._crashHazard,nodes)),'crash-hazard');
+ const zoneNodes=new Set();
+ for(const ch of chunks.values())for(const z of readArray(ch.zones,nodes)??[])zoneNodes.add(resolve(z,nodes));
+ for(const [key,v] of readMap(game.activeZones,nodes)??[]){
+  const n=resolve(v,nodes),z=obj(n);
+  need(zoneNodes.has(n)&&key===z.modId+':'+Math.round(z.x0),'active-zone');
+ }
+ for(const k of readArray(game.kodiaks,nodes)??[]){
+  const bear=readObject(k,nodes),d=readObject(bear?.def,nodes);
+  need(d&&d.kind===bear.kind,'bear-definition');
  }
  for(const k of Object.keys(matter.bodies))
   if(k==='sled'||k.startsWith('hazard:')||k.startsWith('powerup:'))need(seenBodies.has(k),'unbound-entity-body');

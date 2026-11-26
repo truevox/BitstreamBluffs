@@ -171,6 +171,7 @@ export function createNativeRunSceneRestoreKit(Phaser) {
       throw Error('native restore: only complete normal tick boundary');
   };
   return Object.freeze({
+    projectConfig(run){return internal.projectConfig(run);},
     // INTERNAL staging helper: reconstruct the exact leading graph identity
     // sequence from already validated detached native sections, not wire tags.
     // The caller must bind the terrain recipe against trusted fresh options.
@@ -562,7 +563,7 @@ function installRunSceneStateKit(global) {
       ghost, game: fields, telegraph: run.snapshotTelegraph ? run.snapshotTelegraph() : null, matter, camera: captureCamera(run),
       meshOrder: [...run.mesh.chunks.keys()],
       pool: poolState(run, ix.keyOf),
-      config: opt.withConfig ? Object.fromEntries(CONFIG.filter((k) => k in run && k !== 'content' && k !== 'tuner').map((k) => [k, JSON.stringify(run[k])])) : undefined,
+      config: opt.withConfig ? projectConfig(run) : undefined,
       classes, audit, skipped: skipped.length,
       recorder: opt.withRecorder ? global.__ssRecorderKit.captureRecorderPrefix(run) : undefined,
     };
@@ -653,6 +654,11 @@ function installRunSceneStateKit(global) {
       for (const [k, v] of Object.entries(snap.config)) if (JSON.stringify(run[k]) !== v) throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
     }
     for (const k of order) if (!early.includes(k)) run[k] = dcd.dec(snap.game[k], run[k], k);
+    // The marker palette key is derived, not a serialized color. A
+    // freshly materialized mark has no live color for the skip marker to
+    // preserve; rebuild exactly as planTelegraphMarks does.
+    for (const mark of run._teleMarks || [])
+      mark.color = mark.state === 'go' ? 'lime' : mark.kind === 'hop' ? 'danger' : 'amber';
     if (snap.telegraph && !skip.has('telegraph')) run.restoreTelegraph(snap.telegraph);
     if (skip.has('runRandom')) for (const [k, st] of Object.entries(fresh.rng)) if (run.runRandom[k]) run.runRandom[k].state = st;
     if (skip.has('kodiaks')) { run.kodiaks = []; run.kodiakNext = 0; }
@@ -759,6 +765,9 @@ function installRunSceneStateKit(global) {
     return res;
   }
 
+  function projectConfig(run){
+    return Object.fromEntries(CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner').map(k=>[k,JSON.stringify(run[k])]));
+  }
   function projectEarly(run,clock,rng,terrain,queue,collected){
     const {enc,audit}=makeEncoder(run,bodyIndex(run).keyOf);
     const values={simClock:clock,runRandom:rng,terrain,collectedPowerups:collected,_chunkQueue:queue};
@@ -766,5 +775,5 @@ function installRunSceneStateKit(global) {
     if(audit.length)throw Error('early projection: '+audit.join(' | '));
     return game;
   }
-  return Object.freeze({capture,restore,digests,runBatch,classifyScene,bodyIndex,projectEarly,CLASS:Object.fromEntries(CLASS)});
+  return Object.freeze({capture,restore,digests,runBatch,classifyScene,bodyIndex,projectEarly,projectConfig,CLASS:Object.fromEntries(CLASS)});
 }

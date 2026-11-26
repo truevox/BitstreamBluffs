@@ -45,3 +45,24 @@ test.each([
  const f=fixture();mutate(f);
  expect(()=>validate(f)).toThrow('section-binding:'+code);
 });
+
+test('telegraph history and marks reference actual live hazards',()=>{
+ const f=fixture();
+ hz(f).teleAtMs=25;
+ f.game._teleMarks=a(40,[o(41,{ref:ref(21)})]);
+ expect(validateSectionBindings(f.game,f.matter,f.meshOrder,{hazards:[['1:0',25,false,35]]})).toBe(true);
+ expect(()=>validateSectionBindings(f.game,f.matter,f.meshOrder,{hazards:[['1:0',26,false,35]]})).toThrow(/tracker-hazard/);
+ expect(()=>validateSectionBindings(f.game,f.matter,f.meshOrder,{hazards:[['1:1',25,false,35]]})).toThrow(/tracker-hazard/);
+ f.game._teleMarks.__arr[0].__obj.ref=ref(24);
+ expect(()=>validate(f)).toThrow(/mark-hazard/);
+});
+test('active zone must be a real generated zone and key matches its coordinates',()=>{
+ const f=fixture(),chunk=f.game.terrain.__obj.active.__map[0][1].__obj;
+ chunk.zones=a(40,[o(41,{modId:'sticky',x0:12.5,x1:45})]);
+ f.game.activeZones=m(42,[['sticky:13',ref(41)]]);
+ expect(validate(f)).toBe(true);
+ f.game.activeZones.__map[0][0]='sticky:12';
+ expect(()=>validate(f)).toThrow(/active-zone/);
+ f.game.activeZones.__map[0]=['sticky:13',ref(7)];
+ expect(()=>validate(f)).toThrow(/active-zone/);
+});
