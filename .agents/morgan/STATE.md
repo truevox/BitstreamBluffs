@@ -1,13 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-26 02:22 UTC. GitHub main `42e74fb5172ef4e542237c924a22bae6f08acc24` (#384), v2.22.11/SIM9; live deployment not independently verified. Guest practice is unverified and unranked; #58/#81 and trusted restore remain open.
+Last verified: 2026-11-26 14:34 UTC. GitHub main `f2e02aac170ffa09645db10388224afbccbbb73b` (#405), v2.25.6/SIM9. Native recorder continuity is inert; no live Save/Resume or ranking authority. Guest practice remains unverified and unranked; #58/#81 and trusted restore remain open.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **#391 owner-directed Ghost consent fix:** exact draft `39a83c158d47abe4024a5af264cf54424d87e5e5`, branch `galfriday/team-a-post69-release-20261125`, on v2.22.11. Consumes keyboard repeat without confirming or reloading the preview. Production Chromium held/released/fresh key and mobile-emulated file QA passed; 42 focused tests, production build and deterministic identity passed. [Owner direction recorded](https://github.com/truevox/BitstreamBluffs/pull/391#issuecomment-7180745934); not an independent approval. Read-only exact-head CI follow-up scheduled. No physical-device pass, merge or deploy by Morgan. Release coordination remains with the owner.
+- **Shipped #391/#392 Ghost consent follow-up:** `39a83c15` requires a fresh press; consolidated #392 shipped v2.25.0 in `3e15dd98` (Pages deploy verified). #396 later hardened the mobile browser test against a moving hit zone. #395 is CI-only and remains open; no physical Chromebook/Android acceptance yet. #69 sharing shipped; #172 physical PWA QA remains open.
 
 - **#384 / #135 settled:** security-library slice landed as v2.22.11 in `42e74fb5`; owner reviewed `460a135f` and `cdbc0d34` adds metadata only. [Release note](https://github.com/truevox/BitstreamBluffs/pull/384#issuecomment-7180542140) posted after merge. No claim of public verification, real issuer or wallet; #135 and #388 remain follow-ups.
 
@@ -84,16 +84,7 @@ means resume this queue, not take over another lane or merge a draft.
    0/2, identity, build and 81 focused Jest tests passed. [Updated Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/338#issuecomment-7174428665).
    Exact-head [identity CI](https://github.com/truevox/BitstreamBluffs/actions/runs/45699867541) green;
    still waiting for fresh review. No player data or runtime change.
-   **#79 / [#381](https://github.com/truevox/BitstreamBluffs/pull/381)** independent
-   developer-only terrain-marker witness draft, `morgan/issue-79-fatal-event-witness`
-   @ `630e040e258da45bc3e2a3611d38604890558039` on v2.22.7. Pinned HTML/module
-   in five fresh Chromium contexts, scripted fixture: fatal tick 937, final
-   recorded pose 936 (gap 2.592px), 234 Float32 pose triples and 7 checkpoints
-   match. Pose-only edit leaves replay/event equal yet refuses marker;
-   header-only cutoff stays nonfatal through tick465 and matches 3 checks.
-   Wrong build refused before output; 40 tests, identity and 4,882 byte-identical
-   production files. [Gal exact-head review requested](https://github.com/truevox/BitstreamBluffs/pull/381#issuecomment-7176756268).
-   Separate from #345 and #338. No inspector change, player artifacts or release.
+   **#79 / [#381](https://github.com/truevox/BitstreamBluffs/pull/381)** developer-only terrain marker draft, `morgan/issue-79-fatal-event-witness` @ `408e542ef19cf6b82e55a2a57dae666b510d4015` on v2.25.6. Five compiled Chromium contexts verify tick 937 against 234 stored poses ending tick 936, 2.592px gap, seven checks, and refusal of shifted-pose or nonfatal cutoff markers. Wrong build refused; 40 tests, identity and all 4,884 production files unchanged. Draft requests current-head Gal review; prior v2.22.7 proof historical, not cross-version playback. No player surface, release, or scoring change.
 3. **#126 / #341**: open five-file developer-only draft
    `morgan/issue-126-paired-fatigue-report` @ `a560cec88bc835877620e808dd30d270d70b2722`, based on
    `044ebd4b`. Opt-in comparator matches classic/fatigue by course, reaction
