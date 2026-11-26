@@ -5,6 +5,8 @@ import {createGhostLink,parseGhostLink,GhostLinkError} from '../src/systems/ghos
 import {chromium} from 'playwright';
 const natural=process.env.BSB_LINK_NATURAL==='1',base=process.env.BSB_LINK_BASE||'/';
 const mobile=process.env.BSB_LINK_MOBILE==='1';
+// Opt-in trace is read-only: it never sends extra pointer/keyboard events.
+const raceDiagnostics=process.env.BSB_RACE_HITZONE_TRACE==='1';
 let vite,browser;
 try{
  const dist=process.env.BSB_LINK_DIST;
@@ -324,6 +326,58 @@ try{
   throw Error('Direct hash preview unexpectedly launched gameplay '+JSON.stringify({accepted,recipientErrors}));
  let practiceAcceptance=null;
  if(process.env.BSB_GUEST_PRACTICE==='1'){
+  // Read-only trace watches the actual view lifecycle, DOM/Phaser pointer
+  // routing and panel transforms. Nothing here invokes a game handler.
+  if(raceDiagnostics){
+   await recipient.evaluate(()=>{
+    const g=window.__bbGame,s=g.scene.getScene('TitleScene');
+    const log=[];window.__raceHitzoneLog=log;
+    const snap=(event,details={})=>{
+     try{
+      const v=s.view,z=v?.practiceBtn?.zone,canvas=g.canvas,
+       r=canvas?.getBoundingClientRect(),p=z?.scene&&z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
+      const x=p&&r?r.left+p.x/g.scale.gameSize.width*r.width:null,
+       y=p&&r?r.top+p.y/g.scale.gameSize.height*r.height:null;
+      log.push({event,now:performance.now()|0,titleActive:g.scene.isActive('TitleScene'),
+       view:v?.constructor?.name||null,alive:v?.alive??null,
+       zoneLive:!!z?.scene,buttonDisabled:v?.practiceBtn?.disabled??null,
+       practiceArmed:v?.practiceArmed??null,starting:s.starting===true,
+       attract:s.attract===true,panel:v?.panel?{
+        x:v.panel.x,y:v.panel.y,sy:v.panel.scaleY,alpha:v.panel.alpha}:null,
+       target:x!==null?document.elementFromPoint(x,y)?.tagName:null,
+       coords:x!==null?{x,y}:null,
+       canvas:r?{left:r.left,top:r.top,width:r.width,height:r.height}:null,
+       activeElement:document.activeElement?.tagName||null,details});
+      if(log.length>75)log.shift();
+     }catch(err){log.push({event,error:String(err)});}
+    };
+    window.__raceSnapshot=snap;
+    const originalClose=s._closeView;
+    s._closeView=function(...args){snap('title-close-view');return originalClose.apply(this,args);};
+    const originalOpen=s._openView;
+    s._openView=function(...args){snap('title-open-view',{next:args[0]?.constructor?.name});return originalOpen.apply(this,args);};
+    const v=s.view;
+    if(v){const originalDestroy=v.destroy;
+     v.destroy=function(...args){snap('ghost-view-destroy');return originalDestroy.apply(this,args);};
+     v.practiceBtn?.zone?.on('destroy',()=>snap('practice-zone-destroy'));
+    }
+    s.events.on('shutdown',()=>snap('title-shutdown'));
+    s.input.on('gameobjectdown',(_pointer,obj)=>snap('phaser-gameobjectdown',{
+     practice:obj===s.view?.practiceBtn?.zone,back:obj===s.view?.back?.zone,
+     file:obj===s.view?.fileBtn?.zone,type:obj?.type||null}));
+    document.addEventListener('pointerdown',e=>snap('dom-pointerdown',{
+     trusted:e.isTrusted,tag:e.target?.tagName||null,x:e.clientX,y:e.clientY}),true);
+    const watcher=()=>{if(s.view!==last){snap('view-changed',{from:last?.constructor?.name||null});last=s.view;}};
+    let last=s.view;
+    s.events.on('update',watcher);
+    snap('installed');
+   });
+   const rate=Number(process.env.BSB_RACE_CPU_RATE||1);
+   if(Number.isFinite(rate)&&rate>1&&rate<=6){
+    const cdp=await recipient.context().newCDPSession(recipient);
+    await cdp.send('Emulation.setCPUThrottlingRate',{rate});
+   }
+  }
   // Authoritative denial proof on a genuine freshly decoded incoming link.
   const before=await recipient.evaluate(async()=>{
    const g=window.__bbGame,r=g.registry,s=r.get('saveStore'),p=r.get('progression'),lib=r.get('ghostLibrary');
@@ -355,7 +409,11 @@ try{
   });
   for(;armAttempts<5;armAttempts++){
    const point=await practicePoint();
-   if(!point)throw Error('Race Guest hitzone disappeared before consent');
+   if(raceDiagnostics)await recipient.evaluate(i=>window.__raceSnapshot?.('before-race-click',{attempt:i}),armAttempts);
+   if(!point){
+    const diag=raceDiagnostics?await recipient.evaluate(()=>window.__raceHitzoneLog):null;
+    throw Error('Race Guest hitzone disappeared before consent'+(diag?' '+JSON.stringify(diag):''));
+   }
    await recipient.mouse.move(point.x,point.y);
    await recipient.mouse.click(point.x,point.y);
    // Phaser pointerdown can be dispatched on the NEXT rendering frame. Wait
@@ -363,6 +421,7 @@ try{
    // be a SECOND consent and race ahead of the state assertion.
    await recipient.waitForTimeout(500);
    armedRace=await raceState();
+   if(raceDiagnostics)await recipient.evaluate(i=>window.__raceSnapshot?.('after-race-click',{attempt:i}),armAttempts);
    if(armedRace.running||armedRace.starting)
     throw Error('Guest launched before an OBSERVED first consent '+JSON.stringify({armedRace,armAttempts}));
    if(armedRace.armed)break;
@@ -373,11 +432,19 @@ try{
   // Reacquire the same real hitzone after arming; the first click must NEVER
   // launch gameplay and must not be repeated after practiceArmed becomes true.
   const confirmPoint=await practicePoint();
-  if(!confirmPoint)throw Error('Race Guest hitzone disappeared after consent');
+  if(raceDiagnostics)await recipient.evaluate(()=>window.__raceSnapshot?.('before-confirm-click'));
+  if(!confirmPoint){
+   const diag=raceDiagnostics?await recipient.evaluate(()=>window.__raceHitzoneLog):null;
+   throw Error('Race Guest hitzone disappeared after consent'+(diag?' '+JSON.stringify(diag):''));
+  }
   await recipient.mouse.click(confirmPoint.x,confirmPoint.y);
   await recipient.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&
     window.__bbGame.scene.getScene('RunScene').guestPractice===true&&
     window.__bbGame.scene.getScene('RunScene').sled?.body,null,{timeout:40000});
+  if(raceDiagnostics){
+   const diag=await recipient.evaluate(()=>window.__raceHitzoneLog||[]);
+   console.log('TRACE_RACE_HITZONE',JSON.stringify({mobile,rate:process.env.BSB_RACE_CPU_RATE||1,events:diag}));
+  }
   const live=await recipient.evaluate(()=>{
    const g=window.__bbGame,r=g.scene.getScene('RunScene'),ui=g.scene.getScene('UIScene');
    return {seed:r.seed,mask:r.biomeMask,practice:r.guestPractice,recorder:!!r.ghostRecorder,

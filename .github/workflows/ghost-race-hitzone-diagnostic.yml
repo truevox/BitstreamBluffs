@@ -1,0 +1,46 @@
+name: Guest Race mobile hitzone lifecycle diagnostic
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ghost-race-hitzone-diagnostic.yml'
+      - 'tools/test-real-ghost-link-browser.mjs'
+      - 'src/ui/GhostLinkView.js'
+      - 'src/scenes/TitleScene.js'
+      - 'src/ui/Button.js'
+      - 'src/ui/View.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  race-hitzone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Compile actual GitHub Pages subpath without deploying
+        run: node tools/pwa/build-pages-site.mjs /BitstreamBluffs/ dist
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Recreate the original sequential mobile consent smoke
+        run: |
+          set -e
+          BSB_LINK_DIST=dist BSB_LINK_BASE=/BitstreamBluffs/ node tools/test-real-ghost-link-browser.mjs > /tmp/ghost-desktop.log
+          BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE=/BitstreamBluffs/ node tools/test-real-ghost-link-browser.mjs > /tmp/ghost-mobile.log
+          BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_DIST=dist BSB_LINK_BASE=/BitstreamBluffs/ node tools/test-real-ghost-link-browser.mjs > /tmp/guest-desktop.log
+          BSB_RACE_HITZONE_TRACE=1 BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE=/BitstreamBluffs/ node tools/test-real-ghost-link-browser.mjs | grep -E 'TRACE_RACE_HITZONE|PASS_SHORT_GHOST|PASS_REAL_GHOST'
+      - name: Repeat mobile pointer race under deliberate frame pressure
+        run: |
+          set -e
+          for iteration in 1 2 3; do
+            echo "Guest Race trace trial ${iteration}, Chromium CPU slowdown 3x"
+            BSB_RACE_CPU_RATE=3 BSB_RACE_HITZONE_TRACE=1 BSB_GUEST_PRACTICE=1 BSB_GUEST_PRACTICE_RESTART=1 BSB_LINK_MOBILE=1 BSB_LINK_DIST=dist BSB_LINK_BASE=/BitstreamBluffs/ node tools/test-real-ghost-link-browser.mjs | grep -E 'TRACE_RACE_HITZONE|PASS_SHORT_GHOST|PASS_REAL_GHOST'
+          done
