@@ -140,4 +140,3 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
   }
   return Object.freeze({issueChallenge,admit,close:()=>db.close()});
 }
-

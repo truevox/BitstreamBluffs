@@ -166,4 +166,3 @@ test('separate approved verifier keys produce byte-identical decisions (syntheti
    assert.deepEqual(canonicalBytes(r1.verdict),canonicalBytes(r2.verdict));
  }finally{a.close();}
 });
-
