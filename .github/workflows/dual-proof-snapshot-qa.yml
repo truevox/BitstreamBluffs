@@ -11,7 +11,8 @@ on:
       - 'tests/trust/**'
       - 'tests/replay/rulesetVerifier.test.js'
       - 'tests/replay/canonicalJson.test.js'
-      - 'tools/trust/test-dual-proof-browser.mjs'
+      - 'tools/trust/**'
+      - 'tools/test-takeover-browser.mjs'
       - 'package*.json'
   workflow_dispatch:
 permissions:
@@ -68,3 +69,6 @@ jobs:
           trap 'kill "$server" 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18420/ >/dev/null && break; sleep 1; done
           GAME_URL=http://127.0.0.1:18420/ node tools/trust/test-dual-proof-browser.mjs
+
+      - name: Independent compiled replay of native stored evidence and tamper controls
+        run: node tools/trust/test-real-independent-replay.mjs
