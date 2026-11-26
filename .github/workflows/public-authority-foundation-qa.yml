@@ -24,7 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Assert checkout uses exact triggering source
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -32,8 +37,10 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - name: Server ledger, crypto nonce, one-time admission and forged wallet negative controls
-        run: node --test tests/server/public-challenge-ledger.test.mjs
+      - name: Server wallet, provisional/signed boundary, role crypto and one-time admission negatives
+        run: node --test tests/server/public-challenge-ledger.test.mjs tests/server/public-signed-boundary.test.mjs server/trust/admission.test.mjs
+      - name: Current exact source identity
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Independent dual-proof free/paid policy parity regressions
         run: npm test -- --runInBand tests/trust/dualProof.test.js
       - name: Client build must not contain the private authority implementation

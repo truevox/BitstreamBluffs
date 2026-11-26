@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.9 — #135 private server Shard/gear and UNVERIFIED challenge ledger (2026-11-26)
+
+- Preserve the separate #403 server-only authoritative wallet and provisional-challenge source atop merged v2.25.8 #408 signed-admission foundations. SQLite transactions enforce account-owned grants and equipment receipts, server catalogue prices, bounded server-issued challenges, expiry, one-time submission and public `UNVERIFIED`-only projection with no trusted rank/reward promotion.
+- Add an explicit cross-module negative gate: a valid provisional ledger entry is **not** a signed Verified admission; forged billion-Shard local wallet and fake Verified flags cannot cross the server boundary. All 5 original server authority and 11 signed-admission tests remain intact, plus the new no-promotion test.
+- Server-only reference code; no authenticated public adapter, real production issuer, hosted verifier, payment provider, customer account, automatic upload, policy-final TTL/catalogue or Verified payout. Free/paid verification fairness remains identical and local/offline game behavior unchanged. Parent #135 stays OPEN. [skip netlify]
+
 ## v2.25.8 — #135 server-only signed independent admission reference (2026-11-26)
 
 - Preserve draft #406's original source in a non-force merge onto the v2.25.7 main source. Add private, server-only Ed25519 issuer-role signing verification (simulation, authorization, consent), an atomic SQLite challenge/admission ledger, exact account/challenge/claim/expiry/verifier bindings, replay/duplicate/forgery rejection and private receipt audit digests. No HTTP endpoint, key material or production issuer is deployed.
