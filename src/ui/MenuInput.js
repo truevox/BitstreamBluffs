@@ -1,7 +1,7 @@
 /**
  * OWNER: UI engineer.
  * Normalises every input device into a small menu vocabulary:
- *   'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'alt' | 'shop' | 'ghost' | 'retry' (opt-in)
+ *   'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'alt' | 'shop' | 'ghost' | 'montage' | 'retry' (opt-in)
  * Sources: EVT.INPUT_ACTION (InputRouter: keyboard / gamepad / touch), Phaser keyboard (redundant, so menus work
  * with the stub router too) and a direct navigator.getGamepads() poll. The same action arriving from two sources
  * within DEDUPE_MS is delivered once. All listeners are removed on scene shutdown.
@@ -33,6 +33,8 @@ const KEY_MAP = {
   b: 'shop', B: 'shop',
   // Issue #56: Game Over ghost favorites. Other menus ignore the action.
   g: 'ghost', G: 'ghost',
+  // Issue #68: Game Over Cemetery Montage. Other menus ignore the action.
+  m: 'montage', M: 'montage',
 };
 const DIRS = new Set(['up', 'down', 'left', 'right']);
 const ROUTER_MAP = {
