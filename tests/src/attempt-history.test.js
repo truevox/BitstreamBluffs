@@ -258,7 +258,11 @@ describe('restart, corruption, clearing', () => {
     await h.trim(0);
     await h.clear();
     expect(JSON.stringify([...lib.courses])).toBe(before);
-    expect(await lib.getTape(best.runId)).toBe(best);
+    // GhostLibrary now returns a detached copy in the memory backend: the
+    // attempt-history store must not change the tape's bytes or alias it.
+    const retained = await lib.getTape(best.runId);
+    expect(retained).toStrictEqual(best);
+    expect(retained).not.toBe(best);
   });
 });
 
@@ -385,7 +389,11 @@ describe('two tabs on one store: every change is planned from disk, not a tab ca
     const [a, b] = await tabs();
     await Promise.all([a.record(best, 1), b.record(makeTape(), 1), a.trim(0), b.clear()]);
     expect(JSON.stringify([...lib.courses])).toBe(before);
-    expect(await lib.getTape(best.runId)).toBe(best);
+    // GhostLibrary now returns a detached copy in the memory backend: the
+    // attempt-history store must not change the tape's bytes or alias it.
+    const retained = await lib.getTape(best.runId);
+    expect(retained).toStrictEqual(best);
+    expect(retained).not.toBe(best);
   });
 });
 
