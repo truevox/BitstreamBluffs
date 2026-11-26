@@ -6,6 +6,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {preview} from 'vite';
 import {chromium} from 'playwright';
+import {isBenignOptionalIconAbort} from './offline-request-failure-policy.mjs';
 const [dist,inventoryPath,base='/BitstreamBluffs/']=process.argv.slice(2);if(!dist||!inventoryPath)throw Error('Usage: test-real-offline-run-browser BUILT_DIST VERIFIED_INVENTORY BASE');
 let catalog;
 if(inventoryPath.endsWith('.bin')){
@@ -26,14 +27,23 @@ const root=fileURLToPath(new URL('../../',import.meta.url));let browser,server;
 try{
  server=await preview({root,base,build:{outDir:resolve(dist)},preview:{host:'127.0.0.1',port:0,strictPort:true}});const origin='http://127.0.0.1:'+server.httpServer.address().port;
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const ctx=await browser.newContext({serviceWorkers:'allow',viewport:{width:1000,height:540}}),errors=[],sameOriginFailures=[];
- const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>{try{const u=new URL(r.url());if(u.origin===origin)sameOriginFailures.push({url:u.pathname,error:r.failure()?.errorText});}catch{}});
+ const ctx=await browser.newContext({serviceWorkers:'allow',viewport:{width:1000,height:540}}),errors=[],sameOriginFailures=[],benignIconAborts=[];
+ const optionalIconPath=new URL('icons/apple-touch-icon.png',origin+base).pathname;
+ const recordFailure=r=>{try{
+  const u=new URL(r.url());if(u.origin!==origin)return;
+  const error=r.failure()?.errorText;
+  if(isBenignOptionalIconAbort(u.pathname,error,optionalIconPath)){
+   benignIconAborts.push({url:u.pathname,error});return;
+  }
+  sameOriginFailures.push({url:u.pathname,error});
+ }catch{/* A non-URL request cannot be classified as a same-origin resource. */}};
+ const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',recordFailure);
  await page.addInitScript(selection=>{if(!localStorage.getItem('bb.settings'))localStorage.setItem('bb.settings',JSON.stringify({musicEnabledSongs:selection,offlineMusicQuality:'space-saver'}));},selection);
  await page.goto(origin+base,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});await page.evaluate(()=>navigator.serviceWorker.ready);
  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&!!window.__bbGame.registry.get('offlineMusicDownloads'),null,{timeout:30000});
  const installed=await page.evaluate(async()=>{const g=window.__bbGame,c=g.registry.get('offlineMusicDownloads'),a=g.registry.get('audioSynth');const result=await c.start({consent:true});if(!result.ready)throw Error('Cannot download real required recordings: '+JSON.stringify(result));a.stopMusic();await c.apply();if(c.quality!=='lite')throw Error('Lite not applied');return {quality:c.quality,groups:c.plan.groups.length,keys:(await caches.keys()).filter(k=>k.startsWith('bb-r2-recordings')).length};});
  await page.close();await ctx.setOffline(true);
- const cold=await ctx.newPage();cold.on('pageerror',e=>errors.push(e.message));cold.on('requestfailed',r=>{try{const u=new URL(r.url());if(u.origin===origin)sameOriginFailures.push({url:u.pathname,error:r.failure()?.errorText});}catch{}});
+ const cold=await ctx.newPage();cold.on('pageerror',e=>errors.push(e.message));cold.on('requestfailed',recordFailure);
  await cold.goto(origin+base,{waitUntil:'domcontentloaded'});await cold.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&!!window.__bbGame.registry.get('offlineMusicDownloads')&&window.__bbGame.registry.get('audioSynth')?._stemMusic?.ready,null,{timeout:30000});
  await cold.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('pwa-physical-offline-local-run'));
  await cold.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&!!window.__bbGame.scene.getScene('RunScene').sled?.body,null,{timeout:30000});
@@ -49,5 +59,5 @@ try{
  await cold.waitForTimeout(400);
  const resumed=await cold.evaluate(()=>{const r=window.__bbGame.scene.getScene('RunScene');return {time:r.runTimeMs,x:r.sled?.x,active:r.scene.isActive()};});
  if(!resumed.active||resumed.time<=paused.time||errors.length||sameOriginFailures.length)throw Error('Offline resume failed '+JSON.stringify({resumed,paused,errors,sameOriginFailures}));
- console.log('PASS_PWA_REAL_OFFLINE_GAMEPLAY',JSON.stringify({installed,first,second,paused,resumed,errors,sameOriginFailures}));
+ console.log('PASS_PWA_REAL_OFFLINE_GAMEPLAY',JSON.stringify({installed,first,second,paused,resumed,errors,sameOriginFailures,benignIconAborts}));
 }finally{if(browser)await browser.close();if(server)await new Promise((r,j)=>server.httpServer.close(e=>e?j(e):r()));}

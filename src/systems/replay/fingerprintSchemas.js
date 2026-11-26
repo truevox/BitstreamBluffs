@@ -443,8 +443,8 @@ export const NON_CAUSAL = Object.freeze({
     _ghostToken: PRESENTATION, ghostRecorder: 'the recorder itself', tapePlayer: 'replay input source (inputs are the tape)',
     _replayTape: RUN_CONSTANT, _manualPauseSeq: PRESENTATION, _manualPausePending: PRESENTATION,
     // #69 / #72 unranked-practice policy: selects which STORES a run may write; no simulation path reads it
-    guestPractice: 'unranked-practice flag (#69): a write-policy switch, never read by the simulation',
-    guestPracticeTape: 'untrusted visual-only guest tape (#69): drives a cosmetic GhostRider, never the sim',
+    guestPractice: 'untrusted guest-only practice discriminator; explicitly excluded from verified replay, rewards and durable run evidence',
+    guestPracticeTape: 'untrusted, visually rendered opponent trace only; cannot control Matter, scoring or ranked replay inputs',
     takeover: 'Replay Takeover descriptor + phase (#72): seek/handoff bookkeeping; the sim is driven by the tape and then live input',
     coachSim: 'Crash Coach scene handoff and ownership metadata (#66); not part of causal state',
     crashInfo: 'Crash Coach terminal outcome witness (#66); written only on crash, not read by sim',
