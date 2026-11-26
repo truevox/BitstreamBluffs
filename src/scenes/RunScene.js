@@ -172,14 +172,14 @@ export class RunScene extends Phaser.Scene {
     const desc = data && data.coachSim;
     this.coachSim = null;
     this.crashInfo = null;
-    if (!desc) return this._create();
+    if (!desc) { this.sys?.setVisible?.(true); return this._create(); }
     this.unrankedPractice = true;
     const restore = this._muteForSeek();
     try {
       let verdict = { ok: false, reason: 'undecodable' };
       if (desc.live && desc.live.cancelled) verdict = { ok: false, reason: 'cancelled' };
       else if (desc.kind === 'bb-coach-sim' && desc.tape) verdict = takeoverEligible(desc.tape, 1, { rulesetId: CURRENT_RULESET_ID });
-      this.coachSim = { token: desc.token ?? null, created: false, refused: verdict.ok ? null : { reason: verdict.reason, message: verdict.message } };
+      this.coachSim = { token: desc.token ?? null, live: desc.live, created: false, refused: verdict.ok ? null : { reason: verdict.reason, message: verdict.message } };
       if (verdict.ok) {
         reg.set(REG.GHOST_REPLAY, desc.tape); // consumed (and removed) by _create() just below
         this._create();

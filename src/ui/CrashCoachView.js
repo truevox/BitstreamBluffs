@@ -26,7 +26,7 @@ const PROGRESS_Y = 133;
 const SUMMARY_Y = 150;
 const STRIP = { x: X0, y: 172, w: INNER_W, h: 30 };
 const SENS_Y = 207;
-const BTN_Y = 226;
+const BTN_Y = 221;
 const COLOR_KEY = { survived: 'lime', crashed: 'danger', unstable: 'amber', error: 'text' };
 
 export class CrashCoachView extends View {
@@ -67,8 +67,8 @@ export class CrashCoachView extends View {
     this.altG = scene.add.graphics();
     this.panel.add(this.altG);
     this.altObjs = [];
-    this.altBtn = new Button(scene, theme, { x: X0, y: BTN_Y, w: 128, h: 16, label: 'SHOW ALTERNATIVE', color: 'lime', onClick: () => this.toggleAlternative() });
-    this.practiceBtn = new Button(scene, theme, { x: X0 + 134, y: BTN_Y, w: 150, h: 16, label: 'PRACTICE THIS MOMENT', color: 'cyan', onClick: () => this.practice() });
+    this.altBtn = new Button(scene, theme, { x: X0, y: BTN_Y, w: 128, h: 24, label: 'SHOW ALTERNATIVE', hint: 'ENTER', color: 'lime', onClick: () => this.toggleAlternative() });
+    this.practiceBtn = new Button(scene, theme, { x: X0 + 134, y: BTN_Y, w: 150, h: 24, label: 'PRACTICE THIS MOMENT', hint: 'N', color: 'cyan', onClick: () => this.practice() });
     this.panel.add(this.altBtn);
     this.panel.add(this.practiceBtn);
     this.canPractice = !!(o.ctx && o.ctx.ok);
@@ -190,7 +190,7 @@ export class CrashCoachView extends View {
   _paintAlternative() {
     const r = this.result;
     const surv = r.survivors[0];
-    const area = { x: X0, y: CLAIMS_Y, w: INNER_W, h: 132 };
+    const area = { x: X0, y: CLAIMS_Y, w: INNER_W, h: 112 };
     const g = this.altG;
     g.lineStyle(1, this.theme.color('cyan'), 0.3);
     g.strokeRect(area.x, area.y, area.w, area.h);

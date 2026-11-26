@@ -757,4 +757,12 @@ async function recordAlt() {
   return { tape };
 }
 
-main().catch((e) => { console.error('FATAL', e); process.exitCode = 2; });
+export { boot, freshPage, recordRun, launchTakeoverInPage, seekToReady, until, sameStorage, padSchedule };
+export async function closeHarness() {
+  await browser?.close().catch(() => {});
+  await server?.close?.().catch?.(() => {});
+  if (tmpDist) rmSync(tmpDist, { recursive: true, force: true });
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((e) => { console.error('FATAL', e); process.exitCode = 2; });
+}

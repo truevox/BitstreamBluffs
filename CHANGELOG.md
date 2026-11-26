@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.25.0 — #66 Crash Coach and Butterfly Meter (2026-11-25)
+
+- Game Over C opens Crash Coach, explaining the recorded crash with evidence and testing nearby input variations through the real engine. The search is bounded, not exhaustive; alternatives require a second matching replay.
+- Butterfly Meter displays the observed outcomes and divergence. Practice This Moment replays the original tape to the branch tick and hands over control in unranked practice. Candidate tapes are not stored or credited.
+
 ## v2.23.0 — #72 Replay Takeover (unranked practice/TAS) (2026-11-25)
 
 - From Game Over press **T**: pick any tick of the run you just finished (1 s with the arrows, 5 s with Shift, one tick with `,` / `.`; D-pad / A / B on a pad), see the time and tick on a trace preview, and take over. The game re-simulates the tape up to that tick with the real engine, freezes on **READY**, and hands you live control when you press Space / Enter / A. The key that ends READY is consumed: it can never become a hop or trick edge on the first live tick.
