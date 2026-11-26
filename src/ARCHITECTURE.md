@@ -2728,3 +2728,14 @@ data (already uploaded files remain in Drive). Same-tab manual JSON export
 remains a fallback. No raw keys, seeds, device IDs, error messages, or account
 data. Network and local buffers are bounded; tab closure/offline can lose data.
 Inform adult testers before playing. Remove the production-host default before public launch.
+
+### Cooperative PWA updates (v2.25.15)
+A checked waiting worker is offered via Update Now on the idle main title and
+automatically requested after five safe seconds. No active, paused, game-over,
+takeover, or menu-view reloads. The active worker polls every controlled
+in-scope window, freezes only consenting idle titles, checks pending
+run/ghost/attempt/evidence writes and memory-only storage, gates new navigations,
+and requests activation of the verified waiting worker only after all consent.
+No cache or user-storage deletion. Legacy clients must close/reopen once;
+unresponsive windows and unsafe storage refuse activation. Existing version
+caches are retained. Failed preparations unlock all participating titles.

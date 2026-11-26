@@ -259,6 +259,7 @@ export class AttemptHistory {
     /** @type {Map<string, object>} id -> meta: a CACHE of the last state read from or committed to disk */
     this.metas = new Map();
     this._queue = Promise.resolve();
+    this.pendingWrites = 0;
     this.ready = false;
   }
 
@@ -291,7 +292,8 @@ export class AttemptHistory {
 
   /** In-tab ordering only (cross-tab ordering is the backend transaction's job). */
   _serial(fn) {
-    const run = this._queue.then(fn, fn);
+    this.pendingWrites++;
+    const run = this._queue.then(fn, fn).finally(() => { this.pendingWrites--; });
     this._queue = run.catch(() => {});
     return run;
   }

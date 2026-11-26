@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.15 — cooperative PWA updates (2026-11-26)
+
+- Check for updates every minute and on foreground/online events. An idle title offers Update Now and automatically requests a verified waiting update after five safe seconds. All controlled tabs must confirm safe title state and settled durable storage before activation; active/paused runs and open menus block the handoff. No cache or save deletion. Legacy workers require a final close/reopen.
+
 ## v2.25.14 — temporary default-on playtest telemetry (2026-11-26)
 
 - Enable the existing bounded gameplay telemetry on the normal simulate.sledhead.ing URL for the current adult pre-alpha test. Persist URL opt-out across visits and stop other open recording tabs. No overlay or change to gameplay. Other hosts remain opt-in. Remove default-on collection before public launch.
