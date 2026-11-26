@@ -23,7 +23,7 @@ import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { visibleAchievements } from '../systems/Achievements.js';
-import { shopLayout, upgradeShopLayout, shopMenuItems, titlesLayout, titlesMenuItems, gymSetupLayout } from './ShopLayout.js';
+import { shopLayout, upgradeShopLayout, courseArchiveManagerLayout, shopMenuItems, titlesLayout, titlesMenuItems, gymSetupLayout } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
@@ -1873,6 +1873,12 @@ export class ShopView extends View {
     this.page = 0;
     this.upgradePage = false;
     this.gymSetupPage = false;
+    this.archivePage = false;
+    this.archivePageIndex = 0;
+    this.archives = [];
+    this.archiveSelected = null;
+    this.archiveNotice = '';
+    this.archiveBusy = false;
     // state chips, washes and rules live on one Graphics UNDER the list (added before any menu exists, so
     // every rebuilt menu lands above it); repainted from the current layout on every _build
     this.deco = scene.add.graphics();
@@ -1897,6 +1903,16 @@ export class ShopView extends View {
 
   /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
   _menuItems(layout) {
+    if (this.archivePage) return layout.rows.map((r) => {
+      if(r.kind==='archiveBack')return {kind:'action',label:r.label,onSelect:()=>this._showUpgrades()};
+      if(r.kind==='archivePager')return {kind:'action',rowKind:'archivePager',label:r.label,sub:r.state,
+        onSelect:()=>this._turnArchivePage(1)};
+      if(r.kind==='archiveEntry')return {kind:'action',id:r.archiveKey,label:r.label,sub:r.state,
+        onSelect:()=>this._selectArchive(r.archiveKey)};
+      if(r.kind==='archiveConfirm')return {kind:'action',id:r.archiveKey,label:r.label,sub:r.state,
+        onSelect:()=>this._deleteSelectedArchive()};
+      return {kind:'static',label:r.label,disabled:true};
+    });
     if (this.gymSetupPage) return layout.rows.map((r) => {
       if (r.kind === 'gymSetupBack') return {kind:'action',label:r.label,
         onSelect:()=>this._showUpgrades()};
@@ -1931,6 +1947,10 @@ export class ShopView extends View {
         kind: 'action', id: r.id, label: r.label, sub: r.state,
         disabled: r.disabled === true, onSelect: () => this._buyUpgrade(r.id),
       };
+      if (r.kind === 'archiveBuy') return {kind:'action',id:'archiveBuy',label:r.label,sub:r.state,
+        disabled:r.disabled===true,onSelect:()=>this._buyArchiveSlot()};
+      if (r.kind === 'archiveLink') return {kind:'action',id:'archiveLink',label:r.label,sub:r.state,
+        onSelect:()=>this._openArchiveManager()};
       return { kind: 'static', label: r.label, disabled: true };
     });
     return shopMenuItems(layout).map((m) => {
@@ -1973,12 +1993,15 @@ export class ShopView extends View {
   }
 
   _build() {
-    const layout = this.gymSetupPage ? gymSetupLayout({profile:this._profile()})
+    const layout = this.archivePage ? courseArchiveManagerLayout({profile:this._profile(),archives:this.archives,
+      page:this.archivePageIndex,selected:this.archiveSelected,notice:this.archiveNotice})
+      : this.gymSetupPage ? gymSetupLayout({profile:this._profile()})
       : this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
       : shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
+    if(this.archivePage)this.archivePageIndex=layout.page;
     // Only the ordinary Shop layout has a page index. Nested Gym setup
     // must preserve the last selected catalogue category for BACK navigation.
-    if (!this.upgradePage && !this.gymSetupPage) this.page = layout.page;
+    if (!this.upgradePage && !this.gymSetupPage && !this.archivePage) this.page = layout.page;
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
     // torn down with it or every rebuild would stack another "BANK n" on the same pixel.
@@ -2007,6 +2030,7 @@ export class ShopView extends View {
 
   /** Change only this shop panel, keeping the title/profile ownership and Back semantics. */
   _showUpgrades() {
+    this.archivePage = false;
     this.gymSetupPage = false;
     this.upgradePage = true;
     this._build();
@@ -2030,6 +2054,7 @@ export class ShopView extends View {
   }
 
   _showShop() {
+    this.archivePage = false;
     this.gymSetupPage = false;
     this.upgradePage = false;
     this._build();
@@ -2062,6 +2087,65 @@ export class ShopView extends View {
       uiSfx(this.scene, 'uiBack');
     }
     this._refresh();
+  }
+
+  _buyArchiveSlot() {
+    const tx=this.store?.buyCourseArchiveSlot();
+    if(tx?.ok){
+      this.scene.registry.set(REG.PROFILE,tx.profile);
+      this.scene.registry.get(REG.GHOSTS)?.setArchiveLimit(
+        tx.profile.courseArchive.included+tx.profile.courseArchive.purchased);
+      uiSfx(this.scene,'uiSelect',{pitch:1.3});
+    }else uiSfx(this.scene,'uiBack');
+    this._refresh();
+  }
+
+  _archiveLibrary(){return this.scene.registry.get(REG.GHOSTS);}
+
+  async _openArchiveManager(){
+    this.gymSetupPage=false;this.upgradePage=false;this.archivePage=true;
+    this.archivePageIndex=0;this.archiveSelected=null;this.archiveNotice='READING LOCAL COURSES...';
+    this._build();
+    await this._loadArchiveCourses();
+  }
+
+  async _loadArchiveCourses(){
+    const list=await this._archiveLibrary()?.listArchiveCourses();
+    if(!this.archivePage||!this.alive)return;
+    this.archives=Array.isArray(list)?list:[];
+    this.archiveNotice=Array.isArray(list)
+      ?(this.archiveNotice.startsWith('ARCHIVE DELETED')?this.archiveNotice:'SELECT COURSE, THEN CONFIRM DELETE')
+      :'STORAGE UNAVAILABLE; NO DELETE';
+    this.archivePageIndex=Math.min(this.archivePageIndex,Math.max(0,Math.ceil(this.archives.length/7)-1));
+    this._build();
+  }
+
+  _turnArchivePage(dir){
+    const count=Math.max(1,Math.ceil(this.archives.length/7));
+    this.archivePageIndex=(this.archivePageIndex+(dir<0?-1:1)+count)%count;
+    this.archiveSelected=null;
+    this._build();
+  }
+
+  _selectArchive(key){
+    if(!this.archivePage||!this.archives.some(c=>c.key===key))return;
+    this.archiveSelected=key;
+    this.archiveNotice='TO DELETE, SELECT SEPARATE CONFIRM ROW';
+    this._build();
+    uiSfx(this.scene,'uiMove');
+  }
+
+  async _deleteSelectedArchive(){
+    const key=this.archiveSelected;
+    if(!this.archivePage||this.archiveBusy||!key||!this.archives.some(c=>c.key===key))return;
+    this.archiveBusy=true;
+    // The only delete action is the distinct confirm row. Repeated Enter on
+    // a COURSE row can never delete, even after its first selection rebuild.
+    const result=await this._archiveLibrary()?.deleteArchiveCourse(key);
+    this.archiveBusy=false;this.archiveSelected=null;
+    if(!this.archivePage||!this.alive)return;
+    this.archiveNotice=result?'ARCHIVE DELETED; PROTECTED EVIDENCE UNTOUCHED':'DELETE FAILED; NOTHING REMOVED';
+    await this._loadArchiveCourses();
   }
 
   _buyUpgrade(id) {
@@ -2158,6 +2242,9 @@ export class ShopView extends View {
 
   handleAction(action) {
     if (action === 'cancel') { this.close(); return true; }
+    if (this.archivePage && (action === 'left' || action === 'right')){
+      this._turnArchivePage(action==='left'?-1:1);return true;
+    }
     if (action === 'left' || action === 'right') {
       // The slot IS the page, so left/right on the page row or on any catalogue row turns it. On a boost
       // row they still toggle the boost (MenuList's own choice handling).

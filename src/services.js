@@ -12,6 +12,7 @@ import { installAttemptHistory, protectOwnedSettings, ATTEMPT_HISTORY_KEY } from
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
+import { archiveCapacity } from './systems/ghost/CourseArchiveCapacity.js';
 import { createMissionsService } from './systems/MissionsService.js';
 import { RULESET_KEY, BUILD_ID_KEY } from './systems/replay/evidenceCapture.js';
 
@@ -54,6 +55,14 @@ export async function createServices(game) {
   // W1: progression service (profile load + one-time backfill + RUN_END listener). Additive.
   const progression = await createProgressionService(game, { levels: game.registry.get(REG.CONTENT).progression });
   game.registry.set(REG.PROGRESSION, progression);
+  // #56: migrate the legacy unlimited course count BEFORE enforcing an
+  // archive cap. On a denied profile write, leave GhostLibrary uncapped to
+  // avoid silently losing a pre-alpha player's recorded courses.
+  const archiveMigration = progression.store.ensureCourseArchiveLegacy(ghosts.courses.size);
+  if (archiveMigration.ok) {
+    ghosts.setArchiveLimit(archiveCapacity(archiveMigration.profile));
+    progression.publish();
+  }
   // Profile entitlement is not available during initial AudioSynth
   // construction. Reapply once progression has loaded it so saved,
   // purchased vocal enablement is honored on a new browser session.
