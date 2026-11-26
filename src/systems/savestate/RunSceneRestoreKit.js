@@ -41,13 +41,34 @@ export function createRunSceneRestoreKit(Phaser) {
   const normal = run => !!run && !run.unrankedPractice && !run.bsodGym &&
     !run.guestPractice && !run.coachSim && !run.takeover && !run.crashed &&
     !!run.ghostRecorder && !run.tapePlayer && !run._replayTape;
+  const record = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  // Fail visibly BEFORE any world mutation when a caller hands us a truncated
+  // diagnostic snapshot. A future serialized layout must independently check
+  // exact-build identity, types and hostile input; this is only an internal
+  // completeness guard, never a trust boundary or an authentication result.
+  const complete = snap => {
+    if (!record(snap?.game) || !record(snap?.classes) ||
+        !Array.isArray(snap.classes.SIM) || !Array.isArray(snap.classes.unclassified) ||
+        snap.classes.unclassified.length || !record(snap.config) ||
+        !record(snap.matter) || !record(snap.camera) || !record(snap.telegraph) ||
+        !Array.isArray(snap.meshOrder) || !Array.isArray(snap.ghost) ||
+        snap.ghost.length !== 8) return false;
+    const declared = snap.classes.SIM;
+    const actual = Object.keys(snap.game);
+    if (declared.length !== actual.length ||
+        new Set(declared).size !== declared.length ||
+        !declared.every(k => typeof k === 'string' &&
+          kit.CLASS[k] === 'SIM' && Object.prototype.hasOwnProperty.call(snap.game,k))) return false;
+    return ['simClock','runRandom','terrain','sled','score'].every(k =>
+      Object.prototype.hasOwnProperty.call(snap.game,k));
+  };
   return Object.freeze({
     capture(run) {
       if (!normal(run) || !Number.isSafeInteger(run.simClock?.tick) || run.simClock.tick < 0)
         throw Error('production snapshot refused: only complete normal live runs');
       const snap=kit.capture(run,{withConfig:true,withRecorder:true});
       if (snap.kind!=='bb-runscene-diagnostic-snapshot'||snap.diagnosticOnly!==true||
-          !Array.isArray(snap.audit)||snap.audit.length||!snap.recorder||!snap.config)
+          !Array.isArray(snap.audit)||snap.audit.length||!snap.recorder||!complete(snap))
         throw Error('production snapshot refused: incomplete causal/recorder capture');
       return snap;
     },
@@ -55,7 +76,7 @@ export function createRunSceneRestoreKit(Phaser) {
       if (!normal(run) || run.simClock?.tick!==0 || run.ghostRecorder.lastTick!==0 ||
           run.ghostRecorder.inputs.length || !snap || typeof snap!=='object' ||
           snap.kind!=='bb-runscene-diagnostic-snapshot'||snap.diagnosticOnly!==true||
-          !Array.isArray(snap.audit)||snap.audit.length || !snap.recorder || !snap.config)
+          !Array.isArray(snap.audit)||snap.audit.length || !snap.recorder || !complete(snap))
         throw Error('production restore refused: only intact complete snapshot into fresh normal run');
       // Always full Matter/contact reconstruction + strict recorder preflight.
       // Never accept a user-controllable restore level, skip list or relaxed QA.

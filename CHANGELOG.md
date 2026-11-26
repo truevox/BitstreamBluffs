@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.7 — #119 strict full-Matter RunScene restore mechanism (2026-11-26)
+
+- Non-force-integrate the existing #404 real RunScene/Matter V3 contact and recorder restoration code onto shipped v2.25.6 RNG/clock and native GhostRecorder infrastructure. Internal opt-in ES-module interface supports complete normal-run capture and fresh-world full restore; no automatic global hook, storage, UI, ranking, or network writes.
+- Added strict pre-mutation completeness checks against the reviewed SIM field inventory, core fields, terrain/telegraph/Matter/camera sections and recorder snapshot; refuse truncated/unclassified content before mutation. Experimental partial/ablation paths remain excluded from the operational API.
+- Real compiled browser regression checks contact-heavy and hazard-heavy 300/280-tick strict equality, recorder suffix and corruption controls. Version and source identity remain explicit; SIM9 physics unchanged.
+- This is **not** player Save/Resume: no registered serializable production layout, atomic fresh-scene lifecycle, one-time slot consumption after verified resume, UI, or public leaderboard authorization. Parent #119 stays OPEN. [skip netlify]
+
 ## v2.25.6 — #119 native GhostRecorder prefix continuity (2026-11-25)
 
 - Add developer-only strict, complete native `GhostRecorder` tick-zero input/history checkpoint section codec. Actual game recorder is captured through bounded canonical bytes with F64-exact trace/checkpoints; decode checks current exact source build/ruleset, run/tick identity, input cursors (including repeated edge ticks), full trace/checkpoint/fingerprint coverage and source-sorted setup. A fresh matching recorder is restored as a **separate detached instance**, not a trusted gameplay or official-board authority.
