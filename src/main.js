@@ -3,6 +3,8 @@
  * updating src/ARCHITECTURE.md.
  */
 import Phaser from 'phaser';
+import packageInfo from '../package.json';
+import { installPlaytestTelemetry } from './systems/PlaytestTelemetry.js';
 import { GAME_WIDTH, GAME_HEIGHT, TARGET_FPS } from './constants.js';
 import { PreloadScene } from './scenes/PreloadScene.js';
 import { TitleScene } from './scenes/TitleScene.js';
@@ -45,3 +47,7 @@ export const config = {
 
 export const game = new Phaser.Game(config);
 if (typeof window !== 'undefined') window.__bbGame = game; // handy for headless tests / debugging
+
+if (typeof window !== 'undefined') {
+  try { installPlaytestTelemetry(game, packageInfo.version); } catch { /* optional playtest tooling */ }
+}

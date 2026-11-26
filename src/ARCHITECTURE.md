@@ -2717,3 +2717,13 @@ site were not merged/deployed.
 A non-null frozen result contains `trusted:false`, `timingKind:'synthetic-unverified'`, `use:'cosmetic-only'`, `canAuthorizeGameplay:false`, `trackId` and `transportRevision` as stale-callback guards, `sourceTimeSeconds`, `beatSeconds:.5`, `beatsPerMeasure:4`, `measureSeconds:2`, zero-based `beatIndex` and `measureIndex`, one-based `beatInMeasure`, `beatStartSeconds`, `measureStartSeconds`, `nextBeatSeconds`, `nextMeasureStartSeconds`, `isMeasureStartBeat`, `atMeasureStart` (approx. 50ms boundary window), and corresponding WebAudio `*AudioTime` fields. Time fields use the same real source-transport clock as the original OGG music; no extra player, timers, or derived 160 BPM claim. Visual consumers (e.g. a future optional World Dance rhythm mode) should react to **changes of `(transportRevision, beatIndex)` or `(transportRevision, measureIndex)`** once per boundary, never retrigger continuously while `isMeasureStartBeat` remains true. Never gate gameplay, Gym starts, collision, scoring or release pacing on this value. The existing `getBeatTiming()` verified-only fail-closed interface is unchanged.
 
 The existing `planFatalCountIn()` additionally reports `beatInMeasure:[1,2,3,4]`, one `measureStartOnsets` timestamp at the first drum accent, `beatsPerMeasure:4`, `measureSeconds`, and `syntheticMeterOrigin:'count-in-first-drum'`, without changing scheduling. This is an **independent artificial count-in** and should not be assumed aligned with the song-wide fake meter, much less an actual source downbeat. Actual source measure verification remains separate research; release beat catalogs stay unverified.
+
+### Optional local playtest recorder
+`?playtest=1` automatically enables a bounded event observer with no game UI.
+Normal URLs do not record; `?playtest=0` disables and erases the tab's data.
+`?playtest=export` downloads JSON in the same tab; the developer can also call
+`window.__bbPlaytest.export()` from the console. Up to three bounded segments
+survive reload in sessionStorage, not tab closure. No network transmission,
+raw keys, seeds, run IDs, device identifiers, error messages or account data.
+Does not write saves or affect replay/physics authority. Inform testers (and
+parents/guardians when applicable) before sharing the recording link.

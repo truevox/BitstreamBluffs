@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.12 — local playtest telemetry (2026-11-26)
+
+- Dedicated playtest URL automatically records bounded, anonymous gameplay events and 1 Hz performance samples, without overlays or network transmission. Same-tab export and opt-out erase are available by URL. Normal game URLs do not record. No physics or replay authority changes.
+
 ## v2.25.11 — #413 one-ledger UNVERIFIED provisional submission reference (2026-11-26)
 
 - Add a **server-only**, opt-in provisional submission adapter that reuses the *same* #411 signed challenge, account and frozen equipment tables, rather than inventing a competing public Shard balance. Require canonical `provisional-public` request bytes, authenticated account, independently trusted consent/audience, exact pinned course/equipment, server clock and one-use SQLite publication. No live HTTP endpoint or upload is enabled.
