@@ -163,13 +163,25 @@ export function createNativeRunSceneRestoreKit(Phaser) {
       run.startedAt=prepared.startedAt;
     },
   };
-  const world=strictWorldKit(createInternalKit(Phaser,nativeRecorder));
+  const internal=createInternalKit(Phaser,nativeRecorder);
+  const world=strictWorldKit(internal);
   const boundary=run=>{
     if(!normal(run)||run.dailyOfficial||run.dailyMode==='draft'||run.guestPracticeTape!=null||
        !run.registry||run.ghostRecorder.lastTick!==run.simClock?.tick)
       throw Error('native restore: only complete normal tick boundary');
   };
   return Object.freeze({
+    // INTERNAL staging helper: reconstruct the exact leading graph identity
+    // sequence from already validated detached native sections, not wire tags.
+    // The caller must bind the terrain recipe against trusted fresh options.
+    projectEarly(run,clockState,rngState,terrain,queue,collectedKeys){
+      boundary(run);
+      const clock=new SimClock(run.simClock.tickMs,run.simClock.maxTicks);
+      const rng=runRandomStreams(run.seed);
+      restoreSimClockState(clock,clockState);
+      restoreRunRandomState(rng,rngState);
+      return internal.projectEarly(run,clock,rng,terrain,queue,new Set(collectedKeys));
+    },
     capture(run){
       boundary(run);
       const ctx=context(run);
@@ -747,5 +759,12 @@ function installRunSceneStateKit(global) {
     return res;
   }
 
-  return Object.freeze({capture,restore,digests,runBatch,classifyScene,bodyIndex,CLASS:Object.fromEntries(CLASS)});
+  function projectEarly(run,clock,rng,terrain,queue,collected){
+    const {enc,audit}=makeEncoder(run,bodyIndex(run).keyOf);
+    const values={simClock:clock,runRandom:rng,terrain,collectedPowerups:collected,_chunkQueue:queue};
+    const game=Object.fromEntries(Object.entries(values).map(([k,v])=>[k,enc(v,k)]));
+    if(audit.length)throw Error('early projection: '+audit.join(' | '));
+    return game;
+  }
+  return Object.freeze({capture,restore,digests,runBatch,classifyScene,bodyIndex,projectEarly,CLASS:Object.fromEntries(CLASS)});
 }
