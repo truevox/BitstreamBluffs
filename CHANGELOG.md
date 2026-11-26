@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.25.6 — #119 native GhostRecorder prefix continuity (2026-11-25)
+
+- Add developer-only strict, complete native `GhostRecorder` tick-zero input/history checkpoint section codec. Actual game recorder is captured through bounded canonical bytes with F64-exact trace/checkpoints; decode checks current exact source build/ruleset, run/tick identity, input cursors (including repeated edge ticks), full trace/checkpoint/fingerprint coverage and source-sorted setup. A fresh matching recorder is restored as a **separate detached instance**, not a trusted gameplay or official-board authority.
+- Tests include 28/28 dedicated native recorders, a real Chromium production game at tick 481 continuing to natural fatal tick 977 with **identical final tape, record, fingerprint and zero JS errors** and 3 additional distinct review-only real stock/upgraded/boosted header acceptance cases. Validation and restoration refuse hostile, missing or inconsistent data without changing the fresh recorder.
+- **Not player Save/Resume:** no production Matter/RunScene total-world snapshot registry, full atomic world restore, UI, ranking/entitlements, replay authority or physics/SIM revision changes. The v2.25.3 local single-use slot is still inert; the v2.25.5 RNG/clock adapters remain separate until an integrated causal-world restore is proven.
+
+## v2.25.5 — #119 strict causal RNG/clock primitive adapters (2026-11-25)
+
+- Add developer-only explicit state adapters for the *actual* RunRandom four named streams and fixed-tick SimClock. Restore only into fresh, seed-state-matched instances; validate every own field and reject unknown fields, truncated streams, pending inputs, incompatible versions/configuration, aliasing and read-only targets **before modifying the target**.
+- Pure BB-CJSON round-trip tests prove 120 identical suffix draws in each named RNG stream and matching clock tick/input scheduling, floating-point accumulator, and dropped time across irregular frames and a long stall. New path-scoped CI checks these genuine production-class primitives and the build identity.
+- **Not a game Save/Resume feature:** no production Matter/scene layout, world capture/restore, recorder reattachment, official ranking/verification, UI, networking or physics/SIM revision changes. The v2.25.3 single-use envelope slot remains inert until the entire atomic resume path is proven.
+
+## v2.25.4 — #56 course-archive migration recovery hardening (2026-11-25)
+
+- Avoid permanently stamping an empty Ghost Library inventory as migrated when IndexedDB is unavailable or temporarily blocked at startup. Only a successfully opened/read authoritative IndexedDB course store enables the new archive capacity limit; memory-only mode stays uncapped while migration remains pending.
+- On the next successful boot, repair v2.25.2/v2.25.3 profiles already marked migrated whose actual stored course count exceeds their entitlement. Preserve all historical courses and purchased slots; account for already-purchased capacity without granting duplicate free slots. Require a durable profile write before claiming migration success.
+- Add outage/recovery, erroneously migrated profile, purchased-slot and no-persistent-storage regressions; preserve five ghosts per course and the original manual deletion-only behavior. No changes to SIM9 physics, scores, public trust, Shard purchases/prices, privacy, or automatic upload. [skip netlify]
+
 ## v2.25.3 — #119 inert single-use local suspend-slot foundation (2026-11-25)
 
 - Introduces a private IndexedDB suspend-slot protocol with exact-build and registered-layout envelope admission, atomic cross-tab claim, owner-token-gated release/consume, reload-persistent claimed state and bounded 16 MiB input. An occupied/claimed slot cannot be overwritten by another tab.

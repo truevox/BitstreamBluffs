@@ -1,0 +1,35 @@
+name: Strict savestate primitives QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/savestate-primitives-qa.yml'
+      - 'src/systems/savestate/primitiveState.js'
+      - 'tests/determinism/savestate-primitive-state.test.js'
+      - 'src/systems/RunRandom.js'
+      - 'src/systems/Rng.js'
+      - 'src/systems/SimClock.js'
+      - 'src/systems/replay/canonicalJson.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  primitive-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify source identity without modifying source artifacts
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Test strict primitive fresh restore and surrounding current RNG/clock contracts
+        run: npm test -- --runInBand tests/determinism/savestate-primitive-state.test.js tests/src/run-random.test.js tests/src/sim-clock.test.js tests/determinism/savestate-envelope.test.js
+      - name: Build production game without deploying
+        run: npm run build
