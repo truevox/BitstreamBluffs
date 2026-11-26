@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.13 — automatic playtest uploads (2026-11-26)
+
+- Dedicated playtest link sends bounded, pseudonymous gameplay event batches directly to the owner’s private Google Drive via a write-only Apps Script collector. No prompts, overlays, credentials, or network requests on ordinary game URLs. Pending uploads retry with stable IDs; opt-out erases unsent tab data.
+
 ## v2.25.12 — local playtest telemetry (2026-11-26)
 
 - Dedicated playtest URL automatically records bounded, anonymous gameplay events and 1 Hz performance samples, without overlays or network transmission. Same-tab export and opt-out erase are available by URL. Normal game URLs do not record. No physics or replay authority changes.

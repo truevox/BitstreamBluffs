@@ -2718,12 +2718,13 @@ A non-null frozen result contains `trusted:false`, `timingKind:'synthetic-unveri
 
 The existing `planFatalCountIn()` additionally reports `beatInMeasure:[1,2,3,4]`, one `measureStartOnsets` timestamp at the first drum accent, `beatsPerMeasure:4`, `measureSeconds`, and `syntheticMeterOrigin:'count-in-first-drum'`, without changing scheduling. This is an **independent artificial count-in** and should not be assumed aligned with the song-wide fake meter, much less an actual source downbeat. Actual source measure verification remains separate research; release beat catalogs stay unverified.
 
-### Optional local playtest recorder
+### Dedicated playtest telemetry
 `?playtest=1` automatically enables a bounded event observer with no game UI.
-Normal URLs do not record; `?playtest=0` disables and erases the tab's data.
-`?playtest=export` downloads JSON in the same tab; the developer can also call
-`window.__bbPlaytest.export()` from the console. Up to three bounded segments
-survive reload in sessionStorage, not tab closure. No network transmission,
-raw keys, seeds, run IDs, device identifiers, error messages or account data.
-Does not write saves or affect replay/physics authority. Inform testers (and
-parents/guardians when applicable) before sharing the recording link.
+It uploads batches to the owner's write-only Google Apps Script collector every
+30 seconds and on page hide; confirmed batches are removed, failed batches retry
+with identical session/batch IDs. Random ID is per page load, not a player ID.
+Normal URLs do not record; `?playtest=0` disables and erases the tab's pending
+data (already uploaded files remain in Drive). Same-tab manual JSON export
+remains a fallback. No raw keys, seeds, device IDs, error messages, or account
+data. Network and local buffers are bounded; tab closure/offline can lose data.
+Inform adult testers before sharing the recording link.

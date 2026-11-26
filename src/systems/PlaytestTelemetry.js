@@ -1,5 +1,6 @@
-// Local-only recorder for the dedicated playtest URL. Never send, identify, or fingerprint a player.
+// Dedicated playtest recorder. No account IDs or device fingerprints.
 import { EVT } from '../events.js';
+import { createPlaytestUpload, QUEUE_KEY } from './PlaytestUpload.js';
 
 const fields = {
   [EVT.RUN_START]: 'dailyOfficial dailyMode gym practice takeover',
@@ -45,12 +46,14 @@ const pick = (data, keys) => {
   return out;
 };
 
-export function createPlaytestRecorder({version, now = () => performance.now(), limit = 12000} = {}) {
+export function createPlaytestRecorder({version, now = () => performance.now(), limit = 12000, onEvent = () => {}} = {}) {
   let start = null, events = [], dropped = 0, run = 0, active = false, sample = {};
   const add = (type, data = {}) => {
     if (start === null) return;
+    const event = {ms: Math.max(0, Math.round(now() - start)), run, type, data};
+    try { onEvent(event); } catch {}
     if (events.length >= limit) { dropped++; return; }
-    events.push({ms: Math.max(0, Math.round(now() - start)), run, type, data});
+    events.push(event);
   };
   return {
     get recording() { return start !== null; },
@@ -81,11 +84,11 @@ export function createPlaytestRecorder({version, now = () => performance.now(), 
 
 const storageKey = 'bb.playtest.telemetry.v1';
 
-// Dedicated playtest URL only; no in-game overlay or network transport.
+// Dedicated playtest URL only; no in-game overlay.
 export function installPlaytestTelemetry(game, version, win = window) {
   const mode = new URLSearchParams(win.location.search).get('playtest');
   if (mode === '0') {
-    try { win.sessionStorage.removeItem(storageKey); } catch {}
+    try { win.sessionStorage.removeItem(storageKey); win.sessionStorage.removeItem(QUEUE_KEY); } catch {}
     return;
   }
   if (mode !== '1' && mode !== 'export') return;
@@ -100,7 +103,9 @@ export function installPlaytestTelemetry(game, version, win = window) {
     try { download(win.sessionStorage.getItem(storageKey)); } catch {}
     return;
   }
-  const recorder = createPlaytestRecorder({version});
+  let upload;
+  try { upload = createPlaytestUpload(win, version); } catch {}
+  const recorder = createPlaytestRecorder({version, onEvent: event => upload?.add(event)});
   recorder.start();
   // Keep previous reload segments, within a strict total bound. Never merge raw save data.
   let previous = [];
@@ -114,7 +119,9 @@ export function installPlaytestTelemetry(game, version, win = window) {
   win.__bbPlaytest = {
     export: () => download(serialize()),
     snapshot: () => JSON.parse(serialize()),
-    stop: () => { recorder.clear(); previous = []; try { win.sessionStorage.removeItem(storageKey); } catch {} },
+    uploadStatus: () => upload?.status(),
+    flush: () => upload?.flush(),
+    stop: () => { upload?.stop(); recorder.clear(); previous = []; try { win.sessionStorage.removeItem(storageKey); } catch {} },
   };
   const listeners = [...Object.keys(fields), ...Object.keys(samples), EVT.RUN_END].map(type => {
     const fn = payload => { try { recorder.event(type, payload); if (recorder.recording && (type === EVT.RUN_END || type === EVT.RUN_ABORT)) persist(); } catch {} };
@@ -122,16 +129,18 @@ export function installPlaytestTelemetry(game, version, win = window) {
   });
   const timer = win.setInterval(() => { if (!doc.hidden && recorder.recording) recorder.tick(game.loop?.actualFps); }, 1000);
   const saveTimer = win.setInterval(() => { if (recorder.recording) persist(); }, 5000);
-  const onHide = () => { if (recorder.recording) persist(); };
+  const uploadTimer = win.setInterval(() => { if (recorder.recording) void upload?.flush(); }, 30000);
+  const onHide = () => { if (recorder.recording) { persist(); void upload?.flush(true); } };
   const onError = e => recorder.error(e.type);
+  const onVisibility = () => { if (doc.hidden) onHide(); };
   win.addEventListener('pagehide', onHide);
-  doc.addEventListener('visibilitychange', onHide);
+  doc.addEventListener('visibilitychange', onVisibility);
   win.addEventListener('error', onError); win.addEventListener('unhandledrejection', onError);
   game.events.once('destroy', () => {
     onHide();
     for (const [type, fn] of listeners) game.events.off(type, fn);
-    win.clearInterval(timer); win.clearInterval(saveTimer);
-    win.removeEventListener('pagehide', onHide); doc.removeEventListener('visibilitychange', onHide);
+    win.clearInterval(timer); win.clearInterval(saveTimer); win.clearInterval(uploadTimer);
+    win.removeEventListener('pagehide', onHide); doc.removeEventListener('visibilitychange', onVisibility);
     win.removeEventListener('error', onError); win.removeEventListener('unhandledrejection', onError);
     delete win.__bbPlaytest;
   });
