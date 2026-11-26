@@ -378,6 +378,7 @@ export const NON_CAUSAL_MODULES = Object.freeze([
   { file: 'src/systems/ControlLayouts.js', reason: 'input binding layouts; the recorded pad bits are the protocol (bb-pad)' },
   { file: 'src/systems/Cosmetics.js', reason: 'cosmetic catalogue' },
   { file: 'src/systems/CrashReport.js', reason: 'Game Over text timing/beat labels: presentation' },
+  { file: 'src/systems/ghost/GhostLibrary.js', reason: 'untrusted guest trace compatibility and local noncolliding ghost-role storage; only reached from guest-practice admission, never authoritative Matter, input replay or scored outcomes' },
   { file: 'src/systems/HazardTelegraph.js', reason: 'ground warning timing: presentation' },
   { file: 'src/systems/HintScheduler.js', reason: 'first-run hint definitions: presentation' },
   { file: 'src/systems/MarkerLayout.js', reason: 'minimap/marker label layout: presentation' },

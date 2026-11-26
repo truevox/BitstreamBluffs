@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.22.8 — #244 private protected replay evidence release candidate (2026-11-25)
+
+- Retain canonical full-run input evidence in a separate local IndexedDB v3 archive independent of the five visible ghost roles, with atomic run-ID/seed/biome binding, candidate/submitted/pinned references, explicit unpin, and corruption/quota fail-closed behavior.
+- Add deliberate private Game Over Keep, Export, Import and Refresh controls with visible durable-versus-memory-only statuses and explicit source-file retention guidance. No automatic network uploads, rankings or official verification.
+- Reconcile the new Local Evidence entry with the already released #69 Share Link button: both fit in the same Game Over ghost panel, keyboard/pointer navigation preserves both, and entering local files disarms any prepared share URL. Preserve #56 exact-course atomic ghost roles and retention.
+- Extend source-bound current-SIM9 terminal replay QA: 12 ordinary + 12 high-density native RunScene/Matter captures, plus a 32-run genuine-native Chromium 300 KB quota stress test. All observed byte integrity, actual contact and quota/retry results remain **local technical evidence**, not honest-human-play authentication or actual Chromebook capacity proof.
+- Keep public score/entitlement proof #135, competitive submission, physical-device storage acceptance and parent #119 trusted savestate UI **open**. No SIM9 physics, input-tick meaning, scoring, automatic publication or user consent behavior is changed. This is a draft candidate pending exact-head independent review and release coordination.
+
 ## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
 
 - After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.

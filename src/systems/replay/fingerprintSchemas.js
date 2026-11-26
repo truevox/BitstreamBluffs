@@ -441,7 +441,12 @@ export const NON_CAUSAL = Object.freeze({
     _contactQueue: 'drained by processContacts inside the tick; empty at a checkpoint',
     _leaving: PRESENTATION + ' (scene exit latch)',
     _ghostToken: PRESENTATION, ghostRecorder: 'the recorder itself', tapePlayer: 'replay input source (inputs are the tape)',
-    _replayTape: RUN_CONSTANT, _manualPauseSeq: PRESENTATION, _manualPausePending: PRESENTATION,
+    _replayTape: RUN_CONSTANT,
+    // Guest-only unranked presentation lane: never creates an authoritative
+    // GhostRecorder/RunRecord or enters canonical replay/savestate verification.
+    guestPractice: 'untrusted guest-only practice discriminator; explicitly excluded from verified replay, rewards and durable run evidence',
+    guestPracticeTape: 'untrusted, visually rendered opponent trace only; cannot control Matter, scoring or ranked replay inputs',
+    _manualPauseSeq: PRESENTATION, _manualPausePending: PRESENTATION,
     _bsodObserverErrorLogged: PRESENTATION, _view: PRESENTATION, heightFn: 'closure over terrain',
     markerHeightFn: 'presentation-only closure: joinedMarkerHeight uses existing Matter mesh coverage, avoiding speculative TerrainGenerator.heightAt() writes',
     // run constants (manifest territory)
