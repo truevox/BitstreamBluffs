@@ -43,7 +43,8 @@ import { GhostRecorder, TapePlayer, quantizeTilt, TRACE_EVERY } from '../systems
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
-import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, traceOf, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS } from '../systems/replay/Takeover.js';
+import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, traceOf, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS, COVERAGE_FINGERPRINT_ONLY, REFUSALS as TAKEOVER_REFUSALS } from '../systems/replay/Takeover.js';
+import { liveFingerprint } from '../systems/replay/PostcardChallenge.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
@@ -2869,6 +2870,7 @@ export class RunScene extends Phaser.Scene {
     const msg = reason === 'desync'
       ? `the tape desynced at tick ${detail && detail.desync ? detail.desync.tick : '?'} (${detail && detail.desync && detail.desync.via === 'trace' ? 'pose' : 'checkpoint'}); takeover cancelled`
       : reason === 'prefix-crash' ? 'the replay crashed before the chosen tick; takeover cancelled'
+        : reason === 'fingerprint' ? TAKEOVER_REFUSALS.fingerprint
         : reason === 'error' ? `takeover failed (${String((detail && detail.message) || detail || 'error').slice(0, 80)})` : 'takeover could not start';
     if (this.takeover) { this.takeover.phase = 'aborted'; this.takeover.abort = { reason, detail: detail || null }; }
     this._postTakeoverNotice(reason, msg);
@@ -2895,7 +2897,9 @@ export class RunScene extends Phaser.Scene {
     if (!t || this._leaving) return;
     if (t.phase === 'seeking') {
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const r = this.seekTo(t.targetTick, { maxTicks: SEEK_MAX_TICKS_PER_FRAME, budgetMs: SEEK_BUDGET_MS });
+      // #67: a postcard has no checkpoints / trace to verify against; its authority is the fingerprint compared in _finishSeek.
+      const fpOnly = t.descriptor.coverage === COVERAGE_FINGERPRINT_ONLY;
+      const r = this.seekTo(t.targetTick, { maxTicks: SEEK_MAX_TICKS_PER_FRAME, budgetMs: SEEK_BUDGET_MS, ...(fpOnly ? { verify: false } : {}) });
       t.seekMs += (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       t.seekTicks += r.steps;
       t.seekFrames++;
@@ -2953,6 +2957,13 @@ export class RunScene extends Phaser.Scene {
   /** Seek reached tick N: drop the presentation debris of the re-simulation, draw the frame, wait for the player. */
   _finishSeek() {
     const t = this.takeover;
+    // #67: the postcard's trust check. The combined fingerprint of the state this build just re-simulated at tick N must equal
+    // the one the sender's build captured; otherwise this prefix does not reproduce here and the takeover is REFUSED.
+    if (t.descriptor.coverage === COVERAGE_FINGERPRINT_ONLY) {
+      let got = null;
+      try { got = liveFingerprint(this); } catch (e) { got = null; }
+      if (got !== t.descriptor.expectedFingerprint) { this._abortTakeover('fingerprint', { want: t.descriptor.expectedFingerprint, got, tick: this.simClock.tick }); return; }
+    }
     t.phase = 'ready';
     try {
       // The seek made fx particles / shake / flash that were never updated or drawn: they belong to no frame the player saw.

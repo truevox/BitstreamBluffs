@@ -23,6 +23,7 @@ import { RUN_STREAMS } from '../RunRandom.js';
 import { canonicalBytes, parseCanonical, f64Encode, f64Decode, CJSONError } from './canonicalJson.js';
 import { digestOf } from './canonicalSha256.js';
 import { validateInputRows } from './manifest.js';
+import { buildTakeoverDescriptor, COVERAGE_FINGERPRINT_ONLY, POSTCARD_SOURCE } from './Takeover.js';
 
 export const POSTCARD_KIND = 'bb-postcard';
 export const POSTCARD_VERSION = 1;
@@ -104,6 +105,7 @@ export const REFUSALS = Object.freeze({
   'invalid-field': 'this postcard has an invalid value',
   'digest-mismatch': 'this postcard was altered or damaged',
   'other-build': 'this postcard was made on a different game build',
+  'older-build': 'this tape has no build id; only the run you just played can become a postcard',
   mode: 'only normal runs can become postcards',
   tick: 'that tick is outside the recorded run',
   window: 'the challenge window must be a number of seconds',
@@ -192,9 +194,9 @@ function challengeProblem(c) {
   if (!exactKeys(c, CHALLENGE_FIELDS) || !CHALLENGE_FIELDS.every((k) => hasOwn(c, k))) return 'fields';
   if (!isFin(c.speedPxS) || c.speedPxS < 0 || c.speedPxS > 1e6) return 'speedPxS';
   if (!isFin(c.angVel) || Math.abs(c.angVel) > 1e4) return 'angVel';
-  if (!(c.parachuteFuel === null || (isFin(c.parachuteFuel) && c.parachuteFuel >= 0 && c.parachuteFuel <= 1e7))) return 'parachuteFuel';
-  // hazardPhase is whatever scalar phase the wiring stage derives (a cycle position); only its sanity is checked here.
-  if (!(c.hazardPhase === null || (isFin(c.hazardPhase) && c.hazardPhase >= 0 && c.hazardPhase <= 1e7))) return 'hazardPhase';
+  if (!(c.parachuteFuel === null || (isFin(c.parachuteFuel) && c.parachuteFuel >= 0 && c.parachuteFuel <= 1e5))) return 'parachuteFuel';
+  // hazardPhase: ms until the nearest gate hazard ahead next flips (PostcardChallenge); gate periods are ~1-2 s, 60 s is a generous bound.
+  if (!(c.hazardPhase === null || (isFin(c.hazardPhase) && c.hazardPhase >= 0 && c.hazardPhase <= 60000))) return 'hazardPhase';
   if (!(c.bsodGapPx === null || (isFin(c.bsodGapPx) && c.bsodGapPx >= 0 && c.bsodGapPx <= 1e7))) return 'bsodGapPx';
   return null;
 }
@@ -253,7 +255,7 @@ const digestOfWire = (wire) => { const { digest, ...rest } = wire; return digest
  *   identity:{gameVersion:string, simRevision:number, rulesetId:string, buildId:string}}} p
  * @returns {{ok:true, postcard:object}|{ok:false, reason:string, message:string}}
  */
-export function createPostcard({ tape, startTick, windowSec, fingerprintAtStart, challenge, identity } = {}) {
+export function createPostcard({ tape, startTick, windowSec, fingerprintAtStart, challenge, identity, inSessionTape = false } = {}) {
   try {
     const id = identity;
     if (!isObj(id) || typeof id.gameVersion !== 'string' || !VERSION_RE.test(id.gameVersion) || !isInt(id.simRevision)
@@ -274,9 +276,12 @@ export function createPostcard({ tape, startTick, windowSec, fingerprintAtStart,
 
     const header = pickHeader(tape);
     // Identity: the tape must have been recorded by exactly the build that is creating the postcard. A null build id
-    // (stamped before the async ruleset loader finished) is the same build by construction (same rulesetId), so the
-    // caller's id is used; a different non-null id is refused.
-    if (header.buildId === null || header.buildId === undefined) header.buildId = id.buildId;
+    // (stamped before the async ruleset loader finished) is filled with the caller's id ONLY for the in-session tape this
+    // build just recorded (`inSessionTape:true`, REG.LAST_GHOST_TAPE). Any other tape without a build id is `older-build`.
+    if (header.buildId === null || header.buildId === undefined) {
+      if (inSessionTape !== true) return refuse('older-build');
+      header.buildId = id.buildId;
+    }
     if (header.simRevision !== id.simRevision || header.rulesetId !== id.rulesetId || header.buildId !== id.buildId) return refuse('other-build', 'the tape was recorded on another build');
     const hp = headerProblem(header);
     if (hp) return refuse('invalid-field', `header: ${hp}`);
@@ -578,4 +583,15 @@ export async function decodeReply(str, opts = {}) {
   } catch (e) {
     return refuse('bad-json', e && e.message);
   }
+}
+
+/**
+ * The #72 takeover descriptor of a postcard: `source:'postcard'`, `coverage:'fingerprint-only'`, the expected fingerprint at N, and
+ * the postcard binding (digest, window, challenge). The caller must have decoded it and checked `postcardCompatible`.
+ * @returns {Readonly<object>} frozen descriptor (see Takeover.buildTakeoverDescriptor)
+ */
+export function buildPostcardDescriptor(pc) {
+  const i = postcardToTakeoverInput(pc);
+  return buildTakeoverDescriptor({ tape: i.tape, tick: i.tick, source: POSTCARD_SOURCE, coverage: COVERAGE_FINGERPRINT_ONLY, expectedFingerprint: i.expectedFingerprint,
+    postcard: { digest: i.postcardDigest, windowTicks: i.windowTicks, challenge: i.challenge } });
 }

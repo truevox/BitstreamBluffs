@@ -459,8 +459,18 @@ describe('compatibility', () => {
     expect(createPostcard(baseArgs(makeTape(), { identity: undefined }))).toMatchObject({ ok: false, reason: 'identity' });
   });
 
-  test('a tape stamped before the build id was known (buildId null) takes the creating build id; one with no rulesetId is refused', () => {
-    expect(must(createPostcard(baseArgs(makeTape({ header: { buildId: null } })))).buildId).toBe(BUILD);
+  test('null buildId: filled ONLY for the in-session tape (inSessionTape:true); any other tape is refused as older-build', () => {
+    const nullTape = () => makeTape({ header: { buildId: null } });
+    expect(must(createPostcard(baseArgs(nullTape(), { inSessionTape: true }))).buildId).toBe(BUILD);
+    expect(createPostcard(baseArgs(nullTape()))).toMatchObject({ ok: false, reason: 'older-build' });
+    expect(createPostcard(baseArgs(nullTape(), { inSessionTape: false }))).toMatchObject({ ok: false, reason: 'older-build' });
+    expect(createPostcard(baseArgs(nullTape(), { inSessionTape: 'yes' }))).toMatchObject({ ok: false, reason: 'older-build' });
+    const absent = makeTape(); delete absent.buildId;
+    expect(createPostcard(baseArgs(absent))).toMatchObject({ ok: false, reason: 'older-build' });
+    // inSessionTape never lets a DIFFERENT build id through
+    expect(createPostcard(baseArgs(makeTape({ header: { buildId: `sha256:${'00'.repeat(32)}` } }), { inSessionTape: true }))).toMatchObject({ ok: false, reason: 'other-build' });
+    // and a tape with a build id is unaffected by the flag
+    expect(createPostcard(baseArgs(makeTape())).ok).toBe(true);
     const noRuleset = makeTape(); delete noRuleset.rulesetId;
     expect(createPostcard(baseArgs(noRuleset)).ok).toBe(false);
   });

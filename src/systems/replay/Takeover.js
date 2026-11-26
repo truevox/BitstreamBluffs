@@ -50,7 +50,14 @@ export const REFUSALS = Object.freeze({
   loadout: 'the tape lacks its loadout (boosts, upgrade ranks, sync level)',
   tick: 'that tick is outside the recorded run',
   'prefix-uncovered': 'the tape does not cover the run up to that tick',
+  coverage: 'fingerprint-only coverage is only for a postcard with a valid expected fingerprint',
+  fingerprint: "this postcard isn't reproducible on this build",
 });
+
+/** #67: a postcard carries no checkpoints / trace; its prefix is authenticated by the combined fingerprint at tick N alone. */
+export const COVERAGE_FINGERPRINT_ONLY = 'fingerprint-only';
+export const POSTCARD_SOURCE = 'postcard';
+const FP_ID = /^xxh32x2:[0-9a-f]{16}$/;
 
 const refuse = (reason, extra) => ({ ok: false, reason, message: REFUSALS[reason] + (extra ? ` (${extra})` : '') });
 
@@ -58,12 +65,16 @@ const refuse = (reason, extra) => ({ ok: false, reason, message: REFUSALS[reason
  * Can `tape` be taken over at `tick`? Pure. Never throws.
  * @param {object} tape a finished ghost tape (GhostRecorder.finish)
  * @param {number} tick N: the number of ticks to re-simulate before handoff
- * @param {{rulesetId?:string, guestPractice?:boolean}} [ctx] rulesetId = the EXACT id of the running build
+ * @param {{rulesetId?:string, guestPractice?:boolean, coverage?:'fingerprint-only', source?:string, expectedFingerprint?:string}} [ctx]
+ *   rulesetId = the EXACT id of the running build. `coverage:'fingerprint-only'` (#67) skips the checkpoint / trace coverage test and
+ *   is accepted ONLY with `source:'postcard'` AND a well-formed `expectedFingerprint`; anything else is refused as `coverage`.
  * @returns {{ok:true}|{ok:false, reason:string, message:string}}
  */
 export function takeoverEligible(tape, tick, ctx = {}) {
   try {
     if (ctx && ctx.guestPractice) return refuse('guest-practice');
+    const fpOnly = !!(ctx && ctx.coverage !== undefined && ctx.coverage !== null);
+    if (fpOnly && !(ctx.coverage === COVERAGE_FINGERPRINT_ONLY && ctx.source === POSTCARD_SOURCE && typeof ctx.expectedFingerprint === 'string' && FP_ID.test(ctx.expectedFingerprint))) return refuse('coverage');
     if (!tape || typeof tape !== 'object' || Array.isArray(tape)) return refuse('undecodable');
     if (tape.format !== GHOST_TAPE_FORMAT || !tapeCompatible(tape)) return refuse('undecodable');
     if (!isInt(tape.endTick) || tape.endTick < 1 || !Array.isArray(tape.inputs) || !Array.isArray(tape.checkpoints)) return refuse('undecodable');
@@ -80,6 +91,7 @@ export function takeoverEligible(tape, tick, ctx = {}) {
     if (typeof tape.seed !== 'string' || !tape.seed || !isInt(tape.biomeMask) || tape.biomeMask < 0 || tape.biomeMask > U32) return refuse('course');
     if (!Array.isArray(tape.boosts) || !('upgradeRanks' in tape) || !isInt(tape.syncLevel) || tape.syncLevel < 1) return refuse('loadout');
     if (!isInt(tick) || tick < 1 || tick > tape.endTick - 1) return refuse('tick', `1..${tape.endTick - 1}`);
+    if (fpOnly) return { ok: true }; // the combined fingerprint at N is checked by the seek (RunScene), and is the authority
     // Coverage: the prefix must be verifiable. Every 1 s checkpoint up to N must exist, in order, and the first trace
     // samples must exist; otherwise a tampered or truncated tape could not be told apart from a real one.
     const due = Math.floor(tick / CHECKPOINT_EVERY);
@@ -107,16 +119,26 @@ function frozenTapeCopy(tape) {
 /**
  * The one-shot handoff object RunScene reads from REG.TAKEOVER. The caller must have checked takeoverEligible first;
  * RunScene re-validates it anyway (fail closed).
- * @param {{tape:object, tick:number, source?:string}} p
+ * @param {{tape:object, tick:number, source?:string, coverage?:string, expectedFingerprint?:string,
+ *   postcard?:{digest:string, windowTicks:number, challenge?:object}}} p `coverage`, `expectedFingerprint` and `postcard` are #67
+ *   postcard fields; they are added only when given, so an ordinary descriptor is unchanged
  * @returns {Readonly<{kind:string, v:number, tape:object, tick:number, source:string, parentDigest:string, rulesetId:string, simRevision:number}>}
  */
-export function buildTakeoverDescriptor({ tape, tick, source }) {
+export function buildTakeoverDescriptor({ tape, tick, source, coverage, expectedFingerprint, postcard }) {
   if (!tape || typeof tape !== 'object') throw new TypeError('takeover descriptor needs a tape');
-  return Object.freeze({
+  const d = {
     kind: TAKEOVER_KIND, v: TAKEOVER_VERSION, tape: frozenTapeCopy(tape), tick, source: String(source || 'unknown'),
     parentDigest: tapeDigest(tape), rulesetId: tape.rulesetId, simRevision: tape.simRevision,
-  });
+  };
+  if (coverage !== undefined) d.coverage = coverage;
+  if (expectedFingerprint !== undefined) d.expectedFingerprint = expectedFingerprint;
+  if (postcard) d.postcard = Object.freeze({ digest: postcard.digest, windowTicks: postcard.windowTicks, ...(postcard.challenge ? { challenge: Object.freeze({ ...postcard.challenge }) } : {}) });
+  return Object.freeze(d);
 }
+
+/** The postcard coverage ctx a descriptor implies (so the eligibility rule judges the descriptor's own claims). */
+const coverageCtx = (d) => (d.coverage !== undefined || d.expectedFingerprint !== undefined
+  ? { coverage: d.coverage ?? null, source: d.source, expectedFingerprint: d.expectedFingerprint } : {});
 
 /**
  * Re-validate a descriptor (RunScene calls this in create(), PauseScene / TakeoverEndView before a retry).
@@ -125,7 +147,8 @@ export function buildTakeoverDescriptor({ tape, tick, source }) {
 export function validateTakeoverDescriptor(d, ctx = {}) {
   try {
     if (!d || d.kind !== TAKEOVER_KIND || d.v !== TAKEOVER_VERSION || !d.tape) return refuse('undecodable');
-    const e = takeoverEligible(d.tape, d.tick, ctx);
+    if (d.source === POSTCARD_SOURCE && !(d.postcard && isInt(d.postcard.windowTicks))) return refuse('coverage');
+    const e = takeoverEligible(d.tape, d.tick, { ...ctx, ...coverageCtx(d) });
     if (!e.ok) return e;
     if (d.rulesetId !== d.tape.rulesetId || d.simRevision !== d.tape.simRevision) return refuse('undecodable', 'descriptor mismatch');
     if (d.parentDigest !== tapeDigest(d.tape)) return refuse('undecodable', 'parent digest mismatch');
@@ -215,9 +238,12 @@ export function fmtTickTime(tick) {
 export function retryDescriptor(d, ctx = {}) {
   try {
     if (!d || !d.tape) return refuse('undecodable');
-    const e = takeoverEligible(d.tape, d.tick, ctx);
+    const e = takeoverEligible(d.tape, d.tick, { ...ctx, ...coverageCtx(d) });
     if (!e.ok) return e;
-    return { ok: true, descriptor: buildTakeoverDescriptor({ tape: d.tape, tick: d.tick, source: 'retry' }) };
+    // A retry of a postcard stays a postcard (same binding, same fingerprint-only check at N); anything else is a plain 'retry'.
+    const post = d.source === POSTCARD_SOURCE
+      ? { source: POSTCARD_SOURCE, coverage: d.coverage, expectedFingerprint: d.expectedFingerprint, postcard: d.postcard } : { source: 'retry' };
+    return { ok: true, descriptor: buildTakeoverDescriptor({ tape: d.tape, tick: d.tick, ...post }) };
   } catch {
     return refuse('undecodable');
   }
