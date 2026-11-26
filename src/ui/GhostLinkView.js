@@ -243,6 +243,10 @@ export class GhostLinkView extends View {
   input.setAttribute('aria-label','Open local ghost file - unverified preview only');
   Object.assign(input.style,{position:'fixed',opacity:'0.003',zIndex:'60',cursor:'pointer',
    margin:'0',padding:'0',border:'0'});
+  // A new file-picker action is a change of source intent. Never let a
+  // previously armed CONFIRM RACE survive this native dialog, even if the
+  // player cancels or the browser skips its cancel event.
+  input.addEventListener('click',()=>{if(this.alive)this._disarmPractice();});
   input.addEventListener('keydown',e=>{
    e.stopPropagation();
    // Keyboard users must be able to leave a focused native file input.
@@ -255,7 +259,10 @@ export class GhostLinkView extends View {
    if(file)this._inspectFile(file);
   });
   input.addEventListener('cancel',()=>{
-   if(this.alive)this.status.setText('FILE SELECTION CANCELLED - NOTHING IMPORTED');
+   if(this.alive){
+    this._disarmPractice();
+    this.status.setText('FILE SELECTION CANCELLED - NOTHING IMPORTED');
+   }
   });
   document.body.appendChild(input);
   this.fileInput=input;

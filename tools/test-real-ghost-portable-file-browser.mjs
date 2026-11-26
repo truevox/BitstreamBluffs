@@ -139,6 +139,32 @@ try{
  });
  if(visible.guestRunId!==parsed.tape.runId||visible.seed!==parsed.tape.seed||!visible.canRace||
   !visible.status.includes('UNVERIFIED'))throw Error('Native file picker failed unverified visual preview '+JSON.stringify(visible));
+ // A canceled native picker must not leave a PREVIOUS race's second-click consent armed.
+ // This is a UI event regression, not a simulated file trust result: an OS file chooser has no selected file.
+ const staleConsent=await page.evaluate(()=>{
+  const v=window.__bbGame.scene.getScene('TitleScene').view;
+  v.startGuestPractice();
+  const before={armed:v.practiceArmed,label:v.practiceBtn.label.main.text};
+  v.fileInput.dispatchEvent(new Event('cancel'));
+  return {before,after:{armed:v.practiceArmed,label:v.practiceBtn.label.main.text,
+   preview:!!v.preview,status:v.status.main.text}};
+ });
+ if(!staleConsent.before.armed||staleConsent.after.armed||staleConsent.after.label!=='RACE GUEST'||
+  !staleConsent.after.preview||!staleConsent.after.status.includes('CANCELLED'))
+  throw Error('Canceled local file chooser left stale RACE GUEST consent '+JSON.stringify(staleConsent));
+ console.log('PASS_GHOST_FILE_CANCEL_DISARMS_PRACTICE');
+ // Starting a new native chooser must also revoke a prepared race BEFORE
+ // a browser-specific cancel event arrives (or if the browser omits cancel).
+ const pickerOpen=await page.evaluate(()=>{
+  const v=window.__bbGame.scene.getScene('TitleScene').view;
+  v.startGuestPractice();
+  const before=v.practiceArmed;
+  v.fileInput.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  return {before,armed:v.practiceArmed,label:v.practiceBtn.label.main.text,preview:!!v.preview};
+ });
+ if(!pickerOpen.before||pickerOpen.armed||pickerOpen.label!=='RACE GUEST'||!pickerOpen.preview)
+  throw Error('Opening local file chooser retained prior RACE consent '+JSON.stringify(pickerOpen));
+ console.log('PASS_GHOST_FILE_PICKER_OPEN_DISARMS_PRACTICE');
  // A corrupt replacement MUST clear the prior preview and disarm practice.
  const corrupt=actualBytes.slice();corrupt[corrupt.length-3]^=0x04;
  await choose(corrupt,{viaKeyboard:true});

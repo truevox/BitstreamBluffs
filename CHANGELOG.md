@@ -3,7 +3,7 @@
 ## v2.22.11 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
 
 - When a Ghost Link exceeds the 8,192-character URL limit, offer an explicitly disclosed, two-step **SAVE FILE** local `.bbghost` download; do not silently upload or expose any user credentials, profile, original run ID or account data. Short URL links keep their existing behavior.
-- The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations.
+- The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations. Opening or canceling the native picker disarms any previously prepared CONFIRM RACE, without erasing a valid earlier preview.
 - Integrates on top of the v2.22.8 replay archive, v2.22.9 Heavy diagnostic gate and v2.22.10 Cemetery Montage without changing SIM9 or authoritative replay semantics. This is a **draft** candidate: independent review, physical Chromebook/Android acceptance and optional hosted oversize fallback remain outstanding; #69 is not closed.
 
 ## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)

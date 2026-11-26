@@ -22,7 +22,9 @@ The file download is a local browser gesture, never an upload. Recipient uses
 an actual native file input (including keyboard/touch) to choose `.bbghost`,
 with bounded byte read and no implicit score import. Malformed/unsupported or
 oversized packages must fail closed, clearing stale previews and guest-practice
-permission. No remote-host fallback, real-device Chromebook/Android acceptance,
+permission. A cancelled or newly opened file picker also clears a prior
+second-click RACE confirmation without forcing the user to re-preview the same
+valid file. No remote-host fallback, real-device Chromebook/Android acceptance,
 producer authentication, #72 authoritative takeover or #135 public verification
 is claimed.
 
