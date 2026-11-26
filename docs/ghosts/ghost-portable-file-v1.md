@@ -33,7 +33,7 @@ producer authentication, #72 authoritative takeover or #135 public verification
 is claimed.
 
 The original standalone #374 draft is based on v2.22.7; the separate #383 integration
-candidate is proposed as **v2.22.11**, stacked after #244 v2.22.8,
+candidate is proposed as **v2.22.12**, stacked after #244 v2.22.8,
 #242 v2.22.9 and #68 v2.22.10. Neither draft is a public release.
 Original #374 stays intact until Morgan completes its independent review.
 
