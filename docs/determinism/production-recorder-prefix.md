@@ -25,3 +25,46 @@ target, aliasing and failed captures. Use existing BB-CJSON and native
 fingerprint/row contracts, not the diagnostic sentinel format. Keep source
 integration separate from physics or UI; no registration until complete
 world schema, recorder and transaction reviewed together.
+
+## Implemented source and evidence
+
+`src/systems/savestate/recorderState.js` now exposes capture (canonical
+section bytes), decode (detached validated data), and restore (new native
+GhostRecorder). The header matches every current RunScene header field,
+including the original timestamp, exact build/ruleset and captured
+loadout. Capture refuses a run whose build stamp is absent rather than
+inventing it. Fresh restore compares the entire setup except startedAt;
+world creation must separately use the admitted original setup, and
+the complete envelope must bind run ID, tick, purpose and layout.
+No mutating apply callback is exported.
+
+Native coverage checks include input row order, first tick, redundant
+non-edge rows, impossible gaps after an edge, last encoded pad, finite
+raw trace/checkpoint doubles (including signed zero), trace/checkpoint
+pose equality and integer score, complete checkpoint fingerprints and
+recomputed combined digests. Unknown properties, sparse arrays and
+accessors refuse. Native capture is application-owned, not a hostile
+Proxy interface. Decode takes BB-CJSON bytes, not a caller's live object.
+The outer envelope checksum and later full replay remain necessary;
+this section alone cannot detect every re-sealed altered input history.
+
+Local focused Jest: 66/66 across native recorder (28), envelope,
+diagnostic recorder and suspend-slot suites. Real Matter-backed
+RunScene suffix at 241->720 matched complete tape and fingerprints.
+A separate real Chromium source-game gate uses two isolated contexts,
+stock seed sim-05@0, independent prefix re-simulation and native
+recorder attachment at tick 481, no forced physics state. Both
+actually crash at tick 977, native tape end tick 976, score 166,
+8 fingerprints, byte-identical native record and tape plus terminal
+combined fingerprint, zero page errors. Recorder section: 12,378
+bytes. This is **not** a full-world restore: B independently replays
+the prefix to establish the exact attachment boundary. The game
+has no runtime callsite yet, and no competitive eligibility is granted.
+The source-game Vite module graph is intentional to exercise the same
+GhostRecorder constructor as the running game. Existing compiled
+diagnostic and Pages gates remain separate. The section is not added
+to the registered layout or source tripwire until full integration.
+
+Reproduce:
+`npm test -- --runInBand tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-envelope.test.js tests/determinism/savestate-recorder-prefix.test.js tests/determinism/savestate-local-suspend-slot.test.js`
+and `node tools/savestate-experiment/test-native-recorder-browser.mjs`.
