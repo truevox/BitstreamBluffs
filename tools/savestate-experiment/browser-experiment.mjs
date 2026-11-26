@@ -102,6 +102,22 @@ async function bootPage(browser, fx, tape) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const page = await ctx.newPage();
   const errors = [];
+  // Ordinary strict fixtures obtain a DailyPatch rule from UTC wall date even on a non-Daily course.
+  // A source/fresh-destination pair may straddle midnight (CI did at 23:59→00:00), changing
+  // the recorded header's dailyRuleId. Offset Date onto one fixed UTC day while leaving
+  // Phaser timers, requestAnimationFrame and performance.now running naturally.
+  if(STRICT && !fx.natural)await page.addInitScript(() => {
+    const NativeDate=Date;
+    // Keep wall time ADVANCING (Phaser's scene timers may use Date.now) but shift
+    // it to a fixed UTC day well away from midnight during the test.
+    const offset=NativeDate.UTC(2026,0,5,12)-NativeDate.now();
+    const current=()=>NativeDate.now()+offset;
+    globalThis.Date=new Proxy(NativeDate,{
+      apply:()=>new NativeDate(current()).toString(),
+      construct:(target,args)=>Reflect.construct(target,args.length?args:[current()]),
+      get:(target,key,receiver)=>key==='now'?current:Reflect.get(target,key,receiver),
+    });
+  });
   if(fx.natural)await page.clock.setFixedTime(new Date('2026-01-05T12:00:00Z'));
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(URL_, { waitUntil: 'domcontentloaded', timeout: 30000 });

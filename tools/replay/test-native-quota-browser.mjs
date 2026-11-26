@@ -17,7 +17,10 @@ assert.ok(rows.every(r=>r.nativeContactPairs>=0&&r.inputRows===r.ticks+1),
  'not the native high-density recorder corpus');
 assert.ok(rows.reduce((n,r)=>n+r.bytes,0)>400000,'insufficient real bundle volume for quota test');
 const origin=new URL(url).origin;
-const quotaSize=300000;
+// Stress a fixed 128 KiB of NEW native evidence growth, not the pre-existing
+// origin databases (Cemetery adds its own separate IndexedDB metadata).
+const quotaHeadroom=128*1024;
+let quotaSize=quotaHeadroom,baselineUsage=0;
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||'/usr/bin/chromium',args:['--no-sandbox']});
 let context,cdp,overrideActive=false;
 const pageErrors=[],mutating=[];
@@ -29,10 +32,19 @@ try{
  context=await browser.newContext();
  let page=await context.newPage();watch(page);
  cdp=await context.newCDPSession(page);
- // Override before the origin's evidence DB can be opened. There are no
- // synthetic QuotaExceededError throws/mocks here: Chromium rejects writes.
- await cdp.send('Storage.overrideQuotaForOrigin',{origin,quotaSize});overrideActive=true;
+ // First allow the game to initialize its own independent databases. The
+ // origin may already occupy most of 300 KB before we save even ONE tape;
+ // denying that bootstrap is not a useful evidence quota test.
  await page.goto(url,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() &&
+   window.__bbGame?.registry?.get('attemptHistory')?.ready,{timeout:30000});
+ // CDP still enforces a REAL origin quota (no synthetic exceptions): exactly
+ // 128 KiB of headroom over baseline storage, then native bundles must hit it.
+ const baseline=await cdp.send('Storage.getUsageAndQuota',{origin});
+ baselineUsage=baseline.usage;
+ if(!Number.isSafeInteger(baselineUsage)||baselineUsage<0)throw Error('invalid baseline origin storage usage');
+ quotaSize=baselineUsage+quotaHeadroom;
+ await cdp.send('Storage.overrideQuotaForOrigin',{origin,quotaSize});overrideActive=true;
  const underLimit=await page.evaluate(async({rows,rulesetId})=>{
   const [{EvidenceStore},{validateEvidenceBundle},{digestOfBytes},{loadCurrentRuleset}]=await Promise.all([
    import('/src/systems/replay/evidenceStore.js'),import('/src/systems/replay/manifest.js'),
@@ -129,7 +141,7 @@ try{
  console.log('NATIVE_REAL_QUOTA_PASS',JSON.stringify({source:'native-source-current-SIM9',
   automatedPadNotHuman:true,captured:rows.length,storedBeforeQuota:underLimit.savedCount,
   nativeBytesStoredBeforeQuota:underLimit.storedBytes,
-  nativeFailedBytes:underLimit.failedBytes,quotaSize,overrideActive:usage.overrideActive,
+  nativeFailedBytes:underLimit.failedBytes,baselineUsage,quotaHeadroom,quotaSize,overrideActive:usage.overrideActive,
   quotaFailure:underLimit.failed.code,oldIntact:afterClear.oldIntact,
   explicitRetry:afterClear.receipt,restartedDurableRecords:restarted.length,
   errors:pageErrors,mutatingRequests:mutating,
