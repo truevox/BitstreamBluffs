@@ -1,8 +1,10 @@
 /** #67 compiled-game sender/recipient acceptance proof. Shares #72's real browser harness. */
 import assert from 'node:assert/strict';
-import { boot, closeHarness, freshPage, recordRun, launchTakeoverInPage, seekToReady, until, sameStorage } from './test-takeover-browser.mjs';
+import { boot, closeHarness, freshPage, recordRun, launchTakeoverInPage, seekToReady, until, sameStorage, padSchedule } from './test-takeover-browser.mjs';
 import { buildTakeoverDescriptor } from '../src/systems/replay/Takeover.js';
-import { decodePostcard, decodeReply, encodePostcard } from '../src/systems/replay/Postcard.js';
+import { decodePostcard, decodeReply, encodePostcard, postcardWire, createReply, encodeReply } from '../src/systems/replay/Postcard.js';
+import { digestOf } from '../src/systems/replay/canonicalSha256.js';
+import { defaultSongSelection } from '../src/systems/music/MusicPlaylist.js';
 import { replyReplayTape, judgeReply } from '../src/systems/replay/PostcardVerify.js';
 
 const pass = (label, condition) => { assert.ok(condition, label); console.log('PASS '+label); };
@@ -25,12 +27,13 @@ async function stepUntilReady(page) {
   assert.ok(running,'Title launched RunScene');
   return seekToReady(page);
 }
-async function attempt(page, buttons) {
-  return page.evaluate(async (buttons) => {
+async function attempt(page, buttons, schedule = null) {
+  return page.evaluate(async ({buttons,schedule}) => {
     const tk=window.__tk;
     tk.key('Space',true); tk.step(1); tk.key('Space',false);
     for(let i=0;i<1500 && !tk.g.scene.isActive('TakeoverEndScene');i++){
-      tk.hold(new Set(buttons)); tk.step(1);
+      const next=schedule?.[i];
+      tk.hold(new Set(next?.names ?? buttons), next?.edgeHop); tk.step(1);
     }
     tk.releaseAll();
     const end=tk.g.scene.getScene('TakeoverEndScene');
@@ -39,12 +42,12 @@ async function attempt(page, buttons) {
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async s=>{code=s;}}});
     const reply=await end.copyReply();
     return {outcome:end.outcome,code,reply,unranked:!tk.events.some(e=>e.name==='runEnd'),source:end.descriptor.source};
-  },buttons);
+  },{buttons,schedule});
 }
 await boot();
 try {
   const {P:sender,rec,info}=await recordRun();
-  const N=info.tape.endTick-300;
+  const N=info.tape.endTick-1100;
   const sb=await sender.page.evaluate(()=>window.__tk.snapshot());
   await launchTakeoverInPage(sender.page,buildTakeoverDescriptor({tape:info.tape,tick:N,source:'last-run'}));
   pass('sender READY',await seekToReady(sender.page)==='ready');
@@ -58,6 +61,10 @@ try {
   pass('sender unchanged storage',sameStorage(sb,await sender.page.evaluate(()=>window.__tk.snapshot())));
   await sender.close();
   const P=await freshPage();
+  await P.page.waitForLoadState('networkidle');
+  // Prove offline gameplay under the existing user-selectable ALL OFF playlist.
+  // The normal enabled soundtrack streams media independently of postcards.
+  await P.page.evaluate(selection=>{const tk=window.__tk,a=tk.reg('audioSynth');a.applySettings({...tk.reg('settings'),musicEnabledSongs:selection});a.stopMusic();},Object.fromEntries(Object.keys(defaultSongSelection()).map(id=>[id,false])));
   await P.page.waitForLoadState('networkidle');
   const requests=[];
   P.page.on('request',r=>requests.push({type:r.resourceType(),url:r.url()}));
@@ -75,23 +82,55 @@ try {
   const a=await checkReady();
   pass('challenge and tick preserved',a.tick===N&&a.unranked&&a.fp===pc.fingerprintAtStart&&JSON.stringify(a.challenge)===JSON.stringify(pc.challenge));
   const outcomes=[];
-  for (const buttons of [[],['push'],['hop']]) {
+  for (const [buttons,schedule] of [[[],padSchedule(info.tape,N)],[[],null],[['hop'],null]]) {
     if(outcomes.length){
       await P.page.evaluate(()=>{const tk=window.__tk;tk.g.scene.getScene('TakeoverEndScene').retry();tk.step(1);});
       pass('retry returns to READY',await stepUntilReady(P.page)==='ready');
       assert.deepEqual(await checkReady(),a);
     }
-    const r=await attempt(P.page,buttons);
+    const r=await attempt(P.page,buttons,schedule);
     pass('attempt ends unranked with reply',r.unranked&&r.source==='postcard'&&r.reply.ok&&!!r.code&&['crashed','survived'].includes(r.outcome.result));
     const reply=await decodeReply(r.code);
     pass('reply decodes and binds to postcard',reply.ok&&reply.reply.postcardDigest===pc.digest);
-    outcomes.push({result:r.outcome.result,reply:reply.reply});
+    outcomes.push({result:r.outcome.result,reply:reply.reply,code:r.code});
   }
   pass('recipient unchanged storage',sameStorage(before,await P.page.evaluate(()=>window.__tk.snapshot())));
   console.log('REQUESTS',JSON.stringify(requests));
   console.log('OUTCOMES',JSON.stringify(outcomes.map(o=>o.result)));
-  pass('no outbound requests or XHR/fetch/beacon',requests.every(r=>new URL(r.url).hostname==='127.0.0.1'&&!['xhr','fetch','ping','websocket'].includes(r.type)));
+  pass('offline playlist: no outbound requests or XHR/fetch/beacon',requests.every(r=>new URL(r.url).hostname==='127.0.0.1'&&!['xhr','fetch','ping','websocket'].includes(r.type)));
   pass('no browser exceptions',P.errors.length===0);
   console.log('OUTCOMES',JSON.stringify(outcomes.map(o=>o.result)));
   await P.close();
+  pass('original input schedule survives full challenge',outcomes[0].result==='survived');
+  // Independently drive compiled RunScene with the full replay tape.
+  for(const o of outcomes){
+    const V=await freshPage();
+    const observation=await V.page.evaluate(({tape,pc})=>{
+      const tk=window.__tk;tk.startRun(tape.seed);tk.R=tk.run().ghostRecorder.constructor;
+      tk.g.scene.stop('RunScene');tk.g.registry.set('ghostReplay',tape);
+      tk.g.scene.start('RunScene');tk.g.headlessStep(0,0);
+      const r=tk.run(),a=r.seekTo(pc.startTick,{verify:false,maxTicks:Infinity});
+      const startFingerprint=a.done&&!a.crashed?tk.fp(r):null;
+      const b=r.seekTo(pc.startTick+pc.windowTicks,{verify:false,maxTicks:Infinity});
+      return {prefixDone:!!a.done,prefixCrashed:!!a.crashed,startFingerprint,endTick:b.tick,endDone:!!b.done,endCrashed:!!b.crashed};
+    },{tape:replyReplayTape(pc,o.reply),pc});
+    const verdict=judgeReply(pc,o.reply,observation);
+    pass('fresh compiled reply replay confirms '+o.result,verdict.ok&&verdict.outcome===o.result);
+    const lie=createReply({postcard:pc,outcome:o.result==='survived'?'crashed':'survived',crashOffsetTicks:o.result==='survived'?1:null,suffix:o.reply.suffix});
+    if(lie.ok) pass('forged outcome refused by engine',!judgeReply(pc,lie.reply,observation).ok);
+    pass('corrupted reply rejected',!(await decodeReply(o.code.slice(0,8)+'!'+o.code.slice(9))).ok);
+    await V.close();
+  }
+  // Re-sign a validly encoded but wrong start fingerprint, plus another build.
+  const resign=async p=>{const {digest,...rest}=postcardWire(p);return encodePostcard({...p,digest:digestOf(rest)});};
+  const other='sha256:'+'f'.repeat(64);
+  const negatives=[['corrupt',code.slice(0,8)+'!'+code.slice(9)],['other-build',await resign({...pc,buildId:other,header:{...pc.header,buildId:other}})],['wrong-fingerprint',await resign({...pc,fingerprintAtStart:'xxh32x2:0000000000000000'})]];
+  for(const [label,bad] of negatives){
+    const V=await freshPage();
+    await openCode(V.page,bad);
+    await V.page.evaluate(async()=>{const tk=window.__tk;tk.g.loop.sleep();for(let i=0;i<1000;i++){tk.step(1);if(i%20===0)await new Promise(r=>setTimeout(r,0));}});
+    const verdict=await V.page.evaluate(()=>{const tk=window.__tk;return {title:tk.g.scene.isActive('TitleScene'),ranked:tk.events.some(e=>e.name==='runStart'&&!e.p.practice),ready:tk.run()?.takeover?.phase==='ready',status:tk.g.scene.getScene('TitleScene').view?.status?.main?.text};});
+    console.log('NEGATIVE',label,JSON.stringify(verdict));pass(label+' fails closed',verdict.title&&!verdict.ranked&&!verdict.ready);
+    await V.close();
+  }
 } finally {await closeHarness();}
