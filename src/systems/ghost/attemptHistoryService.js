@@ -15,6 +15,38 @@ export const ATTEMPT_HISTORY_KEY = 'attemptHistory';
 const OWNED = Object.freeze({ attemptHistoryKeep: sanitizeAttemptKeep, cemeteryMontage: sanitizeMontageStyle });
 
 /**
+ * Owned settings exactly as persisted in localStorage now, or null when that cannot be read (no storage, a throwing
+ * accessor, nothing saved yet, unparsable). Null never means "defaults": the caller's live copy then stands, so a
+ * storage hiccup can never turn a player's 0 back into 5.
+ * @param {any} [win]
+ * @returns {object|null}
+ */
+export function persistedSettings(win = typeof window !== 'undefined' ? window : undefined) {
+  try {
+    const raw = (win && win.localStorage ? win.localStorage : globalThis.localStorage)?.getItem(STORAGE.settingsKey);
+    if (typeof raw !== 'string') return null;
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === 'object' && 'attemptHistoryKeep' in obj ? obj : null;
+  } catch { return null; }
+}
+
+/**
+ * Called by services.updateSetting BEFORE it saves the whole settings object (PR #378/#382 review, Morgan): every
+ * owned setting EXCEPT the one being changed is refreshed from what is persisted, so saving an unrelated preference
+ * (or the other owned setting) in a tab that has not yet heard another tab's change can never write a stale
+ * retention choice back. The key being changed is the player's explicit choice and is left alone. Mutates in place.
+ * @param {object} settings the live settings object about to be saved
+ * @param {string} key the setting being changed
+ * @param {any} [win]
+ */
+export function protectOwnedSettings(settings, key, win) {
+  if (!settings || typeof settings !== 'object') return;
+  const p = persistedSettings(win);
+  if (!p) return;
+  for (const [k, clean] of Object.entries(OWNED)) if (k !== key && k in p) settings[k] = clean(p[k]);
+}
+
+/**
  * Issue #68: keep each finished run's pose trace in the attempt history (when the player keeps any), and apply a
  * lowered PAST ATTEMPTS TO KEEP at once. Listens to RUN_END, which RunScene emits after it has stored the run's ghost
  * tape in REG.LAST_GHOST_TAPE: the run scene itself is not changed. Gym, replay and guest-practice runs record no tape,
@@ -31,19 +63,7 @@ const OWNED = Object.freeze({ attemptHistoryKeep: sanitizeAttemptKeep, cemeteryM
  */
 export function installAttemptHistory(game, history, { win = typeof window !== 'undefined' ? window : undefined } = {}) {
   const live = () => game.registry.get(REG.SETTINGS) || null;
-  /**
-   * Owned settings exactly as persisted in localStorage now, or null when that cannot be read (no storage, a throwing
-   * accessor, nothing saved yet, unparsable). Null never means "defaults": this tab's live copy then stands, so a
-   * storage hiccup can never turn a player's 0 back into 5.
-   */
-  const persisted = () => {
-    try {
-      const raw = (win && win.localStorage ? win.localStorage : globalThis.localStorage)?.getItem(STORAGE.settingsKey);
-      if (typeof raw !== 'string') return null;
-      const obj = JSON.parse(raw);
-      return obj && typeof obj === 'object' && 'attemptHistoryKeep' in obj ? obj : null;
-    } catch { return null; }
-  };
+  const persisted = () => persistedSettings(win);
   /** Copy persisted owned settings into the live object (no save, no event). @returns {{before:number, after:number}} */
   const sync = () => {
     const st = live();
