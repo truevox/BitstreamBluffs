@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.5 — #119 strict causal RNG/clock primitive adapters (2026-11-25)
+
+- Add developer-only explicit state adapters for the *actual* RunRandom four named streams and fixed-tick SimClock. Restore only into fresh, seed-state-matched instances; validate every own field and reject unknown fields, truncated streams, pending inputs, incompatible versions/configuration, aliasing and read-only targets **before modifying the target**.
+- Pure BB-CJSON round-trip tests prove 120 identical suffix draws in each named RNG stream and matching clock tick/input scheduling, floating-point accumulator, and dropped time across irregular frames and a long stall. New path-scoped CI checks these genuine production-class primitives and the build identity.
+- **Not a game Save/Resume feature:** no production Matter/scene layout, world capture/restore, recorder reattachment, official ranking/verification, UI, networking or physics/SIM revision changes. The v2.25.3 single-use envelope slot remains inert until the entire atomic resume path is proven.
+
 ## v2.25.4 — #56 course-archive migration recovery hardening (2026-11-25)
 
 - Avoid permanently stamping an empty Ghost Library inventory as migrated when IndexedDB is unavailable or temporarily blocked at startup. Only a successfully opened/read authoritative IndexedDB course store enables the new archive capacity limit; memory-only mode stays uncapped while migration remains pending.
