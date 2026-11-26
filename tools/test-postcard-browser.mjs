@@ -116,8 +116,8 @@ try {
     },{tape:replyReplayTape(pc,o.reply),pc});
     const verdict=judgeReply(pc,o.reply,observation);
     pass('fresh compiled reply replay confirms '+o.result,verdict.ok&&verdict.outcome===o.result);
-    const lie=createReply({postcard:pc,outcome:o.result==='survived'?'crashed':'survived',crashOffsetTicks:o.result==='survived'?1:null,suffix:o.reply.suffix});
-    if(lie.ok) pass('forged outcome refused by engine',!judgeReply(pc,lie.reply,observation).ok);
+    const lie=createReply({postcard:pc,outcome:o.result==='survived'?'crashed':'survived',crashOffsetTicks:o.result==='survived'?pc.windowTicks:null,suffix:o.reply.suffix});
+    pass('forged outcome refused by engine',lie.ok&&!judgeReply(pc,lie.reply,observation).ok);
     pass('corrupted reply rejected',!(await decodeReply(o.code.slice(0,8)+'!'+o.code.slice(9))).ok);
     await V.close();
   }
@@ -125,6 +125,18 @@ try {
   const resign=async p=>{const {digest,...rest}=postcardWire(p);return encodePostcard({...p,digest:digestOf(rest)});};
   const other='sha256:'+'f'.repeat(64);
   const negatives=[['corrupt',code.slice(0,8)+'!'+code.slice(9)],['other-build',await resign({...pc,buildId:other,header:{...pc.header,buildId:other}})],['wrong-fingerprint',await resign({...pc,fingerprintAtStart:'xxh32x2:0000000000000000'})]];
+  // A distant input edit can legitimately reconverge by N; use a changed
+  // final applied pad so the last-pad causal fingerprint must differ.
+  const mutated=pc.prefix.map(row=>[...row]);
+  const at=mutated.reduce((n,row)=>n+row[0],0);
+  const last=mutated.at(-1)??[0,0,0];
+  const changedTilt=last[2]===127?-127:127;
+  if(at===pc.startTick)last[2]=changedTilt;
+  else mutated.push([pc.startTick-at,last[1]&~(63<<12),changedTilt]);
+  assert.notDeepEqual(mutated,pc.prefix);
+  const altered=await resign({...pc,prefix:mutated});
+  pass('mutated prefix is structurally valid', (await decodePostcard(altered)).ok);
+  negatives.push(['mutated-prefix',altered]);
   for(const [label,bad] of negatives){
     const V=await freshPage();
     await openCode(V.page,bad);
