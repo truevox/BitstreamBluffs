@@ -568,6 +568,26 @@ describe('canonical dual-proof decision contract (#245)', () => {
     NO_RANK(rejected);
   });
 
+  test('near-cap snapshot agrees with canonical UTF-8 sizes for every escape width',()=>{
+    const cap=256*1024;
+    // Each payload is large enough to exercise the incremental budget;
+    // canonicalBytes is the independent byte-length oracle.
+    for(const char of ['A','\\','"','\u0000','é','雪','🛷','\u2028']){
+      const fixture={...good(),ignored:{chunk:'',other:[0.125,-17,null,true]}};
+      const base=canonicalBytes(fixture).length;
+      const width=canonicalBytes({x:char}).length-canonicalBytes({x:''}).length;
+      fixture.ignored.chunk=char.repeat(Math.floor((cap-base)/width));
+      const length=canonicalBytes(fixture).length;
+      expect(length).toBeLessThanOrEqual(cap);
+      expect(adjudicateDualProof(fixture).publication).toBe('verified-eligible');
+      fixture.ignored.chunk+='A'.repeat(cap-length+1);
+      expect(canonicalBytes(fixture).length).toBe(cap+1);
+      const blocked=adjudicateDualProof(fixture);
+      expect(blocked.proof.reason).toBe('malformed-input');
+      NO_RANK(blocked);
+    }
+  });
+
   test('free peer and paid hosted routes use identical pure decision bytes, with zero payment leverage', () => {
     const source=good();
     const peer=adjudicateDualProof({...clone(source),route:'peer-free',fee:0});
