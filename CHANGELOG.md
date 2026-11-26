@@ -1,5 +1,103 @@
 # Changelog
 
+## v2.25.6 — #119 native GhostRecorder prefix continuity (2026-11-25)
+
+- Add developer-only strict, complete native `GhostRecorder` tick-zero input/history checkpoint section codec. Actual game recorder is captured through bounded canonical bytes with F64-exact trace/checkpoints; decode checks current exact source build/ruleset, run/tick identity, input cursors (including repeated edge ticks), full trace/checkpoint/fingerprint coverage and source-sorted setup. A fresh matching recorder is restored as a **separate detached instance**, not a trusted gameplay or official-board authority.
+- Tests include 28/28 dedicated native recorders, a real Chromium production game at tick 481 continuing to natural fatal tick 977 with **identical final tape, record, fingerprint and zero JS errors** and 3 additional distinct review-only real stock/upgraded/boosted header acceptance cases. Validation and restoration refuse hostile, missing or inconsistent data without changing the fresh recorder.
+- **Not player Save/Resume:** no production Matter/RunScene total-world snapshot registry, full atomic world restore, UI, ranking/entitlements, replay authority or physics/SIM revision changes. The v2.25.3 local single-use slot is still inert; the v2.25.5 RNG/clock adapters remain separate until an integrated causal-world restore is proven.
+
+## v2.25.5 — #119 strict causal RNG/clock primitive adapters (2026-11-25)
+
+- Add developer-only explicit state adapters for the *actual* RunRandom four named streams and fixed-tick SimClock. Restore only into fresh, seed-state-matched instances; validate every own field and reject unknown fields, truncated streams, pending inputs, incompatible versions/configuration, aliasing and read-only targets **before modifying the target**.
+- Pure BB-CJSON round-trip tests prove 120 identical suffix draws in each named RNG stream and matching clock tick/input scheduling, floating-point accumulator, and dropped time across irregular frames and a long stall. New path-scoped CI checks these genuine production-class primitives and the build identity.
+- **Not a game Save/Resume feature:** no production Matter/scene layout, world capture/restore, recorder reattachment, official ranking/verification, UI, networking or physics/SIM revision changes. The v2.25.3 single-use envelope slot remains inert until the entire atomic resume path is proven.
+
+## v2.25.4 — #56 course-archive migration recovery hardening (2026-11-25)
+
+- Avoid permanently stamping an empty Ghost Library inventory as migrated when IndexedDB is unavailable or temporarily blocked at startup. Only a successfully opened/read authoritative IndexedDB course store enables the new archive capacity limit; memory-only mode stays uncapped while migration remains pending.
+- On the next successful boot, repair v2.25.2/v2.25.3 profiles already marked migrated whose actual stored course count exceeds their entitlement. Preserve all historical courses and purchased slots; account for already-purchased capacity without granting duplicate free slots. Require a durable profile write before claiming migration success.
+- Add outage/recovery, erroneously migrated profile, purchased-slot and no-persistent-storage regressions; preserve five ghosts per course and the original manual deletion-only behavior. No changes to SIM9 physics, scores, public trust, Shard purchases/prices, privacy, or automatic upload. [skip netlify]
+
+## v2.25.3 — #119 inert single-use local suspend-slot foundation (2026-11-25)
+
+- Introduces a private IndexedDB suspend-slot protocol with exact-build and registered-layout envelope admission, atomic cross-tab claim, owner-token-gated release/consume, reload-persistent claimed state and bounded 16 MiB input. An occupied/claimed slot cannot be overwritten by another tab.
+- The protocol is intentionally inert: there is **no registered production Matter savestate layout, real game restore or recorder continuation, player save/load UI, trust claim, score/ranking credit or upload**. A claim still means `envelope-only` validation. Browser crashes leave claims locked rather than granting an unsafe second resume; full player-facing recovery requires future policy and runtime work.
+- Developer tests prove rejected corrupt/incompatible envelopes and malformed persisted status (including attempted overwrite), two real Chromium tabs competing for one claim, persistence across reload, failed-storage denial, stale-token rejection and zero HTTP writes; no physics/replay revision changed.
+
+## v2.25.2 — #56 repeatable Course Archive Slots (2026-11-25)
+
+- The fixed display stays **Best, Latest and three Favorites** (at most five distinct ghosts) for each exact seed+biome course. Added capacity buys **more distinct retained courses**, never extra on-screen riders. Provisional pre-alpha economics: 8 included archives, +1 per deliberate shop purchase and an increasing Shard price (40 at first rank). These values were Friday-selected for implementation, **not** a historical Marvin economy decision.
+- Grandfather the full historical course inventory once, DURABLY before enabling a cap; an interrupted migration cannot mark the default as finished. On full capacity, decline only a NEW course's Ghost Library write, visibly explain SHOP > UPGRADES > COURSE SLOTS, and NEVER evict or silently discard pinned Favorites. Protected local replay evidence, RunRecords, physics and official rankings are untouched.
+- Shop > Permanent Upgrades now offers COURSES SLOT +1 and MANAGE COURSE ARCHIVES. Separate explicit select and CONFIRM DELETE rows prevent a repeated Enter from destroying stored data accidentally. A delete clears only that course's GhostLibrary metadata and unreferenced tapes atomically in IndexedDB; independent protected evidence remains separate. No automatic uploads or account requirement.
+- Unit and real two-tab Chromium gates test atomic last-slot races, pinned Ghost ID immutability, Shard bank write failure and purchased-slot persistence, migration, normal course updates, no network writes, and real in-game Shop manager confirmation. SIM9 unchanged. Future #135 trusted public verification and #119 production savestates remain separate.
+
+## v2.25.1 — #69 real mobile Guest Race browser QA stability (2026-11-25)
+
+- Prevent the compiled Pages browser acceptance test from clicking the RACE GUEST button while the CRT modal is still opening. The test waits for real Phaser scene time and a fully expanded, visible panel before sending the first genuine pointer activation. A real diagnostic recorded the panel at scaleY 1 during coordinate sampling but scaleY 0.108 at pointerdown, which struck the modal dim background instead of the Race Guest hitzone.
+- The second explicit click still remains mandatory for unranked Guest Practice; the QA script continues to reject missing/destroyed hitzones, unexpected early launches and accidental saves. **Test-only fix:** no runtime/gameplay, physics, score, consent, Shards, upload or public trust code changes; no physical-device acceptance is claimed.
+
+## v2.25.0 — #66 Crash Coach and Butterfly Meter (2026-11-25)
+
+- Game Over C opens Crash Coach, explaining the recorded crash with evidence and testing nearby input variations through the real engine. The search is bounded, not exhaustive; alternatives require a second matching replay.
+- Butterfly Meter displays the observed outcomes and divergence. Practice This Moment replays the original tape to the branch tick and hands over control in unranked practice. Candidate tapes are not stored or credited.
+
+## v2.24.0 — #67 Playable Postcards (2026-11-25)
+
+- From an ordinary takeover's READY screen, make a local postcard with P / LB; choose a 5–10 second challenge and copy the code or save a file. Open on Title with O. Compatible builds re-simulate the prefix and must match its causal fingerprint before handing over control.
+- Postcard attempts are always unranked, with a window countdown, an independent retry, and a local reply code for completed attempts. Reply verification logic re-simulates the prefix and suffix; no upload, ranked score, progression, or persistent ghost import is introduced.
+
+## v2.23.0 — #72 Replay Takeover (unranked practice/TAS) (2026-11-25)
+
+- From Game Over press **T**: pick any tick of the run you just finished (1 s with the arrows, 5 s with Shift, one tick with `,` / `.`; D-pad / A / B on a pad), see the time and tick on a trace preview, and take over. The game re-simulates the tape up to that tick with the real engine, freezes on **READY**, and hands you live control when you press Space / Enter / A. The key that ends READY is consumed: it can never become a hop or trick edge on the first live tick.
+- **Scope, honestly:** takeover is authoritative re-simulation of the tape prefix (ticks 1..N), then handoff. There is **no snapshot format** and the Heavy diagnostic kit is only a test oracle. Only tapes from **this session** (the run that just ended, `REG.LAST_GHOST_TAPE`) are offered; a #244 evidence-bundle source is not wired yet. Takeover is refused for daily, daily-draft, gym, guest and takeover tapes, for another `SIM_REVISION`, and for any tape not stamped with this build's exact `rulesetId` ("recorded on an older build; not takeover-compatible"). The seek runs at most 1,500 ticks or 12 ms per frame behind a SEEKING n% banner; any checkpoint or pose-trace desync at or before N aborts to the title with the reason and never continues.
+- **No** ranked eligibility. A takeover is UNRANKED PRACTICE / TAS: **no** score record, XP, Sync Level, Data Shards, missions, achievements, biome progress, daily stats/streaks, leaderboard/initials, NEW_BEST, ghost-library save or #244 evidence capture. One `unrankedPractice` predicate (takeover or guest practice) guards the `doCrash` early return, BSOD-bluff progression, NEW_BEST, tape and evidence saving and `RUN_START {practice, takeover}`; tutorial / tuck-hint flags remain session-local in every unranked practice mode; Daily / Gym are forced off. `GhostLibrary.saveRun` and guest practice refuse `mode:'takeover'` tapes.
+- A takeover ends (crash, BSOD catch or quit) with `RUN_ABORT {reason:'takeover-ended', practice, takeover}` and a small end screen: **RETRY FROM <time> (tick N)** or BACK, never Game Over. Pause shows TAKEOVER // UNRANKED; RESTART there means retry from the same tick, never a new ranked run. Every retry is an independent attempt rebuilt from the same parent tape and re-validated. The live suffix is recorded as a `mode:'takeover'` tape (parent header + `parentDigest` + `takeoverTick`, prefix rows copied) kept in memory only (`REG.LAST_TAKEOVER_TAPE`).
+- New tape headers carry `rulesetId` (the compile-time id of `tools/ruleset/current.json`) and `buildId` (set from `services.js` once the ruleset has loaded; `null` before). Header only: the record, its `ledgerHash`, checkpoints, inputs, trace and every fingerprint are unchanged (proven by test). `RunScene` gained a shared `_stepTick`, a reusable `seekTo(N)` (for #66's off-screen candidate re-simulation) and `stepReplayTick`.
+- SIM_REVISION 9/physics and ranked input/scoring rules are unchanged; the source tripwire was updated with reviewed no-behavior-change attestations. Also classifies the #69 `guestPractice` / `guestPracticeTape` fields that the Heavy gate and the fingerprint-completeness test were reporting as unclassified.
+
+## v2.22.13 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
+
+- When a Ghost Link exceeds the 8,192-character URL limit, offer an explicitly disclosed, two-step **SAVE FILE** local `.bbghost` download; do not silently upload or expose any user credentials, profile, original run ID or account data. Short URL links keep their existing behavior.
+- The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations. Opening or canceling the native picker disarms any previously prepared CONFIRM RACE, without erasing a valid earlier preview. Guest-practice tutorial completions and tuck-hint shows remain ephemeral; they never consume the normal player's persisted first-run hints.
+- Integrates on top of the v2.22.8 replay archive, v2.22.9 Heavy diagnostic gate and v2.22.10 Cemetery Montage without changing SIM9 or authoritative replay semantics. This is a **draft** candidate: independent review, physical Chromebook/Android acceptance and optional hosted oversize fallback remain outstanding; #69 is not closed.
+
+## v2.22.12 — #56 immutable local ghost recording IDs (2026-11-25)
+
+- Prevent a different tape reusing an existing run ID on the **same exact course** from overwriting a previously saved Best or Favorite recording. Enforce immutable recording identity within one IndexedDB `courses`+`tapes` readwrite transaction across tabs; distinct trace, score, inputs, checkpoints, RNG or course values fail closed before mutating roles, tapes or garbage collection.
+- An exactly identical whole-tape retry is idempotent and **does not** promote an older run back to Latest. Memory-only fallback stores detached tape copies and returns copies to callers, avoiding mutable alias reuse. Own-data value comparison retains `undefined`, `-0` and `NaN` distinctions that `JSON.stringify` loses.
+- Extend P0 regression tests and real Chromium two-tab same-course run-ID collision QA; preserve original cross-course isolation and Favorites. No ghost count change: still Best, Latest, and Favorite A/B/C per matching seed/biome mask; no sixth on-screen rider. No pricing, slot count, account dependency or silent favorite eviction decisions.
+- **Source-only integrity fix:** no physics, SIM_REVISION, scoring, public ranking, upload, consent, Shards, wallet or public verifier changes. Parent #56 remains OPEN for owner-set course-archive capacity/pricing and device acceptance; Team A's separate replay release must reconcile its intermediate version and release order.
+
+
+## v2.22.11 — #135 dual-proof trust snapshot input hardening (2026-11-25)
+
+- Harden the **pure, non-deployed** dual-proof adjudicator (#384): copy only validated own-data descriptors into a bounded, fresh JSON snapshot *before* making the decision. Stop post-inspection Proxy getter swaps from changing denied authorization/consent receipts into authorized ones. Malformed, accessor, inherited hook, symbol, cycle, exotic array and nonfinite inputs fail closed without granting public rank/rewards.
+- Reject prototype-disguised native objects with internal slots (Date, Map/Set, weak collections, typed-array/DataView, ArrayBuffer and SharedArrayBuffer) rather than treating them as ordinary `{}`. Cumulative 256 KiB escaped UTF-8 accounting applies before serialization. Include new near-limit, hostile Proxy, Node/Chromium and trust/canonicalization regressions; four original pinned free/paid verdict hashes remain unchanged.
+- **Owner-approved review of exact security source commit `460a135f`** recorded on #384, including red-to-green negative proof, Proxy-trap parity and green CI. A non-exploitable strictness inconsistency for other disguised built-ins is tracked separately as non-blocking #388; this release does not expand the brand-check denylist.
+- **Library only:** no authenticated verifier, issuer/consent/wallet adapter, public API, leaderboard publication, fee pathway, Shard settlement or change to game physics/replay semantics. The full public-verification system remains #135. Package and lockfile advance together to v2.22.11.
+
+## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
+
+- **Owner-approved local attempt history** (Marvin, #68, 2026-11-25): a separate IndexedDB store `bitstream-attempt-history` keeps each finished ordinary run's 30 Hz pose trace plus compatibility metadata only (no inputs, checkpoints, fingerprints or ledger data). **Default 5 per course**, Settings → PAST ATTEMPTS → *PAST ATTEMPTS TO KEEP* 0..40 (0 keeps none; the maximum is shown). FIFO eviction of this store only, ≤ 256 KB per attempt and ≤ 12 MB overall, quota recovery from its own oldest rows, damaged rows dropped, two-press CLEAR HISTORY. Lowering trims at once; raising cannot restore. Never uploaded.
+- **Game Over → MONTAGE (M)**: past attempts ride beside this run (follow camera), each fallen self leaves a headstone, then the whole field as an overview. MONTAGE style labels up to 8 recent attempts; SWARM draws every kept attempt within a device rider budget (40 standard, 16 Chromebook-class, adaptive down to 4). Exact course + ruleset/terrain revision only; also reads this course's existing Best/Latest/Favorite ghosts read-only. Never opens by itself; reduced motion (setting or OS under AUTO) shows a still overview that never autoplays.
+- Presentation only: no GhostRider/Matter body, collision, RNG, score, replay or physics change. `RunScene`, `GhostLibrary` and causal tripwire files are untouched; build identity unchanged apart from the package version.
+- Tests: 53 current focused history/montage Jest cases, real-Chromium acceptance + performance harness `tools/ghosts/cemetery-montage-browser.mjs` (CI workflow `cemetery-montage.yml`). Physical Chromebook acceptance is still owed; #68 stays open until it passes.
+
+## v2.22.9 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
+
+- Enforce compiled Chromium savestate capture→fresh restore→strict identical contact/hazard suffix checks on relevant PR source changes, after the source-bound Matter/recorder and fast CLI refusal tests. Retain the already proved native long-run and moving-hazard gate evidence.
+- Harmonize the child-process and Jest timeouts for fast negative tests so slow CI cannot falsely label a routine refusal as a test failure; unexpected spawn errors remain fatal.
+- Exempt only a browser-cancelled *optional* Apple touch icon (`net::ERR_ABORTED`) from offline-PWA release QA. Worker, JavaScript, manifest, audio and all other resource failures remain hard failures with dedicated negative tests.
+- Developer-only diagnostics and offline browser QA: **no** live player savestate UI, trusted suspend slot, public score acceptance, simulation physics, changed SIM_REVISION or automatic upload. Parent #119 and player-facing trusted savestates remain open. This is an isolated draft stacked after v2.22.8, awaiting independent exact-head review and coordinated deployment.
+
+## v2.22.8 — #244 private protected replay evidence release candidate (2026-11-25)
+
+- Retain canonical full-run input evidence in a separate local IndexedDB v3 archive independent of the five visible ghost roles, with atomic run-ID/seed/biome binding, candidate/submitted/pinned references, explicit unpin, and corruption/quota fail-closed behavior.
+- Add deliberate private Game Over Keep, Export, Import and Refresh controls with visible durable-versus-memory-only statuses and explicit source-file retention guidance. No automatic network uploads, rankings or official verification.
+- Reconcile the new Local Evidence entry with the already released #69 Share Link button: both fit in the same Game Over ghost panel, keyboard/pointer navigation preserves both, and entering local files disarms any prepared share URL. Preserve #56 exact-course atomic ghost roles and retention.
+- Extend source-bound current-SIM9 terminal replay QA: 12 ordinary + 12 high-density native RunScene/Matter captures, plus a 32-run genuine-native Chromium 300 KB quota stress test. All observed byte integrity, actual contact and quota/retry results remain **local technical evidence**, not honest-human-play authentication or actual Chromebook capacity proof.
+- Keep public score/entitlement proof #135, competitive submission, physical-device storage acceptance and parent #119 trusted savestate UI **open**. No SIM9 physics, input-tick meaning, scoring, automatic publication or user consent behavior is changed. This is a draft candidate pending exact-head independent review and release coordination.
+
 ## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
 
 - After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.

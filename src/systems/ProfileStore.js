@@ -16,6 +16,7 @@ import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 import { canonicalBiomeId, canonicalLegacyId } from '../data/biomeAliases.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
+import { COURSE_ARCHIVE_VERSION, archiveCapacity, sanitizeCourseArchive, grandfatherArchives, purchaseArchiveSlot } from './ghost/CourseArchiveCapacity.js';
 import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,sanitizeDraftRanks,draftCost} from './DailyDraft.js';
 
@@ -150,6 +151,7 @@ export function sanitizeProfile(raw, levels) {
   p.xp = nonNeg(raw.xp);
   p.bank = nonNeg(raw.bank);
   p.upgrades = sanitizeUpgradeRanks(raw.upgrades);
+  p.courseArchive = sanitizeCourseArchive(raw.courseArchive);
   p.upgradesEnabled = raw.upgradesEnabled === true;
   // Device-local preset for the separate ranked Daily Draft ruleset. NOT
   // permanently owned upgrades and NEVER a drain on the shard bank.
@@ -607,6 +609,7 @@ export class ProfileStore {
     /** @type {Object} */
     this.profile = defaultProfile();
     this.backend = 'memory';
+    this.archiveLegacyInitialized = false;
   }
 
   /** @returns {Object} the in-memory profile (always usable). */
@@ -623,6 +626,10 @@ export class ProfileStore {
       this.backend = 'memory';
     }
     this.profile = sanitizeProfile(raw, this.levels);
+    // Only a profile ALREADY carrying the V1 archive envelope has had its
+    // legacy course inventory grandfathered. A fresh default needs the pass.
+    this.archiveLegacyInitialized = raw?.v === PROFILE_VERSION &&
+      raw?.courseArchive?.v === COURSE_ARCHIVE_VERSION && raw.courseArchive.migrated === true;
     // Existing pilots keep earned progress when new catalogue rungs ship.
     // Stamp any newly qualified achievements once from persisted lifetime
     // metrics, but never guess a Surfing chain from raw near-miss counts.
@@ -750,6 +757,46 @@ export class ProfileStore {
     catch { return { ok: false, profile: this.profile }; }
     this.profile = next;
     return { ok: true, profile: this.profile };
+  }
+
+  /**
+   * One-time migration AFTER GhostLibrary.init(): preserve every course a
+   * previous unlimited-library build already stored. A storage failure means
+   * capacity enforcement must remain disabled; never erase legacy courses.
+   */
+  ensureCourseArchiveLegacy(existingCourseCount) {
+    if (!Number.isSafeInteger(existingCourseCount) || existingCourseCount < 0)
+      return {ok:false,reason:'invalid-existing-count',profile:this.profile};
+    // Already-migrated profiles may have been stamped during a temporary IDB
+    // outage in v2.25.2. Repair only if the authoritative inventory exceeds
+    // their current entitlement; never silently hide a legacy archive.
+    if (this.archiveLegacyInitialized && existingCourseCount <= archiveCapacity(this.profile))
+      return {ok:true,profile:this.profile};
+    if (!this.storage) return {ok:false,reason:'storage-unavailable',profile:this.profile};
+    const expanded = grandfatherArchives(this.profile, existingCourseCount);
+    const next = sanitizeProfile(expanded, this.levels);
+    if (this.storage) {
+      try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
+      catch { return {ok:false,reason:'storage-unavailable',profile:this.profile}; }
+      this.backend = 'localStorage';
+    }
+    this.profile = next;
+    this.archiveLegacyInitialized = true;
+    return {ok:true,profile:this.profile};
+  }
+
+  /** Spend local Shards and acquire exactly ONE more distinct-course slot. */
+  buyCourseArchiveSlot() {
+    const next = purchaseArchiveSlot(this.profile);
+    if (next === this.profile) return {ok:false,reason:'unavailable-or-insufficient-shards',profile:this.profile};
+    if (!this.archiveLegacyInitialized || !this.storage)
+      return {ok:false,reason:'storage-unavailable',profile:this.profile};
+    const clean = sanitizeProfile(next,this.levels);
+    try { this.storage.setItem(PROFILE_KEY,JSON.stringify(clean)); }
+    catch { return {ok:false,reason:'storage-unavailable',profile:this.profile}; }
+    this.profile = clean;
+    this.backend = 'localStorage';
+    return {ok:true,reason:'purchased',profile:this.profile};
   }
 
   /** Buy one permanent upgrade with the exact same atomic persistence guarantees

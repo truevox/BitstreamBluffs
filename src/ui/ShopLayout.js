@@ -18,6 +18,7 @@
  */
 import { measureText } from './PixelFont.js';
 import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice } from '../systems/PermanentUpgrades.js';
+import {archiveCapacity,nextArchiveSlotPrice} from '../systems/ghost/CourseArchiveCapacity.js';
 import { BSOD_GYM_PRICE, gymVisible, gymOwned, gymAdvanced, gymSetupForProfile, GYM_SETUP_OPTIONS } from '../systems/BsodGym.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
@@ -303,8 +304,14 @@ export function upgradeShopLayout(o = {}) {
     if (gymAdvanced(profile)) rows.push({ kind: 'gymSetupLink', key: 'bsodGymSetup',
       id: 'bsodGymSetup', label: 'GYM SETUP', state: 'OPEN' });
   }
-  rows.push({ kind: 'static', key: 'softcap', label: 'UNLIMITED RANKS / DIMINISHING RETURNS' });
-  rows.push({ kind: 'static', key: 'ranked', label: 'MODE ON = MODDED, OFFICIAL DAILY CLEAN' });
+  // Replaces two old footer hints rather than pushing the 236px panel
+  // over its fixed BACK control in the advanced Gym page.
+  const archiveRank=profile.courseArchive?.purchased||0;
+  const archivePrice=nextArchiveSlotPrice(archiveRank);
+  rows.push({kind:'archiveBuy',key:'archiveBuy',label:`COURSE SLOT +1 (${archiveCapacity(profile)} TOTAL)`,
+    state:archivePrice===null?'UNAVAILABLE':String(archivePrice),
+    disabled:archivePrice===null||bank<archivePrice});
+  rows.push({kind:'archiveLink',key:'archiveLink',label:'MANAGE COURSE ARCHIVES',state:'OPEN'});
   const texts = [];
   let y = 8;
   for (const row of rows) {
@@ -328,6 +335,53 @@ export function upgradeShopLayout(o = {}) {
   }
   return { w: SHOP_PANEL.w, h: SHOP_PANEL.h, rows, texts, rowH: ROW_H,
     band: { x: PAD - 6, y: 8, w: SHOP_PANEL.w - (PAD - 6) * 2 } };
+}
+
+/** The course manager never auto-deletes: select an archive, THEN a separate
+ * CONFIRM DELETE row. Changing the page clears the selection in the host. */
+export function courseArchiveManagerLayout(o={}) {
+  const archives=Array.isArray(o.archives)?o.archives:[];
+  const pageCount=Math.max(1,Math.ceil(archives.length/7));
+  const page=Number.isSafeInteger(o.page)?((o.page%pageCount)+pageCount)%pageCount:0;
+  const capacity=archiveCapacity(o.profile||{});
+  const rows=[
+    {kind:'head',key:'head',label:'',right:'BANK '+(o.profile?.bank||0)},
+    {kind:'archiveBack',key:'archiveBack',label:'← BACK TO UPGRADES'},
+    {kind:'header',key:'archiveHeader',label:`COURSE ARCHIVES ${archives.length}/${capacity}`},
+    {kind:'archivePager',key:'archivePager',label:'← PREV / NEXT →',state:`${page+1}/${pageCount}`},
+  ];
+  const selected=typeof o.selected==='string'?o.selected:null;
+  for(const course of archives.slice(page*7,(page+1)*7)) {
+    const key=String(course.key);
+    const seed=String(course.seed||'?');
+    const mask=Number.isSafeInteger(course.biomeMask)?course.biomeMask:0;
+    const favoriteCount=Array.isArray(course.favorites)?course.favorites.filter(Boolean).length:0;
+    rows.push({kind:'archiveEntry',key:'entry-'+key,archiveKey:key,
+      label:(selected===key?'[SELECTED] ':'')+seed.slice(0,23),
+      state:`MASK ${mask.toString(16).toUpperCase()} F${favoriteCount}`});
+  }
+  if(selected && archives.some(c=>c.key===selected))
+    rows.push({kind:'archiveConfirm',key:'archiveConfirm',archiveKey:selected,
+      label:'CONFIRM DELETE SELECTED ARCHIVE',state:'ERASE'});
+  rows.push({kind:'static',key:'archiveNotice',label:String(o.notice||'SELECT COURSE FIRST; DELETION IS EXPLICIT').slice(0,58)});
+  const texts=[];let y=8;
+  for(const row of rows){
+    row.y=y;
+    if(row.kind==='head'){
+      const w=measureText(row.right);
+      row.texts=[{key:'archive-bank',text:row.right,x:SHOP_PANEL.w-PAD-w,y,w,h:GLYPH_H,color:'amber'}];
+    }else{
+      const label=String(row.label);
+      const left=row.kind==='header'||row.kind==='static'?PAD:PAD+6;
+      row.texts=[{key:row.key+'-label',text:label,x:left,y,w:measureText(label),h:GLYPH_H,
+        color:row.kind==='archiveConfirm'?'danger':row.kind==='archiveEntry'?'cyan':'magenta'}];
+      if(row.state){const w=measureText(row.state);row.texts.push({key:row.key+'-state',text:row.state,
+        x:SHOP_PANEL.w-PAD-6-w,y,w,h:GLYPH_H,color:'amber'});}
+    }
+    texts.push(...row.texts);y+=ROW_H;
+  }
+  return {w:SHOP_PANEL.w,h:SHOP_PANEL.h,rows,texts,page,pageCount,rowH:ROW_H,
+    band:{x:PAD-6,y:8,w:SHOP_PANEL.w-(PAD-6)*2}};
 }
 
 export { ROW_H as SHOP_ROW_H, GLYPH_H as SHOP_GLYPH_H };

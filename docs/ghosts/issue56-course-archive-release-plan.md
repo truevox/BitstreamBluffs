@@ -1,0 +1,11 @@
+# #56 Course Archive Slots — v2.25.x implementation and verification contract
+
+**Owner-established invariant:** each exact seed+biome course has at most five visible ghost roles (Best, Latest, Favorites A/B/C); increasing archive capacity means more *distinct courses*, never a sixth ghost on one course. Existing favorites cannot silently disappear. All data is local-first; no automatic upload, trusted leaderboard eligibility, or physics/scoring changes.
+
+**Friday-selected, reversible pre-alpha defaults (NOT a past Marvin pricing decision):** 8 included courses; each deliberate Shard Shop upgrade adds one course; price rises from 40 Shards as `ceil(40 + 12*r*(1 + r/8))` at purchased rank `r`. No hard purchase limit, but no unbounded integer or charge overflow. Prices/economics are balancing constants, not a trusted server entitlement.
+
+**Migration:** legacy devices may already store more than eight courses. Persist a one-time grandfather floor for their actual existing archive count before enforcing capacity; *never* truncate, silently delete, repack, or revoke historical course slots. New purchases raise the floor one course at a time. A failed localStorage write is not a successful shard charge.
+
+**Integrity/UX:** a new course save at capacity refuses the ghost archival write, but leaves the normal ranked RunRecord, protected replay evidence, and run intact. Present the failure clearly and provide a manual manager showing individual stored seed+mask courses with a separate deliberate deletion confirmation. Deleting a course only removes its Ghost Library roles and tapes if unreferenced; protected replay evidence stays separate. Exact same-course run IDs remain immutable, and IDB course admission is serialized across tabs. Daily, Gym, Guest and Takeover eligibility stay unchanged.
+
+**QA:** unit tests for price integer/overflow, profile migration, Shard-bank atomic failure, one-vs-five limits, full-capacity refusal, same-course updates and retries, two-tab IndexedDB race, explicit course deletion and evidence isolation, and complete local Playwright/Chromium browser acceptance. Native source digest/tripwire, current-main CI, PWA/offline behavior and postmerge live site must pass before claiming shipped. #119 and #135 remain separate P0s.

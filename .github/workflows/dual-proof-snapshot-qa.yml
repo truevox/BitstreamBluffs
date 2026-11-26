@@ -1,0 +1,67 @@
+name: Dual-proof descriptor-snapshot trust gate
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dual-proof-snapshot-qa.yml'
+      - 'src/systems/trust/**'
+      - 'src/systems/replay/canonicalJson.js'
+      - 'src/systems/replay/canonicalSha256.js'
+      - 'src/systems/replay/rulesetVerifier.js'
+      - 'tests/trust/**'
+      - 'tests/replay/rulesetVerifier.test.js'
+      - 'tests/replay/canonicalJson.test.js'
+      - 'tools/trust/test-dual-proof-browser.mjs'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dual-proof-snapshot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  snapshot-and-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # pull_request otherwise checks out a synthetic merge commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert checkout is the exact triggering source commit
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual=$(git rev-parse HEAD)
+          test "$actual" = "$EXPECTED_HEAD" || {
+            echo "::error::Wrong source commit: $actual; expected $EXPECTED_HEAD"
+            exit 1
+          }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install reproducible dependency graph
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Confirm source ruleset identity stays exact
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Trust adjudication, negative mutations, canonical JSON and replay verifier
+        run: |
+          npm test -- --runInBand \
+            tests/trust/dualProof.test.js \
+            tests/replay/rulesetVerifier.test.js \
+            tests/replay/canonicalJson.test.js \
+            tests/replay/canonicalSha256.test.js \
+            tests/replay/rulesetContent.test.js \
+            tests/replay/rulesetArtifacts.test.js
+      - name: Install Chromium for real client/host verdict byte parity
+        run: npx playwright install --with-deps chromium
+      - name: Real browser versus Node parity, including hostile Proxy
+        run: |
+          npm exec vite -- --host 127.0.0.1 --port 18420 --strictPort >/tmp/dual-proof-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18420/ >/dev/null && break; sleep 1; done
+          GAME_URL=http://127.0.0.1:18420/ node tools/trust/test-dual-proof-browser.mjs

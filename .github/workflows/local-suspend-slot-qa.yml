@@ -1,0 +1,52 @@
+name: Single-use local suspend slot safety QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/local-suspend-slot-qa.yml'
+      - 'src/systems/savestate/**'
+      - 'src/systems/replay/canonicalJson.js'
+      - 'src/systems/replay/canonicalSha256.js'
+      - 'tests/determinism/savestate-local-suspend-slot.test.js'
+      - 'tests/determinism/savestate-envelope.test.js'
+      - 'tests/determinism/savestate-recorder-prefix.test.js'
+      - 'tests/determinism/savestate-native-recorder.test.js'
+      - 'tools/savestate-experiment/test-native-recorder-browser.mjs'
+      - 'tools/savestate-experiment/test-local-suspend-slot-browser.mjs'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: single-use-suspend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  suspend-slot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Require exact build source identity
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Pure format, recorder prefix, single-use storage and hostile-input tests
+        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-recorder-prefix.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-local-suspend-slot.test.js
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Cross-tab, page-reload and atomic-claim acceptance in real browser
+        run: |
+          npm exec vite -- --host 127.0.0.1 --port 18410 --strictPort > /tmp/suspend-slot-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18410/ >/dev/null && break; sleep 1; done
+          GAME_URL=http://127.0.0.1:18410/ node tools/savestate-experiment/test-local-suspend-slot-browser.mjs
+      - name: Native recorder prefix to real fatal result in Chromium
+        run: node tools/savestate-experiment/test-native-recorder-browser.mjs

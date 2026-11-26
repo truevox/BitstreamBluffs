@@ -7,11 +7,14 @@ import { EVT } from './events.js';
 import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
 import { GhostLibrary } from './systems/ghost/GhostLibrary.js';
+import { AttemptHistory } from './systems/ghost/AttemptHistory.js';
+import { installAttemptHistory, protectOwnedSettings, ATTEMPT_HISTORY_KEY } from './systems/ghost/attemptHistoryService.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
+import { activateCourseArchiveLimit } from './systems/ghost/CourseArchiveCapacity.js';
 import { createMissionsService } from './systems/MissionsService.js';
-import { RULESET_KEY } from './systems/replay/evidenceCapture.js';
+import { RULESET_KEY, BUILD_ID_KEY } from './systems/replay/evidenceCapture.js';
 
 /**
  * Instantiate SaveStore, load settings, create InputRouter + AudioSynth, load content, set a default seed.
@@ -28,12 +31,22 @@ export async function createServices(game) {
   await ghosts.init();
   game.registry.set(REG.GHOSTS, ghosts);
   const settings = saveStore.loadSettings();
+  // Issue #68: separate, local-only past-attempt traces for the Cemetery Montage. Never touches the ghost library.
+  const history = new AttemptHistory();
+  await history.init();
+  game.registry.set(ATTEMPT_HISTORY_KEY, history);
+  installAttemptHistory(game, history);
   game.registry.set(REG.SAVE_STORE, saveStore);
   game.registry.set(REG.SETTINGS, settings);
   game.registry.set(REG.CONTENT, loadContent());
   // Replay evidence (#116): the committed ruleset of this build. Non-blocking; without it runs simply produce no evidence.
   // (dynamic import: runtimeRuleset.js uses Vite's import.meta.glob, like data/index.js, so Jest must not load it statically)
-  import('./systems/replay/runtimeRuleset.js').then((m) => m.loadCurrentRuleset()).then((r) => game.registry.set(RULESET_KEY, r)).catch((e) => console.warn(`[replay-evidence] ruleset unavailable: ${e && e.message}`));
+  import('./systems/replay/runtimeRuleset.js').then((m) => m.loadCurrentRuleset()).then((r) => {
+    game.registry.set(RULESET_KEY, r);
+    // #72: the build id stamped into new tape headers (header-only; RunScene never imports the savestate modules itself)
+    import('./systems/savestate/runtimeIdentity.js').then((m) => game.registry.set(BUILD_ID_KEY, m.composeCurrentBuildIdentity(r).buildId))
+      .catch((e) => console.warn(`[replay-evidence] build id unavailable: ${e && e.message}`));
+  }).catch((e) => console.warn(`[replay-evidence] ruleset unavailable: ${e && e.message}`));
   game.registry.set(REG.INPUT, new InputRouter(game));
   game.registry.set(REG.AUDIO, new AudioSynth(game));
   if (!game.registry.get(REG.SEED)) game.registry.set(REG.SEED, String(Date.now()));
@@ -42,6 +55,11 @@ export async function createServices(game) {
   // W1: progression service (profile load + one-time backfill + RUN_END listener). Additive.
   const progression = await createProgressionService(game, { levels: game.registry.get(REG.CONTENT).progression });
   game.registry.set(REG.PROGRESSION, progression);
+  // #56: migrate the legacy unlimited course count BEFORE enforcing an
+  // archive cap. On a denied profile write, leave GhostLibrary uncapped to
+  // avoid silently losing a pre-alpha player's recorded courses.
+  const archiveMigration = activateCourseArchiveLimit(ghosts,progression.store);
+  if (archiveMigration.ok) progression.publish();
   // Profile entitlement is not available during initial AudioSynth
   // construction. Reapply once progression has loaded it so saved,
   // purchased vocal enablement is honored on a new browser session.
@@ -75,6 +93,8 @@ export async function createServices(game) {
  */
 export function updateSetting(game, key, value) {
   const settings = game.registry.get(REG.SETTINGS);
+  // #68: saving an unrelated preference must never rewrite another tab's newer PAST ATTEMPTS TO KEEP / montage style.
+  protectOwnedSettings(settings, key);
   settings[key] = value;
   game.registry.get(REG.SAVE_STORE).saveSettings(settings);
   game.events.emit(EVT.SETTINGS_CHANGED, { key, value, settings });

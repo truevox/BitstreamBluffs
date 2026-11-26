@@ -26,7 +26,12 @@ try{
  // potential contents. Second activation explicitly copies the URL.
  await p.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene')._openGhosts());
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView?.shareBtn,null,{timeout:12000});
- await p.waitForTimeout(450);
+ // Same CRT animation on the sender side. A fixed wall-clock delay is
+ // not a rendered-frame guarantee on a saturated Chromium runner.
+ await p.waitForFunction(()=>{
+  const v=window.__bbGame.scene.getScene('GameOverScene').ghostView,panel=v?.panel;
+  return v?.alive&&v.shareBtn?.zone?.scene&&panel.alpha===1&&panel.scaleX===1&&panel.scaleY===1&&panel.y===Math.round((270-v.h)/2);
+ },null,{timeout:15000});
  // Source could be opened with an untrusted path/query; sharing must never
  // copy either into the URL sent to a friend.
  await p.evaluate(()=>history.replaceState(null,'',location.pathname+'my-private-route/?session=secret-session-token'));
@@ -92,10 +97,23 @@ try{
    pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),rect=document.querySelector('canvas').getBoundingClientRect();
   return {x:rect.left+pt.x/g.scale.gameSize.width*rect.width,y:rect.top+pt.y/g.scale.gameSize.height*rect.height};
  },which);
- const openPoint=await clickPoint('ghostLinkBtn');
- await p.waitForTimeout(500);
- await p.mouse.click(openPoint.x,openPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
+ // The title menu uses an entrance tween. A click can hit the prior
+ // translucent scene on a slower runner. Reacquire the real active button
+ // center and observe the destination before ANY retry, never issuing extra
+ // pointer events after it opens.
+ let openedGuest=false;
+ for(let attempt=0;attempt<4;attempt++){
+  await p.waitForTimeout(420);
+  const openPoint=await clickPoint('ghostLinkBtn');
+  await p.mouse.click(openPoint.x,openPoint.y);
+  try{
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:2500});
+   openedGuest=true;break;
+  }catch{
+   if(await p.evaluate(()=>Boolean(window.__bbGame.scene.getScene('TitleScene').view?.previewBtn))){openedGuest=true;break;}
+  }
+ }
+ if(!openedGuest)throw Error('Open Ghost Link did not respond after genuine pointer attempts');
  const beforehand=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,preview:!!v.preview,courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};
@@ -104,11 +122,40 @@ try{
  await p.locator('textarea').fill(await p.evaluate(()=>window.__ghostCopies[0]));
  const filled=await p.evaluate(()=>({loaded:!!window.__bbGame.scene.getScene('TitleScene').view?.tape,field:document.querySelector('textarea')?.value.length}));
  if(filled.loaded||filled.field!==ui.copiedLength)throw Error('Filling input performed an implicit import '+JSON.stringify(filled));
- // Press the genuine on-screen PREVIEW button.
- const previewPoint=await clickPoint('previewBtn');
- await p.waitForTimeout(750);
- await p.mouse.click(previewPoint.x,previewPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
+ // Press the genuine on-screen PREVIEW button. Mobile/CI display scaling
+ // and Phaser panel transitions can move its real hit zone between sampling
+ // and pointerdown. Never fake a preview, invoke its handler, or claim success
+ // until the actual rendered button has accepted a real Playwright click.
+ let previewAccepted=false;
+ for(let attempt=0;attempt<4;attempt++){
+  const ready=await p.evaluate(()=>{
+   const v=window.__bbGame.scene.getScene('TitleScene')?.view;
+   return {preview:!!v?.preview?.count,busy:v?.busy===true,button:!!v?.previewBtn?.zone?.scene};
+  });
+  if(ready.preview){previewAccepted=true;break;}
+  if(!ready.button)throw Error('PREVIEW button disappeared before pointer consent');
+  if(ready.busy){
+   // An already accepted asynchronous preview should settle before we
+   // consider sending another gesture; retries must not cancel valid work.
+   await p.waitForTimeout(1600);
+   continue;
+  }
+  const previewPoint=await clickPoint('previewBtn');
+  await p.mouse.move(previewPoint.x,previewPoint.y);
+  await p.mouse.click(previewPoint.x,previewPoint.y);
+  try{
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:3300});
+   previewAccepted=true;break;
+  }catch(e){if(e.name!=='TimeoutError')throw e;}
+ }
+ if(!previewAccepted){
+  const state=await p.evaluate(()=>{
+   const v=window.__bbGame.scene.getScene('TitleScene')?.view;
+   return {status:v?.status?.main?.text,disabled:v?.previewBtn?.disabled,
+    previewCount:v?.preview?.count||0,button:!!v?.previewBtn?.zone?.scene};
+  });
+  throw Error('Real PREVIEW pointer never produced a decoded guest after four bounded attempts '+JSON.stringify(state));
+ }
  const previewed=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,count:v.preview?.count,localCount:v.localPreview?.count,localRole:v.localRole,traceX:v.preview?.trace[0],status:v.status.main.text,
@@ -233,7 +280,8 @@ try{
  if(pendingEdit.busy||pendingEdit.loaded||stale.loaded||stale.preview||
    !stale.status.includes('LINK CHANGED'))
   throw Error('Stale async guest validation restored edited-away content '+JSON.stringify({pendingEdit,stale}));
- await p.mouse.click(previewPoint.x,previewPoint.y);
+ const invalidPreviewPoint=await clickPoint('previewBtn');
+ await p.mouse.click(invalidPreviewPoint.x,invalidPreviewPoint.y);
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.status?.main?.text?.includes('INCOMPATIBLE'),null,{timeout:10000});
  const invalid=await p.evaluate(()=>{
   const v=window.__bbGame.scene.getScene('TitleScene').view;
@@ -261,6 +309,15 @@ try{
  await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene')._openSeed());
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.ghostLinkBtn,null,{timeout:8000});
  await recipient.locator('input').focus();
+ // The failing CI path is the mobile opt-in race. Freeze the real CRT open
+ // tween before constructing this view, then hold it partway open until the
+ // stable-target wait observes and rejects the moving geometry below.
+ const slowRaceOpen=mobile&&process.env.BSB_GUEST_PRACTICE==='1';
+ if(slowRaceOpen)await recipient.evaluate(()=>{
+  const t=window.__bbGame.scene.getScene('TitleScene');
+  window.__raceOldTweens=t.tweens.getTweens();
+  t.tweens.timeScale=0;
+ });
  await recipient.keyboard.press('Shift+Enter');
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
  const direct=await recipient.evaluate(()=>{
@@ -270,6 +327,7 @@ try{
  });
  if(!direct.prefilled||direct.loaded||direct.length!==copiedUrl.length)
   throw Error('Arrived ghost was auto-imported or failed to prefill '+JSON.stringify(direct));
+ await recipient.locator('textarea').focus();
  await recipient.keyboard.press('Control+Enter');
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
  const accepted=await recipient.evaluate(()=>{
@@ -291,46 +349,119 @@ try{
     courses:lib.courses.size,tapes:lib.tapes.size,lastRecord:r.get('lastRecord')?.id||null,
     lastTape:r.get('lastGhostTape')?.runId||null};
   });
-  // A cross-machine CSS-scale/tween race can move the Phaser hitzone after
-  // the first coordinate sample. Re-read the real rendered hitbox on each
-  // attempt. Only genuine Playwright pointer clicks may arm/confirm.
-  const practicePoint=()=>recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v?.practiceBtn?.zone;
-   if(!z||!z.scene)return null;
-   const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
-   const r=document.querySelector('canvas').getBoundingClientRect();
-   return {x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
+  // The preview can finish while the CRT opening animation is still moving
+  // the panel (even while alpha is zero). Never sample a hitbox during that
+  // transition: a stale Race coordinate can hit BACK instead. Preserve the
+  // actual view identity and require a stable, visible canvas hit target.
+  await recipient.evaluate(()=>{
+   const t=window.__bbGame.scene.getScene('TitleScene'),v=t.view;
+   window.__raceView=v;
+   window.__racePointerTrace=[];
+   const record=(kind,p)=>{if(window.__racePointerTrace.length<16)window.__racePointerTrace.push({kind,x:p?.x,y:p?.y});};
+   v.practiceBtn.zone.on('pointerdown',p=>record('race',p));
+   v.back.zone.on('pointerdown',p=>record('back',p));
+   v.panel.once('destroy',()=>record('destroy'));
   });
-  const allowed=await recipient.evaluate(()=>({disabled:window.__bbGame.scene.getScene('TitleScene').view.practiceBtn.disabled}));
-  if(allowed.disabled)throw Error('Eligible NORMAL guest was refused by practice policy');
-  let armAttempts=0,armedRace=null;
-  const raceState=()=>recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene')?.view;
-   return {armed:v?.practiceArmed===true,
-    text:v?.status?.main?.text||null,label:v?.practiceBtn?.label?.main?.text||null,
-    view:!!v,running:g.scene.isActive('RunScene'),starting:g.scene.getScene('TitleScene')?.starting===true};
-  });
-  for(;armAttempts<5;armAttempts++){
-   const point=await practicePoint();
-   if(!point)throw Error('Race Guest hitzone disappeared before consent');
-   await recipient.mouse.move(point.x,point.y);
-   await recipient.mouse.click(point.x,point.y);
-   // Phaser pointerdown can be dispatched on the NEXT rendering frame. Wait
-   // for that input before deciding the click missed; otherwise a retry may
-   // be a SECOND consent and race ahead of the state assertion.
-   await recipient.waitForTimeout(500);
-   armedRace=await raceState();
-   if(armedRace.running||armedRace.starting)
-    throw Error('Guest launched before an OBSERVED first consent '+JSON.stringify({armedRace,armAttempts}));
-   if(armedRace.armed)break;
-   if(!armedRace.view)throw Error('Practice preview disappeared without consent '+JSON.stringify(armedRace));
+  if(slowRaceOpen){
+   // Recreate the measured red geometry using Phaser's actual open tween.
+   // At ~0.74 scale the nominal full-size Race center lies inside BACK.
+   // Do not click the stale coordinates: the production test must WAIT.
+   const held=await recipient.evaluate(()=>{
+    const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view;
+    const tween=t.tweens.getTweens().find(x=>!window.__raceOldTweens.includes(x)&&x.data?.[0]?.duration===260);
+    if(!tween)throw Error('Missing real Ghost CRT open tween');
+    const center=b=>{const z=b.zone;return z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);};
+    const stale=center(v.practiceBtn);
+    const backZone=v.back.zone;
+    let back,scale,staleHitsBack=false,seekMs;
+    t.tweens.timeScale=1;
+    try{
+     // Phaser's seek setup can consume different initial ticks. Select the
+     // actual measured overlap, not a fixed assumed animation timestamp.
+     for(seekMs=110;seekMs<=155;seekMs++){
+      tween.seek(seekMs,1,true);
+      back=center(v.back);scale=v.panel.scaleY;
+      staleHitsBack=scale>0&&scale<1&&Math.abs(stale.x-back.x)<backZone.width/2&&
+       Math.abs(stale.y-back.y)<backZone.height*scale/2;
+      if(staleHitsBack&&v.panel.alpha===1)break;
+     }
+    }finally{t.tweens.timeScale=0;}
+    return {seekMs,scale,alpha:v.panel.alpha,stale:{x:stale.x,y:stale.y},back:{x:back.x,y:back.y},staleHitsBack};
+   });
+   if(!(held.scale>0&&held.scale<1)||held.alpha!==1||!held.staleHitsBack)
+    throw Error('Slow-open control did not reproduce stale Race -> BACK geometry '+JSON.stringify(held));
+   console.log('RACE_SLOW_OPEN_CONTROL',JSON.stringify(held));
   }
-  if(!armedRace?.armed||armedRace.running||!armedRace.text?.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
-   throw Error('Unranked double-consent gate failed after stable pointer attempts '+JSON.stringify({armedRace,armAttempts}));
-  // Reacquire the same real hitzone after arming; the first click must NEVER
-  // launch gameplay and must not be repeated after practiceArmed becomes true.
+  const raceState=()=>recipient.evaluate(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view,original=window.__raceView;
+   return {armed:v?.practiceArmed===true,text:v?.status?.main?.text||null,
+    label:v?.practiceBtn?.label?.main?.text||null,view:!!v,sameView:v===original,
+    alive:v?.alive===true,zone:!!v?.practiceBtn?.zone?.scene,
+    disabled:v?.practiceBtn?.disabled,busy:v?.busy,alpha:v?.panel?.alpha,
+    scaleY:v?.panel?.scaleY,panelY:v?.panel?.y,
+    running:g.scene.isActive('RunScene'),starting:t.starting===true,trace:window.__racePointerTrace};
+  });
+  // Retain #394's shipped scene-time guard as well as our explicit
+  // settled geometry and consecutive frame checks.
+  const openingCheckedAt=await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').time.now);
+  const practicePoint=async()=>{
+   // Check consecutive rendered frames, not just elapsed time. Slow
+   // Chromium may take much longer than the 260 ms animation duration.
+   await recipient.evaluate(()=>{window.__raceStable={key:null,frames:0,blocked:0};});
+   await recipient.waitForFunction(openingCheckedAt=>{
+    const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view,z=v?.practiceBtn?.zone,panel=v?.panel;
+    if(v!==window.__raceView||!v?.alive||!z?.scene||t.starting||g.scene.isActive('RunScene'))
+     throw Error('Guest preview replaced before explicit consent');
+    if(v.busy||v.practiceBtn.disabled||panel.alpha!==1||panel.scaleX!==1||panel.scaleY!==1||panel.y!==18){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked+1};return false;
+    }
+    if(t.time.now-openingCheckedAt<320){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked};return false;
+    }
+    const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=g.canvas.getBoundingClientRect();
+    const point={x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
+    if(document.elementFromPoint(point.x,point.y)!==g.canvas){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked+1};return false;
+    }
+    const key=JSON.stringify({point,left:r.left,top:r.top,width:r.width,height:r.height});
+    const old=window.__raceStable;
+    window.__raceStable={key,frames:old.key===key?old.frames+1:1,point,blocked:old.blocked};
+    return window.__raceStable.frames>=3;
+   },openingCheckedAt,{timeout:15000,polling:'raf'}).catch(async e=>{
+    throw Error('Race Guest never became a stable rendered target '+JSON.stringify(await raceState()),{cause:e});
+   });
+   return recipient.evaluate(()=>window.__raceStable.point);
+  };
+  const allowed=await raceState();
+  if(allowed.disabled||!allowed.sameView||!allowed.zone)throw Error('Eligible NORMAL guest was refused by practice policy '+JSON.stringify(allowed));
+  // Exactly ONE first activation. Wait for observed consent, never retry a
+  // click which might still be queued and then count as a confirmation.
+  const firstPointPromise=practicePoint();
+  if(slowRaceOpen){
+   // Confirm the actual wait has refused at least one partial-open frame
+   // before letting the real animation finish. No synthetic consent.
+   try{
+    await recipient.waitForFunction(()=>window.__raceStable?.blocked>0,null,{timeout:8000});
+    console.log('PASS_RACE_TARGET_REJECTS_PARTIAL_OPEN');
+   }finally{
+    await recipient.evaluate(()=>{window.__bbGame.scene.getScene('TitleScene').tweens.timeScale=1;});
+   }
+  }
+  const firstPoint=await firstPointPromise;
+  await recipient.mouse.click(firstPoint.x,firstPoint.y);
+  await recipient.waitForFunction(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view;
+   return v?.practiceArmed===true||v!==window.__raceView||t.starting||g.scene.isActive('RunScene');
+  },null,{timeout:10000}).catch(async e=>{
+   throw Error('First Race Guest click did not arm '+JSON.stringify(await raceState()),{cause:e});
+  });
+  const armedRace=await raceState();
+  if(!armedRace.sameView||!armedRace.alive||!armedRace.zone||!armedRace.armed||armedRace.running||armedRace.starting||
+     !armedRace.text?.includes('NO XP')||armedRace.label!=='CONFIRM RACE'||
+     armedRace.trace.filter(x=>x.kind==='race').length!==1||armedRace.trace.some(x=>x.kind==='back'||x.kind==='destroy'))
+   throw Error('Unranked double-consent gate failed '+JSON.stringify(armedRace));
+  // A fresh rendered hitbox and an explicitly distinct second click.
   const confirmPoint=await practicePoint();
-  if(!confirmPoint)throw Error('Race Guest hitzone disappeared after consent');
   await recipient.mouse.click(confirmPoint.x,confirmPoint.y);
   await recipient.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&
     window.__bbGame.scene.getScene('RunScene').guestPractice===true&&
@@ -346,6 +477,21 @@ try{
      live.recorder||live.tapePlayer||live.ghosts!==1||live.guestRoles?.[0]!=='guest'||
      live.dailyOfficial||live.registryPending||!live.tag)
    throw Error('Guest run admitted to ranking/replay or not visible '+JSON.stringify(live));
+  // Both the short-URL and local-file guest transport share this RunScene
+  // admission: session hints may change in RAM but cannot consume device-wide
+  // normal-play tutorial progress or the tuck reminder limit.
+  const guestHints=await recipient.evaluate(()=>{
+   const r=window.__bbGame.scene.getScene('RunScene');
+   localStorage.removeItem('bb.tutorialDone');
+   localStorage.removeItem('bb.tuckShows');
+   r.tutDone.delete('push');r.tutDoneId('push');
+   r.applyHintEvents([{id:'tuck',show:true}]);
+   return {inMemoryDone:r.tutDone.has('push'),inMemoryShows:r.tuckShows,
+    tutorial:localStorage.getItem('bb.tutorialDone'),tuck:localStorage.getItem('bb.tuckShows')};
+  });
+  if(!guestHints.inMemoryDone||guestHints.inMemoryShows<1||guestHints.tutorial!==null||guestHints.tuck!==null)
+   throw Error('Short-link guest practice leaked device tutorial/tuck history '+JSON.stringify(guestHints));
+  console.log('PASS_SHORT_GHOST_PRACTICE_HINTS_EPHEMERAL',JSON.stringify(guestHints));
   await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('RunScene').simClock.tick>=85,null,{timeout:30000});
   const tick=await recipient.evaluate(()=>{
    const r=window.__bbGame.scene.getScene('RunScene');
@@ -363,12 +509,17 @@ try{
     lastTape:r.get('lastGhostTape')?.runId||null,
     events:window.__practiceEvents,gameOver:g.scene.isActive('GameOverScene')};
   });
+  const guestHintDisk=await recipient.evaluate(()=>({
+   tutorial:localStorage.getItem('bb.tutorialDone'),tuck:localStorage.getItem('bb.tuckShows')
+  }));
+  if(guestHintDisk.tutorial!==null||guestHintDisk.tuck!==null)
+   throw Error('Short-link guest practice wrote first-run hints after exit '+JSON.stringify(guestHintDisk));
   const {events,gameOver,...durable}=after;
   if(JSON.stringify(durable)!==JSON.stringify(before)||events.includes('RUN_END')||
      !events.includes('RUN_ABORT:guest-practice-ended')||gameOver)
    throw Error('Guest run mutated persistent profile/records or leaked ranked end '+JSON.stringify({before,after}));
   practiceAcceptance={before:{runs:before.runs,profileBytes:before.profile.length,courses:before.courses,tapes:before.tapes},
-   armedRace,live,tick,after:{runs:after.runs,profileBytes:after.profile.length,courses:after.courses,tapes:after.tapes,
+   armedRace,live,guestHints,tick,after:{runs:after.runs,profileBytes:after.profile.length,courses:after.courses,tapes:after.tapes,
    events,gameOver},zeroDurableMutation:true};
   if(process.env.BSB_GUEST_PRACTICE_RESTART==='1'){
    // Reopen the SAME verified link, then restart/quit through genuine PauseScene

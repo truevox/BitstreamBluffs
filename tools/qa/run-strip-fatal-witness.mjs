@@ -11,10 +11,10 @@ import { openDownhillRunTrace } from '../../src/systems/downhill-run-strip.js';
 const url = new URL(process.env.GAME_URL ?? 'http://127.0.0.1:8293/');
 assert.equal(url.href, url.origin + '/', 'Use the normal entry at the loopback root');
 assert.ok(url.protocol === 'http:' && url.hostname === '127.0.0.1', 'HTTP loopback only');
-const entry = '/assets/main-CnvlsBaW.js';
+const entry = '/assets/main-BFWlldkw.js';
 const pins = new Map([
-  ['/', 'c1d9d45f390809882320830957a9dc8ecd11f18a541241428273245a159ec75b'],
-  [entry, 'c733706b6fe810c335ac3966b009a16ed34bc84409db4a739b3543d0b985f41c'],
+  ['/', 'c1ac859e52422d49e3aae2b3f4f988973bf38bafc2fe7381bf5eb72f005c71ac'],
+  [entry, '44324233172df184b0104aa3ad304c311f9305a8286a5018386788b7ec2da538'],
 ]);
 const harness = fileURLToPath(new URL('../conformance/cross-engine-page.js', import.meta.url));
 const fixture = { seed: 'CE120-BUMP3', hz: 120, style: 'reckless', params: { hopEvery: 400 }, rngSeed: 9 };

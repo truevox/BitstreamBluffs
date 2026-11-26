@@ -205,6 +205,8 @@ export function defaultProfile() {
     // Permanent ranks persist forever; OFF by default so clean/daily competition stays unchanged.
     upgrades: emptyUpgradeRanks(),
     upgradesEnabled: false,
+    // #56: count distinct retained course libraries, never a sixth ghost on one course.
+    courseArchive: {v:1,included:8,purchased:0,migrated:false},
     dailyDraft: {version:DRAFT_RULES_VERSION,ranks:emptyUpgradeRanks()},
     bsodGym: { discovered: false, owned: false },
     missions: { counter: 0, active: [], progress: {} },
