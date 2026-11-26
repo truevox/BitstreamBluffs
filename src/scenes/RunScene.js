@@ -2918,9 +2918,10 @@ export class RunScene extends Phaser.Scene {
     if (t.phase !== 'ready') return;
     // READY: the sim is paused at tick N and the frame is drawn. The key that ends it is consumed here.
     const polled = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
-    if (polled.pressed.pause) { this.pauseRun(); return; }
+    // #67: while the postcard view is open over READY (t.modal), the READY / pause keys belong to it, not to the run.
+    if (polled.pressed.pause && !t.modal) { this.pauseRun(); return; }
     this.renderFrame(0);
-    if (polled.pressed.hop || polled.pressed.confirm) this._takeoverGo();
+    if (!t.modal && (polled.pressed.hop || polled.pressed.confirm)) this._takeoverGo();
   }
 
   /**

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.24.0 — #67 Playable Postcards (2026-11-25)
+
+- From an ordinary takeover's READY screen, make a local postcard with P / LB; choose a 5–10 second challenge and copy the code or save a file. Open on Title with O. Compatible builds re-simulate the prefix and must match its causal fingerprint before handing over control.
+- Postcard attempts are always unranked, with a window countdown, an independent retry, and a local reply code for completed attempts. Reply verification logic re-simulates the prefix and suffix; no upload, ranked score, progression, or persistent ghost import is introduced.
+
 ## v2.23.0 — #72 Replay Takeover (unranked practice/TAS) (2026-11-25)
 
 - From Game Over press **T**: pick any tick of the run you just finished (1 s with the arrows, 5 s with Shift, one tick with `,` / `.`; D-pad / A / B on a pad), see the time and tick on a trace preview, and take over. The game re-simulates the tape up to that tick with the real engine, freezes on **READY**, and hands you live control when you press Space / Enter / A. The key that ends READY is consumed: it can never become a hop or trick edge on the first live tick.
