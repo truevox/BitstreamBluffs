@@ -38,6 +38,8 @@ const EXE = process.env.CHROMIUM_PATH;
 const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
 const STRICT = argv.includes('--strict-suffix');
+const PRODUCTION_RUNTIME = argv.includes('--runtime-module');
+if(PRODUCTION_RUNTIME && !STRICT)throw Error('--runtime-module requires strict suffix checking');
 const repeatFlag=argv.indexOf('--repeat-ticks');
 const BOUNDARY=argv.includes('--repeat-boundaries');
 const MOVING=argv.includes('--repeat-moving');
@@ -75,6 +77,8 @@ const matterKitSrc = readFileSync(path.join(here, 'matter-snapshot-kit.js'), 'ut
 const recorderKitSrc = (await build({entryPoints:[path.join(here,'recorder-snapshot-kit.js')],
   bundle:true,write:false,format:'iife',globalName:'__ssRecorderKit',platform:'browser'})).outputFiles[0].text;
 const gameKitSrc = readFileSync(path.join(here, 'game-state-kit.js'), 'utf8');
+const runtimeSrc = PRODUCTION_RUNTIME ? (await build({entryPoints:[path.join(here,'../../src/systems/savestate/RunSceneRestoreKit.js')],
+  bundle:true,write:false,format:'iife',globalName:'__ssRuntimeModule',platform:'browser'})).outputFiles[0].text : null;
 
 // Tick-indexed tape (120 Hz ticks). Held ranges [from, to) and one-shot edges.
 const TAPES = {
@@ -122,10 +126,26 @@ async function bootPage(browser, fx, tape) {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(URL_, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
-  await page.addScriptTag({ content: matterKitSrc });
-  await page.addScriptTag({ content: recorderKitSrc });
-  await page.addScriptTag({ content: gameKitSrc });
-  await page.evaluate(strict => { window.__ssCanonical = strict; }, STRICT);
+  if(PRODUCTION_RUNTIME){
+    // Keep the pre-existing *test-only* diagnostic oracles available for the
+    // unchanged equivalence assertions, independent of the imported source.
+    // Importing/creating the runtime module itself must install ZERO globals.
+    await page.addScriptTag({content:matterKitSrc});
+    await page.addScriptTag({content:recorderKitSrc});
+    await page.addScriptTag({content:runtimeSrc});
+    await page.evaluate(()=>{
+      if(window.__ssGameKit || window.__ssCanonical)
+        throw Error('runtime module leaked a global install');
+      window.__ssGameKit=window.__ssRuntimeModule.createDiagnosticRunSceneRestoreKit(window.Phaser);
+      window.__ssProductionKit=window.__ssRuntimeModule.createRunSceneRestoreKit(window.Phaser);
+      window.__ssCanonical=true; // ONLY the diagnostic harness flag
+    });
+  }else{
+    await page.addScriptTag({ content: matterKitSrc });
+    await page.addScriptTag({ content: recorderKitSrc });
+    await page.addScriptTag({ content: gameKitSrc });
+    await page.evaluate(strict => { window.__ssCanonical = strict; }, STRICT);
+  }
   await page.evaluate(async ({ fx, tape }) => {
     const g = window.__bbGame;
     const run = g.scene.getScene('RunScene');
@@ -229,7 +249,12 @@ function compareDigests(a, b) {
 async function restoreCandidate(candidate,json,level,skip) {
   try {
     const result=await candidate.page.evaluate(({json,level,skip})=>{
-      try{return {ok:true,...window.__ssGameKit.restore(window.__ss.run,JSON.parse(json),level,{skip})};}
+      try{
+        const snapshot=JSON.parse(json),result=window.__ssProductionKit
+          ?window.__ssProductionKit.restore(window.__ss.run,snapshot)
+          :window.__ssGameKit.restore(window.__ss.run,snapshot,level,{skip});
+        return {ok:true,...result};
+      }
       catch(e){return {ok:false,error:String(e.message||e)};}
     },{json,level,skip});
     if(result.ok)return result;
@@ -263,7 +288,9 @@ async function runCase(browser, fxName, level, skip = []) {
     if (level !== 'control') {
       await A.page.evaluate((K) => window.__ss.step(K), fx.K);
       fixtureStats = await fixtureStatsOf(A);
-      const json = await A.page.evaluate(() => JSON.stringify(window.__ssGameKit.capture(window.__ss.run, { withConfig: true, withRecorder: window.__ssCanonical })));
+      const json = await A.page.evaluate(() => JSON.stringify(window.__ssProductionKit
+        ?window.__ssProductionKit.capture(window.__ss.run)
+        :window.__ssGameKit.capture(window.__ss.run, {withConfig:true,withRecorder:window.__ssCanonical})));
       snapBytes = json.length;
       const parsed = JSON.parse(json);
       classes = parsed.classes; audit = parsed.audit;
