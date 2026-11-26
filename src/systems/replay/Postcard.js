@@ -530,23 +530,57 @@ export function replyWire(r) {
 }
 
 /**
- * @param {{postcard:object, outcome:'survived'|'crashed', crashOffsetTicks:number|null, suffix:number[][]}} p
+ * @param {{postcard?:object, binding?:{digest:string, windowTicks:number}, outcome:'survived'|'crashed', crashOffsetTicks:number|null, suffix:number[][]}} p
  * @returns {{ok:true, reply:object}|{ok:false, reason:string, message:string}}
  */
-export function createReply({ postcard, outcome, crashOffsetTicks, suffix } = {}) {
+export function createReply({ postcard, binding, outcome, crashOffsetTicks, suffix } = {}) {
   try {
-    if (!isObj(postcard) || typeof postcard.digest !== 'string' || !SHA_ID.test(postcard.digest) || !isInt(postcard.windowTicks)
-      || postcard.windowTicks < MIN_WINDOW_TICKS || postcard.windowTicks > MAX_WINDOW_TICKS) return refuse('invalid-field', 'postcard');
-    if (digestOfWire(postcardWire(postcard)) !== postcard.digest) return refuse('digest-mismatch', 'postcard');
+    // Either the full postcard (integrity re-checked) or just its binding {digest, windowTicks} (what a takeover descriptor carries).
+    let b = binding;
+    if (postcard !== undefined) {
+      if (!isObj(postcard) || typeof postcard.digest !== 'string') return refuse('invalid-field', 'postcard');
+      if (digestOfWire(postcardWire(postcard)) !== postcard.digest) return refuse('digest-mismatch', 'postcard');
+      b = { digest: postcard.digest, windowTicks: postcard.windowTicks };
+    }
+    if (!isObj(b) || typeof b.digest !== 'string' || !SHA_ID.test(b.digest) || !isInt(b.windowTicks)
+      || b.windowTicks < MIN_WINDOW_TICKS || b.windowTicks > MAX_WINDOW_TICKS) return refuse('invalid-field', 'postcard');
     if (outcome !== 'survived' && outcome !== 'crashed') return refuse('outcome');
-    const reply = { kind: REPLY_KIND, v: REPLY_VERSION, unranked: true, postcardDigest: postcard.digest, outcome, crashOffsetTicks: crashOffsetTicks === undefined ? null : crashOffsetTicks,
+    const reply = { kind: REPLY_KIND, v: REPLY_VERSION, unranked: true, postcardDigest: b.digest, outcome, crashOffsetTicks: crashOffsetTicks === undefined ? null : crashOffsetTicks,
       suffix: Array.isArray(suffix) ? suffix.map((row) => (Array.isArray(row) ? [row[0], row[1], row[2] === 0 ? 0 : row[2]] : row)) : suffix, digest: '' };
-    const p = replyProblem(reply, postcard.windowTicks);
+    const p = replyProblem(reply, b.windowTicks);
     if (p) return refuse('invalid-field', p);
     reply.digest = digestOfWire(replyWire(reply));
     return { ok: true, reply };
   } catch (e) {
     return refuse('invalid-field', e && e.message);
+  }
+}
+
+/**
+ * The reply for a finished postcard attempt, built from the takeover's own in-memory live tape (REG.LAST_TAKEOVER_TAPE: the
+ * postcard prefix + the live input, recorded by createTakeoverRecorder). Only rows INSIDE the window cross, re-based so the first
+ * dt counts from tick N. Outcomes other than survived / crashed (the player quit) have no reply.
+ * @param {{tape:object, descriptor:object, outcome:{result:string, crashOffsetTicks:number|null}}} p
+ */
+export function replyFromTakeoverTape({ tape, descriptor, outcome } = {}) {
+  try {
+    const bind = descriptor && descriptor.postcard;
+    if (!bind || !isObj(tape) || !Array.isArray(tape.inputs) || !isObj(outcome)) return refuse('mismatch', 'no postcard attempt');
+    if (outcome.result !== 'survived' && outcome.result !== 'crashed') return refuse('outcome', 'a quit attempt has no reply');
+    const N = descriptor.tick;
+    const suffix = [];
+    let at = 0; let prev = 0;
+    for (const r of tape.inputs) {
+      at += r[0];
+      if (at <= N) continue;
+      const off = at - N;
+      if (off > bind.windowTicks) break;
+      suffix.push([off - prev, r[1], r[2]]);
+      prev = off;
+    }
+    return createReply({ binding: { digest: bind.digest, windowTicks: bind.windowTicks }, outcome: outcome.result, crashOffsetTicks: outcome.result === 'crashed' ? outcome.crashOffsetTicks : null, suffix });
+  } catch (e) {
+    return refuse('mismatch', e && e.message);
   }
 }
 

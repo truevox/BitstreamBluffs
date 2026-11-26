@@ -1405,6 +1405,12 @@ export class RunScene extends Phaser.Scene {
       const r = this._stepTick(tickPad);
       if (r === 'hold') { this.renderFrame(0); return; }
       if (this.crashed) break;
+      // #67: the postcard window ends on its exact tick, whatever the display rate (extra ticks of this frame are dropped).
+      if (this.takeover && this.takeover.windowEndTick && this.simClock.tick >= this.takeover.windowEndTick) { this._endPostcardWindow(); return; }
+    }
+    if (this.takeover && this.takeover.windowEndTick && !this._leaving) {
+      this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'window', tick: this.simClock.tick, windowTicks: this.takeover.windowTicks,
+        remainingTicks: Math.max(0, this.takeover.windowEndTick - this.simClock.tick) });
     }
     for (const g of this.ghostRiders || []) g.update(this.simClock.tick);
     this.renderFrame(dt, pad);
@@ -2999,6 +3005,9 @@ export class RunScene extends Phaser.Scene {
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     t.phase = 'live';
     t.liveFromTick = this.simClock.tick;
+    // #67: a postcard is a bounded challenge: survive until N + windowTicks, or crash inside it. Ordinary takeovers have no window.
+    const pw = t.descriptor.postcard;
+    if (pw && Number.isSafeInteger(pw.windowTicks)) { t.windowTicks = pw.windowTicks; t.windowEndTick = t.targetTick + pw.windowTicks; }
     this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'live', tick: this.simClock.tick, target: t.targetTick, pct: 100 });
   }
 
@@ -3008,6 +3017,7 @@ export class RunScene extends Phaser.Scene {
     this.ghostRecorder = null;
     if (!this.takeover) return;
     this.takeover.cause = cause || 'crash';
+    this._recordPostcardOutcome(this.takeover.cause);
     if (!rec) return;
     try {
       const snap = this.score.getSnapshot();
@@ -3015,6 +3025,24 @@ export class RunScene extends Phaser.Scene {
       this.takeover.endTick = tape.endTick;
       this.registry.set(REG.LAST_TAKEOVER_TAPE, tape);
     } catch (e) { /* the practice tape is a convenience; it must never break the end of a run */ }
+  }
+
+  /** #67: how a postcard attempt ended. `survived` = reached N + window; a crash / BSOD catch inside the window = `crashed` at +ticks. */
+  _recordPostcardOutcome(cause) {
+    const t = this.takeover;
+    if (!t || !t.windowEndTick || t.outcome) return;
+    const base = { windowTicks: t.windowTicks, atTick: this.simClock.tick };
+    if (cause === 'survived') t.outcome = { result: 'survived', crashOffsetTicks: null, ...base };
+    else if (cause === 'quit') t.outcome = { result: 'quit', crashOffsetTicks: null, ...base };
+    else t.outcome = { result: 'crashed', crashOffsetTicks: Math.max(1, this.simClock.tick - t.targetTick), cause, ...base };
+  }
+
+  /** #67: reached the last tick of the window alive. Same exit as a crash (tape in memory, RUN_ABORT, the end screen); never GAME_OVER. */
+  _endPostcardWindow() {
+    if (this._leaving || !this.takeover) return;
+    this._leaving = true;
+    this._storeTakeoverTape('survived');
+    this._leaveTakeover('survived');
   }
 
   /** End a takeover that is still going (PauseScene QUIT): keep the tape, then leave like a crash would. */
@@ -3033,7 +3061,7 @@ export class RunScene extends Phaser.Scene {
       this.game.events.emit(EVT.RUN_ABORT, { runId: this.runId, reason: 'takeover-ended', practice: true, takeover: true, cause });
     } catch (e) { console.warn('Takeover end observer failed; continuing', e); }
     try { this.scene.stop(SCENES.UI); } catch (e) { /* ignore */ }
-    this.scene.start(SCENES.TAKEOVER_END, { descriptor: t.descriptor, cause, endTick: t.endTick ?? null, liveFromTick: t.liveFromTick ?? t.targetTick });
+    this.scene.start(SCENES.TAKEOVER_END, { descriptor: t.descriptor, cause, endTick: t.endTick ?? null, liveFromTick: t.liveFromTick ?? t.targetTick, outcome: t.outcome || null });
   }
 
   updateCrashed(dt) {
