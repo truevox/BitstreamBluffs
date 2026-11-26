@@ -12,6 +12,19 @@ import { CURRENT_RULESET_ID } from '../systems/replay/currentRulesetId.js';
 import { launchTakeover } from './TakeoverLauncher.js';
 import { uiSfx } from './Sound.js';
 
+/**
+ * T opens the picker only when Game Over is idle: never while the initials entry (or any text entry) is active, where T is a
+ * letter, and never while the shop, ghost view or picker is open or the scene is leaving.
+ */
+export function takeoverKeyAllowed(scene) {
+  return !(scene.takeoverPicker || scene.leaving || scene.entry || scene.shopOpen || scene.ghostView);
+}
+
+/** The "T = TAKEOVER" footer hint shows only while the key would work (not during initials entry). */
+export function takeoverHintVisible(scene) {
+  return takeoverKeyAllowed(scene) || !!scene.takeoverPicker;
+}
+
 export function installTakeoverHook(scene, theme) {
   const lastTape = () => {
     const t = scene.registry.get(REG.LAST_GHOST_TAPE);
@@ -20,6 +33,9 @@ export function installTakeoverHook(scene, theme) {
   if (!lastTape() || !scene.input || !scene.input.keyboard) return null;
   const hint = new NeonText(scene, theme, 6, GAME_HEIGHT - 5, 'T = TAKEOVER', { color: 'amber', vAnchor: 0.5, outline: 'none' });
   hint.setAlpha(0.7);
+  const syncHint = () => { try { if (hint.scene) hint.setVisible(takeoverHintVisible(scene)); } catch (e) { /* cosmetic */ } };
+  syncHint();
+  scene.events.on('update', syncHint);
   const close = () => {
     try { scene.takeoverPicker?.destroy(); } catch (e) { /* a failed teardown must not wedge the screen */ }
     scene.takeoverPicker = null;
@@ -31,7 +47,7 @@ export function installTakeoverHook(scene, theme) {
   };
   const open = () => {
     const tape = lastTape();
-    if (!tape || scene.takeoverPicker || scene.leaving || scene.entry || scene.shopOpen || scene.ghostView) return;
+    if (!tape || !takeoverKeyAllowed(scene)) return;
     if (typeof scene.skipReveal === 'function') scene.skipReveal();
     if (typeof scene._cancelShopAutoprompt === 'function') scene._cancelShopAutoprompt();
     if (scene.input_) scene.input_.enabled = false; // GameOver must not also act on the picker's Enter / Space / arrows
@@ -53,6 +69,7 @@ export function installTakeoverHook(scene, theme) {
   scene.input.keyboard.on('keydown-T', onKey);
   scene.events.once('shutdown', () => {
     scene.input.keyboard?.off('keydown-T', onKey);
+    scene.events.off('update', syncHint);
     close();
     try { hint.destroy(); } catch (e) { /* already gone */ }
   });

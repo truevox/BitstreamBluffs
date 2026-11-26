@@ -7,6 +7,7 @@ const { CURRENT_RULESET_ID } = await import('../../src/systems/replay/currentRul
 const { takeTakeoverNotice } = await import('../../src/ui/TakeoverNotice.js');
 const { TakeoverPicker, PICKER_BANNER } = await import('../../src/ui/TakeoverPicker.js');
 const { TakeoverEndScene } = await import('../../src/scenes/TakeoverEndScene.js');
+const { takeoverKeyAllowed, takeoverHintVisible } = await import('../../src/ui/TakeoverHook.js');
 
 jest.spyOn(Date, 'now').mockReturnValue(1_767_000_000_000);
 const scripted = (t) => H.livePad({ push: t < 400, variableHop: true, noAutoNudge: true, hop: t >= 300 && t <= 303, pressed: { hop: t === 300 } });
@@ -231,5 +232,27 @@ describe('primeTakeover clears every ranked/other-mode one-shot', () => {
     expect(m.has(H.REG.GUEST_PRACTICE)).toBe(false);
     expect(m.has(H.REG.GHOST_REPLAY)).toBe(false);
     expect(m.get(H.REG.TAKEOVER).kind).toBe('bb-takeover');
+  });
+});
+
+describe('Game Over T key vs initials entry', () => {
+  const idle = () => ({ takeoverPicker: null, leaving: false, entry: null, shopOpen: false, ghostView: null });
+  test('idle Game Over: T opens the picker and the hint shows', () => {
+    expect(takeoverKeyAllowed(idle())).toBe(true);
+    expect(takeoverHintVisible(idle())).toBe(true);
+  });
+  test('initials entry active: T is a letter (picker blocked) and the hint is hidden; after the entry is skipped T works again', () => {
+    const s = { ...idle(), entry: { getValue: () => 'AB' } };
+    expect(takeoverKeyAllowed(s)).toBe(false);
+    expect(takeoverHintVisible(s)).toBe(false);
+    s.entry = null; // finished / skipped
+    expect(takeoverKeyAllowed(s)).toBe(true);
+    expect(takeoverHintVisible(s)).toBe(true);
+  });
+  test('shop, ghost view, leaving: blocked; an open picker keeps the hint but blocks a second open', () => {
+    for (const k of ['shopOpen', 'ghostView', 'leaving']) expect(takeoverKeyAllowed({ ...idle(), [k]: true })).toBe(false);
+    const open = { ...idle(), takeoverPicker: {} };
+    expect(takeoverKeyAllowed(open)).toBe(false);
+    expect(takeoverHintVisible(open)).toBe(true);
   });
 });

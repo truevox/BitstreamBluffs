@@ -481,6 +481,18 @@ async function uiPathAndSideEffects(main, tape, rec, Ns) {
   console.log('UI path + side effects (main page, real scenes)');
   // A run that qualifies for the leaderboard opens the initials prompt, where T is a letter: skip it with Esc first (the same
   // thing a player does), let the deferred leaderboard write settle, THEN take the baseline.
+  // (fix 2) while the initials entry is active, T is a LETTER: no picker, and the hint is hidden
+  await page.evaluate(() => { const go = window.__tk.g.scene.getScene('GameOverScene'); if (go.skipReveal) go.skipReveal(); window.__tk.step(40); });
+  const entryT = await page.evaluate(() => {
+    const tk = window.__tk, go = tk.g.scene.getScene('GameOverScene');
+    if (!go.entry) return { hadEntry: false };
+    const before = String(go.entry.getValue());
+    tk.key('KeyT', true); tk.key('KeyT', false); tk.step(10);
+    const hint = go.children.list.find((c) => c.main && c.main.text === 'T = TAKEOVER');
+    return { hadEntry: true, before, after: String(go.entry.getValue()), picker: !!go.takeoverPicker, hintVisible: hint ? hint.visible : null };
+  });
+  if (entryT.hadEntry) check('(fix 2) initials entry active: T types a letter, does NOT open the picker, and the T hint is hidden', /T/i.test(entryT.after) && entryT.after !== entryT.before && entryT.picker === false && entryT.hintVisible === false, entryT);
+  else console.log('NOTE no initials entry appeared on Game Over for this run, so the typed-T check was skipped');
   for (let i = 0; i < 4; i++) {
     const st = await page.evaluate(() => { const go = window.__tk.g.scene.getScene('GameOverScene'); if (go.skipReveal) go.skipReveal(); window.__tk.step(40); return { entry: !!go.entry }; });
     if (!st.entry) { if (i >= 1) break; else continue; }
@@ -491,6 +503,8 @@ async function uiPathAndSideEffects(main, tape, rec, Ns) {
   const before = await page.evaluate(() => { window.__tk.events.length = 0; return window.__tk.snapshot(); }); // events: only what the takeover itself emits
   // Game Over -> T opens the picker (real key), banner/eligibility, scrubbing keys, Enter launches
   await page.evaluate(() => { window.__tk.key('KeyT', true); window.__tk.key('KeyT', false); });
+  const hintAfterSkip = await page.evaluate(() => { const go = window.__tk.g.scene.getScene('GameOverScene'); const h = go.children.list.find((c) => c.main && c.main.text === 'T = TAKEOVER'); return { entry: !!go.entry, hint: h ? h.visible : null }; });
+  check('(fix 2) after the entry is skipped the T hint shows again', hintAfterSkip.entry === false && hintAfterSkip.hint === true, hintAfterSkip);
   const opened = await until(page, '(tk)=>!!tk.g.scene.getScene("GameOverScene").takeoverPicker', 40);
   await page.waitForTimeout(300); // the picker's own MenuInput ignores input for its first 120 ms of real time
   const pk0 = await page.evaluate(() => { const p = window.__tk.g.scene.getScene('GameOverScene').takeoverPicker; return p && { tick: p.tick, max: p.max, ok: p.elig.ok, banner: p.constructor.name }; });
