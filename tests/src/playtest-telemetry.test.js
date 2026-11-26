@@ -24,18 +24,19 @@ test('opt-in, bounded, explicit field allowlist, local-only data', () => {
   expect(r.recording).toBe(false);
 });
 
-test('normal URLs install nothing', () => {
+test('non-production normal URLs install nothing', () => {
   expect(installPlaytestTelemetry(null,'test',{location:{search:'?other=1'}})).toBeUndefined();
 });
 
-test('dedicated link records automatically, no UI, opt-out erases tab data', () => {
+test('production normal URL records automatically, no UI, opt-out persists', () => {
   const handlers = new Map();
   const game = {events:{on:(k,v)=>handlers.set(k,v),once:()=>{},off:()=>{}},loop:{actualFps:60}};
   const win = {
-    location:{search:'?playtest=1'}, document:{addEventListener:()=>{},removeEventListener:()=>{}},
-    sessionStorage, addEventListener:()=>{}, removeEventListener:()=>{},
+    location:{search:'',hostname:'simulate.sledhead.ing'}, document:{addEventListener:()=>{},removeEventListener:()=>{}},
+    sessionStorage, localStorage, addEventListener:()=>{}, removeEventListener:()=>{},
     setInterval:()=>1, clearInterval:()=>{},
   };
+  localStorage.removeItem('bb.playtest.disabled.v1');
   installPlaytestTelemetry(game,'test',win);
   handlers.get(EVT.RUN_START)({gym:false});
   handlers.get(EVT.RUN_END)({record:{score:12}});
@@ -48,4 +49,13 @@ test('dedicated link records automatically, no UI, opt-out erases tab data', () 
   win.location.search='?playtest=0';
   installPlaytestTelemetry(game,'test',win);
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).toBeNull();
+  expect(localStorage.getItem('bb.playtest.disabled.v1')).toBe('1');
+  delete win.__bbPlaytest;
+  win.location.search='';
+  installPlaytestTelemetry(game,'test',win);
+  expect(win.__bbPlaytest).toBeUndefined();
+  win.location.search='?playtest=1';
+  installPlaytestTelemetry(game,'test',win);
+  expect(win.__bbPlaytest).toBeUndefined();
+  localStorage.removeItem('bb.playtest.disabled.v1');
 });

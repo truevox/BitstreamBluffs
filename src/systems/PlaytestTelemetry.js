@@ -1,4 +1,4 @@
-// Dedicated playtest recorder. No account IDs or device fingerprints.
+// Temporary production playtest recorder. No account IDs or device fingerprints.
 import { EVT } from '../events.js';
 import { createPlaytestUpload, QUEUE_KEY } from './PlaytestUpload.js';
 
@@ -83,15 +83,25 @@ export function createPlaytestRecorder({version, now = () => performance.now(), 
 }
 
 const storageKey = 'bb.playtest.telemetry.v1';
+const optOutKey = 'bb.playtest.disabled.v1';
+// Temporary owner-authorized pre-alpha collection. Remove before public launch.
+const DEFAULT_PLAYTEST_HOST = 'simulate.sledhead.ing';
 
-// Dedicated playtest URL only; no in-game overlay.
+// Default on at the production playtest host only; no in-game overlay.
 export function installPlaytestTelemetry(game, version, win = window) {
   const mode = new URLSearchParams(win.location.search).get('playtest');
-  if (mode === '0') {
+  const erasePending = () => {
     try { win.sessionStorage.removeItem(storageKey); win.sessionStorage.removeItem(QUEUE_KEY); } catch {}
+  };
+  if (mode === '0') {
+    try { win.localStorage.setItem(optOutKey, '1'); } catch {}
+    erasePending();
     return;
   }
-  if (mode !== '1' && mode !== 'export') return;
+  let disabled = false;
+  try { disabled = win.localStorage.getItem(optOutKey) === '1'; } catch {}
+  if (disabled) { erasePending(); return; }
+  if (mode !== '1' && mode !== 'export' && win.location.hostname !== DEFAULT_PLAYTEST_HOST) return;
   const doc = win.document;
   const download = data => {
     if (!data) return;
@@ -115,13 +125,20 @@ export function installPlaytestTelemetry(game, version, win = window) {
   } catch {}
   const serialize = () => JSON.stringify({schema:1, segments:[...previous, recorder.snapshot()]});
   const persist = () => { try { win.sessionStorage.setItem(storageKey, serialize()); } catch {} };
+  const stop = () => {
+    upload?.stop(); recorder.clear(); previous = [];
+    try { win.localStorage.setItem(optOutKey, '1'); } catch {}
+    erasePending();
+  };
+  const onStorage = e => { if (e.key === optOutKey && e.newValue === '1') stop(); };
+  win.addEventListener('storage', onStorage);
   // Developer access from the console, not an in-game control.
   win.__bbPlaytest = {
     export: () => download(serialize()),
     snapshot: () => JSON.parse(serialize()),
     uploadStatus: () => upload?.status(),
     flush: () => upload?.flush(),
-    stop: () => { upload?.stop(); recorder.clear(); previous = []; try { win.sessionStorage.removeItem(storageKey); } catch {} },
+    stop,
   };
   const listeners = [...Object.keys(fields), ...Object.keys(samples), EVT.RUN_END].map(type => {
     const fn = payload => { try { recorder.event(type, payload); if (recorder.recording && (type === EVT.RUN_END || type === EVT.RUN_ABORT)) persist(); } catch {} };
@@ -142,6 +159,7 @@ export function installPlaytestTelemetry(game, version, win = window) {
     win.clearInterval(timer); win.clearInterval(saveTimer); win.clearInterval(uploadTimer);
     win.removeEventListener('pagehide', onHide); doc.removeEventListener('visibilitychange', onVisibility);
     win.removeEventListener('error', onError); win.removeEventListener('unhandledrejection', onError);
+    win.removeEventListener('storage', onStorage);
     delete win.__bbPlaytest;
   });
 }

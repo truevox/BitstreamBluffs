@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.14 — temporary default-on playtest telemetry (2026-11-26)
+
+- Enable the existing bounded gameplay telemetry on the normal simulate.sledhead.ing URL for the current adult pre-alpha test. Persist URL opt-out across visits and stop other open recording tabs. No overlay or change to gameplay. Other hosts remain opt-in. Remove default-on collection before public launch.
+
 ## v2.25.13 — automatic playtest uploads (2026-11-26)
 
 - Dedicated playtest link sends bounded, pseudonymous gameplay event batches directly to the owner’s private Google Drive via a write-only Apps Script collector. No prompts, overlays, credentials, or network requests on ordinary game URLs. Pending uploads retry with stable IDs; opt-out erases unsent tab data.
