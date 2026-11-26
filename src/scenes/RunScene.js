@@ -160,28 +160,28 @@ export class RunScene extends Phaser.Scene {
   // ------------------------------------------------------------------ lifecycle
 
   /**
-   * #66 Crash Coach: a descriptor in REG.COACH_SIM re-runs a (candidate) tape on this scene HIDDEN, SILENT and UNRANKED so
-   * the coach can ask the real engine whether a nearby input change survives. It rides the ordinary tape-replay path
-   * (REG.GHOST_REPLAY) and the unranked write policy; update() does nothing (the coach drives it through seekTo), no HUD
-   * scene is launched and no event escapes. A tape this build cannot replay faithfully is REFUSED (fail closed).
+   * #66 Crash Coach: a descriptor handed over as SCENE DATA (`scene.launch(RUN, {coachSim})`, never through the registry,
+   * so a stale one can never turn the next ordinary run into a hidden simulation) re-runs a (candidate) tape on this scene
+   * HIDDEN, SILENT and UNRANKED, so the coach can ask the real engine whether a nearby input change survives. It rides the
+   * ordinary tape-replay path (REG.GHOST_REPLAY) and the unranked write policy; update() does nothing (the coach drives it
+   * through seekTo), no HUD scene is launched and no event escapes. A tape this build cannot replay faithfully, or a search
+   * that was cancelled before the scene started, is REFUSED (fail closed).
    */
-  create() {
+  create(data) {
     const reg = this.registry;
-    const desc = reg.get(REG.COACH_SIM);
+    const desc = data && data.coachSim;
     this.coachSim = null;
     this.crashInfo = null;
-    if (desc === undefined || desc === null) return this._create();
-    reg.remove(REG.COACH_SIM);
-    reg.remove(REG.TAKEOVER);
-    reg.remove(REG.GUEST_PRACTICE);
-    reg.remove(REG.GHOST_REPLAY);
+    if (!desc) return this._create();
     this.unrankedPractice = true;
     const restore = this._muteForSeek();
     try {
-      const verdict = desc.kind === 'bb-coach-sim' && desc.tape ? takeoverEligible(desc.tape, 1, { rulesetId: CURRENT_RULESET_ID }) : { ok: false, reason: 'undecodable' };
+      let verdict = { ok: false, reason: 'undecodable' };
+      if (desc.live && desc.live.cancelled) verdict = { ok: false, reason: 'cancelled' };
+      else if (desc.kind === 'bb-coach-sim' && desc.tape) verdict = takeoverEligible(desc.tape, 1, { rulesetId: CURRENT_RULESET_ID });
       this.coachSim = { token: desc.token ?? null, created: false, refused: verdict.ok ? null : { reason: verdict.reason, message: verdict.message } };
       if (verdict.ok) {
-        reg.set(REG.GHOST_REPLAY, desc.tape);
+        reg.set(REG.GHOST_REPLAY, desc.tape); // consumed (and removed) by _create() just below
         this._create();
         try { this.sys.setVisible(false); } catch (e) { /* headless */ }
       }
@@ -214,8 +214,9 @@ export class RunScene extends Phaser.Scene {
     if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
     // Fail closed: even a malformed or externally planted handoff may only
     // start an unranked practice session, NEVER an ordinary credited run.
-    const candidate = reg.get(REG.GUEST_PRACTICE);
-    reg.remove(REG.GUEST_PRACTICE);
+    // (a coach simulation is neither: it neither reads nor clears a primed guest / takeover handoff meant for a later start)
+    const candidate = this.coachSim ? undefined : reg.get(REG.GUEST_PRACTICE);
+    if (!this.coachSim) reg.remove(REG.GUEST_PRACTICE);
     this.guestPractice = candidate !== undefined && candidate !== null;
     this.guestPracticeTape = this.guestPractice && guestPracticeEligible(candidate) ? candidate : null;
     // An untrusted guest must never be promoted into TapePlayer/input replay,
@@ -224,8 +225,8 @@ export class RunScene extends Phaser.Scene {
     // #72 Replay Takeover: a one-shot descriptor (REG.TAKEOVER), read and cleared like GUEST_PRACTICE. FAIL CLOSED: a
     // descriptor that does not validate against THIS build never falls through to an ordinary (ranked) run. The sim
     // prefix is re-simulated from the tape (authoritative), then control is handed over; the whole run is UNRANKED.
-    const takeoverCandidate = reg.get(REG.TAKEOVER);
-    reg.remove(REG.TAKEOVER);
+    const takeoverCandidate = this.coachSim ? undefined : reg.get(REG.TAKEOVER);
+    if (!this.coachSim) reg.remove(REG.TAKEOVER);
     this.takeover = null;
     if (takeoverCandidate !== undefined && takeoverCandidate !== null) {
       const verdict = validateTakeoverDescriptor(takeoverCandidate, { rulesetId: CURRENT_RULESET_ID, guestPractice: this.guestPractice });
@@ -790,6 +791,7 @@ export class RunScene extends Phaser.Scene {
    * resolution. The actual audio subscriber additionally handles its own errors,
    * so a failing mixer cannot suppress unrelated listeners. */
   publishBsodState(state) {
+    if (this.coachSim) return; // #66: a hidden simulation never tells the audio engine about its BSOD
     try { this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, state); }
     catch (e) {
       if (!this._bsodObserverErrorLogged) {

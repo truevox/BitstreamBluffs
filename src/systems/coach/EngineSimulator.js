@@ -1,6 +1,6 @@
 /**
  * #66 Crash Coach: the REAL simulator behind runCoach's injected `simulate(tape, {untilTick, ...})`. No Phaser import: the
- * engine is a RunScene in coach-sim mode (RunScene.create with REG.COACH_SIM), reached through a small `host`:
+ * engine is a RunScene in coach-sim mode (RunScene.create with scene data {coachSim}), reached through a small `host`:
  *
  *   host.acquire(tape) -> Promise<scene>   a FRESH RunScene at tick 0 that replays `tape` hidden, silent and unranked
  *   host.frame()       -> Promise<void>    let the page breathe (one display frame); the simulation is time-sliced

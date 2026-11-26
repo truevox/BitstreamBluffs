@@ -27,8 +27,6 @@ export const SCENES = Object.freeze({
   GAME_OVER: 'GameOverScene',
   /** #72: where a Replay Takeover ends (retry from the same tick, or back). Never GAME_OVER. */
   TAKEOVER_END: 'TakeoverEndScene',
-  /** #66: the Crash Coach screen launched over Game Over (C). Never replaces Game Over. */
-  CRASH_COACH: 'CrashCoachScene',
 });
 
 /** Keys used with `game.registry` (shared across scenes). See ARCHITECTURE.md section 4. */
@@ -54,8 +52,6 @@ export const REG = Object.freeze({
   GUEST_PRACTICE: 'guestPracticeTape',
   /** One-shot #72 Replay Takeover descriptor (`bb-takeover`, Takeover.buildTakeoverDescriptor). RunScene validates it and FAILS CLOSED. */
   TAKEOVER: 'takeoverDescriptor',
-  /** One-shot #66 Crash Coach simulation descriptor `{kind:'bb-coach-sim', tape, token}`. RunScene runs the (candidate) tape hidden and unranked. */
-  COACH_SIM: 'coachSimDescriptor',
   /** Memory-only tape of the last takeover's live suffix (never written to GhostLibrary, IDB or localStorage). */
   LAST_TAKEOVER_TAPE: 'lastTakeoverTape',
   /** One-shot `{reason, message}` the TitleScene shows after a refused or aborted takeover. */

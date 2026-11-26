@@ -133,7 +133,7 @@ export async function runCoach({
       errors++;
     }
     if (onProgress) {
-      try { onProgress({ searched, planned: candidates.length, survivors: survivors.length, unstable, errors, label: c.label, elapsedMs: hasClock ? now() - t0 : 0 }); } catch (e) { /* a progress view must never end the search */ }
+      try { onProgress({ searched, planned: candidates.length, survivors: survivors.length, unstable, errors, label: c.label, elapsedMs: hasClock ? now() - t0 : 0, points: butterflyData(results, { branchTick }).points }); } catch (e) { /* a progress view must never end the search */ }
     }
   }
   const elapsedMs = hasClock ? now() - t0 : 0;

@@ -53,8 +53,8 @@ export const coastPad = (t) => livePad({ push: t < 400, variableHop: true, noAut
 // #66: the pure coach modules, for tests that build candidate tapes against a real recording.
 export const coach = await import('../../src/systems/coach/Perturb.js');
 
-/** #66: a hidden coach-sim RunScene replaying `tape` (the REG.COACH_SIM handoff), as the browser host builds it. */
-export function coachSceneFor(tape, { token = 'tok', before } = {}) {
+/** #66: a hidden coach-sim RunScene replaying `tape` (the `{coachSim}` scene-data handoff), as the browser host builds it. */
+export function coachSceneFor(tape, { token = 'tok', before, live } = {}) {
   class C extends RunScene {
     create() {
       this.__events = [];
@@ -65,9 +65,8 @@ export function coachSceneFor(tape, { token = 'tok', before } = {}) {
       this.scene.start = (...a) => this.__calls.start.push(a);
       this.scene.stop = (...a) => this.__calls.stop.push(a);
       this.registry.set(RULESET_KEY, RULESET);
-      this.registry.set(REG.COACH_SIM, { kind: 'bb-coach-sim', tape, token });
       if (before) before(this);
-      super.create();
+      super.create({ coachSim: { kind: 'bb-coach-sim', tape, token, ...(live ? { live } : {}) } });
     }
   }
   return createRun(C, REG, { seed: 'WRONG-SEED-IGNORED' });

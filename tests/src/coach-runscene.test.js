@@ -42,7 +42,6 @@ describe('coach simulation scene', () => {
     expect(s.__calls.launch).toEqual([]); // UIScene is never launched
     expect(s.__events.map((e) => e[0])).not.toContain(H.EVT.RUN_START);
     expect(s._seeking).toBe(false); // the creation mute is released
-    expect(s.registry.get(H.REG.COACH_SIM)).toBeUndefined(); // one-shot
     s.inputRouter = { poll: () => { throw new Error('a coach sim must never poll live input'); }, setEnabled() {} };
     expect(() => s.update(0, 8)).not.toThrow(); // update() is a no-op in coach mode
     expect(s.simClock.tick).toBe(0);
@@ -92,6 +91,28 @@ describe('coach simulation scene', () => {
     expect(s.__events.map((e) => e[0])).not.toContain(H.EVT.CRASH);
     expect(s.__events.map((e) => e[0])).not.toContain(H.EVT.RUN_END);
     expect(s.__calls.start).toEqual([]); // never heads for GameOver / Title on its own
+  });
+
+  test('NEGATIVE CONTROL: a cancelled search that reaches create() late is refused, builds nothing and does not touch other handoffs', () => {
+    const live = { cancelled: true };
+    const s = coachScene(TAPE, { live, before: (sc) => { sc.registry.set(H.REG.TAKEOVER, 'primed-for-a-later-start'); sc.registry.set(H.REG.GUEST_PRACTICE, 'also-primed'); } });
+    expect(s.coachSim.refused).toMatchObject({ reason: 'cancelled' });
+    expect(s.sled).toBeUndefined();
+    expect(s.registry.get(H.REG.TAKEOVER)).toBe('primed-for-a-later-start'); // not consumed by a hidden simulation
+    expect(s.registry.get(H.REG.GUEST_PRACTICE)).toBe('also-primed');
+  });
+
+  test('a live coach simulation does not consume a takeover handoff primed for a later start either', () => {
+    const s = coachScene(TAPE, { before: (sc) => sc.registry.set(H.REG.TAKEOVER, 'primed') });
+    expect(s.registry.get(H.REG.TAKEOVER)).toBe('primed');
+    expect(s.takeover).toBeNull();
+    expect(s.coachSim.refused).toBeNull();
+  });
+
+  test('without scene data an ordinary create is not a coach simulation (no registry flag can make it one)', () => {
+    const s = H.createRun(H.RunScene, H.REG, { seed: 'A' });
+    expect(s.coachSim).toBeNull();
+    expect(s.unrankedPractice).toBe(false);
   });
 
   test('NEGATIVE CONTROL: a tape of another build is refused (fail closed, no sled, nothing runs)', () => {
