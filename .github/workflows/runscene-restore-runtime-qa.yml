@@ -5,6 +5,7 @@ on:
       - '.github/workflows/runscene-restore-runtime-qa.yml'
       - 'src/systems/savestate/**'
       - 'tests/determinism/runscene-runtime-kit.test.js'
+      - 'tests/determinism/savestate-terrain-state.test.js'
       - 'tests/determinism/savestate-matter-state.test.js'
       - 'tools/savestate-experiment/**'
       - 'src/scenes/RunScene.js'
@@ -14,6 +15,7 @@ on:
       - '.github/workflows/runscene-restore-runtime-qa.yml'
       - 'src/systems/savestate/**'
       - 'tests/determinism/runscene-runtime-kit.test.js'
+      - 'tests/determinism/savestate-terrain-state.test.js'
       - 'tests/determinism/savestate-matter-state.test.js'
 permissions:
   contents: read
@@ -33,7 +35,7 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
       - name: Pure strict snapshot admission and existing single-use slot protections
-        run: npm test -- --runInBand tests/determinism/runscene-runtime-kit.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-envelope.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-primitive-state.test.js tests/determinism/savestate-matter-state.test.js tests/determinism/sim-math-boundary.test.js
+        run: npm test -- --runInBand tests/determinism/runscene-runtime-kit.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-envelope.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-primitive-state.test.js tests/determinism/savestate-matter-state.test.js tests/determinism/savestate-terrain-state.test.js tests/determinism/sim-math-boundary.test.js
       - name: Native source tripwire and exact build identity
         run: |
           node tools/ruleset/build-ruleset.mjs --check
@@ -55,3 +57,5 @@ jobs:
         run: node tools/savestate-experiment/test-native-world-restore-browser.mjs
       - name: Explicit Matter section disk transport and exact reconstructed bytes
         run: node tools/savestate-experiment/test-native-world-restore-browser.mjs --matter-section
+      - name: Native detached terrain recipe disk transport and streaming equivalence
+        run: node tools/savestate-experiment/test-native-terrain-browser.mjs
