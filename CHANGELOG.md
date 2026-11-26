@@ -19,11 +19,19 @@
 - New tape headers carry `rulesetId` (the compile-time id of `tools/ruleset/current.json`) and `buildId` (set from `services.js` once the ruleset has loaded; `null` before). Header only: the record, its `ledgerHash`, checkpoints, inputs, trace and every fingerprint are unchanged (proven by test). `RunScene` gained a shared `_stepTick`, a reusable `seekTo(N)` (for #66's off-screen candidate re-simulation) and `stepReplayTick`.
 - SIM_REVISION 9/physics and ranked input/scoring rules are unchanged; the source tripwire was updated with reviewed no-behavior-change attestations. Also classifies the #69 `guestPractice` / `guestPracticeTape` fields that the Heavy gate and the fingerprint-completeness test were reporting as unclassified.
 
-## v2.22.12 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
+## v2.22.13 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
 
 - When a Ghost Link exceeds the 8,192-character URL limit, offer an explicitly disclosed, two-step **SAVE FILE** local `.bbghost` download; do not silently upload or expose any user credentials, profile, original run ID or account data. Short URL links keep their existing behavior.
 - The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations. Opening or canceling the native picker disarms any previously prepared CONFIRM RACE, without erasing a valid earlier preview. Guest-practice tutorial completions and tuck-hint shows remain ephemeral; they never consume the normal player's persisted first-run hints.
 - Integrates on top of the v2.22.8 replay archive, v2.22.9 Heavy diagnostic gate and v2.22.10 Cemetery Montage without changing SIM9 or authoritative replay semantics. This is a **draft** candidate: independent review, physical Chromebook/Android acceptance and optional hosted oversize fallback remain outstanding; #69 is not closed.
+
+## v2.22.12 — #56 immutable local ghost recording IDs (2026-11-25)
+
+- Prevent a different tape reusing an existing run ID on the **same exact course** from overwriting a previously saved Best or Favorite recording. Enforce immutable recording identity within one IndexedDB `courses`+`tapes` readwrite transaction across tabs; distinct trace, score, inputs, checkpoints, RNG or course values fail closed before mutating roles, tapes or garbage collection.
+- An exactly identical whole-tape retry is idempotent and **does not** promote an older run back to Latest. Memory-only fallback stores detached tape copies and returns copies to callers, avoiding mutable alias reuse. Own-data value comparison retains `undefined`, `-0` and `NaN` distinctions that `JSON.stringify` loses.
+- Extend P0 regression tests and real Chromium two-tab same-course run-ID collision QA; preserve original cross-course isolation and Favorites. No ghost count change: still Best, Latest, and Favorite A/B/C per matching seed/biome mask; no sixth on-screen rider. No pricing, slot count, account dependency or silent favorite eviction decisions.
+- **Source-only integrity fix:** no physics, SIM_REVISION, scoring, public ranking, upload, consent, Shards, wallet or public verifier changes. Parent #56 remains OPEN for owner-set course-archive capacity/pricing and device acceptance; Team A's separate replay release must reconcile its intermediate version and release order.
+
 
 ## v2.22.11 — #135 dual-proof trust snapshot input hardening (2026-11-25)
 

@@ -26,6 +26,37 @@ const req2p = (req) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error || new Error('idb request failed'));
 });
 
+// Stored run IDs identify immutable recorded data, not just matching JSON
+// strings: JSON.stringify loses undefined, -0, NaN and object property order.
+// Only strict plain object/array graphs with equal own data properties may be
+// retried idempotently. Cycles, accessors and exotic objects fail closed.
+function sameRecording(a,b){
+  const leftSeen=new WeakSet(),rightSeen=new WeakSet();
+  const equal=(x,y)=>{
+    if(x===null||y===null||typeof x!=='object'||typeof y!=='object')return Object.is(x,y);
+    if(Array.isArray(x)!==Array.isArray(y))return false;
+    if(!Array.isArray(x)){
+      const xp=Object.getPrototypeOf(x),yp=Object.getPrototypeOf(y);
+      if((xp!==Object.prototype&&xp!==null)||(yp!==Object.prototype&&yp!==null))return false;
+    }
+    if(leftSeen.has(x)||rightSeen.has(y))return false;
+    leftSeen.add(x);rightSeen.add(y);
+    const keys=Reflect.ownKeys(x),other=Reflect.ownKeys(y);
+    if(keys.length!==other.length)return false;
+    for(const key of keys){
+      if(typeof key!=='string'||!Object.prototype.hasOwnProperty.call(y,key))return false;
+      const d=Object.getOwnPropertyDescriptor(x,key),e=Object.getOwnPropertyDescriptor(y,key);
+      if(!d||!e||!Object.prototype.hasOwnProperty.call(d,'value')||
+         !Object.prototype.hasOwnProperty.call(e,'value')||!equal(d.value,e.value))return false;
+    }
+    return true;
+  };
+  try{return equal(a,b);}catch{return false;}
+}
+const copyRecording=t=>typeof structuredClone==='function'
+  ?structuredClone(t):JSON.parse(JSON.stringify(t));
+
+
 /** A tape this build can draw: right format, version, tick rate and physics. A Kodiak run from another bear ruleset (contact crashed before v3) would not replay. */
 export function tapeCompatible(tape) {
   return Boolean(tape && tape.format === GHOST_TAPE_FORMAT && tape.version === GHOST_TAPE_VERSION &&
@@ -141,7 +172,15 @@ export class GhostLibrary {
       courseReq.onsuccess = safely((onDisk) => {
         if (kind === 'save') {
           tapes.get(tape.runId).onsuccess = safely((existing) => {
-            if (existing && courseKey(existing.seed, existing.biomeMask) !== key) { reject(); return; }
+            if(existing){
+              // Same-course collisions are just as dangerous as foreign IDs:
+              // a pinned Favorite could otherwise change behind its label.
+              // Exact retries are NO-OP, not a promotion back to Latest.
+              if(courseKey(existing.seed,existing.biomeMask)!==key||
+                 !sameRecording(existing,tape)||!onDisk){reject();return;}
+              updated=onDisk;writtenTape=existing;
+              return;
+            }
             const prior = onDisk || emptyCourse(key, tape);
             const next = { ...prior, favorites: [...(prior.favorites || Array(FAVORITE_SLOTS).fill(null))] };
             const finalize = (oldBest) => {
@@ -156,7 +195,7 @@ export class GhostLibrary {
               tapes.put(tape);
               courses.put(next);
               updated = next;
-              writtenTape = tape;
+              writtenTape = copyRecording(tape);
               reclaim(prior, next, tape.simRevision);
             };
             if (next.best) tapes.get(next.best).onsuccess = safely(finalize);
@@ -206,10 +245,14 @@ export class GhostLibrary {
     if (!tape?.runId || tape.mode === 'gym' || tape.mode === 'takeover') return null;
     if (this._db) return this._idbChange('save', { tape });
     const key = courseKey(tape.seed, tape.biomeMask);
-    // Stable run IDs are global tape identities. A same-ID import from another
-    // course must never overwrite a retained or favorite local recording.
-    const existing = await this.getTape(tape.runId);
-    if (existing && courseKey(existing.seed, existing.biomeMask) !== key) return null;
+    // Memory fallback is synchronous until course+tape are both committed:
+    // two same-tick callers cannot both pass the first-read ID check.
+    const existing = this.tapes.get(tape.runId) || null;
+    if(existing){
+      if(courseKey(existing.seed,existing.biomeMask)!==key||!sameRecording(existing,tape))return null;
+      // Exact retry: never re-promote a stale recording to Latest/Best.
+      return this.courses.get(key)||null;
+    }
     const course = { ...(this.courses.get(key) || emptyCourse(key, tape)) };
     course.favorites = [...course.favorites];
     const before = new Set(courseGhostRuns(course).map((g) => g.runId));
@@ -217,7 +260,7 @@ export class GhostLibrary {
     // Terrain/ruleset revisions are distinct courses for competitive Best
     // purposes even when their seed and mask are identical. An old-terrain
     // distance must not permanently outrank every fresh-terrain tape.
-    const oldBest = course.best ? await this.getTape(course.best) : null;
+    const oldBest = course.best ? (this.tapes.get(course.best) || null) : null;
     const staleBest = Number.isSafeInteger(tape.simRevision) && tape.simRevision > 0 &&
       course.best && oldBest?.simRevision !== tape.simRevision;
     if (staleBest || tape.distanceM > course.bestDistanceM) {
@@ -225,8 +268,9 @@ export class GhostLibrary {
       course.bestDistanceM = tape.distanceM;
     }
     course.lastPlayedAt = tape.endedAt || Date.now();
-    await this._putTape(tape);
-    await this._putCourse(course);
+    // Do not expose the caller's mutable object as the stored identity.
+    this.tapes.set(tape.runId,copyRecording(tape));
+    this.courses.set(key,course);
     const after = new Set(courseGhostRuns(course).map((g) => g.runId));
     for (const runId of before) {
       if (after.has(runId)) continue;
@@ -301,7 +345,10 @@ export class GhostLibrary {
   async getTape(runId) {
     // The IDB record wins over this tab's possibly stale read cache. A tape
     // deleted by another tab must not continue drawing from old memory.
-    if (!this._db) return this.tapes.get(runId) || null;
+    if (!this._db){
+      const tape=this.tapes.get(runId);
+      return tape ? copyRecording(tape) : null;
+    }
     try {
       const tape = await req2p(this._db.transaction('tapes', 'readonly').objectStore('tapes').get(runId));
       if (tape) this.tapes.set(runId, tape);

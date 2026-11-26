@@ -71,6 +71,38 @@ try {
  });
  assert.equal(collisionDisk.courseKey,collision[0]?'race-seed-A':'race-seed-B');
  assert.equal(Number(collisionDisk.seedA)+Number(collisionDisk.seedB),1);
+ // Same-course but DISTINCT recordings must never mutate one another's
+ // immutable run ID. Two tabs race for the same ID: one can win, not both.
+ const sameCourse=await Promise.all(pages.map((p,i)=>p.evaluate(async i=>{
+  const lib=globalThis.__ghostRaceLibrary;
+  const tape={runId:'race-immutable-id',seed:'race-immutable',biomeMask:4,
+   mode:'normal',simRevision:9,trace:i?'TAPE_B':'TAPE_A',distanceM:100+i,
+   score:10+i,endedAt:15+i,inputs:[[1,i,0]]};
+  return Boolean(await lib.saveRun(tape));
+ },i)));
+ assert.equal(sameCourse.filter(Boolean).length,1,'different same-course tapes cannot both claim a run ID');
+ const immutable=await pages[0].evaluate(async()=>{
+  const lib=globalThis.__ghostRaceLibrary;
+  const original=await lib.getTape('race-immutable-id');
+  const pinned=await lib.setFavorite('race-immutable',4,0,original.runId);
+  if(!pinned)throw Error('cannot pin winning same-course tape');
+  const next=await lib.saveRun({runId:'race-immutable-new',seed:'race-immutable',biomeMask:4,
+   mode:'normal',simRevision:9,trace:'NEW_LATEST',distanceM:10,endedAt:30});
+  if(!next)throw Error('cannot save newer independent run');
+  const before=structuredClone(await lib.freshCourse('race-immutable',4));
+  const identical=await lib.saveRun(structuredClone(original));
+  const forged=await lib.saveRun({...original,score:999999,trace:'FORGED_TRACE'});
+  const after=await lib.freshCourse('race-immutable',4);
+  return {winner:original.trace,identical:!!identical,forged:!!forged,
+   preserved:JSON.stringify(before)===JSON.stringify(after),
+   latest:after.latest,best:after.best,fav:after.favorites[0],
+   tape:(await lib.getTape(original.runId))?.trace};
+ });
+ assert.equal(immutable.winner,sameCourse[0]?'TAPE_A':'TAPE_B');
+ assert.deepEqual({identical:immutable.identical,forged:immutable.forged,preserved:immutable.preserved,
+  latest:immutable.latest,best:immutable.best,fav:immutable.fav,tape:immutable.tape},
+ {identical:true,forged:false,preserved:true,latest:'race-immutable-new',best:'race-immutable-id',
+  fav:'race-immutable-id',tape:immutable.winner});
  // Race a pin against an incoming Latest that previously overwrote the old
  // role array and deleted the pinned tape from the authoritative DB.
  await pages[0].evaluate(async()=>{
@@ -120,6 +152,6 @@ try {
  });
  assert.deepEqual(final,{showBest:false,slotA:'race-prior-latest',slotB:'race-best',latest:'race-next'});
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
- console.log(JSON.stringify({format:'bb56-real-chromium-course-isolation',source:origin,create,restart,collision,collisionDisk,pinned,refreshedPanel,final,errors,mutatingRequests:writes,noPhysicsOrRankClaims:true},null,2));
+ console.log(JSON.stringify({format:'bb56-real-chromium-course-isolation',source:origin,create,restart,collision,collisionDisk,sameCourse,immutable,pinned,refreshedPanel,final,errors,mutatingRequests:writes,noPhysicsOrRankClaims:true},null,2));
  await context.close();
 }finally{await browser.close();}

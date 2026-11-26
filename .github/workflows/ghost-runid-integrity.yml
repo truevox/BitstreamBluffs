@@ -1,0 +1,53 @@
+name: Ghost immutable run ID regression
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ghost-runid-integrity.yml'
+      - 'src/systems/ghost/GhostLibrary.js'
+      - 'src/systems/ghost/GhostTape.js'
+      - 'tests/src/ghost-runid-immutable.test.js'
+      - 'tests/src/ghost-tapes.test.js'
+      - 'tests/src/ghost-course-rows.test.js'
+      - 'tools/test-ghost-course-boundary-browser.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ghost-runid-integrity.yml'
+      - 'src/systems/ghost/GhostLibrary.js'
+      - 'src/systems/ghost/GhostTape.js'
+      - 'tests/src/ghost-runid-immutable.test.js'
+      - 'tools/test-ghost-course-boundary-browser.mjs'
+permissions:
+  contents: read
+jobs:
+  immutable-id:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Exact-source memory and replay regression
+        run: npm test -- --runInBand tests/src/ghost-runid-immutable.test.js tests/src/ghost-tapes.test.js tests/src/ghost-course-rows.test.js tests/src/ghost-guest-practice.test.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Actual dual-tab IndexedDB transaction collision
+        run: |
+          npx vite --host 127.0.0.1 --port 18790 --strictPort >/tmp/bsb-ghost-idb-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:18790/ >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18790/src/systems/ghost/GhostLibrary.js -o /tmp/bsb-ghost-idb-source.js
+          grep -q sameRecording /tmp/bsb-ghost-idb-source.js
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";process.stdout.write(chromium.executablePath())')"
+          GAME_URL=http://127.0.0.1:18790/ node tools/test-ghost-course-boundary-browser.mjs
