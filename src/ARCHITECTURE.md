@@ -2722,12 +2722,18 @@ The existing `planFatalCountIn()` additionally reports `beatInMeasure:[1,2,3,4]`
 The normal simulate.sledhead.ing host automatically enables a bounded event observer with no game UI during the owner-authorized pre-alpha test. Other hosts require `?playtest=1`.
 It uploads batches to the owner's write-only Google Apps Script collector every
 30 seconds and on page hide; confirmed batches are removed, failed batches retry
-with identical session/batch IDs. Random ID is per page load, not a player ID.
+with identical session/batch IDs. Since v2.25.16, each batch also includes a
+random pseudonymous browser UUID (player) persisted in localStorage, when
+available. The session UUID still changes per page load. Browser storage denial
+falls back to session-only; no IP collection or fingerprinting. Older queued
+batches remain unchanged and cannot be linked retroactively.
 `?playtest=0` persists a browser opt-out and erases the tab's pending
-data (already uploaded files remain in Drive). Same-tab manual JSON export
+data and the persistent browser UUID (already uploaded files remain in Drive).
+Same-tab manual JSON export
 remains a fallback. No raw keys, seeds, device IDs, error messages, or account
 data. Network and local buffers are bounded; tab closure/offline can lose data.
-Inform adult testers before playing. Remove the production-host default before public launch.
+Inform adult testers before playing, including the persistent pseudonymous browser ID.
+Remove the production-host default before public launch.
 
 ### Cooperative PWA updates (v2.25.15)
 A checked waiting worker is offered via Update Now on the idle main title and

@@ -35,3 +35,33 @@ test('caps each batch and persists pending batches for reload retry', async () =
   expect(createPlaytestUpload(win,'2.25.13').status().queued).toBe(3);
   u.stop();
 });
+
+test('persistent random browser ID survives reload, while session IDs rotate', async () => {
+  const ids = [
+    '00000000-0000-4000-8000-000000000011',
+    '00000000-0000-4000-8000-000000000012',
+    '00000000-0000-4000-8000-000000000013',
+  ];
+  const bodies = [];
+  const win = {sessionStorage, localStorage, crypto:{randomUUID:()=>ids.shift()},
+    fetch:async (_, options)=>{bodies.push(JSON.parse(options.body)); return {ok:true,json:async()=>({ok:true})};}};
+  localStorage.removeItem('bb.playtest.player.v1');
+  sessionStorage.removeItem(QUEUE_KEY);
+  for (let i=0;i<2;i++) {
+    const u = createPlaytestUpload(win,'2.25.16');
+    u.add({type:'runStart'}); await u.flush();
+  }
+  expect(bodies.map(b=>b.player)).toEqual(['00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000012']);
+  expect(bodies.map(b=>b.session)).toEqual(['00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000013']);
+  localStorage.removeItem('bb.playtest.player.v1');
+});
+
+test('storage unavailable: upload remains session-only', async () => {
+  let body;
+  const win = {sessionStorage, get localStorage(){throw Error('denied');},
+    crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000014'},
+    fetch:async (_,o)=>{body=JSON.parse(o.body);return {ok:true,json:async()=>({ok:true})};}};
+  sessionStorage.removeItem(QUEUE_KEY);
+  const u=createPlaytestUpload(win,'2.25.16');u.add({type:'sample'});await u.flush();
+  expect(body).not.toHaveProperty('player');
+});

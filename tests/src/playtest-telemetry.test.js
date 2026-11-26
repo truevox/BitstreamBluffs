@@ -37,19 +37,23 @@ test('production normal URL records automatically, no UI, opt-out persists', () 
     setInterval:()=>1, clearInterval:()=>{},
   };
   localStorage.removeItem('bb.playtest.disabled.v1');
+  localStorage.setItem('bb.playtest.player.v1','00000000-0000-4000-8000-000000000015');
   installPlaytestTelemetry(game,'test',win);
   handlers.get(EVT.RUN_START)({gym:false});
   handlers.get(EVT.RUN_END)({record:{score:12}});
   expect(win.__bbPlaytest.snapshot().segments[0].events.map(e=>e.type)).toEqual(['recording_start','runStart','run_end']);
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).not.toBeNull();
   win.__bbPlaytest.stop();
+  expect(localStorage.getItem('bb.playtest.player.v1')).toBeNull();
   handlers.get(EVT.RUN_END)({record:{score:13}});
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).toBeNull();
   sessionStorage.setItem('bb.playtest.telemetry.v1','old');
+  localStorage.setItem('bb.playtest.player.v1','00000000-0000-4000-8000-000000000016');
   win.location.search='?playtest=0';
   installPlaytestTelemetry(game,'test',win);
   expect(sessionStorage.getItem('bb.playtest.telemetry.v1')).toBeNull();
   expect(localStorage.getItem('bb.playtest.disabled.v1')).toBe('1');
+  expect(localStorage.getItem('bb.playtest.player.v1')).toBeNull();
   delete win.__bbPlaytest;
   win.location.search='';
   installPlaytestTelemetry(game,'test',win);

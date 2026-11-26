@@ -1,6 +1,6 @@
 // Temporary production playtest recorder. No account IDs or device fingerprints.
 import { EVT } from '../events.js';
-import { createPlaytestUpload, QUEUE_KEY } from './PlaytestUpload.js';
+import { createPlaytestUpload, QUEUE_KEY, PLAYER_KEY } from './PlaytestUpload.js';
 
 const fields = {
   [EVT.RUN_START]: 'dailyOfficial dailyMode gym practice takeover',
@@ -92,6 +92,7 @@ export function installPlaytestTelemetry(game, version, win = window) {
   const mode = new URLSearchParams(win.location.search).get('playtest');
   const erasePending = () => {
     try { win.sessionStorage.removeItem(storageKey); win.sessionStorage.removeItem(QUEUE_KEY); } catch {}
+    try { win.localStorage.removeItem(PLAYER_KEY); } catch {}
   };
   if (mode === '0') {
     try { win.localStorage.setItem(optOutKey, '1'); } catch {}

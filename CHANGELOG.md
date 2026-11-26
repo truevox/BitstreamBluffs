@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.16 — returning playtest browsers (2026-11-26)
+
+- Attach a random persistent browser UUID to new telemetry batches while retaining a separate page-session UUID. Opt-out erases the browser UUID and unsent local data. No IP addresses, fingerprints or account identifiers are collected by game code. Storage-denied browsers remain session-only. Earlier batches cannot be linked retroactively.
+
 ## v2.25.15 — cooperative PWA updates (2026-11-26)
 
 - Check for updates every minute and on foreground/online events. An idle title offers Update Now and automatically requests a verified waiting update after five safe seconds. All controlled tabs must confirm safe title state and settled durable storage before activation; active/paused runs and open menus block the handoff. No cache or save deletion. Legacy workers require a final close/reopen.
