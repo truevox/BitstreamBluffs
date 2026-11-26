@@ -472,7 +472,7 @@ async function hudCase(tape, rec) {
   const oracle = await O.page.evaluate(({ tape, N }) => {
     const tk = window.__tk; tk.startRun(tape.seed); tk.g.scene.stop('RunScene'); tk.g.registry.set('ghostReplay', tape); tk.g.scene.start('RunScene'); tk.g.headlessStep(0, 0);
     const run = tk.run(); while (run.simClock.tick < N) tk.step(1);
-    return { facts: tk.hudFacts(), snap: JSON.parse(JSON.stringify(run.hudSnapshot())) };
+    return { facts: tk.hudFacts(), snap: JSON.parse(JSON.stringify(run.hudSnapshot())), simKmh: run.sled.speed / 20 * 3.6 };
   }, { tape, N });
   await O.close();
   const takeover = async (disableResync) => {
@@ -491,11 +491,12 @@ async function hudCase(tape, rec) {
   const same = (a, b) => JSON.stringify([a.effects, a.zones, a.score, a.combo, a.dist, a.power.map((p) => [p.id, p.charges])]) === JSON.stringify([b.effects, b.zones, b.score, b.combo, b.dist, b.power.map((p) => [p.id, p.charges])]) &&
     a.power.every((p, i) => Math.abs(p.remaining - b.power[i].remaining) <= 450);
   const kmh = (f) => Number(String(f.speed).replace(/[^0-9]/g, ''));
-  const speedOk = (f) => kmh(f) > 0 && Math.abs(kmh(f) - kmh(oracle.facts)) <= Math.max(10, 0.12 * kmh(oracle.facts));
+  // the replay's own HUD readout lags the sim (it is the last 100 ms HUD_SPEED_EVENT, smoothed): the reference is the sim speed
+  const speedOk = (f) => kmh(f) > 0 && Math.abs(kmh(f) - oracle.simKmh) <= 2;
   const nonTrivial = oracle.facts.power.length > 0 || oracle.facts.effects.length > 0 || oracle.facts.zones.length > 0;
   check(`(fix 3) HUD handoff at N=${N}: the uninterrupted replay shows active timers (${oracle.facts.power.map((p) => p.id).join(',') || '-'}; effects ${oracle.facts.effects.join(',') || '-'}; zones ${oracle.facts.zones.join(',') || '-'})`, nonTrivial && real.ph === 'ready', { N, oracle: oracle.facts });
   check(`(fix 3) HUD handoff at N=${N}: power-up chips + timers, effects, zones, score, combo and distance after takeover == the uninterrupted replay's HUD`, same(oracle.facts, real.facts), { oracle: oracle.facts, takeover: real.facts });
-  check(`(fix 4) HUD speed at READY is the sled's real speed (${real.facts.speed} vs the replay's ${oracle.facts.speed}), not 0, and still is after 2 s of frozen READY frames (${real.later.speed})`, speedOk(real.facts) && speedOk(real.later), { oracle: oracle.facts.speed, takeover: real.facts.speed, later: real.later.speed });
+  check(`(fix 4) HUD speed at READY is the sled's real speed (${real.facts.speed} vs sim speed ${Math.round(oracle.simKmh)}; the replay's own lagging readout ${oracle.facts.speed}), not 0, and still is after 2 s of frozen READY frames (${real.later.speed})`, speedOk(real.facts) && speedOk(real.later), { oracle: oracle.facts.speed, takeover: real.facts.speed, later: real.later.speed });
   check(`(fix 3) negative control: with the HUD resync disabled the takeover HUD does NOT match (the check can fail)`, nonTrivial && !same(oracle.facts, ctl.facts), { control: ctl.facts });
   return { N, oracle: oracle.facts, takeover: real.facts };
 }
