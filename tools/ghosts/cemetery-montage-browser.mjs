@@ -15,6 +15,8 @@
  *     the newest committed survives keep=1, a stale tab's trim/record/clear plans from disk, GhostLibrary untouched.
  * 10. OPT-OUT ACROSS TABS: Tab A sets keep 0, Tab B (still showing 5) finishes a real run: nothing stored, B adopts 0,
  *     empty after reload; 0 -> 5 re-enables, 5 -> 2 trims; GhostLibrary untouched.
+ * 11. UNRELATED SAVE: Tab A sets keep 0 in Settings; Tab B, not yet notified, saves PALETTE in Settings: the saved
+ *     limit stays 0 and Tab B's next real run stores nothing.
  *  8. PERF: synthetic QA traces (ids `synthetic-qa-*`, derived from this device's real trace) at 0/5/10/20/40 kept
  *     attempts, swarm style, at real requestAnimationFrame pacing (optionally CPU-throttled): frame p50/p95, the
  *     montage's own update cost per frame, history write time and bytes.
@@ -267,6 +269,52 @@ try {
     report.steps.optOut = { afterZero: [], reenabled: kept, afterTrim2: kept.slice(2) };
     console.log('CEMETERY_OPTOUT_TWO_TABS_PASS', JSON.stringify(report.steps.optOut));
     await tabB.close();
+  }
+
+  // 11. UNRELATED SAVE IN A NOT-YET-NOTIFIED TAB (PR #382 review, Morgan): Tab A chooses PAST ATTEMPTS TO KEEP = 0 through
+  //     the real Settings screen; Tab B, whose storage event is held back (it has not heard yet), changes its PALETTE
+  //     through the real Settings screen. The saved limit must stay 0, and Tab B's next real run must store nothing.
+  {
+    const ORD = 'CEMETERY68-ORDER';
+    await setSetting(p2.page, 'attemptHistoryKeep', 5);
+    const A = await open();
+    const B = await open();
+    // Hold back Tab B's storage events: a capture listener registered first stops them reaching the game's listener.
+    await B.page.evaluate(() => {
+      window.__holdStorage = true;
+      window.addEventListener('storage', (e) => { if (window.__holdStorage) e.stopImmediatePropagation(); }, true);
+    });
+    const viaSettings = (pg, label, value, sub) => pg.evaluate(({ label, value, sub }) => {
+      const ts = window.__bbGame.scene.getScene('TitleScene');
+      if (!ts.view) ts.menu.items.find((i) => i.label === 'SETTINGS').onSelect();
+      let menu = ts.view.menu;
+      if (sub) { if (!ts.view.historyView) menu.items.find((i) => i.label === sub).onSelect(); menu = ts.view.historyView.menu; }
+      menu.items.find((i) => i.label === label).set(value);
+      return JSON.parse(localStorage.getItem('bb.settings')).attemptHistoryKeep;
+    }, { label, value, sub });
+    const rowsFor = (pg) => pg.evaluate(async (seed) => {
+      const db = await new Promise((r) => { const q = indexedDB.open('bitstream-attempt-history'); q.onsuccess = () => r(q.result); });
+      const all = await new Promise((r) => { const q = db.transaction('meta').objectStore('meta').getAll(); q.onsuccess = () => r(q.result); });
+      db.close();
+      return all.filter((m) => m.key.startsWith(seed + '|')).map((m) => m.id);
+    }, ORD);
+    assert.equal(await B.page.evaluate(() => window.__bbGame.registry.get('settings').attemptHistoryKeep), 5);
+    assert.equal(await viaSettings(A.page, 'PAST ATTEMPTS TO KEEP', 0, 'PAST ATTEMPTS'), 0);
+    await B.page.waitForTimeout(300);
+    assert.equal(await B.page.evaluate(() => window.__bbGame.registry.get('settings').attemptHistoryKeep), 5, 'B must not have heard yet');
+    const afterPalette = await viaSettings(B.page, 'PALETTE', 'colorblind');
+    assert.equal(afterPalette, 0, `an unrelated PALETTE save in Tab B restored the limit to ${afterPalette}`);
+    await B.page.evaluate(() => { const ts = window.__bbGame.scene.getScene('TitleScene'); ts._closeView?.(); });
+    const bRun = await run(B.page, ORD, 1400);
+    await B.page.waitForTimeout(300);
+    assert.deepEqual(await rowsFor(B.page), [], `Tab B stored ${bRun} after an unrelated save`);
+    await viaSettings(A.page, 'PALETTE', 'default');
+    await setSetting(A.page, 'attemptHistoryKeep', 5);
+    assert.deepEqual([...A.errors, ...B.errors], []);
+    report.steps.unrelatedSave = { persistedAfterPalette: afterPalette, rows: [] };
+    console.log('CEMETERY_UNRELATED_SAVE_PASS', JSON.stringify(report.steps.unrelatedSave));
+    await A.page.close();
+    await B.page.close();
   }
 
   // 6. reduced motion via the OS preference under AUTO

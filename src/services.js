@@ -8,7 +8,7 @@ import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
 import { GhostLibrary } from './systems/ghost/GhostLibrary.js';
 import { AttemptHistory } from './systems/ghost/AttemptHistory.js';
-import { installAttemptHistory, ATTEMPT_HISTORY_KEY } from './systems/ghost/attemptHistoryService.js';
+import { installAttemptHistory, protectOwnedSettings, ATTEMPT_HISTORY_KEY } from './systems/ghost/attemptHistoryService.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
@@ -82,6 +82,8 @@ export async function createServices(game) {
  */
 export function updateSetting(game, key, value) {
   const settings = game.registry.get(REG.SETTINGS);
+  // #68: saving an unrelated preference must never rewrite another tab's newer PAST ATTEMPTS TO KEEP / montage style.
+  protectOwnedSettings(settings, key);
   settings[key] = value;
   game.registry.get(REG.SAVE_STORE).saveSettings(settings);
   game.events.emit(EVT.SETTINGS_CHANGED, { key, value, settings });
