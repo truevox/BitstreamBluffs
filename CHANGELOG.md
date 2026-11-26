@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.4 — #56 course-archive migration recovery hardening (2026-11-25)
+
+- Avoid permanently stamping an empty Ghost Library inventory as migrated when IndexedDB is unavailable or temporarily blocked at startup. Only a successfully opened/read authoritative IndexedDB course store enables the new archive capacity limit; memory-only mode stays uncapped while migration remains pending.
+- On the next successful boot, repair v2.25.2/v2.25.3 profiles already marked migrated whose actual stored course count exceeds their entitlement. Preserve all historical courses and purchased slots; account for already-purchased capacity without granting duplicate free slots. Require a durable profile write before claiming migration success.
+- Add outage/recovery, erroneously migrated profile, purchased-slot and no-persistent-storage regressions; preserve five ghosts per course and the original manual deletion-only behavior. No changes to SIM9 physics, scores, public trust, Shard purchases/prices, privacy, or automatic upload. [skip netlify]
+
 ## v2.25.3 — #119 inert single-use local suspend-slot foundation (2026-11-25)
 
 - Introduces a private IndexedDB suspend-slot protocol with exact-build and registered-layout envelope admission, atomic cross-tab claim, owner-token-gated release/consume, reload-persistent claimed state and bounded 16 MiB input. An occupied/claimed slot cannot be overwritten by another tab.
