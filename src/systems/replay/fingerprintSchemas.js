@@ -446,6 +446,8 @@ export const NON_CAUSAL = Object.freeze({
     guestPractice: 'untrusted guest-only practice discriminator; explicitly excluded from verified replay, rewards and durable run evidence',
     guestPracticeTape: 'untrusted, visually rendered opponent trace only; cannot control Matter, scoring or ranked replay inputs',
     takeover: 'Replay Takeover descriptor + phase (#72): seek/handoff bookkeeping; the sim is driven by the tape and then live input',
+    coachSim: 'Crash Coach scene handoff and ownership metadata (#66); not part of causal state',
+    crashInfo: 'Crash Coach terminal outcome witness (#66); written only on crash, not read by sim',
     unrankedPractice: 'unranked-practice flag (#69/#72): a write-policy switch, never read by the simulation',
     _seeking: PRESENTATION + ' (true only while a takeover re-simulates the prefix: mutes SFX and events)',
     _bsodObserverErrorLogged: PRESENTATION, _view: PRESENTATION, heightFn: 'closure over terrain',

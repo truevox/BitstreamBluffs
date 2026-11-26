@@ -43,7 +43,7 @@ import { GhostRecorder, TapePlayer, quantizeTilt, TRACE_EVERY } from '../systems
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
-import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, traceOf, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS, COVERAGE_FINGERPRINT_ONLY, REFUSALS as TAKEOVER_REFUSALS } from '../systems/replay/Takeover.js';
+import { validateTakeoverDescriptor, takeoverEligible, createTakeoverRecorder, seekStep, traceOf, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS, COVERAGE_FINGERPRINT_ONLY, REFUSALS as TAKEOVER_REFUSALS } from '../systems/replay/Takeover.js';
 import { liveFingerprint } from '../systems/replay/PostcardChallenge.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
@@ -160,7 +160,43 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ lifecycle
 
-  create() {
+  /**
+   * #66 Crash Coach: a descriptor handed over as SCENE DATA (`scene.launch(RUN, {coachSim})`, never through the registry,
+   * so a stale one can never turn the next ordinary run into a hidden simulation) re-runs a (candidate) tape on this scene
+   * HIDDEN, SILENT and UNRANKED, so the coach can ask the real engine whether a nearby input change survives. It rides the
+   * ordinary tape-replay path (REG.GHOST_REPLAY) and the unranked write policy; update() does nothing (the coach drives it
+   * through seekTo), no HUD scene is launched and no event escapes. A tape this build cannot replay faithfully, or a search
+   * that was cancelled before the scene started, is REFUSED (fail closed).
+   */
+  create(data) {
+    const reg = this.registry;
+    const desc = data && data.coachSim;
+    // Phaser preserves scene start data when a later start omits it. Consume
+    // this private one-shot descriptor so a normal retry cannot reuse it.
+    if (desc && this.sys?.settings) this.sys.settings.data = {};
+
+    this.coachSim = null;
+    this.crashInfo = null;
+    if (!desc) { this.sys?.setVisible?.(true); return this._create(); }
+    this.unrankedPractice = true;
+    const restore = this._muteForSeek();
+    try {
+      let verdict = { ok: false, reason: 'undecodable' };
+      if (desc.live && desc.live.cancelled) verdict = { ok: false, reason: 'cancelled' };
+      else if (desc.kind === 'bb-coach-sim' && desc.tape) verdict = takeoverEligible(desc.tape, 1, { rulesetId: CURRENT_RULESET_ID });
+      this.coachSim = { token: desc.token ?? null, live: desc.live, created: false, refused: verdict.ok ? null : { reason: verdict.reason, message: verdict.message } };
+      if (verdict.ok) {
+        reg.set(REG.GHOST_REPLAY, desc.tape); // consumed (and removed) by _create() just below
+        this._create();
+        try { this.sys.setVisible(false); } catch (e) { /* headless */ }
+      }
+    } finally {
+      restore();
+      if (this.coachSim) this.coachSim.created = true;
+    }
+  }
+
+  _create() {
     const reg = this.registry;
     this.content = reg.get(REG.CONTENT) || { chunks: [], hazards: {}, powerups: {}, terrainMods: {}, palettes: {} };
     this.inputRouter = reg.get(REG.INPUT) || null;
@@ -183,8 +219,9 @@ export class RunScene extends Phaser.Scene {
     if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
     // Fail closed: even a malformed or externally planted handoff may only
     // start an unranked practice session, NEVER an ordinary credited run.
-    const candidate = reg.get(REG.GUEST_PRACTICE);
-    reg.remove(REG.GUEST_PRACTICE);
+    // (a coach simulation is neither: it neither reads nor clears a primed guest / takeover handoff meant for a later start)
+    const candidate = this.coachSim ? undefined : reg.get(REG.GUEST_PRACTICE);
+    if (!this.coachSim) reg.remove(REG.GUEST_PRACTICE);
     this.guestPractice = candidate !== undefined && candidate !== null;
     this.guestPracticeTape = this.guestPractice && guestPracticeEligible(candidate) ? candidate : null;
     // An untrusted guest must never be promoted into TapePlayer/input replay,
@@ -193,8 +230,8 @@ export class RunScene extends Phaser.Scene {
     // #72 Replay Takeover: a one-shot descriptor (REG.TAKEOVER), read and cleared like GUEST_PRACTICE. FAIL CLOSED: a
     // descriptor that does not validate against THIS build never falls through to an ordinary (ranked) run. The sim
     // prefix is re-simulated from the tape (authoritative), then control is handed over; the whole run is UNRANKED.
-    const takeoverCandidate = reg.get(REG.TAKEOVER);
-    reg.remove(REG.TAKEOVER);
+    const takeoverCandidate = this.coachSim ? undefined : reg.get(REG.TAKEOVER);
+    if (!this.coachSim) reg.remove(REG.TAKEOVER);
     this.takeover = null;
     if (takeoverCandidate !== undefined && takeoverCandidate !== null) {
       const verdict = validateTakeoverDescriptor(takeoverCandidate, { rulesetId: CURRENT_RULESET_ID, guestPractice: this.guestPractice });
@@ -204,7 +241,7 @@ export class RunScene extends Phaser.Scene {
     }
     // Takeover and guest practice share one predicate for every write site (record, XP, shards, missions, ghost library,
     // evidence, tutorial flags, progression stores). Set before tick 0 and never changed mid-run.
-    this.unrankedPractice = this.guestPractice || !!this.takeover;
+    this.unrankedPractice = this.guestPractice || !!this.takeover || !!this.coachSim;
     const replay = this._replayTape;
     // Replay Contract R-1..R-4: a replay resolves daily rule, Sync Level and Kodiak/magnet flags from the recorded
     // tape/manifest, never from the clock, the live profile or the live registry flags.
@@ -522,8 +559,10 @@ export class RunScene extends Phaser.Scene {
 
     // post-FX + HUD + go
     GlitchPipeline.install(this);
-    this.scene.stop(SCENES.UI);
-    this.scene.launch(SCENES.UI);
+    if (!this.coachSim) { // #66: a coach simulation has no HUD scene
+      this.scene.stop(SCENES.UI);
+      this.scene.launch(SCENES.UI);
+    }
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
     try {
@@ -532,6 +571,7 @@ export class RunScene extends Phaser.Scene {
         this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
     } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
+    if (this.coachSim) return; // #66: not a run anyone can see or be credited for: no RUN_START
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
@@ -756,6 +796,7 @@ export class RunScene extends Phaser.Scene {
    * resolution. The actual audio subscriber additionally handles its own errors,
    * so a failing mixer cannot suppress unrelated listeners. */
   publishBsodState(state) {
+    if (this.coachSim) return; // #66: a hidden simulation never tells the audio engine about its BSOD
     try { this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, state); }
     catch (e) {
       if (!this._bsodObserverErrorLogged) {
@@ -1337,6 +1378,7 @@ export class RunScene extends Phaser.Scene {
 
   update(time, delta) {
     if (!this.sled) return;
+    if (this.coachSim) return; // #66: driven only by seekTo()
     const dt = clamp(Number.isFinite(delta) ? delta : 16.7, 0, 50);
     this._frameDt = dt;
 
@@ -1473,7 +1515,7 @@ export class RunScene extends Phaser.Scene {
    * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean}}
    */
   seekTo(target = this.takeover?.targetTick, opts = {}) {
-    if (!this.tapePlayer || !Number.isFinite(target)) return { done: false, tick: this.simClock.tick, steps: 0, desync: { tick: this.simClock.tick, reason: this.tapePlayer ? 'no-target' : 'no-tape' } };
+    if (!this.tapePlayer || !Number.isFinite(target)) return { done: false, tick: this.simClock?.tick ?? 0, steps: 0, desync: { tick: this.simClock?.tick ?? 0, reason: this.tapePlayer ? 'no-target' : 'no-tape' } };
     const restore = this._muteForSeek();
     try { return seekStep(this, target, opts); } finally { restore(); }
   }
@@ -2744,6 +2786,7 @@ export class RunScene extends Phaser.Scene {
       return;
     }
     this.crashed = true;
+    this.crashInfo = { cause: c.cause, hazardId: c.hazardId || null }; // #66: what the coach reads through seekTo({stopOnCrash})
     this.deactivateBsod();
     this.crashTimerMs = 0;
     this.emitFlow(this.score.onCrash());

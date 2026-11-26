@@ -12,13 +12,14 @@ import { CURRENT_RULESET_ID } from '../systems/replay/currentRulesetId.js';
 import { launchTakeover } from './TakeoverLauncher.js';
 import { uiSfx } from './Sound.js';
 import { showTakeoverNotice } from './TakeoverNotice.js';
+import { installCrashCoachHook } from './CrashCoachHook.js';
 
 /**
  * T opens the picker only when Game Over is idle: never while the initials entry (or any text entry) is active, where T is a
  * letter, and never while the shop, ghost view or picker is open or the scene is leaving.
  */
 export function takeoverKeyAllowed(scene) {
-  return !(scene.takeoverPicker || scene.leaving || scene.entry || scene.shopOpen || scene.ghostView);
+  return !(scene.takeoverPicker || scene.coachView || scene.leaving || scene.entry || scene.shopOpen || scene.ghostView);
 }
 
 /** The "T = TAKEOVER" footer hint shows only while the key would work (not during initials entry). */
@@ -85,6 +86,7 @@ export function installTakeoverHook(scene, theme) {
   };
   const onKey = () => open();
   scene.input.keyboard.on('keydown-T', onKey);
+  installCrashCoachHook(scene, theme); // #66: C = Crash Coach, the other Game Over tool, lives in its own file
   scene.events.once('shutdown', () => {
     scene.input.keyboard?.off('keydown-T', onKey);
     scene.events.off('update', syncHint);

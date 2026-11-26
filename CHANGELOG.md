@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.25.0 — #66 Crash Coach and Butterfly Meter (2026-11-25)
+
+- Game Over C opens Crash Coach, explaining the recorded crash with evidence and testing nearby input variations through the real engine. The search is bounded, not exhaustive; alternatives require a second matching replay.
+- Butterfly Meter displays the observed outcomes and divergence. Practice This Moment replays the original tape to the branch tick and hands over control in unranked practice. Candidate tapes are not stored or credited.
+
 ## v2.24.0 — #67 Playable Postcards (2026-11-25)
 
 - From an ordinary takeover's READY screen, make a local postcard with P / LB; choose a 5–10 second challenge and copy the code or save a file. Open on Title with O. Compatible builds re-simulate the prefix and must match its causal fingerprint before handing over control.

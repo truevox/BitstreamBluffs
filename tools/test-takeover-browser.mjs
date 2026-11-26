@@ -185,30 +185,35 @@ const until = (page, predSrc, cap = 3000) => page.evaluate(({ predSrc, cap }) =>
 }, { predSrc, cap });
 
 // -------------------------------------------------------------------------------------------------- 1. record a run
-async function recordRun() {
+async function recordRun({ seed = SEED, fixture = null } = {}) {
   const P = await freshPage({ kit: true });
   const { page } = P;
-  const rec = await page.evaluate(async (seed) => {
+  const rec = await page.evaluate(async ({seed,fixture}) => {
     const tk = window.__tk;
     tk.startRun(seed);
     const run = tk.run();
     tk.R = run.ghostRecorder.constructor; // the compiled recorder class: gives us the game's own fingerprint method
+    const originalPoll=run.inputRouter.poll;
+    if(fixture==='hazard') run.inputRouter.poll=()=>{
+      const t=run.simClock.tick+1;
+      return {push:t<400,tilt:t>420&&t<460?-1:0,tuck:t>500&&t<540,brake:false,hop:t>=300&&t<=303,reset:false,heli:0,airBrake:false,parachute:false,divebomb:false,corkscrew:false,pause:false,variableHop:true,noAutoNudge:true,lastSource:'keyboard',pressed:{hop:t===300||t===700,reset:false,pause:false,airBrake:false,parachute:false,confirm:false}};
+    };
     const before = { hold: 0 };
     const fps = [], gaps = [], hudTicks = [];
     const ev = { hazardHit: [], nearMiss: [], landing: [] };
     for (const k of Object.keys(ev)) window.__bbGame.events.on({ hazardHit: 'bb:hazardHit', nearMiss: 'bb:nearMiss', landing: 'bb:landing' }[k], () => ev[k].push(run.simClock.tick));
     let n = 0;
     while (!run.crashed && n < 40000) {
-      const { wanted, edge } = tk.botWanted();
-      tk.hold(wanted, edge);
+      if(!fixture){const { wanted, edge } = tk.botWanted();tk.hold(wanted, edge);}
       tk.step(1); n++;
       fps[run.simClock.tick] = tk.fp(run);
       if (run.simClock.tick % 30 === 0) { const h = run.hudSnapshot(); if (h.power.length || h.effects.length || h.zones.length) hudTicks.push({ tick: run.simClock.tick, power: h.power.map((p) => [p.id, p.remainingMs, p.charges]), effects: h.effects.map((e) => e.effect), zones: h.zones }); }
       gaps[run.simClock.tick] = run.bsodState ? run.bsodState.gapPx : null;
     }
+    if(fixture)run.inputRouter.poll=originalPoll;
     tk.releaseAll();
     return { ticks: run.simClock.tick, crashed: run.crashed, fps, gaps, ev, n, hudTicks };
-  }, SEED);
+  }, {seed,fixture});
   await until(page, '(tk)=>tk.g.registry.get("lastGhostTape") && tk.g.scene.isActive("GameOverScene")', 6000);
   // let the deferred evidence write settle before the baseline
   await page.waitForFunction(() => window.__bbGame.registry.get('lastEvidenceStatus'), null, { timeout: 15000 });
