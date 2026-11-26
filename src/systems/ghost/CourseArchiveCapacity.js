@@ -49,9 +49,22 @@ export function purchaseArchiveSlot(profile) {
 export function grandfatherArchives(profile, actualCourseCount) {
   if (!Number.isSafeInteger(actualCourseCount) || actualCourseCount < 0) return profile;
   const state = sanitizeCourseArchive(profile?.courseArchive);
-  const included = Math.max(state.included, actualCourseCount);
+  // Existing purchased slots already cover part of the actual inventory.
+  const included = Math.max(state.included, actualCourseCount - state.purchased);
   if (!floorOk(included)) return profile;
   return {...profile, courseArchive: {...state, included, migrated:true}};
+}
+
+/** Only a successfully loaded authoritative IDB inventory may complete the
+ * legacy migration. A temporary storage outage must NOT durably stamp an
+ * empty memory fallback as the old course count. Recheck on the next boot.
+ */
+export function activateCourseArchiveLimit(library, store) {
+  if (library?.backend !== 'idb' || !(library.courses instanceof Map))
+    return {ok:false,reason:'archive-inventory-unavailable',profile:store?.profile};
+  const result = store.ensureCourseArchiveLegacy(library.courses.size);
+  if (result.ok) library.setArchiveLimit(archiveCapacity(result.profile));
+  return result;
 }
 
 /** Two-tabs may disagree on stale UI numbers; IDB performs the authoritative check. */

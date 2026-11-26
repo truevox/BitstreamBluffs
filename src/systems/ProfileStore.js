@@ -16,7 +16,7 @@ import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 import { canonicalBiomeId, canonicalLegacyId } from '../data/biomeAliases.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
-import { COURSE_ARCHIVE_VERSION, sanitizeCourseArchive, grandfatherArchives, purchaseArchiveSlot } from './ghost/CourseArchiveCapacity.js';
+import { COURSE_ARCHIVE_VERSION, archiveCapacity, sanitizeCourseArchive, grandfatherArchives, purchaseArchiveSlot } from './ghost/CourseArchiveCapacity.js';
 import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,sanitizeDraftRanks,draftCost} from './DailyDraft.js';
 
@@ -765,9 +765,14 @@ export class ProfileStore {
    * capacity enforcement must remain disabled; never erase legacy courses.
    */
   ensureCourseArchiveLegacy(existingCourseCount) {
-    if (this.archiveLegacyInitialized) return {ok:true,profile:this.profile};
     if (!Number.isSafeInteger(existingCourseCount) || existingCourseCount < 0)
       return {ok:false,reason:'invalid-existing-count',profile:this.profile};
+    // Already-migrated profiles may have been stamped during a temporary IDB
+    // outage in v2.25.2. Repair only if the authoritative inventory exceeds
+    // their current entitlement; never silently hide a legacy archive.
+    if (this.archiveLegacyInitialized && existingCourseCount <= archiveCapacity(this.profile))
+      return {ok:true,profile:this.profile};
+    if (!this.storage) return {ok:false,reason:'storage-unavailable',profile:this.profile};
     const expanded = grandfatherArchives(this.profile, existingCourseCount);
     const next = sanitizeProfile(expanded, this.levels);
     if (this.storage) {
