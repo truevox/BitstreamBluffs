@@ -103,7 +103,11 @@ export class GhostLinkView extends View {
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowRight'){this.scrub(1);return true;}
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='ArrowLeft'){this.scrub(-1);return true;}
     if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='Enter'){this.togglePlayback();return true;}
-    if((e.ctrlKey||e.metaKey)&&e.altKey&&e.key==='Enter'){this.startGuestPractice();return true;}
+    if((e.ctrlKey||e.metaKey)&&e.altKey&&e.key==='Enter'){
+     // Consume auto-repeat without letting it confirm or fall through to Preview.
+     if(!e.repeat)this.startGuestPractice();
+     return true;
+    }
     return false;
    },
   });
