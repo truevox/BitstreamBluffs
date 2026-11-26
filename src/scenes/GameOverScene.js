@@ -43,6 +43,7 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
+import { installTakeoverHook } from '../ui/TakeoverHook.js';
 import { ReplayEvidenceView } from '../ui/ReplayEvidenceView.js';
 import { CemeteryMontageView } from '../ui/CemeteryMontageView.js';
 import { sanitizeMontageStyle } from '../systems/ghost/montageSettings.js';
@@ -173,10 +174,11 @@ export class GameOverScene extends Phaser.Scene {
     // Input is live immediately; nothing below waits on async work.
     // retryAction: Space and pad RB also send 'retry', which retries even from inside the shop (decision 7).
     this.input_ = new MenuInput(this, (a) => this._onAction(a), { retryAction: true });
+    installTakeoverHook(this, theme); // #72: T = Replay Takeover (unranked practice / TAS); all of it lives in ui/TakeoverHook.js
     this._onPointer = (pointer, over) => {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
-      if (this.shopOpen || this.ghostView) return;
+      if (this.shopOpen || this.ghostView || this.takeoverPicker || this.coachView) return;
       this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
@@ -987,7 +989,7 @@ export class GameOverScene extends Phaser.Scene {
   /** Ghost favorites over Game Over (issue #56): G, or the GHOST FAV button. */
   _openGhosts() {
     const tape = this.registry.get(REG.LAST_GHOST_TAPE), library = this.registry.get(REG.GHOSTS);
-    if (this.ghostView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id || !library) return;
+    if (this.ghostView || this.takeoverPicker || this.coachView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id || !library) return;
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
@@ -1034,7 +1036,7 @@ export class GameOverScene extends Phaser.Scene {
   /** Reuses the ghost overlay slot (ghostView / ghostDim), so pointer, retry and shutdown handling stay identical. */
   _openMontage() {
     const tape = this.registry.get(REG.LAST_GHOST_TAPE);
-    if (!this.montageBtn || this.ghostView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id) return;
+    if (!this.montageBtn || this.ghostView || this.takeoverPicker || this.coachView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id) return;
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0, 0).setDepth(400).setInteractive();
@@ -1378,6 +1380,7 @@ export class GameOverScene extends Phaser.Scene {
   // ------------------------------------------------------------ actions
 
   _onAction(action) {
+    if (this.takeoverPicker || this.coachView) return; // each modal owns its own MenuInput
     // Any input fast-forwards the results reveal to its final state, then still does what it always did.
     if (typeof this.skipReveal === 'function') this.skipReveal();
     // W4.1: any action cancels a pending auto-open — the player is already interacting.

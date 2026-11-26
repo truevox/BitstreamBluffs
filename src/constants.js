@@ -25,6 +25,8 @@ export const SCENES = Object.freeze({
   UI: 'UIScene',
   PAUSE: 'PauseScene',
   GAME_OVER: 'GameOverScene',
+  /** #72: where a Replay Takeover ends (retry from the same tick, or back). Never GAME_OVER. */
+  TAKEOVER_END: 'TakeoverEndScene',
 });
 
 /** Keys used with `game.registry` (shared across scenes). See ARCHITECTURE.md section 4. */
@@ -48,6 +50,12 @@ export const REG = Object.freeze({
   GHOST_REPLAY: 'ghostReplay',
   /** One-shot, untrusted, read-only trace opponent for a nonrewarding practice run. */
   GUEST_PRACTICE: 'guestPracticeTape',
+  /** One-shot #72 Replay Takeover descriptor (`bb-takeover`, Takeover.buildTakeoverDescriptor). RunScene validates it and FAILS CLOSED. */
+  TAKEOVER: 'takeoverDescriptor',
+  /** Memory-only tape of the last takeover's live suffix (never written to GhostLibrary, IDB or localStorage). */
+  LAST_TAKEOVER_TAPE: 'lastTakeoverTape',
+  /** One-shot `{reason, message}` the TitleScene shows after a refused or aborted takeover. */
+  TAKEOVER_NOTICE: 'takeoverNotice',
   /** @type {object|null} ghost tape of the run that just ended. Additive. */
   LAST_GHOST_TAPE: 'lastGhostTape',
   /** @type {import('./systems/InputRouter.js').InputRouter} */

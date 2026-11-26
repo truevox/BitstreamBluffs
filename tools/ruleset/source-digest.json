@@ -3,18 +3,18 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: deny device-local tutorial completion and tuck-hint persistence in already-unranked guest practice; normal/Daily physics, replay, pads, rewards and source sim identity remain unchanged",
+  "attestation": "no-behavior-change: #72 takeover prefix replay added without changing ordinary ticks, physics, inputs, rewards or SIM9; combine #69 guest transport and enforce no device tutorial/tuck hint persistence in BOTH guest and takeover unranked modes",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
   "files": {
-    "src/constants.js": "sha256:79b9e5de8c628a2dc72740e10edf960c53922a4d9e159a628992ac0df79eb220",
+    "src/constants.js": "sha256:3abae229bb25b4b2d78b6c8439bd9e6758f91091617e0d5cb16893b9a7680adb",
     "src/entities/Hazard.js": "sha256:95ec763127d49b4dcbdd260695f8cd6136ca70b1e1204bda48d0a008a31fa5a8",
     "src/entities/PowerUp.js": "sha256:9c3965f9c7fe074bfe4fba4abaf80139c637755487fa885195b6ded208a61752",
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:07322a1c765bf2211e546196d34636eb7dced3d5ef8a0c719fcb609c28921463",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
-    "src/scenes/RunScene.js": "sha256:2d8f6126dd0c75df3c7237a469fb05d2a14bcb55f889dea2deec1d096b3f5006",
+    "src/scenes/RunScene.js": "sha256:34f305724e85acab5ae6b3dca67fb80b6963725251b66cbcfbb9c53b4a865e44",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:5f24e720a35b949b68d8e14062d4abab397c2e094598542f9ecebfcbf3cf27c3",

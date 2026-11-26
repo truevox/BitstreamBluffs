@@ -31,6 +31,11 @@ import { stackY, placeX, STRIP_BAND } from '../ui/HudLayout.js';
 import { killerName } from '../systems/CrashReport.js';
 import { RunMinimap } from '../ui/RunMinimap.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import { TakeoverHud } from '../ui/TakeoverHud.js';
+import { applyHudResync } from '../ui/HudResync.js';
+
+/** #72: the HUD tag of a Replay Takeover run (guest practice keeps its own). */
+const TAKEOVER_TAG = 'TAKEOVER // UNRANKED PRACTICE';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -234,6 +239,8 @@ export class UIScene extends Phaser.Scene {
     // W2: toast the moment a mission is met, not just at run end.
     on(EVT.MISSION_COMPLETED, this.onMissionCompleted);
     on(EVT.MUSIC_TRACK_CHANGED, this.onMusicTrackChanged);
+    on(EVT.HUD_RESYNC, (s) => applyHudResync(this, s)); // #72: takeover handoff rebuilds the whole HUD from sim state
+    this.takeoverHud = new TakeoverHud(this, this.theme, this.hud); // #72: SEEKING n% / READY banner
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
@@ -283,9 +290,10 @@ export class UIScene extends Phaser.Scene {
     // zone chip (graphics repainted on palette change)
     this.zoneG = new Phaser.GameObjects.Graphics(this);
     this.hud.add(this.zoneG);
-    this.practiceTag=this._t(cx,16,'GUEST PRACTICE / UNRANKED',
+    const runScene=this.scene.get(SCENES.RUN);
+    this.practiceTag=this._t(cx,16,runScene?.takeover?TAKEOVER_TAG:'GUEST PRACTICE / UNRANKED',
       {color:'magenta',anchor:'center',outline:'none'});
-    this.practiceTag.setVisible(this.scene.get(SCENES.RUN)?.guestPractice===true);
+    this.practiceTag.setVisible(runScene?.unrankedPractice===true);
     this.zoneText = this._t(cx, 6, '', { color: 'cyan', anchor: 'center', outline: 'none' });
     this.zoneChip = { w: 0, key: 'cyan' };
     this.theme.bind(() => this._paintZone());
@@ -556,6 +564,7 @@ export class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------- events
 
   onRunStart(p) {
+    this.practiceTag?.setText?.(p?.takeover===true?TAKEOVER_TAG:'GUEST PRACTICE / UNRANKED');
     this.practiceTag?.setVisible?.(p?.practice===true);
     // First Gym launch gets the same frozen READY cue as later catches.
     this.gymReadyText?.setVisible?.(p?.gym === true);
