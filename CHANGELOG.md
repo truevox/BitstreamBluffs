@@ -19,11 +19,18 @@
 - New tape headers carry `rulesetId` (the compile-time id of `tools/ruleset/current.json`) and `buildId` (set from `services.js` once the ruleset has loaded; `null` before). Header only: the record, its `ledgerHash`, checkpoints, inputs, trace and every fingerprint are unchanged (proven by test). `RunScene` gained a shared `_stepTick`, a reusable `seekTo(N)` (for #66's off-screen candidate re-simulation) and `stepReplayTick`.
 - SIM_REVISION 9/physics and ranked input/scoring rules are unchanged; the source tripwire was updated with reviewed no-behavior-change attestations. Also classifies the #69 `guestPractice` / `guestPracticeTape` fields that the Heavy gate and the fingerprint-completeness test were reporting as unclassified.
 
-## v2.22.11 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
+## v2.22.12 — #69 local-only portable Ghost file fallback (integration draft, 2026-11-25)
 
 - When a Ghost Link exceeds the 8,192-character URL limit, offer an explicitly disclosed, two-step **SAVE FILE** local `.bbghost` download; do not silently upload or expose any user credentials, profile, original run ID or account data. Short URL links keep their existing behavior.
 - The recipient selects a bounded integrity-checked local file through a native file picker and may PREVIEW an **UNVERIFIED** guest trace, optionally launching separately confirmed **UNRANKED** visual practice. Corrupt/oversized/replaced files revoke old preview/race authorization; no scoring, XP, leaderboards, automatic ghost import or durable profile mutations. Opening or canceling the native picker disarms any previously prepared CONFIRM RACE, without erasing a valid earlier preview. Guest-practice tutorial completions and tuck-hint shows remain ephemeral; they never consume the normal player's persisted first-run hints.
 - Integrates on top of the v2.22.8 replay archive, v2.22.9 Heavy diagnostic gate and v2.22.10 Cemetery Montage without changing SIM9 or authoritative replay semantics. This is a **draft** candidate: independent review, physical Chromebook/Android acceptance and optional hosted oversize fallback remain outstanding; #69 is not closed.
+
+## v2.22.11 — #135 dual-proof trust snapshot input hardening (2026-11-25)
+
+- Harden the **pure, non-deployed** dual-proof adjudicator (#384): copy only validated own-data descriptors into a bounded, fresh JSON snapshot *before* making the decision. Stop post-inspection Proxy getter swaps from changing denied authorization/consent receipts into authorized ones. Malformed, accessor, inherited hook, symbol, cycle, exotic array and nonfinite inputs fail closed without granting public rank/rewards.
+- Reject prototype-disguised native objects with internal slots (Date, Map/Set, weak collections, typed-array/DataView, ArrayBuffer and SharedArrayBuffer) rather than treating them as ordinary `{}`. Cumulative 256 KiB escaped UTF-8 accounting applies before serialization. Include new near-limit, hostile Proxy, Node/Chromium and trust/canonicalization regressions; four original pinned free/paid verdict hashes remain unchanged.
+- **Owner-approved review of exact security source commit `460a135f`** recorded on #384, including red-to-green negative proof, Proxy-trap parity and green CI. A non-exploitable strictness inconsistency for other disguised built-ins is tracked separately as non-blocking #388; this release does not expand the brand-check denylist.
+- **Library only:** no authenticated verifier, issuer/consent/wallet adapter, public API, leaderboard publication, fee pathway, Shard settlement or change to game physics/replay semantics. The full public-verification system remains #135. Package and lockfile advance together to v2.22.11.
 
 ## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
 

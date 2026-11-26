@@ -332,9 +332,9 @@ describe('canonical dual-proof decision contract (#245)', () => {
       }
     });
     const verdict=adjudicateDualProof({...base,request:shiftingRequest});
-    // A snapshot may legitimately match the original receipt on its ONE
-    // captured value. The invariant is that no later read changes lanes.
-    expect(reads).toBe(1);
+    // The snapshot now reads the Proxy's *data descriptor* only: `get` is
+    // never invoked, so the later swapped `modded` value cannot be consumed.
+    expect(reads).toBe(0);
     expect(verdict.publication).toBe('verified-eligible');
     // A consent that changes across reads cannot defeat the snapshotted
     // course/lane equality gate either.
@@ -346,8 +346,8 @@ describe('canonical dual-proof decision contract (#245)', () => {
       }
     });
     const next=adjudicateDualProof({...base,consent:changingConsent});
-    expect(['valid','invalid'].includes(next.privacy.status)).toBe(true);
-    expect(flips).toBe(1); // read once, not at multiple policy stages
+    expect(next.privacy.status).toBe('valid');
+    expect(flips).toBe(0); // no Proxy get trap, even a first read
   });
 
   test('consent for provisional publication never authorizes verified publication', () => {
@@ -428,7 +428,7 @@ describe('canonical dual-proof decision contract (#245)', () => {
     expect(valid.provenance.simulationVerifierId).toBe(d('f'));
   });
 
-  test('hostile getters and throwing Proxies fail closed without exceptions or publication', () => {
+  test('hostile accessors and throwing descriptor Proxies fail closed without exceptions or publication', () => {
     const requestGetter={...request()};
     Object.defineProperty(requestGetter,'score',{enumerable:true,get(){throw Error('hostile getter')}});
     const simGetter={...simulation()};
@@ -436,7 +436,7 @@ describe('canonical dual-proof decision contract (#245)', () => {
     const consentGetter={...consent()};
     Object.defineProperty(consentGetter,'status',{enumerable:true,get(){throw Error('hostile consent')}});
     const hostileProxy=new Proxy(request(),{getPrototypeOf(){throw Error('hostile proxy')}});
-    const hostileOuter=new Proxy(good(),{get(){throw Error('hostile envelope')}});
+    const hostileOuter=new Proxy(good(),{ownKeys(){throw Error('hostile envelope descriptor')}});
     for(const input of [
       {...good(),request:requestGetter},
       {...good(),simulation:simGetter},
@@ -448,6 +448,152 @@ describe('canonical dual-proof decision contract (#245)', () => {
       expect(()=>{verdict=adjudicateDualProof(input);}).not.toThrow();
       expect(verdict.publication).toBe('none');NO_RANK(verdict);
       expect(['proof','eligibility','privacy'].some(k=>verdict[k].status==='invalid')).toBe(true);
+    }
+  });
+
+  test('authorization descriptor DENIED cannot be replaced by a later Proxy get AUTHORIZED', () => {
+    const evidence=good();
+    const denied={...evidence.authorization,status:'denied',economyStatus:'rejected'};
+    let gets=0;
+    // Old check(descriptors) then JSON.stringify(original) read attacker-supplied
+    // Proxy.get and returned verified-eligible despite a DENIED descriptor.
+    const swapped=new Proxy({...evidence,authorization:denied},{
+      get(target,key,receiver){
+        if(key==='authorization'){gets++;return evidence.authorization;}
+        return Reflect.get(target,key,receiver);
+      },
+    });
+    expect(Object.getOwnPropertyDescriptor(swapped,'authorization').value.status).toBe('denied');
+    const verdict=adjudicateDualProof(swapped);
+    expect(gets).toBe(0);
+    expect(verdict.eligibility).toMatchObject({status:'invalid',reason:'trusted-eligibility-denied'});
+    expect(verdict.publication).toBe('none');NO_RANK(verdict);
+    const nested=new Proxy(denied,{
+      get(target,key,receiver){if(key==='status'||key==='economyStatus'){
+        gets++;return key==='status'?'authorized':'authorized';
+      }return Reflect.get(target,key,receiver);},
+    });
+    const nestedVerdict=adjudicateDualProof({...evidence,authorization:nested});
+    expect(gets).toBe(0);
+    expect(nestedVerdict.eligibility.status).toBe('invalid');NO_RANK(nestedVerdict);
+  });
+
+  test('consent descriptor DENIED cannot be turned into a later GRANTED read', () => {
+    const evidence=good();
+    const denied={...evidence.consent,status:'denied',audienceGate:'failed'};
+    let calls=0;
+    const swapping=new Proxy({...evidence,consent:denied},{
+      get(target,key,receiver){if(key==='consent'){calls++;return evidence.consent;}
+        return Reflect.get(target,key,receiver);},
+    });
+    const verdict=adjudicateDualProof(swapping);
+    expect(calls).toBe(0);
+    expect(verdict.privacy).toMatchObject({status:'invalid',reason:'consent-or-audience-denied'});
+    expect(verdict.publication).toBe('none');NO_RANK(verdict);
+  });
+
+  test('throwing-only get traps are NEVER invoked; descriptor traps and accessors are denied', () => {
+    let getCount=0;
+    const goodDescriptors=new Proxy(good(),{get(){getCount++;throw Error('get must not run')}});
+    const verdict=adjudicateDualProof(goodDescriptors);
+    expect(getCount).toBe(0);
+    expect(verdict.publication).toBe('verified-eligible');
+    const malformed=new Proxy(good(),{getOwnPropertyDescriptor(){throw Error('no descriptor')}});
+    const blocked=adjudicateDualProof(malformed);
+    NO_RANK(blocked);
+    expect(blocked.proof.reason).toBe('malformed-input');
+  });
+
+  test('inherited toJSON hooks cannot substitute later authorization or consent values', () => {
+    const evidence=good();
+    const denied={...evidence,authorization:{...evidence.authorization,status:'denied',economyStatus:'rejected'}};
+    const previous=Object.getOwnPropertyDescriptor(Object.prototype,'toJSON');
+    let called=0;
+    Object.defineProperty(Object.prototype,'toJSON',{configurable:true,
+      value(){called++;return evidence;}});
+    try{
+      const verdict=adjudicateDualProof(denied);
+      expect(called).toBe(0);
+      expect(verdict.eligibility.status).toBe('invalid');NO_RANK(verdict);
+    }finally{
+      if(previous)Object.defineProperty(Object.prototype,'toJSON',previous);
+      else delete Object.prototype.toJSON;
+    }
+  });
+
+  test('sparse/exotic arrays, decorated/symbol properties, invalid numbers, cycles and hidden fields refuse publication',()=>{
+    const evidence=good();
+    const invalid=[];
+    const holes=[,1];
+    invalid.push({...evidence,garbage:holes});
+    const decorated=[1];decorated.extra=2;
+    invalid.push({...evidence,garbage:decorated});
+    // JSON.parse never constructs Array subclasses or arrays with foreign
+    // prototypes; even ignored envelope fields must not smuggle exotics.
+    class HostileArray extends Array {}
+    const subclassed=new HostileArray(1);
+    subclassed[0]='data';
+    invalid.push({...evidence,garbage:subclassed});
+    const changedPrototype=[1];
+    Object.setPrototypeOf(changedPrototype,Object.create(Array.prototype));
+    invalid.push({...evidence,garbage:changedPrototype});
+    // An object with Object.prototype may still carry hidden native slots.
+    // JSON.parse cannot construct a Map/Date/typed-array with forged prototype.
+    for(const branded of [new Map([['x',1]]),new Set([1]),new Date(),
+      new WeakMap(),new WeakSet(),new Uint8Array(2),
+      new DataView(new ArrayBuffer(2)),new ArrayBuffer(2),
+      ...(typeof SharedArrayBuffer==='function'?[new SharedArrayBuffer(2)]:[])]){
+      Object.setPrototypeOf(branded,Object.prototype);
+      invalid.push({...evidence,garbage:branded});
+    }
+    const symbols={...evidence};symbols[Symbol('hidden')]='untrusted';
+    invalid.push(symbols);
+    const hidden={...evidence};Object.defineProperty(hidden,'invisible',{value:1,enumerable:false});
+    invalid.push(hidden);
+    invalid.push({...evidence,request:{...evidence.request,score:Infinity}});
+    invalid.push({...evidence,request:{...evidence.request,score:-0}});
+    const cyclic={...evidence};cyclic.self=cyclic;invalid.push(cyclic);
+    for(const untrusted of invalid){
+      const verdict=adjudicateDualProof(untrusted);
+      expect(verdict.publication).toBe('none');NO_RANK(verdict);
+    }
+  });
+
+  test('trust snapshot byte cap includes cumulative UTF-8, escaping and JSON punctuation',()=>{
+    const cap=256*1024;
+    const envelope={...good(),ignored:['\u0000\b\n"\\','é','雪','🛷',false,null,-17,0.125],
+      extra:{a:'',b:'',c:''}};
+    const left=cap-canonicalBytes(envelope).length;
+    envelope.extra.a='x'.repeat(Math.floor(left/3));
+    envelope.extra.b='y'.repeat(Math.floor(left/3));
+    envelope.extra.c='z'.repeat(left-2*Math.floor(left/3));
+    expect(canonicalBytes(envelope).length).toBe(cap);
+    expect(adjudicateDualProof(envelope).publication).toBe('verified-eligible');
+    envelope.extra.c+='z';
+    expect(canonicalBytes(envelope).length).toBe(cap+1);
+    const rejected=adjudicateDualProof(envelope);
+    expect(rejected.publication).toBe('none');
+    expect(rejected.proof.reason).toBe('malformed-input');
+    NO_RANK(rejected);
+  });
+
+  test('near-cap snapshot agrees with canonical UTF-8 sizes for every escape width',()=>{
+    const cap=256*1024;
+    // Each payload is large enough to exercise the incremental budget;
+    // canonicalBytes is the independent byte-length oracle.
+    for(const char of ['A','\\','"','\u0000','é','雪','🛷','\u2028']){
+      const fixture={...good(),ignored:{chunk:'',other:[0.125,-17,null,true]}};
+      const base=canonicalBytes(fixture).length;
+      const width=canonicalBytes({x:char}).length-canonicalBytes({x:''}).length;
+      fixture.ignored.chunk=char.repeat(Math.floor((cap-base)/width));
+      const length=canonicalBytes(fixture).length;
+      expect(length).toBeLessThanOrEqual(cap);
+      expect(adjudicateDualProof(fixture).publication).toBe('verified-eligible');
+      fixture.ignored.chunk+='A'.repeat(cap-length+1);
+      expect(canonicalBytes(fixture).length).toBe(cap+1);
+      const blocked=adjudicateDualProof(fixture);
+      expect(blocked.proof.reason).toBe('malformed-input');
+      NO_RANK(blocked);
     }
   });
 
