@@ -1,13 +1,15 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-26 01:08 UTC. Main `bb9fafd71f4a700b3c544bae3fa028996ee31669` (#368), v2.22.7/SIM9. Exact [Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45689247743) reports success (served bytes not independently compared). Explicit unverified Guest practice, no progress/score; #58/#81 and trusted restore remain open.
+Last verified: 2026-11-26 02:22 UTC. GitHub main `42e74fb5172ef4e542237c924a22bae6f08acc24` (#384), v2.22.11/SIM9; live deployment not independently verified. Guest practice is unverified and unranked; #58/#81 and trusted restore remain open.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **#384 / #135 scoped review follow-up**: exact draft `693634be9bbb114cb22fe71fa2e53c34647830ff` retains native-array guard `a708aad3` and now charges the 256 KiB encoded budget during descriptor copy, before canonical encoding. Exact-boundary regression, 265 focused tests, Chromium/Node parity and source identity pass locally. [Independent exact-head review requested](https://github.com/truevox/BitstreamBluffs/pull/384#issuecomment-7179454528); exact CI and coordinated patch release remain gates. No merge, deploy or public verification service.
+- **#391 owner-directed Ghost consent fix:** exact draft `39a83c158d47abe4024a5af264cf54424d87e5e5`, branch `galfriday/team-a-post69-release-20261125`, on v2.22.11. Consumes keyboard repeat without confirming or reloading the preview. Production Chromium held/released/fresh key and mobile-emulated file QA passed; 42 focused tests, production build and deterministic identity passed. [Owner direction recorded](https://github.com/truevox/BitstreamBluffs/pull/391#issuecomment-7180745934); not an independent approval. Read-only exact-head CI follow-up scheduled. No physical-device pass, merge or deploy by Morgan. Release coordination remains with the owner.
+
+- **#384 / #135 settled:** security-library slice landed as v2.22.11 in `42e74fb5`; owner reviewed `460a135f` and `cdbc0d34` adds metadata only. [Release note](https://github.com/truevox/BitstreamBluffs/pull/384#issuecomment-7180542140) posted after merge. No claim of public verification, real issuer or wallet; #135 and #388 remain follow-ups.
 
 - **Gal exact-head source reviews Nov 25:** [#287](https://github.com/truevox/BitstreamBluffs/pull/287#pullrequestreview-6064814459) (10 tests), [#341](https://github.com/truevox/BitstreamBluffs/pull/341#pullrequestreview-6064815049) (42), [#345](https://github.com/truevox/BitstreamBluffs/pull/345#pullrequestreview-6064815358) (29) had no blocking findings in developer scope; still drafts, not release approvals. #338 prior-head review requested clean cutoff playback; updated proof and handoff below.
 
