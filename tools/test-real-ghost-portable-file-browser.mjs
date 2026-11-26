@@ -203,6 +203,24 @@ try{
  });
  if(!run.practice||run.recorder||run.guestCount!==1||run.ghostRoles?.[0]!=='guest')
   throw Error('File imported as ranked run or invisible opponent '+JSON.stringify(run));
+ // Two other practice-only writes must NEVER consume first-run progression:
+ // tutorial completions and the device-wide tuck hint show counter.
+ const practiceHints=await page.evaluate(()=>{
+  const r=window.__bbGame.scene.getScene('RunScene');
+  localStorage.removeItem('bb.tutorialDone');
+  localStorage.removeItem('bb.tuckShows');
+  r.tutDone.delete('push');
+  r.tutDoneId('push');
+  r.applyHintEvents([{id:'tuck',show:true}]);
+  return {inGuestPractice:r.guestPractice===true,
+   inMemoryDone:r.tutDone.has('push'),inMemoryShows:r.tuckShows,
+   persistedTutorial:localStorage.getItem('bb.tutorialDone'),
+   persistedTuck:localStorage.getItem('bb.tuckShows')};
+ });
+ if(!practiceHints.inGuestPractice||!practiceHints.inMemoryDone||practiceHints.inMemoryShows<1||
+  practiceHints.persistedTutorial!==null||practiceHints.persistedTuck!==null)
+  throw Error('UNRANKED guest practice wrote first-run hint state '+JSON.stringify(practiceHints));
+ console.log('PASS_GHOST_FILE_PRACTICE_HINTS_EPHEMERAL',JSON.stringify(practiceHints));
  await page.evaluate(()=>{const r=window.__bbGame.scene.getScene('RunScene');r.bsod.wallX=r.sled.body.bounds.min.x-2;r.bsod.wallSpeedPxS=10000;});
  await page.waitForFunction(()=>window.__bbGame.scene.isActive('TitleScene')&&
   !window.__bbGame.scene.isActive('RunScene'),null,{timeout:25000});
@@ -213,6 +231,28 @@ try{
  });
  if(JSON.stringify(after)!==JSON.stringify(saved)||errors.length||remoteWrites.length)
   throw Error('File guest practice altered saved data or attempted upload '+JSON.stringify({saved,after,errors,remoteReads,remoteWrites}));
+ const afterGuestHints=await page.evaluate(()=>({
+  tutorial:localStorage.getItem('bb.tutorialDone'),
+  tuck:localStorage.getItem('bb.tuckShows')
+ }));
+ if(afterGuestHints.tutorial!==null||afterGuestHints.tuck!==null)
+  throw Error('Guest practice persisted first-run hint history after exiting '+JSON.stringify(afterGuestHints));
+ // Positive control: normal play must still persist both hints; otherwise a
+ // blanket localStorage stub would make the practice denial falsely green.
+ await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('normal-hints-after-guest@0'));
+ await page.waitForFunction(()=>window.__bbGame.scene.isActive('RunScene')&&
+  window.__bbGame.scene.getScene('RunScene').sled?.body,null,{timeout:35000});
+ const normalHints=await page.evaluate(()=>{
+  const r=window.__bbGame.scene.getScene('RunScene');
+  localStorage.removeItem('bb.tutorialDone');localStorage.removeItem('bb.tuckShows');
+  r.tutDone.delete('push');r.tutDoneId('push');
+  r.applyHintEvents([{id:'tuck',show:true}]);
+  return {practice:r.guestPractice,tutorial:localStorage.getItem('bb.tutorialDone'),
+   tuck:localStorage.getItem('bb.tuckShows')};
+ });
+ if(normalHints.practice||!JSON.parse(normalHints.tutorial||'[]').includes('push')||
+  !(Number(normalHints.tuck)>0))throw Error('Normal-play tutorial persistence regressed '+JSON.stringify(normalHints));
+ console.log('PASS_NORMAL_PLAY_HINTS_STILL_PERSIST',JSON.stringify(normalHints));
  console.log('PASS_REAL_GHOST_FILE',JSON.stringify({mode:mobile?'412x915-mobile':'desktop',
   bytes:actualBytes.length,sourcePoints:1200,first,canceled,visible,rejected,run,
   zeroSavedMutation:true,blockedExternalGets:remoteReads.length,externalWrites:remoteWrites.length,pageErrors:errors.length}));

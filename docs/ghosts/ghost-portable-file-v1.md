@@ -24,7 +24,11 @@ with bounded byte read and no implicit score import. Malformed/unsupported or
 oversized packages must fail closed, clearing stale previews and guest-practice
 permission. A cancelled or newly opened file picker also clears a prior
 second-click RACE confirmation without forcing the user to re-preview the same
-valid file. No remote-host fallback, real-device Chromebook/Android acceptance,
+valid file. Guest practice never persists normal-play tutorial completion (`bb.tutorialDone`) or
+tuck-hint show counts (`bb.tuckShows`); both may advance in memory during the
+practice session, but cannot consume future first-run guidance.
+
+No remote-host fallback, real-device Chromebook/Android acceptance,
 producer authentication, #72 authoritative takeover or #135 public verification
 is claimed.
 
