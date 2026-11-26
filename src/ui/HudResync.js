@@ -16,6 +16,9 @@ export function applyHudResync(ui, s) {
   ui.onCombo({ multiplier: s.multiplier, tricks: s.tricks, pendingPoints: s.pendingPoints });
   ui.onDistance({ meters: s.meters });
   ui.onSpeed({ speedPxS: s.speedPxS, flow: s.flow, flowFrac: s.flowFrac });
+  // UIScene decays the speed readout to 0 when no distance / speed event arrives for 1.5 s. The sim is frozen at READY, so no
+  // event will: hold the exact value until the first live HUD_SPEED_EVENT (which sets its own 600 ms window again).
+  ui.exactSpeedUntil = Infinity;
   for (const p of s.power) {
     const t = ui._t(0, GAME_HEIGHT - 26, '', { color: 'text', outline: 'dark' });
     ui.powerups.set(p.id, { total: p.remainingMs > 0 ? p.totalMs : 0, remaining: p.remainingMs, charges: p.charges || 0, text: t });

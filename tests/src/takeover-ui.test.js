@@ -9,7 +9,7 @@ const { TakeoverPicker, PICKER_BANNER } = await import('../../src/ui/TakeoverPic
 const { TakeoverEndScene } = await import('../../src/scenes/TakeoverEndScene.js');
 const { applyHudResync } = await import('../../src/ui/HudResync.js');
 const { addWard } = await import('../../src/systems/Wards.js');
-const { takeoverKeyAllowed, takeoverHintVisible } = await import('../../src/ui/TakeoverHook.js');
+const { takeoverKeyAllowed, takeoverHintVisible, decideTakeoverLaunch } = await import('../../src/ui/TakeoverHook.js');
 
 jest.spyOn(Date, 'now').mockReturnValue(1_767_000_000_000);
 const scripted = (t) => H.livePad({ push: t < 400, variableHop: true, noAutoNudge: true, hop: t >= 300 && t <= 303, pressed: { hop: t === 300 } });
@@ -324,5 +324,26 @@ describe('HUD rebuilt from authoritative sim state at handoff (#72)', () => {
     ord.inputRouter = { poll: () => H.livePad(), setEnabled() {} };
     for (let i = 0; i < 200; i++) ord.update(0, TICK_MS);
     expect(seen).toEqual([]);
+  });
+});
+
+describe('picker launch vs a late initials entry; HUD speed at READY', () => {
+  test('the initials entry appearing after the picker opened sends the player back to it (no launch); no entry launches; a bad tape is refused', () => {
+    const late = decideTakeoverLaunch({ entry: { getValue: () => '' } }, TAPE, 640);
+    expect(late).toEqual({ action: 'back-to-entry' });
+    const ok = decideTakeoverLaunch({ entry: null }, TAPE, 640);
+    expect(ok.action).toBe('launch');
+    expect(ok.descriptor.tick).toBe(640);
+    const old = JSON.parse(JSON.stringify(TAPE)); delete old.rulesetId;
+    expect(decideTakeoverLaunch({ entry: null }, old, 640)).toMatchObject({ action: 'refused', result: { reason: 'older-build' } });
+  });
+  test('hudSnapshot carries the sled speed and the resync holds the speed readout (no 1.5 s decay to 0 while READY is frozen)', () => {
+    const { s } = liveTakeover(640);
+    const snap = s.hudSnapshot();
+    expect(snap.speedPxS).toBe(s.sled.speed);
+    expect(snap.speedPxS).toBeGreaterThan(50);
+    const ui = { powerups: new Map(), effects: new Map(), zones: [], onScore() {}, onCombo() {}, onDistance() {}, onSpeed() { this.exactSpeedUntil = 600; }, _t() { return {}; }, _paintPowerups() {}, _layoutPowerups() {}, _refreshZone() {}, onHazard(p) { this.effects.set(p.effect, { remaining: p.durationMs }); }, _updateEffect() {}, _removePowerup() {}, _removeEffect() {}, exactSpeedUntil: 0 };
+    applyHudResync(ui, snap);
+    expect(ui.exactSpeedUntil).toBe(Infinity);
   });
 });

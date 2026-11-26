@@ -14,7 +14,7 @@
 import { GHOST_TAPE_FORMAT, CHECKPOINT_EVERY, TRACE_EVERY, GhostRecorder, decodeTrace } from '../ghost/GhostTape.js';
 import { tapeCompatible } from '../ghost/GhostLibrary.js';
 import { SIM_REVISION } from './ruleset.js';
-import { tapeDigest, validateInputRows } from './manifest.js';
+import { tapeDigest, validateInputRows, resolveReplaySetup } from './manifest.js';
 
 export const TAKEOVER_KIND = 'bb-takeover';
 export const TAKEOVER_VERSION = 1;
@@ -30,6 +30,14 @@ const U32 = 0xffffffff;
 const isInt = (v) => typeof v === 'number' && Number.isSafeInteger(v);
 
 /** Every refusal code, with the player-facing message. */
+const traceCache = new WeakMap();
+/** Decoded float32 pose trace of a tape, cached per tape object (the seek verifies against it every 4 ticks). */
+export function traceOf(tape) {
+  let t = traceCache.get(tape);
+  if (!t) { t = decodeTrace(tape); traceCache.set(tape, t); }
+  return t;
+}
+
 export const REFUSALS = Object.freeze({
   'guest-practice': 'unavailable during guest practice',
   undecodable: 'this tape cannot be decoded',
@@ -66,6 +74,9 @@ export function takeoverEligible(tape, tick, ctx = {}) {
     if (typeof current !== 'string' || !current) return refuse('no-ruleset');
     if (typeof tape.rulesetId !== 'string' || !tape.rulesetId) return refuse('older-build');
     if (tape.rulesetId !== current) return refuse('ruleset-mismatch');
+    // RunScene resolves the daily rule / sync level / kodiak / magnet settings from the tape in create(); an unknown rule id
+    // THROWS there, which would be a black screen. Refuse it here, where it ends at the title with a reason.
+    try { resolveReplaySetup(tape, {}); } catch { return refuse('undecodable', 'unusable replay setup'); }
     if (typeof tape.seed !== 'string' || !tape.seed || !isInt(tape.biomeMask) || tape.biomeMask < 0 || tape.biomeMask > U32) return refuse('course');
     if (!Array.isArray(tape.boosts) || !('upgradeRanks' in tape) || !isInt(tape.syncLevel) || tape.syncLevel < 1) return refuse('loadout');
     if (!isInt(tick) || tick < 1 || tick > tape.endTick - 1) return refuse('tick', `1..${tape.endTick - 1}`);
@@ -162,19 +173,21 @@ export function createTakeoverRecorder(d) {
  * Bounded seek: advance `scene` by authoritative replay ticks toward `target`, at most `maxTicks` and about `budgetMs`
  * of wall time per call. The scene supplies `stepReplayTick()` (the SAME per-tick body update() runs in replay mode);
  * this driver only meters it and watches for a desync. Any desync at or before N aborts: it never continues.
- * @param {{simClock:{tick:number}, tapePlayer:{desync:object|null}, crashed:boolean, stepReplayTick:()=>void}} scene
+ * @param {{simClock:{tick:number}, tapePlayer:{desync:object|null}, crashed:boolean, stepReplayTick:(o?:object)=>void}} scene
  * @param {number} target
- * @param {{maxTicks?:number, budgetMs?:number, now?:()=>number}} [o]
+ * @param {{maxTicks?:number, budgetMs?:number, now?:()=>number, verify?:boolean}} [o] verify:false skips the checkpoint and
+ *   pose-trace checks (a candidate tape whose checkpoints / trace end before the target); the default verifies up to the last
+ *   checkpoint / trace sample the tape has
  * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean}}
  */
 export function seekStep(scene, target, o = {}) {
-  const maxTicks = o.maxTicks ?? 1500;
+  const maxTicks = o.maxTicks ?? SEEK_MAX_TICKS_PER_FRAME;
   const budgetMs = o.budgetMs ?? Infinity;
   const now = o.now || (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
   const t0 = now();
   let steps = 0;
   while (scene.simClock.tick < target && steps < maxTicks) {
-    scene.stepReplayTick();
+    scene.stepReplayTick(o);
     steps++;
     if (scene.tapePlayer.desync) return { done: false, tick: scene.simClock.tick, steps, desync: scene.tapePlayer.desync };
     // A fatal crash before N cannot be a faithful prefix of the tape (the tape's own run survived to N).

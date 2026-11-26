@@ -43,6 +43,7 @@ describe('takeoverEligible: every refusal reason (each with its control)', () =>
     ['undecodable', () => takeoverEligible(tape({ inputs: [[1, 0xfffffff, 0]] }), 100, CTX)],
     ['undecodable', () => takeoverEligible(tape({ trace: 7 }), 100, CTX)],
     ['undecodable', () => takeoverEligible(tape({ physicsVersion: 99 }), 100, CTX)],
+    ['undecodable', () => takeoverEligible(tape({ dailyRuleId: 'no-such-daily-rule' }), 100, CTX)],
     ['mode', () => takeoverEligible(tape({ mode: 'daily' }), 100, CTX)],
     ['mode', () => takeoverEligible(tape({ mode: 'daily-draft' }), 100, CTX)],
     ['mode', () => takeoverEligible(tape({ mode: 'gym' }), 100, CTX)],

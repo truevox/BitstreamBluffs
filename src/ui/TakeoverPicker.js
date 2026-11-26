@@ -9,7 +9,7 @@
 import { View } from './View.js';
 import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
-import { decodeTrace, tracePose, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
+import { decodeTrace, tracePose } from '../systems/ghost/GhostTape.js';
 import { takeoverEligible, fmtTickTime } from '../systems/replay/Takeover.js';
 import { fmtInt } from './Format.js';
 
@@ -138,4 +138,3 @@ export class TakeoverPicker extends View {
   }
 }
 
-export { TRACE_EVERY };

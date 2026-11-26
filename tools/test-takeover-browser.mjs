@@ -82,7 +82,7 @@ function installHelpers() {
     hudFacts() {
       const ui = g.scene.getScene('UIScene');
       return { power: [...ui.powerups].map(([id, p]) => ({ id, charges: p.charges || 0, remaining: p.remaining, total: p.total })).sort((a, b) => (a.id < b.id ? -1 : 1)),
-        effects: [...ui.effects.keys()].sort(), zones: ui.zones.map((z) => z.modId), score: ui.scoreText.main.text, combo: ui.comboText.main.text, dist: ui.distText.main.text, flow: ui.flow };
+        effects: [...ui.effects.keys()].sort(), zones: ui.zones.map((z) => z.modId), score: ui.scoreText.main.text, combo: ui.comboText.main.text, dist: ui.distText.main.text, flow: ui.flow, speed: ui.speedText.main.text };
     },
     async snapshot() {
       const out = { ls: {}, idb: {}, reg: {} };
@@ -482,15 +482,20 @@ async function hudCase(tape, rec) {
     await launchTakeoverInPage(T.page, descriptor);
     const ph = await seekToReady(T.page);
     const out = await T.page.evaluate(() => { window.__tk.step(2); return window.__tk.hudFacts(); });
+    // READY is frozen: ~2.2 s of READY frames must not decay the speed readout to 0 (UIScene decays it after 1.5 s without an event)
+    const later = await T.page.evaluate(() => { window.__tk.step(260); return window.__tk.hudFacts(); });
     await T.close();
-    return { ph, facts: out };
+    return { ph, facts: out, later };
   };
   const real = await takeover(false), ctl = await takeover(true);
   const same = (a, b) => JSON.stringify([a.effects, a.zones, a.score, a.combo, a.dist, a.power.map((p) => [p.id, p.charges])]) === JSON.stringify([b.effects, b.zones, b.score, b.combo, b.dist, b.power.map((p) => [p.id, p.charges])]) &&
     a.power.every((p, i) => Math.abs(p.remaining - b.power[i].remaining) <= 450);
+  const kmh = (f) => Number(String(f.speed).replace(/[^0-9]/g, ''));
+  const speedOk = (f) => kmh(f) > 0 && Math.abs(kmh(f) - kmh(oracle.facts)) <= Math.max(10, 0.12 * kmh(oracle.facts));
   const nonTrivial = oracle.facts.power.length > 0 || oracle.facts.effects.length > 0 || oracle.facts.zones.length > 0;
   check(`(fix 3) HUD handoff at N=${N}: the uninterrupted replay shows active timers (${oracle.facts.power.map((p) => p.id).join(',') || '-'}; effects ${oracle.facts.effects.join(',') || '-'}; zones ${oracle.facts.zones.join(',') || '-'})`, nonTrivial && real.ph === 'ready', { N, oracle: oracle.facts });
   check(`(fix 3) HUD handoff at N=${N}: power-up chips + timers, effects, zones, score, combo and distance after takeover == the uninterrupted replay's HUD`, same(oracle.facts, real.facts), { oracle: oracle.facts, takeover: real.facts });
+  check(`(fix 4) HUD speed at READY is the sled's real speed (${real.facts.speed} vs the replay's ${oracle.facts.speed}), not 0, and still is after 2 s of frozen READY frames (${real.later.speed})`, speedOk(real.facts) && speedOk(real.later), { oracle: oracle.facts.speed, takeover: real.facts.speed, later: real.later.speed });
   check(`(fix 3) negative control: with the HUD resync disabled the takeover HUD does NOT match (the check can fail)`, nonTrivial && !same(oracle.facts, ctl.facts), { control: ctl.facts });
   return { N, oracle: oracle.facts, takeover: real.facts };
 }

@@ -39,11 +39,11 @@ import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
 import { SimClock } from '../systems/SimClock.js';
-import { GhostRecorder, TapePlayer, quantizeTilt, decodeTrace, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
+import { GhostRecorder, TapePlayer, quantizeTilt, TRACE_EVERY } from '../systems/ghost/GhostTape.js';
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
-import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS } from '../systems/replay/Takeover.js';
+import { validateTakeoverDescriptor, createTakeoverRecorder, seekStep, traceOf, SEEK_MAX_TICKS_PER_FRAME, SEEK_BUDGET_MS } from '../systems/replay/Takeover.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
@@ -1345,7 +1345,7 @@ export class RunScene extends Phaser.Scene {
     }
 
     // #72: SEEKING (re-simulating the tape prefix) and READY (frozen at tick N) are not live play.
-    if (this.takeover && this.takeover.phase !== 'live') { this._updateTakeoverPrelude(time, dt); return; }
+    if (this.takeover && this.takeover.phase !== 'live') { this._updateTakeoverPrelude(); return; }
 
     // Every attempt first freezes real-time gameplay for ~1000ms. Only at
     // that boundary can MUSIC SUGGEST a verified regular pulse <=300ms away.
@@ -1414,7 +1414,7 @@ export class RunScene extends Phaser.Scene {
    * pad, run the simulation tick, then checkpoint / verify. One definition, so a seeked prefix cannot drift from a replay.
    * @returns {'hold'|undefined}
    */
-  _stepTick(tickPad) {
+  _stepTick(tickPad, verify = true) {
     const tick = ++this.simClock.tick;
     // Air brake on the ground brakes: decided per tick, not per display frame.
     tickPad.brake = !!tickPad.brakeHeld || (!!tickPad.airBrake && !!this.sled?.grounded);
@@ -1422,18 +1422,20 @@ export class RunScene extends Phaser.Scene {
     const r = this.simTick(this.simClock.tickMs, tickPad);
     if (!this.crashed) {
       this.ghostRecorder?.afterTick(tick, this);
-      this.tapePlayer?.check(tick, this);
+      if (verify) this.tapePlayer?.check(tick, this);
     }
     return r;
   }
 
   /** One authoritative replay tick from the TapePlayer (the replay branch of update(), without the frame). */
-  stepReplayTick() {
-    const r = this._stepTick(this.tapePlayer.padAt(this.simClock.tick + 1));
-    this._verifyTraceSample();
-    // The camera and `_view` are presentation that the diagnostic kit still classes as read-by-sim (PRESENTATION_READ_BY_SIM):
-    // advance them once per tick, exactly as a replay shown at 120 display frames per second does, so the state at N has the
-    // same camera / `_view` / shake as an uninterrupted replay. Draw, fx, audio and particles stay skipped.
+  stepReplayTick(opts = {}) {
+    const verify = opts.verify !== false;
+    const r = this._stepTick(this.tapePlayer.padAt(this.simClock.tick + 1), verify);
+    if (verify) this._verifyTraceSample();
+    // The camera and `_view` are presentation (the simulation does not read them), but the diagnostic kit still hashes them as
+    // PRESENTATION_READ_BY_SIM. Advance them once per tick, as a replay shown at 120 display frames per second does, so the
+    // state at N matches such a replay exactly. A replay shown at another display rate differs in the camera's dt-dependent
+    // sub-pixel position only: cosmetic. Draw, fx, audio and particles stay skipped.
     if (!this.crashed) { this.updateCamera(this.simClock.tickMs); this._updateView(); }
     return r;
   }
@@ -1446,15 +1448,13 @@ export class RunScene extends Phaser.Scene {
   _verifyTraceSample() {
     const tp = this.tapePlayer, tick = this.simClock.tick;
     if (!tp || tp.desync || this.crashed || tick % TRACE_EVERY !== 0) return;
-    const t = this.takeover;
-    if (!t) return;
-    if (!t.trace) t.trace = decodeTrace(t.descriptor.tape);
+    const trace = traceOf(tp.tape); // works with or without a takeover; a truncated trace verifies only the samples it has
     const i = (tick / TRACE_EVERY - 1) * 3;
-    if (i + 2 >= t.trace.length) return;
+    if (i + 2 >= trace.length) return;
     const b = this.sled.body;
     const got = [Math.fround(b.position.x), Math.fround(b.position.y), Math.fround(b.angle)];
-    if (got[0] !== t.trace[i] || got[1] !== t.trace[i + 1] || got[2] !== t.trace[i + 2]) {
-      tp.desync = { tick, via: 'trace', want: [t.trace[i], t.trace[i + 1], t.trace[i + 2]], got };
+    if (got[0] !== trace[i] || got[1] !== trace[i + 1] || got[2] !== trace[i + 2]) {
+      tp.desync = { tick, via: 'trace', want: [trace[i], trace[i + 1], trace[i + 2]], got };
     }
   }
 
@@ -1466,7 +1466,7 @@ export class RunScene extends Phaser.Scene {
    * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean}}
    */
   seekTo(target = this.takeover?.targetTick, opts = {}) {
-    if (!this.tapePlayer) return { done: false, tick: this.simClock.tick, steps: 0, desync: { tick: this.simClock.tick, reason: 'no-tape' } };
+    if (!this.tapePlayer || !Number.isFinite(target)) return { done: false, tick: this.simClock.tick, steps: 0, desync: { tick: this.simClock.tick, reason: this.tapePlayer ? 'no-target' : 'no-tape' } };
     const restore = this._muteForSeek();
     try { return seekStep(this, target, opts); } finally { restore(); }
   }
@@ -2868,7 +2868,8 @@ export class RunScene extends Phaser.Scene {
     this._leaving = true;
     const msg = reason === 'desync'
       ? `the tape desynced at tick ${detail && detail.desync ? detail.desync.tick : '?'} (${detail && detail.desync && detail.desync.via === 'trace' ? 'pose' : 'checkpoint'}); takeover cancelled`
-      : reason === 'prefix-crash' ? 'the replay crashed before the chosen tick; takeover cancelled' : 'takeover could not start';
+      : reason === 'prefix-crash' ? 'the replay crashed before the chosen tick; takeover cancelled'
+        : reason === 'error' ? `takeover failed (${String((detail && detail.message) || detail || 'error').slice(0, 80)})` : 'takeover could not start';
     if (this.takeover) { this.takeover.phase = 'aborted'; this.takeover.abort = { reason, detail: detail || null }; }
     this._postTakeoverNotice(reason, msg);
     this.ghostRecorder = null;
@@ -2881,7 +2882,15 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** SEEKING (bounded re-simulation of ticks 1..N) and READY (frozen at N, waiting for the player). */
-  _updateTakeoverPrelude(time, dt) {
+  _updateTakeoverPrelude() {
+    try { this._takeoverPreludeStep(); } catch (e) {
+      // An exception anywhere in the seek / READY path must end at the title with a reason, never a frozen black screen.
+      console.warn('Takeover failed; returning to the title', e);
+      this._abortTakeover('error', e);
+    }
+  }
+
+  _takeoverPreludeStep() {
     const t = this.takeover;
     if (!t || this._leaving) return;
     if (t.phase === 'seeking') {

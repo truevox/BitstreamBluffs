@@ -11,6 +11,7 @@ import { buildTakeoverDescriptor, takeoverEligible } from '../systems/replay/Tak
 import { CURRENT_RULESET_ID } from '../systems/replay/currentRulesetId.js';
 import { launchTakeover } from './TakeoverLauncher.js';
 import { uiSfx } from './Sound.js';
+import { showTakeoverNotice } from './TakeoverNotice.js';
 
 /**
  * T opens the picker only when Game Over is idle: never while the initials entry (or any text entry) is active, where T is a
@@ -23,6 +24,19 @@ export function takeoverKeyAllowed(scene) {
 /** The "T = TAKEOVER" footer hint shows only while the key would work (not during initials entry). */
 export function takeoverHintVisible(scene) {
   return takeoverKeyAllowed(scene) || !!scene.takeoverPicker;
+}
+
+/**
+ * What the picker's launch does. If GameOver's asynchronous board load created the initials entry AFTER the picker opened,
+ * launching would leave a qualifying ranked run's initials prompt unseen: go back to the entry instead. The eligibility is
+ * re-checked against THIS tape right before the descriptor (a fresh, frozen copy) is built.
+ * @returns {{action:'back-to-entry'}|{action:'refused', result:{reason:string, message:string}}|{action:'launch', descriptor:object}}
+ */
+export function decideTakeoverLaunch(scene, tape, tick) {
+  if (scene.entry) return { action: 'back-to-entry' };
+  const ok = takeoverEligible(tape, tick, { rulesetId: CURRENT_RULESET_ID });
+  if (!ok.ok) return { action: 'refused', result: ok };
+  return { action: 'launch', descriptor: buildTakeoverDescriptor({ tape, tick, source: 'last-run' }) };
 }
 
 export function installTakeoverHook(scene, theme) {
@@ -55,12 +69,16 @@ export function installTakeoverHook(scene, theme) {
     scene.takeoverPicker = new TakeoverPicker(scene, theme, {
       tape, rulesetId: CURRENT_RULESET_ID, onClose: close,
       onLaunch: (tick) => {
-        // re-check right before launching: the descriptor is a fresh, frozen copy of THIS tape
-        const ok = takeoverEligible(tape, tick, { rulesetId: CURRENT_RULESET_ID });
-        if (!ok.ok) return;
+        const d = decideTakeoverLaunch(scene, tape, tick);
+        if (d.action === 'back-to-entry') { close(); return; } // the initials prompt appeared while the picker was open
+        if (d.action === 'refused') {
+          scene.registry.set(REG.TAKEOVER_NOTICE, { reason: d.result.reason, message: d.result.message, at: Date.now() });
+          showTakeoverNotice(scene, theme);
+          return;
+        }
         scene.leaving = true;
         uiSfx(scene, 'uiSelect', { pitch: 1.3 });
-        launchTakeover(scene, buildTakeoverDescriptor({ tape, tick, source: 'last-run' }));
+        launchTakeover(scene, d.descriptor);
       },
     });
     scene.takeoverInput = new MenuInput(scene, (a) => scene.takeoverPicker && scene.takeoverPicker.handleAction(a), { graceMs: 120 });

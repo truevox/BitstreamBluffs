@@ -445,3 +445,78 @@ describe('UNRANKED at every write site (each with a negative control)', () => {
     expect(tk.ghostRecorder).toBeNull();
   });
 });
+
+describe('exceptions end at the title, never a black screen', () => {
+  test('a throw in the middle of the seek aborts: TITLE, notice with the reason, no recorder / tape driver, RUN_ABORT practice', () => {
+    const s = takeoverScene(TAPE, 900);
+    s.inputRouter = { poll: () => H.livePad(), setEnabled() {} };
+    const orig = s.stepReplayTick.bind(s);
+    s.stepReplayTick = (...a) => { if (s.simClock.tick === 50) throw new Error('boom at 50'); return orig(...a); };
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    for (let i = 0; i < 50 && s.takeover.phase === 'seeking'; i++) s.update(0, tickMs);
+    warn.mockRestore();
+    expect(s.takeover.phase).toBe('aborted');
+    expect(s.takeover.abort.reason).toBe('error');
+    expect(s.__starts.map((a) => a[0])).toEqual([H.SCENES.TITLE]);
+    expect(s.registry.get(H.REG.TAKEOVER_NOTICE)).toMatchObject({ reason: 'error', message: expect.stringContaining('boom at 50') });
+    expect(s.ghostRecorder).toBeNull();
+    expect(s.tapePlayer).toBeNull();
+    expect(s._seeking).toBe(false); // the mute was undone
+    expect(s.__events.find((e) => e[0] === H.EVT.RUN_ABORT)[1]).toMatchObject({ practice: true, takeover: true, why: 'error' });
+    expect(s.__events.some((e) => e[0] === H.EVT.RUN_END)).toBe(false);
+  });
+  test('control: without the injected throw the same seek reaches READY', () => {
+    expect(seekReady(takeoverScene(TAPE, 900))).toBe('ready');
+  });
+  test('a tape with an unknown daily rule id is refused up front (it would have thrown in create)', () => {
+    const t = JSON.parse(JSON.stringify(TAPE)); t.dailyRuleId = 'no-such-daily-rule';
+    const d = { ...buildTakeoverDescriptor({ tape: TAPE, tick: 300 }), tape: t };
+    const s = takeoverScene(TAPE, 300, { raw: d });
+    expect(s.takeover).toBeNull();
+    expect(s.__starts.map((a) => a[0])).toEqual([H.SCENES.TITLE]);
+    expect(s.registry.get(H.REG.TAKEOVER_NOTICE)).toMatchObject({ reason: 'undecodable' });
+  });
+});
+
+describe('seekTo without a takeover (the #66 candidate path)', () => {
+  const replayScene = (tape) => {
+    class R extends H.RunScene { create() { this.registry.set(H.RULESET_KEY, H.RULESET); this.registry.set(H.REG.GHOST_REPLAY, tape); super.create(); } }
+    return H.createRun(R, H.REG, { seed: 'x' });
+  };
+  test('plain GHOST_REPLAY scene: seekTo(N) reaches N exactly, silently, with verification (control: tampered tape desyncs)', () => {
+    const s = replayScene(JSON.parse(JSON.stringify(TAPE)));
+    expect(s.takeover).toBeNull();
+    const r = s.seekTo(700);
+    expect(r).toMatchObject({ done: true, tick: 700 });
+    expect(H.fp(s)).toBe(REC.fps.get(700));
+    const t = JSON.parse(JSON.stringify(TAPE));
+    const i = t.inputs.findIndex((row) => row[1] & (1 << 12)); t.inputs[i][1] &= ~(1 << 12);
+    const bad = replayScene(t).seekTo(900);
+    expect(bad.done).toBe(false);
+    expect(bad.desync).toBeTruthy();
+  });
+  test('verify:false skips the checkpoint and pose checks (a candidate tape that diverges from its own stored trace)', () => {
+    const t = JSON.parse(JSON.stringify(TAPE));
+    const i = t.inputs.findIndex((row) => row[1] & (1 << 12)); t.inputs[i][1] &= ~(1 << 12);
+    const r = replayScene(t).seekTo(900, { verify: false });
+    expect(r).toMatchObject({ done: true, tick: 900 });
+    expect(r.desync).toBeUndefined();
+  });
+  test('a tape whose trace and checkpoints end before the target verifies only what it has (no error, no false desync)', () => {
+    const t = JSON.parse(JSON.stringify(TAPE));
+    t.checkpoints = t.checkpoints.filter((c) => c[0] <= 240);
+    const keep = Math.floor(240 / 4) * 3;
+    const all = new Float32Array(Uint8Array.from(Buffer.from(TAPE.trace, 'base64')).buffer);
+    t.trace = Buffer.from(all.slice(0, keep).buffer).toString('base64');
+    const s = replayScene(t);
+    const r = s.seekTo(700);
+    expect(r).toMatchObject({ done: true, tick: 700 });
+    expect(s.tapePlayer.desync).toBeNull();
+    expect(H.fp(s)).toBe(REC.fps.get(700));
+  });
+  test('seekTo with no tape or no target returns a clean failure instead of throwing', () => {
+    const ord = H.createRun(H.RunScene, H.REG, { seed: 'A' });
+    expect(ord.seekTo(100)).toMatchObject({ done: false, desync: { reason: 'no-tape' } });
+    expect(replayScene(JSON.parse(JSON.stringify(TAPE))).seekTo(undefined)).toMatchObject({ done: false, desync: { reason: 'no-target' } });
+  });
+});
