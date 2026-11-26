@@ -26,7 +26,12 @@ try{
  // potential contents. Second activation explicitly copies the URL.
  await p.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene')._openGhosts());
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView?.shareBtn,null,{timeout:12000});
- await p.waitForTimeout(450);
+ // Same CRT animation on the sender side. A fixed wall-clock delay is
+ // not a rendered-frame guarantee on a saturated Chromium runner.
+ await p.waitForFunction(()=>{
+  const v=window.__bbGame.scene.getScene('GameOverScene').ghostView,panel=v?.panel;
+  return v?.alive&&v.shareBtn?.zone?.scene&&panel.alpha===1&&panel.scaleX===1&&panel.scaleY===1&&panel.y===Math.round((270-v.h)/2);
+ },null,{timeout:15000});
  // Source could be opened with an untrusted path/query; sharing must never
  // copy either into the URL sent to a friend.
  await p.evaluate(()=>history.replaceState(null,'',location.pathname+'my-private-route/?session=secret-session-token'));
@@ -304,6 +309,15 @@ try{
  await recipient.evaluate(()=>window.__bbGame.scene.getScene('TitleScene')._openSeed());
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.ghostLinkBtn,null,{timeout:8000});
  await recipient.locator('input').focus();
+ // The failing CI path is the mobile opt-in race. Freeze the real CRT open
+ // tween before constructing this view, then hold it partway open until the
+ // stable-target wait observes and rejects the moving geometry below.
+ const slowRaceOpen=mobile&&process.env.BSB_GUEST_PRACTICE==='1';
+ if(slowRaceOpen)await recipient.evaluate(()=>{
+  const t=window.__bbGame.scene.getScene('TitleScene');
+  window.__raceOldTweens=t.tweens.getTweens();
+  t.tweens.timeScale=0;
+ });
  await recipient.keyboard.press('Shift+Enter');
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
  const direct=await recipient.evaluate(()=>{
@@ -313,6 +327,7 @@ try{
  });
  if(!direct.prefilled||direct.loaded||direct.length!==copiedUrl.length)
   throw Error('Arrived ghost was auto-imported or failed to prefill '+JSON.stringify(direct));
+ await recipient.locator('textarea').focus();
  await recipient.keyboard.press('Control+Enter');
  await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
  const accepted=await recipient.evaluate(()=>{
@@ -334,46 +349,104 @@ try{
     courses:lib.courses.size,tapes:lib.tapes.size,lastRecord:r.get('lastRecord')?.id||null,
     lastTape:r.get('lastGhostTape')?.runId||null};
   });
-  // A cross-machine CSS-scale/tween race can move the Phaser hitzone after
-  // the first coordinate sample. Re-read the real rendered hitbox on each
-  // attempt. Only genuine Playwright pointer clicks may arm/confirm.
-  const practicePoint=()=>recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v?.practiceBtn?.zone;
-   if(!z||!z.scene)return null;
-   const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
-   const r=document.querySelector('canvas').getBoundingClientRect();
-   return {x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
+  // The preview can finish while the CRT opening animation is still moving
+  // the panel (even while alpha is zero). Never sample a hitbox during that
+  // transition: a stale Race coordinate can hit BACK instead. Preserve the
+  // actual view identity and require a stable, visible canvas hit target.
+  await recipient.evaluate(()=>{
+   const t=window.__bbGame.scene.getScene('TitleScene'),v=t.view;
+   window.__raceView=v;
+   window.__racePointerTrace=[];
+   const record=(kind,p)=>{if(window.__racePointerTrace.length<16)window.__racePointerTrace.push({kind,x:p?.x,y:p?.y});};
+   v.practiceBtn.zone.on('pointerdown',p=>record('race',p));
+   v.back.zone.on('pointerdown',p=>record('back',p));
+   v.panel.once('destroy',()=>record('destroy'));
   });
-  const allowed=await recipient.evaluate(()=>({disabled:window.__bbGame.scene.getScene('TitleScene').view.practiceBtn.disabled}));
-  if(allowed.disabled)throw Error('Eligible NORMAL guest was refused by practice policy');
-  let armAttempts=0,armedRace=null;
-  const raceState=()=>recipient.evaluate(()=>{
-   const g=window.__bbGame,v=g.scene.getScene('TitleScene')?.view;
-   return {armed:v?.practiceArmed===true,
-    text:v?.status?.main?.text||null,label:v?.practiceBtn?.label?.main?.text||null,
-    view:!!v,running:g.scene.isActive('RunScene'),starting:g.scene.getScene('TitleScene')?.starting===true};
-  });
-  for(;armAttempts<5;armAttempts++){
-   const point=await practicePoint();
-   if(!point)throw Error('Race Guest hitzone disappeared before consent');
-   await recipient.mouse.move(point.x,point.y);
-   await recipient.mouse.click(point.x,point.y);
-   // Phaser pointerdown can be dispatched on the NEXT rendering frame. Wait
-   // for that input before deciding the click missed; otherwise a retry may
-   // be a SECOND consent and race ahead of the state assertion.
-   await recipient.waitForTimeout(500);
-   armedRace=await raceState();
-   if(armedRace.running||armedRace.starting)
-    throw Error('Guest launched before an OBSERVED first consent '+JSON.stringify({armedRace,armAttempts}));
-   if(armedRace.armed)break;
-   if(!armedRace.view)throw Error('Practice preview disappeared without consent '+JSON.stringify(armedRace));
+  if(slowRaceOpen){
+   // Recreate the measured red geometry using Phaser's actual open tween.
+   // At ~0.74 scale the nominal full-size Race center lies inside BACK.
+   // Do not click the stale coordinates: the production test must WAIT.
+   const held=await recipient.evaluate(()=>{
+    const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view;
+    const tween=t.tweens.getTweens().find(x=>!window.__raceOldTweens.includes(x)&&x.data?.[0]?.duration===260);
+    if(!tween)throw Error('Missing real Ghost CRT open tween');
+    const center=b=>{const z=b.zone;return z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);};
+    const stale=center(v.practiceBtn);
+    t.tweens.timeScale=1;
+    try{tween.seek(122,1,true);}finally{t.tweens.timeScale=0;}
+    const back=center(v.back);
+    const backZone=v.back.zone,scale=v.panel.scaleY;
+    return {scale,alpha:v.panel.alpha,stale:{x:stale.x,y:stale.y},back:{x:back.x,y:back.y},
+     staleHitsBack:Math.abs(stale.x-back.x)<backZone.width/2&&Math.abs(stale.y-back.y)<backZone.height*scale/2};
+   });
+   if(!(held.scale>0&&held.scale<1)||!held.staleHitsBack)
+    throw Error('Slow-open control did not reproduce stale Race -> BACK geometry '+JSON.stringify(held));
+   console.log('RACE_SLOW_OPEN_CONTROL',JSON.stringify(held));
   }
-  if(!armedRace?.armed||armedRace.running||!armedRace.text?.includes('NO XP')||armedRace.label!=='CONFIRM RACE')
-   throw Error('Unranked double-consent gate failed after stable pointer attempts '+JSON.stringify({armedRace,armAttempts}));
-  // Reacquire the same real hitzone after arming; the first click must NEVER
-  // launch gameplay and must not be repeated after practiceArmed becomes true.
+  const raceState=()=>recipient.evaluate(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view,original=window.__raceView;
+   return {armed:v?.practiceArmed===true,text:v?.status?.main?.text||null,
+    label:v?.practiceBtn?.label?.main?.text||null,view:!!v,sameView:v===original,
+    alive:v?.alive===true,zone:!!v?.practiceBtn?.zone?.scene,
+    disabled:v?.practiceBtn?.disabled,busy:v?.busy,alpha:v?.panel?.alpha,
+    scaleY:v?.panel?.scaleY,panelY:v?.panel?.y,
+    running:g.scene.isActive('RunScene'),starting:t.starting===true,trace:window.__racePointerTrace};
+  });
+  const practicePoint=async()=>{
+   // Check consecutive rendered frames, not elapsed wall-clock time. Slow
+   // Chromium may take much longer than the 260 ms animation duration.
+   await recipient.evaluate(()=>{window.__raceStable={key:null,frames:0,blocked:0};});
+   await recipient.waitForFunction(()=>{
+    const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view,z=v?.practiceBtn?.zone,panel=v?.panel;
+    if(v!==window.__raceView||!v?.alive||!z?.scene||t.starting||g.scene.isActive('RunScene'))
+     throw Error('Guest preview replaced before explicit consent');
+    if(v.busy||v.practiceBtn.disabled||panel.alpha!==1||panel.scaleX!==1||panel.scaleY!==1||panel.y!==18){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked+1};return false;
+    }
+    const p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=g.canvas.getBoundingClientRect();
+    const point={x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
+    if(document.elementFromPoint(point.x,point.y)!==g.canvas){
+     window.__raceStable={key:null,frames:0,blocked:window.__raceStable.blocked+1};return false;
+    }
+    const key=JSON.stringify({point,left:r.left,top:r.top,width:r.width,height:r.height});
+    const old=window.__raceStable;
+    window.__raceStable={key,frames:old.key===key?old.frames+1:1,point,blocked:old.blocked};
+    return window.__raceStable.frames>=3;
+   },null,{timeout:15000,polling:'raf'}).catch(async e=>{
+    throw Error('Race Guest never became a stable rendered target '+JSON.stringify(await raceState()),{cause:e});
+   });
+   return recipient.evaluate(()=>window.__raceStable.point);
+  };
+  const allowed=await raceState();
+  if(allowed.disabled||!allowed.sameView||!allowed.zone)throw Error('Eligible NORMAL guest was refused by practice policy '+JSON.stringify(allowed));
+  // Exactly ONE first activation. Wait for observed consent, never retry a
+  // click which might still be queued and then count as a confirmation.
+  const firstPointPromise=practicePoint();
+  if(slowRaceOpen){
+   // Confirm the actual wait has refused at least one partial-open frame
+   // before letting the real animation finish. No synthetic consent.
+   try{
+    await recipient.waitForFunction(()=>window.__raceStable?.blocked>0,null,{timeout:8000});
+    console.log('PASS_RACE_TARGET_REJECTS_PARTIAL_OPEN');
+   }finally{
+    await recipient.evaluate(()=>{window.__bbGame.scene.getScene('TitleScene').tweens.timeScale=1;});
+   }
+  }
+  const firstPoint=await firstPointPromise;
+  await recipient.mouse.click(firstPoint.x,firstPoint.y);
+  await recipient.waitForFunction(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),v=t.view;
+   return v?.practiceArmed===true||v!==window.__raceView||t.starting||g.scene.isActive('RunScene');
+  },null,{timeout:10000}).catch(async e=>{
+   throw Error('First Race Guest click did not arm '+JSON.stringify(await raceState()),{cause:e});
+  });
+  const armedRace=await raceState();
+  if(!armedRace.sameView||!armedRace.alive||!armedRace.zone||!armedRace.armed||armedRace.running||armedRace.starting||
+     !armedRace.text?.includes('NO XP')||armedRace.label!=='CONFIRM RACE'||
+     armedRace.trace.filter(x=>x.kind==='race').length!==1||armedRace.trace.some(x=>x.kind==='back'||x.kind==='destroy'))
+   throw Error('Unranked double-consent gate failed '+JSON.stringify(armedRace));
+  // A fresh rendered hitbox and an explicitly distinct second click.
   const confirmPoint=await practicePoint();
-  if(!confirmPoint)throw Error('Race Guest hitzone disappeared after consent');
   await recipient.mouse.click(confirmPoint.x,confirmPoint.y);
   await recipient.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene')&&
     window.__bbGame.scene.getScene('RunScene').guestPractice===true&&
