@@ -44,7 +44,9 @@
   // #72/#69: guestPractice, guestPracticeTape, takeover and unrankedPractice select the unranked write policy; _seeking only
   // gates presentation during a takeover re-simulation. None is simulation state.
   const METADATA = ['runId', 'startedAt', 'ghostRecorder', 'tapePlayer', '_ghostToken', '_bsodObserverErrorLogged',
-    'guestPractice', 'guestPracticeTape', 'takeover', 'unrankedPractice', '_seeking'];
+    'guestPractice', 'guestPracticeTape', 'takeover', 'unrankedPractice', '_seeking',
+    // #66: coachSim marks a hidden candidate re-simulation; crashInfo is the cause the coach reads back after a crash
+    'coachSim', 'crashInfo'];
   // PRESENTATION: render-only objects and per-frame visual state.
   // look/palette are re-resolved when the biome sector changes (RunScene ~L2383): derived presentation, not CONFIG.
   const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',

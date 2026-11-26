@@ -175,10 +175,12 @@ export function createTakeoverRecorder(d) {
  * this driver only meters it and watches for a desync. Any desync at or before N aborts: it never continues.
  * @param {{simClock:{tick:number}, tapePlayer:{desync:object|null}, crashed:boolean, stepReplayTick:(o?:object)=>void}} scene
  * @param {number} target
- * @param {{maxTicks?:number, budgetMs?:number, now?:()=>number, verify?:boolean}} [o] verify:false skips the checkpoint and
+ * @param {{maxTicks?:number, budgetMs?:number, now?:()=>number, verify?:boolean, stopOnCrash?:boolean, onTick?:(scene:object)=>void}} [o]
+ *   stopOnCrash (#66): a crash ends the seek as a RESULT `{done:true, crashed:true, crashTick, cause, hazardId}` instead of an abort;
+ *   onTick is called after every step. verify:false skips the checkpoint and
  *   pose-trace checks (a candidate tape whose checkpoints / trace end before the target); the default verifies up to the last
  *   checkpoint / trace sample the tape has
- * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean}}
+ * @returns {{done:boolean, tick:number, steps:number, desync?:object, crashed?:boolean, crashTick?:number, cause?:string|null, hazardId?:string|null}}
  */
 export function seekStep(scene, target, o = {}) {
   const maxTicks = o.maxTicks ?? SEEK_MAX_TICKS_PER_FRAME;
@@ -189,7 +191,13 @@ export function seekStep(scene, target, o = {}) {
   while (scene.simClock.tick < target && steps < maxTicks) {
     scene.stepReplayTick(o);
     steps++;
+    if (o.onTick) o.onTick(scene);
     if (scene.tapePlayer.desync) return { done: false, tick: scene.simClock.tick, steps, desync: scene.tapePlayer.desync };
+    // #66: the Crash Coach re-simulates a candidate and WANTS to know when and why it crashed: that is a result, not an abort.
+    if (scene.crashed && o.stopOnCrash) {
+      const info = scene.crashInfo || {};
+      return { done: true, tick: scene.simClock.tick, steps, crashed: true, crashTick: scene.simClock.tick, cause: info.cause ?? null, hazardId: info.hazardId ?? null };
+    }
     // A fatal crash before N cannot be a faithful prefix of the tape (the tape's own run survived to N).
     if (scene.crashed) return { done: false, tick: scene.simClock.tick, steps, crashed: true };
     if ((steps & 63) === 0 && now() - t0 >= budgetMs) break;

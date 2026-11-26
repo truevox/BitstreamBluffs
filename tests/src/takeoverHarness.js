@@ -49,3 +49,6 @@ export function recordRun({ seed = 'TKOVR72', level = 1, padFor, maxTicks = 2000
 
 /** The default scripted input used by the takeover tests: push, then coast (crashes on its own on most seeds). */
 export const coastPad = (t) => livePad({ push: t < 400, variableHop: true, noAutoNudge: true });
+
+// #66: the pure coach modules, for tests that build candidate tapes against a real recording.
+export const coach = await import('../../src/systems/coach/Perturb.js');
