@@ -392,7 +392,7 @@ describe('UNRANKED at every write site (each with a negative control)', () => {
     expect(run(true)).toEqual([]);
   });
 
-  test('guest practice (#69) and takeover both leave device tutorial / tuck-hint flags unchanged', () => {
+  test('guest practice (#69) never consumes persistent tutorial / tuck-hint flags', () => {
     const guestTape = JSON.parse(JSON.stringify(TAPE));
     const st = spyStorage();
     try {
@@ -401,9 +401,11 @@ describe('UNRANKED at every write site (each with a negative control)', () => {
       expect(guest.guestPractice).toBe(true);
       expect(guest.unrankedPractice).toBe(true);
       expect(guest.takeover).toBeNull();
-      guest.tutDone = new Set(); guest.tuckShows = 0;
+      guest.tutDone.clear(); guest.tuckShows = 0;
       guest.tutDoneId('push'); guest.applyHintEvents([{ id: 'tuck', show: true }]);
       expect(st.calls).toEqual([]);
+      expect(guest.tutDone.has('push')).toBe(true);
+      expect(guest.tuckShows).toBe(1);
     } finally { st.restore(); }
   });
 

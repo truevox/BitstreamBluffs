@@ -11,6 +11,10 @@ import { launchTakeover } from '../ui/TakeoverLauncher.js';
 import { retryDescriptor } from '../systems/replay/Takeover.js';
 import { CURRENT_RULESET_ID } from '../systems/replay/currentRulesetId.js';
 import { uiSfx } from '../ui/Sound.js';
+import { PostcardEndView } from '../ui/PostcardEndView.js';
+import { POSTCARD_SOURCE } from '../systems/replay/Takeover.js';
+import { replyFromTakeoverTape, encodeReply } from '../systems/replay/Postcard.js';
+import { copyText } from '../systems/replay/PostcardShare.js';
 
 export class TakeoverEndScene extends Phaser.Scene {
   constructor() {
@@ -21,6 +25,7 @@ export class TakeoverEndScene extends Phaser.Scene {
   init(data) {
     this.descriptor = (data && data.descriptor) || null;
     this.cause = (data && data.cause) || 'crash';
+    this.outcome = (data && data.outcome) || null; // #67: how a postcard attempt ended
   }
 
   create() {
@@ -30,10 +35,25 @@ export class TakeoverEndScene extends Phaser.Scene {
     this.theme = new Theme(this);
     // The player was mashing keys when the run ended: ignore input for a beat so a stray press cannot retry or leave.
     this.input_ = new MenuInput(this, (a) => this.view && this.view.handleAction(a), { graceMs: 600 });
-    this.view = new TakeoverEndView(this, this.theme, {
-      tick: this.descriptor ? this.descriptor.tick : 0, cause: this.cause,
-      onRetry: () => this.retry(), onClose: () => this.back(),
-    });
+    const post = !!(this.descriptor && this.descriptor.source === POSTCARD_SOURCE);
+    this.view = post
+      ? new PostcardEndView(this, this.theme, {
+        tick: this.descriptor.tick, outcome: this.outcome, replyAvailable: !!this.outcome && this.outcome.result !== 'quit',
+        onRetry: () => this.retry(), onClose: () => this.back(), onReply: () => this.copyReply(),
+      })
+      : new TakeoverEndView(this, this.theme, {
+        tick: this.descriptor ? this.descriptor.tick : 0, cause: this.cause,
+        onRetry: () => this.retry(), onClose: () => this.back(),
+      });
+  }
+
+  /** #67: the reply code of the attempt that just ended, to the local clipboard. Never sent anywhere. */
+  async copyReply() {
+    try {
+      const r = replyFromTakeoverTape({ tape: this.registry.get(REG.LAST_TAKEOVER_TAPE), descriptor: this.descriptor, outcome: this.outcome });
+      if (!r.ok) return { ok: false, message: r.message };
+      return await copyText(await encodeReply(r.reply), typeof navigator !== 'undefined' ? navigator : undefined);
+    } catch (e) { return { ok: false, message: 'could not build the reply' }; }
   }
 
   /** Every retry is an independent attempt: rebuild the descriptor from the parent tape and RE-VALIDATE it. */

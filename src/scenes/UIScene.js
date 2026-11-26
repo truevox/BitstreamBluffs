@@ -32,6 +32,7 @@ import { killerName } from '../systems/CrashReport.js';
 import { RunMinimap } from '../ui/RunMinimap.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { TakeoverHud } from '../ui/TakeoverHud.js';
+import { PostcardReady } from '../ui/PostcardReady.js';
 import { applyHudResync } from '../ui/HudResync.js';
 
 /** #72: the HUD tag of a Replay Takeover run (guest practice keeps its own). */
@@ -241,6 +242,7 @@ export class UIScene extends Phaser.Scene {
     on(EVT.MUSIC_TRACK_CHANGED, this.onMusicTrackChanged);
     on(EVT.HUD_RESYNC, (s) => applyHudResync(this, s)); // #72: takeover handoff rebuilds the whole HUD from sim state
     this.takeoverHud = new TakeoverHud(this, this.theme, this.hud); // #72: SEEKING n% / READY banner
+    this.postcardReady = new PostcardReady(this, this.theme, this.hud); // #67: P = postcard at READY, window countdown
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
