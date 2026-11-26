@@ -26,6 +26,7 @@ export class GhostFavoritesView extends View {
     super(scene, theme, { w: 352, h: 194, title: 'COURSE GHOSTS', color: 'magenta', onClose: o.onClose,
       hints: [{ keys: ['↑', '↓'], label: 'ROW' }, { keys: ['←', '→'], label: 'SHOW' }, { keys: ['ENTER'], label: 'SELECT' }] });
     this.library = o.library;
+    this.onEvidence = o.onEvidence || null;
     this.tape = o.tape;
     // Preserve the existing G, Enter shortcut for pinning Favorite A.
     this.focus = GHOST_COURSE_ROWS.findIndex(({ slot }) => slot === 0);
@@ -56,7 +57,20 @@ export class GhostFavoritesView extends View {
       return { mark, info, detail, save, show };
     });
     text(12, 149, 'SHARED: DRAWS ONCE IF ANY ROLE CAN SHOW.');
-    text(12, 160, 'LINK SHARES INPUTS + LOADOUT + SCORE.');
+    // #69 sharing and #244 private evidence coexist without overlapping the
+    // fixed-size 352px panel: two distinct selectable footer actions.
+    this.archiveButton = null;
+    this.archiveArrow = null;
+    if (this.onEvidence) {
+      this.archiveButton = new Button(scene, theme, {
+        x: 12, y: 157, w: 96, h: 15, label: 'LOCAL EVIDENCE', color: 'cyan',
+        onClick: () => this._openEvidence(),
+      });
+      this.panel.add(this.archiveButton);
+      text(115, 160, 'PRIVATE — NO UPLOAD', 'cyan');
+      this.archiveArrow = new NeonText(scene, theme, 4, 160, '>', { color: 'cyan', outline: 'none' });
+      this.panel.add(this.archiveArrow);
+    } else text(12, 160, 'LINK SHARES INPUTS + SCORE.');
     this.shareBtn = new Button(scene, theme, {
       x: 249, y: 157, w: 92, h: 15, label: 'SHARE LINK', color: 'cyan',
       onClick: () => { this.focus = this.rows.length; this._markFocus(); this._shareGhost(); },
@@ -75,6 +89,17 @@ export class GhostFavoritesView extends View {
   _markFocus() {
     this.rows.forEach(({ mark }, i) => mark.setVisible(i === this.focus));
     this.shareArrow?.setVisible(this.focus === this.rows.length);
+    this.shareBtn?.setHover(this.focus === this.rows.length);
+    this.archiveArrow?.setVisible(this.focus === this.rows.length + 1);
+    this.archiveButton?.setHover(this.focus === this.rows.length + 1);
+  }
+
+  _openEvidence() {
+    if (!this.archiveButton || !this.onEvidence || !this.alive) return;
+    this._disarmShare(); // A prepared ghost URL must not outlive navigation.
+    this.focus = this.rows.length + 1;
+    this._markFocus();
+    this.onEvidence();
   }
 
   _select(i, save) {
@@ -189,11 +214,13 @@ export class GhostFavoritesView extends View {
     if (action === 'cancel' || action === 'ghost') { this.close(); return true; }
     if (action === 'up' || action === 'down') {
       this._disarmShare();
-      this.focus = (this.focus + (action === 'up' ? -1 : 1) + this.rows.length + 1) % (this.rows.length + 1);
+      const available = this.rows.length + 1 + (this.archiveButton ? 1 : 0);
+      this.focus = (this.focus + (action === 'up' ? -1 : 1) + available) % available;
       uiSfx(this.scene, 'uiMove');
       this._markFocus();
     } else if (action === 'confirm') {
       if (this.focus === this.rows.length) this._shareGhost();
+      else if (this.archiveButton && this.focus === this.rows.length + 1) this._openEvidence();
       else this._select(this.focus, GHOST_COURSE_ROWS[this.focus].slot !== undefined);
     } else if ((action === 'left' || action === 'right') && this.focus < this.rows.length) this._toggle(this.focus);
     return true;

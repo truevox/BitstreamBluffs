@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
+
+- **Owner-approved local attempt history** (Marvin, #68, 2026-11-25): a separate IndexedDB store `bitstream-attempt-history` keeps each finished ordinary run's 30 Hz pose trace plus compatibility metadata only (no inputs, checkpoints, fingerprints or ledger data). **Default 5 per course**, Settings → PAST ATTEMPTS → *PAST ATTEMPTS TO KEEP* 0..40 (0 keeps none; the maximum is shown). FIFO eviction of this store only, ≤ 256 KB per attempt and ≤ 12 MB overall, quota recovery from its own oldest rows, damaged rows dropped, two-press CLEAR HISTORY. Lowering trims at once; raising cannot restore. Never uploaded.
+- **Game Over → MONTAGE (M)**: past attempts ride beside this run (follow camera), each fallen self leaves a headstone, then the whole field as an overview. MONTAGE style labels up to 8 recent attempts; SWARM draws every kept attempt within a device rider budget (40 standard, 16 Chromebook-class, adaptive down to 4). Exact course + ruleset/terrain revision only; also reads this course's existing Best/Latest/Favorite ghosts read-only. Never opens by itself; reduced motion (setting or OS under AUTO) shows a still overview that never autoplays.
+- Presentation only: no GhostRider/Matter body, collision, RNG, score, replay or physics change. `RunScene`, `GhostLibrary` and causal tripwire files are untouched; build identity unchanged apart from the package version.
+- Tests: 53 current focused history/montage Jest cases, real-Chromium acceptance + performance harness `tools/ghosts/cemetery-montage-browser.mjs` (CI workflow `cemetery-montage.yml`). Physical Chromebook acceptance is still owed; #68 stays open until it passes.
+
+## v2.22.9 — #242 source-triggered Heavy Mode diagnostic gates (2026-11-25)
+
+- Enforce compiled Chromium savestate capture→fresh restore→strict identical contact/hazard suffix checks on relevant PR source changes, after the source-bound Matter/recorder and fast CLI refusal tests. Retain the already proved native long-run and moving-hazard gate evidence.
+- Harmonize the child-process and Jest timeouts for fast negative tests so slow CI cannot falsely label a routine refusal as a test failure; unexpected spawn errors remain fatal.
+- Exempt only a browser-cancelled *optional* Apple touch icon (`net::ERR_ABORTED`) from offline-PWA release QA. Worker, JavaScript, manifest, audio and all other resource failures remain hard failures with dedicated negative tests.
+- Developer-only diagnostics and offline browser QA: **no** live player savestate UI, trusted suspend slot, public score acceptance, simulation physics, changed SIM_REVISION or automatic upload. Parent #119 and player-facing trusted savestates remain open. This is an isolated draft stacked after v2.22.8, awaiting independent exact-head review and coordinated deployment.
+
+## v2.22.8 — #244 private protected replay evidence release candidate (2026-11-25)
+
+- Retain canonical full-run input evidence in a separate local IndexedDB v3 archive independent of the five visible ghost roles, with atomic run-ID/seed/biome binding, candidate/submitted/pinned references, explicit unpin, and corruption/quota fail-closed behavior.
+- Add deliberate private Game Over Keep, Export, Import and Refresh controls with visible durable-versus-memory-only statuses and explicit source-file retention guidance. No automatic network uploads, rankings or official verification.
+- Reconcile the new Local Evidence entry with the already released #69 Share Link button: both fit in the same Game Over ghost panel, keyboard/pointer navigation preserves both, and entering local files disarms any prepared share URL. Preserve #56 exact-course atomic ghost roles and retention.
+- Extend source-bound current-SIM9 terminal replay QA: 12 ordinary + 12 high-density native RunScene/Matter captures, plus a 32-run genuine-native Chromium 300 KB quota stress test. All observed byte integrity, actual contact and quota/retry results remain **local technical evidence**, not honest-human-play authentication or actual Chromebook capacity proof.
+- Keep public score/entitlement proof #135, competitive submission, physical-device storage acceptance and parent #119 trusted savestate UI **open**. No SIM9 physics, input-tick meaning, scoring, automatic publication or user consent behavior is changed. This is a draft candidate pending exact-head independent review and release coordination.
+
 ## v2.22.7 — #69 opt-in, unranked guest trace practice (2026-11-25)
 
 - After explicitly PREVIEWing a current-SIM9 NORMAL-mode Guest Link, RACE GUEST asks twice before launching a new player-controlled run on the exact shared seed and biome mask. An unverified magenta GUEST trace is visual-only, with no collision body or replay input driver; the player's own current loadout still applies.
