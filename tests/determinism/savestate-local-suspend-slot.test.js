@@ -100,6 +100,21 @@ describe('inert local single-use suspend slot — cannot authorize a restore',()
   expect(await slot.clearReady()).toEqual({ok:true,cleared:false});
   expect(idb.names()).toEqual([SUSPEND_SLOT_DB]);
  });
+ test('a corrupted local status cannot be silently overwritten by replace:true',async()=>{
+  const idb=fakeIdb(),slot=make(idb);
+  expect((await slot.put(bytes(),identity(),layout)).ok).toBe(true);
+  const db=await new Promise((resolve,reject)=>{
+   const req=idb.open(SUSPEND_SLOT_DB,1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+  const tx=db.transaction(SUSPEND_SLOT_STORE,'readwrite'),store=tx.objectStore(SUSPEND_SLOT_STORE);
+  const get=store.get(SUSPEND_SLOT_KEY);
+  get.onsuccess=()=>{store.put({...get.result,status:'unknown-corrupted',claimedBy:uuid(42)});};
+  await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();
+  expect(await slot.put(bytes({runId:'replacement'}),identity(),layout,{replace:true}))
+   .toEqual({ok:false,code:'invalid-slot-state'});
+  expect(await slot.claim(identity(),layout)).toEqual({ok:false,code:'slot-claimed'});
+  expect(await slot.clearReady()).toEqual({ok:false,code:'slot-claimed'});
+ });
  test('quota and storage errors never claim success; subsequent normal write is possible',async()=>{
   const idb=fakeIdb(),slot=make(idb);
   idb.hooks.failPut=Object.assign(Error('full'),{name:'QuotaExceededError'});

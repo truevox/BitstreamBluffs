@@ -86,6 +86,10 @@ export class LocalSuspendSlot{
   const record={id:SUSPEND_SLOT_KEY,status:'ready',bytes:stable,runId,tick,
    integrity,buildId:inspected.envelope.build.buildId};
   return this._modify((store,current)=>{
+   // Unknown persisted state is not a replaceable READY slot. Otherwise a
+   // corrupt/migrated record could be silently destroyed by replace:true.
+   if(current&&current.status!=='ready'&&current.status!=='claimed')
+    return {ok:false,code:'invalid-slot-state'};
    if(current?.status==='claimed')return {ok:false,code:'slot-claimed'};
    if(current&&!replace)return {ok:false,code:'slot-occupied'};
    store.put(record);
