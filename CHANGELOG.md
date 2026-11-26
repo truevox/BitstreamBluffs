@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.3 — #119 inert single-use local suspend-slot foundation (2026-11-25)
+
+- Introduces a private IndexedDB suspend-slot protocol with exact-build and registered-layout envelope admission, atomic cross-tab claim, owner-token-gated release/consume, reload-persistent claimed state and bounded 16 MiB input. An occupied/claimed slot cannot be overwritten by another tab.
+- The protocol is intentionally inert: there is **no registered production Matter savestate layout, real game restore or recorder continuation, player save/load UI, trust claim, score/ranking credit or upload**. A claim still means `envelope-only` validation. Browser crashes leave claims locked rather than granting an unsafe second resume; full player-facing recovery requires future policy and runtime work.
+- Developer tests prove rejected corrupt/incompatible envelopes and malformed persisted status (including attempted overwrite), two real Chromium tabs competing for one claim, persistence across reload, failed-storage denial, stale-token rejection and zero HTTP writes; no physics/replay revision changed.
+
 ## v2.25.2 — #56 repeatable Course Archive Slots (2026-11-25)
 
 - The fixed display stays **Best, Latest and three Favorites** (at most five distinct ghosts) for each exact seed+biome course. Added capacity buys **more distinct retained courses**, never extra on-screen riders. Provisional pre-alpha economics: 8 included archives, +1 per deliberate shop purchase and an increasing Shard price (40 at first rank). These values were Friday-selected for implementation, **not** a historical Marvin economy decision.
