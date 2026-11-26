@@ -4,7 +4,8 @@ import { boot, closeHarness, freshPage, recordRun, seekToReady, until, sameStora
 const pass=(label,ok)=>{assert.ok(ok,label);console.log('PASS '+label);};
 await boot();
 try {
-  const hazard=process.env.BSB_COACH_CASE==='hazard';
+  const flaky=process.env.BSB_COACH_CASE==='flaky';
+  const hazard=flaky||process.env.BSB_COACH_CASE==='hazard';
   const {P,rec,info}=await recordRun(hazard?{seed:'A',fixture:'hazard'}:{});
   console.log('RECORDING',info.tape.seed,rec.ticks,info.lastCrash.cause,info.lastCrash.hazardId);
   pass('expected real crash cause',info.lastCrash.cause===(hazard?'hazard':'bsod'));
@@ -14,18 +15,29 @@ try {
     await page.waitForTimeout(150);
   }
   const before=await page.evaluate(()=>window.__tk.snapshot());
-  await page.evaluate((hazard)=>{
+  await page.evaluate(({hazard,flaky})=>{
     const tk=window.__tk;
     tk.events.length=0;
     window.__coachProof={timings:[],result:null};
+    const candidateCounts=new Map();
     window.__bbCoachTest={
       budget:hazard?8:3,timeBudgetMs:25000,
-      wrapSimulate:sim=>async(...args)=>{const t=performance.now();try{return await sim(...args);}finally{window.__coachProof.timings.push(performance.now()-t);}},
+      wrapSimulate:sim=>async(...args)=>{
+        const t=performance.now();
+        try{
+          const result=await sim(...args);
+          if(!flaky||!result.survived)return result;
+          const key=JSON.stringify(args[0].inputs);
+          const count=(candidateCounts.get(key)||0)+1;candidateCounts.set(key,count);
+          if(count%2===0)return {...result,fingerprintAt:{...result.fingerprintAt,[result.ticks]:'deliberately-different'}};
+          return result;
+        }finally{window.__coachProof.timings.push(performance.now()-t);}
+      },
       onResult:r=>window.__coachProof.result=r,
     };
     for(const type of ['keydown','keyup']) window.dispatchEvent(new KeyboardEvent(type,{code:'KeyC',key:'c',keyCode:67,which:67,bubbles:true,cancelable:true}));
     tk.step(5);
-  },hazard);
+  },{hazard,flaky});
   pass('Game Over C opens Coach',await page.evaluate(()=>!!window.__tk.g.scene.getScene('GameOverScene').coachView));
   const result=await page.evaluate(async()=>{
     const tk=window.__tk;
@@ -40,7 +52,11 @@ try {
   });
   console.log('COACH',JSON.stringify({timings:result.timings,failure:result.failure,scenes:result.scenes,errors:result.errors,summary:result.result?.summary,searched:result.result?.searched,errorsCount:result.result?.errors,cause:result.cause}));
   pass('real engine searched candidates',!!result.result&&result.result.searched>0&&result.result.errors<result.result.searched);
-  if(hazard){
+  if(flaky){
+    pass('flaky engine candidate was rejected',result.result.unstable>0&&result.result.survivors.length===0);
+    pass('no alternative shown',await page.evaluate(()=>{const v=window.__tk.g.scene.getScene('GameOverScene').coachView;return v.result.survivors.length===0&&v.result.unstable>0&&v.altBtn.disabled===true;}));
+    pass('unstable and non-exhaustive result reported',result.result.summary.includes('did not repeat')&&result.result.summary.includes('not exhaustive'));
+  }else if(hazard){
     pass('hazard candidate survives twice',result.result.survivors.length>0);
     const survivor=result.result.survivors[0];
     console.log('SURVIVOR',survivor.id,JSON.stringify(survivor.finalFingerprint));
