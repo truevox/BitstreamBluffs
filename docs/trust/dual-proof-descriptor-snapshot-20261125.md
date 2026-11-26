@@ -1,0 +1,33 @@
+# #135 Public Verification — pure trust-decision input snapshot hardening
+
+**2026-11-25, isolated pre-release draft. No public verifier, server, paid service, upload or scoreboard write.** This patch addresses a narrow integrity defect in the *already-merged* pure `adjudicateDualProof` decision contract (original #245), while keeping parent #135 OPEN for actual authenticated infrastructure.
+
+## Independently reproduced flaw in shipped 2.22.7
+
+The original `snapshotInput` traversed `Object.getOwnPropertyDescriptors()` to reject accessors/exotic values, **then called `JSON.stringify(input)` on the ORIGINAL programmatic object**. A stateful JS `Proxy` can return a denied trusted eligibility receipt from its own descriptor (the inspected input) while returning authorized eligibility on a later `get` trap during JSON serialization. Against original code, an otherwise valid synthetic fixture returned `verified-eligible`, even though its own `authorization` descriptor had `status:'denied', economyStatus:'rejected'`. A second similarly crafted Proxy can swap `consent.status:'denied'` to `granted`.
+
+This is a programmatic time-of-check/time-of-use flaw in a trust-policy library. It is **not proof that a real leaderboard can presently be exploited remotely**: no public authorization adapter/service is connected. Even an ordinary JSON object with fields named `issuer`, `kind` or `trusted` is never authenticated by this pure function. Future free peer and paid hosted adapters still must authenticate receipts **independently, before** passing them to adjudication. No client-provided wallet balance, checksum, claim or self-signed receipt can provide that authentication.
+
+## Fixed contract
+
+- Walk each node's **own data descriptors once**, copying values into a fresh null-prototype JSON-shaped tree. Reject accessor or hidden properties, symbols, decorated/sparse arrays, exotic prototypes, cycles, nonfinite numeric fields, `-0`, deep graphs and oversize objects.
+- Never read `Proxy.get`, inherited `toJSON`, arbitrary object `valueOf`, or `JSON.stringify` the original receipt object. Encode ONLY the defensive tree with the existing canonical JSON encoder (max 256 KiB encoded) and parse that stable value before calling the existing unchanged decision core.
+- Any malformed input returns the same unranked/nonrewarding `malformed-input` candidate verdict, with no thrown exception, side effect, publication, or client/server credit. No route/payment code touches the policy verdict.
+- For a Proxy with ordinary own descriptor data but a malicious/throwing `get` trap, *the verified-on-descriptor policy result* is intentional: the `get` trap is never used. A Proxy that throws from descriptor/prototype enumeration fails closed. This avoids misleading tests asserting that every programmatic Proxy itself must be rejected (there is no cross-platform Proxy brand test). The trusted adapter still cannot accept source claims without independent authentication.
+
+## Owner boundary, checked against canonical GBrain
+
+- The future public leaderboard must prevent enormous editable LOCAL Shard balances from laundering upgraded gear into public results; the local offline game must remain playable.
+- Free anonymous peer and paid hosted verification **must share the exact same validity, Verified label, public ranking eligibility and in-game rewards**. A paid fee buys only convenience. Provisional public Unverified submissions and server-private blind assignments have separate policy and privacy requirements.
+- No author-approved server wallet architecture, backend host, verifier quorum, identity mechanism, rate schedule or public API was selected here. This patch makes none of those decisions. Full public system remains #135; protected local evidence #244 is a separate gate.
+
+## Independent local verification
+
+1. `npm test -- --runInBand tests/trust/dualProof.test.js`: **42/42 PASS**, including original 37 checks with updated descriptor-only semantics and five new adversarial tests. The four existing pinned canonical verdict digests are **unchanged**.
+2. Targeted trust/canonical JSON/replay ruleset verifier suite: **264/264 PASS across 6 suites** on the modified source.
+3. `GAME_URL=http://127.0.0.1:18420/ node tools/trust/test-dual-proof-browser.mjs`: actual Chromium and Node execute nine shared synthetic input cases; all verdict byte digests, publication, rank/reward flags **match exactly**. Denied-to-authorized `Proxy` fails to influence either environment; no page errors or mutating network calls. Synthetic fixtures simulate already-authenticated receipts and are **never** proof of actual authenticated receipts or people.
+4. A new source-scoped GitHub Actions workflow repeats the Jest and real Chromium/Node conformance gates on the exact PR head; the ordinary GitHub Pages PR build and source identity checks still run separately.
+
+## Remaining #135 blockers
+
+Independently authenticated verifier execution and versioned proof receipts; an authoritative wallet/gear/equipment/nonce/challenge validator with replay/reuse protection; separate privacy/consent/audience gate; server-only binding of the original submission+score+tape+build to immutable receipts; free-peer vs paid-service attestation (payment never changes verdict or rewards); real public provisional/verified lifecycle, resource and privacy limits, physical devices, review, API deployment and deletion policies. None is unlocked by this local patch.

@@ -9,6 +9,7 @@
  * NO IO, time, network, storage, identity creation, or leaderboard updates.
  */
 import { validateOutcomeRecord } from '../replay/rulesetVerifier.js';
+import { canonicalBytes, parseCanonical } from '../replay/canonicalJson.js';
 
 export const DUAL_PROOF_FORMAT = 'bb-dual-proof';
 export const DUAL_PROOF_VERSION = 1;
@@ -217,32 +218,68 @@ function adjudicateDualProofCore(input = {}) {
   });
 }
 
-/** Reject executable properties and exotic prototypes before creating ONE stable
- * JSON value. No receipt or claimed request is ever reread from the original
- * potentially stateful Proxy; no mutation is made to its input objects.
- * A server adapter still MUST authenticate every trusted receipt separately. */
+/**
+ * Treat a trust decision as a snapshot, not a live object graph. Read each
+ * property ONLY through its *own data descriptor*, copy that value into a
+ * fresh plain JSON tree, then encode ONLY the copy. Do not JSON.stringify the
+ * original: stateful Proxy `get` traps or inherited `toJSON` may change the
+ * authorization/consent **after** validation, while still passing the first
+ * descriptor traversal. Neither a property name nor an issuer label is proof
+ * that the upstream adapter authenticated the original source.
+ *
+ * Be deliberately stricter than JSON.stringify: accessors, inherited fields,
+ * symbol keys, sparse arrays, custom prototypes, cycles, nonfinite numbers,
+ * negative zero and hidden own properties all fail closed. Budgets bound depth,
+ * total nodes/keys and serialized size; the canonical encoder is run only on
+ * our defensively reconstructed tree, never on the untrusted input object.
+ */
 function snapshotInput(input){
   const ancestors=new WeakSet();
   let budget=0;
-  const check=(v,depth)=>{
+  const copy=(v,depth)=>{
     if(++budget>12000||depth>16)throw new TypeError('unbounded trust input');
-    if(v===null||typeof v==='string'||typeof v==='boolean'||typeof v==='number')return;
-    if(typeof v!=='object'||ancestors.has(v))throw new TypeError('non-JSON trust input');
-    ancestors.add(v);
-    if(!Array.isArray(v)&&!isObj(v))throw new TypeError('exotic trust input');
-    const descriptors=Object.getOwnPropertyDescriptors(v);
-    const entries=Object.entries(descriptors);
-    if(entries.length>4096)throw new TypeError('oversized trust input');
-    for(const [key,descriptor] of entries){
-      if(!OWN(descriptor,'value')||typeof key!=='string')throw new TypeError('accessor trust input');
-      check(descriptor.value,depth+1);
+    if(v===null||typeof v==='string'||typeof v==='boolean')return v;
+    if(typeof v==='number'){
+      if(!Number.isFinite(v)||Object.is(v,-0))throw new TypeError('invalid trust number');
+      return v;
     }
-    ancestors.delete(v);
+    if(typeof v!=='object'||ancestors.has(v))throw new TypeError('non-JSON trust input');
+    const array=Array.isArray(v);
+    if(!array&&!isObj(v))throw new TypeError('exotic trust input');
+    ancestors.add(v);
+    try{
+      const descriptors=Object.getOwnPropertyDescriptors(v);
+      const keys=Reflect.ownKeys(descriptors);
+      budget+=keys.length;
+      if(keys.length>4096||budget>12000)throw new TypeError('oversized trust input');
+      if(array){
+        const size=descriptors.length?.value;
+        if(!Number.isSafeInteger(size)||size<0||size>4095||keys.length!==size+1)
+          throw new TypeError('sparse or decorated trust array');
+        const result=[];
+        for(let i=0;i<size;i++){
+          const d=descriptors[i];
+          if(!d||!OWN(d,'value')||!d.enumerable)
+            throw new TypeError('accessor or sparse trust array');
+          result.push(copy(d.value,depth+1));
+        }
+        return result;
+      }
+      const result=Object.create(null); // no Object.prototype.toJSON or prototype setters
+      for(const key of keys){
+        const d=descriptors[key];
+        if(typeof key!=='string'||!d||!OWN(d,'value')||!d.enumerable)
+          throw new TypeError('accessor or hidden trust property');
+        Object.defineProperty(result,key,{value:copy(d.value,depth+1),
+          enumerable:true,writable:true,configurable:true});
+      }
+      return result;
+    }finally{ancestors.delete(v);}
   };
-  check(input,0);
-  const raw=JSON.stringify(input);
-  if(typeof raw!=='string'||raw.length>262144)throw new TypeError('oversized trust input');
-  return JSON.parse(raw);
+  const stable=copy(input,0);
+  const encoded=canonicalBytes(stable);
+  if(encoded.length>262144)throw new TypeError('oversized trust input');
+  return parseCanonical(encoded);
 }
 
 /** Fail closed even when a programmatic caller supplies hostile objects,
