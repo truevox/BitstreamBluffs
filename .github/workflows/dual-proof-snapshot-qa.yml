@@ -5,6 +5,7 @@ on:
       - '.github/workflows/dual-proof-snapshot-qa.yml'
       - 'src/systems/trust/**'
       - 'server/trust/**'
+      - 'tests/fixtures/trust/**'
       - 'src/systems/replay/canonicalJson.js'
       - 'src/systems/replay/canonicalSha256.js'
       - 'src/systems/replay/rulesetVerifier.js'
@@ -60,6 +61,8 @@ jobs:
             tests/replay/rulesetArtifacts.test.js
       - name: Signed server admission and durable nonce negative controls
         run: node --test server/trust/admission.test.mjs
+      - name: Blind private peer coordinator and local publication gate
+        run: node --test server/trust/blindPeerCoordinator.test.mjs
       - name: Install Chromium for real client/host verdict byte parity
         run: npx playwright install --with-deps chromium
       - name: Real browser versus Node parity, including hostile Proxy
