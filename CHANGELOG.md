@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.8 — #135 server-only signed independent admission reference (2026-11-26)
+
+- Preserve draft #406's original source in a non-force merge onto the v2.25.7 main source. Add private, server-only Ed25519 issuer-role signing verification (simulation, authorization, consent), an atomic SQLite challenge/admission ledger, exact account/challenge/claim/expiry/verifier bindings, replay/duplicate/forgery rejection and private receipt audit digests. No HTTP endpoint, key material or production issuer is deployed.
+- Private compiled Chromium QA independently reruns canonical current-build race evidence to terminal crash, recomputes score, distance and fingerprints, and rejects tampered/edited incomplete inputs. Local, unverified and provisional runs cannot become trusted Verified through this adapter.
+- Current challenge TTL and globally unique tape/run digests remain explicitly **development assumptions**, not Marvin's public competition policy. Actual authoritative wallet/gear issuers, identity/consent, blind peer scheduling, paid/free parity, public provisional publication, rewards and abuse controls are not present.
+- No player upload, game simulation/SIM revision, local wallet, rank, UI or live public service change. Parent #135 remains OPEN. [skip netlify]
+
 ## v2.25.7 — #119 strict full-Matter RunScene restore mechanism (2026-11-26)
 
 - Non-force-integrate the existing #404 real RunScene/Matter V3 contact and recorder restoration code onto shipped v2.25.6 RNG/clock and native GhostRecorder infrastructure. Internal opt-in ES-module interface supports complete normal-run capture and fresh-world full restore; no automatic global hook, storage, UI, ranking, or network writes.
