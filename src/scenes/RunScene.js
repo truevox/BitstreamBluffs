@@ -2257,7 +2257,7 @@ export class RunScene extends Phaser.Scene {
       this.emitIf(EVT.TUTORIAL_HINT, e);
       if (e.id === 'tuck' && e.show) {
         this.tuckShows += 1;
-        if (!this.bsodGym && !this.takeover) saveTuckShows(this.tuckShows);
+        if (!this.bsodGym && !this.unrankedPractice) saveTuckShows(this.tuckShows);
       } else if (!e.show && ((e.id === 'boost') || (e.id === 'tuck' && this.tuckShows >= TUNING.tuckHintMaxShows))) {
         this.tutDoneId(e.id); // explained once / shown often enough
       }
@@ -2270,7 +2270,7 @@ export class RunScene extends Phaser.Scene {
     const ev = this.hints.complete(id, this.runTimeMs);
     // Practice hints may be completed for this session, but never consume a
     // first-run hint in the player's permanent normal-game tutorial history.
-    if (!this.bsodGym && !this.takeover) saveTutorialDone(this.tutDone);
+    if (!this.bsodGym && !this.unrankedPractice) saveTutorialDone(this.tutDone);
     this.applyHintEvents(ev);
   }
 
