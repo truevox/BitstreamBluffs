@@ -278,12 +278,22 @@ try {
     const ORD = 'CEMETERY68-ORDER';
     await setSetting(p2.page, 'attemptHistoryKeep', 5);
     const A = await open();
-    const B = await open();
-    // Hold back Tab B's storage events: a capture listener registered first stops them reaching the game's listener.
-    await B.page.evaluate(() => {
-      window.__holdStorage = true;
-      window.addEventListener('storage', (e) => { if (window.__holdStorage) e.stopImmediatePropagation(); }, true);
-    });
+    // Tab B: gate every window 'storage' listener from before the game loads, so B can be kept "not yet notified"
+    // (window.__holdStorage) exactly like a tab whose event has not been delivered yet.
+    const B = await (async () => {
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      await page.addInitScript(() => {
+        const add = window.addEventListener.bind(window);
+        window.addEventListener = (type, fn, opt) => add(type, type === 'storage'
+          ? (e) => { if (!window.__holdStorage) fn(e); } : fn, opt);
+      });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() && window.__bbGame.registry.get('attemptHistory')?.ready, null, { timeout: 60000 });
+      await page.evaluate(() => { window.__holdStorage = true; });
+      return { page, errors };
+    })();
     const viaSettings = (pg, label, value, sub) => pg.evaluate(({ label, value, sub }) => {
       const ts = window.__bbGame.scene.getScene('TitleScene');
       if (!ts.view) ts.menu.items.find((i) => i.label === 'SETTINGS').onSelect();
