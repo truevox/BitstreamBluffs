@@ -550,6 +550,24 @@ describe('canonical dual-proof decision contract (#245)', () => {
     }
   });
 
+  test('trust snapshot byte cap includes cumulative UTF-8, escaping and JSON punctuation',()=>{
+    const cap=256*1024;
+    const envelope={...good(),ignored:['\u0000\b\n"\\','é','雪','🛷',false,null,-17,0.125],
+      extra:{a:'',b:'',c:''}};
+    const left=cap-canonicalBytes(envelope).length;
+    envelope.extra.a='x'.repeat(Math.floor(left/3));
+    envelope.extra.b='y'.repeat(Math.floor(left/3));
+    envelope.extra.c='z'.repeat(left-2*Math.floor(left/3));
+    expect(canonicalBytes(envelope).length).toBe(cap);
+    expect(adjudicateDualProof(envelope).publication).toBe('verified-eligible');
+    envelope.extra.c+='z';
+    expect(canonicalBytes(envelope).length).toBe(cap+1);
+    const rejected=adjudicateDualProof(envelope);
+    expect(rejected.publication).toBe('none');
+    expect(rejected.proof.reason).toBe('malformed-input');
+    NO_RANK(rejected);
+  });
+
   test('free peer and paid hosted routes use identical pure decision bytes, with zero payment leverage', () => {
     const source=good();
     const peer=adjudicateDualProof({...clone(source),route:'peer-free',fee:0});

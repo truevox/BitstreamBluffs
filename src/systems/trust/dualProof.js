@@ -233,14 +233,45 @@ function adjudicateDualProofCore(input = {}) {
  * total nodes/keys and serialized size; the canonical encoder is run only on
  * our defensively reconstructed tree, never on the untrusted input object.
  */
+const MAX_TRUST_BYTES = 256 * 1024;
+
 function snapshotInput(input){
   const ancestors=new WeakSet();
-  let budget=0;
+  let budget=0, remaining=MAX_TRUST_BYTES;
+  const charge=(size)=>{
+    remaining-=size;
+    if(remaining<0)throw new TypeError('oversized trust input');
+  };
+  // Count the quoted BB-CJSON token without allocating an escaped string.
+  // Scan no further than the remaining budget; canonicalBytes still validates
+  // the reconstructed value and is the source of truth for canonical bytes.
+  const chargeString=(s)=>{
+    charge(2); // quotes
+    if(s.length>remaining)throw new TypeError('oversized trust string');
+    for(let i=0;i<s.length;i++){
+      const c=s.charCodeAt(i);
+      if(c===0x22||c===0x5c||c===8||c===9||c===10||c===12||c===13)charge(2);
+      else if(c<0x20)charge(6);
+      else if(c<0x80)charge(1);
+      else if(c<0x800)charge(2);
+      else if(c>=0xd800&&c<=0xdbff){
+        const tail=s.charCodeAt(++i);
+        if(!(tail>=0xdc00&&tail<=0xdfff))throw new TypeError('invalid trust string');
+        charge(4);
+      }else{
+        if(c>=0xdc00&&c<=0xdfff)throw new TypeError('invalid trust string');
+        charge(3);
+      }
+    }
+  };
   const copy=(v,depth)=>{
     if(++budget>12000||depth>16)throw new TypeError('unbounded trust input');
-    if(v===null||typeof v==='string'||typeof v==='boolean')return v;
+    if(v===null){charge(4);return v;}
+    if(typeof v==='boolean'){charge(v?4:5);return v;}
+    if(typeof v==='string'){chargeString(v);return v;}
     if(typeof v==='number'){
       if(!Number.isFinite(v)||Object.is(v,-0))throw new TypeError('invalid trust number');
+      charge(String(v).length);
       return v;
     }
     if(typeof v!=='object'||ancestors.has(v))throw new TypeError('non-JSON trust input');
@@ -252,28 +283,36 @@ function snapshotInput(input){
     }else if(!isObj(v))throw new TypeError('exotic trust input');
     ancestors.add(v);
     try{
-      const descriptors=Object.getOwnPropertyDescriptors(v);
-      const keys=Reflect.ownKeys(descriptors);
+      const keys=Reflect.ownKeys(v);
       budget+=keys.length;
       if(keys.length>4096||budget>12000)throw new TypeError('oversized trust input');
+      // Snapshot this node's descriptors before descending into any child.
+      const descriptors=new Map();
+      for(const key of keys){
+        if(typeof key!=='string')throw new TypeError('symbol trust property');
+        const d=Object.getOwnPropertyDescriptor(v,key);
+        if(!d||!OWN(d,'value')||(!d.enumerable&&!(array&&key==='length')))
+          throw new TypeError('accessor or hidden trust property');
+        descriptors.set(key,d);
+      }
       if(array){
-        const size=descriptors.length?.value;
+        const size=descriptors.get('length')?.value;
         if(!Number.isSafeInteger(size)||size<0||size>4095||keys.length!==size+1)
           throw new TypeError('sparse or decorated trust array');
+        charge(2+Math.max(0,size-1)); // brackets and commas
         const result=[];
         for(let i=0;i<size;i++){
-          const d=descriptors[i];
-          if(!d||!OWN(d,'value')||!d.enumerable)
-            throw new TypeError('accessor or sparse trust array');
+          const d=descriptors.get(String(i));
+          if(!d)throw new TypeError('sparse trust array');
           result.push(copy(d.value,depth+1));
         }
         return result;
       }
+      charge(2+Math.max(0,keys.length-1)+keys.length); // braces, commas, colons
       const result=Object.create(null); // no Object.prototype.toJSON or prototype setters
       for(const key of keys){
-        const d=descriptors[key];
-        if(typeof key!=='string'||!d||!OWN(d,'value')||!d.enumerable)
-          throw new TypeError('accessor or hidden trust property');
+        chargeString(key);
+        const d=descriptors.get(key);
         Object.defineProperty(result,key,{value:copy(d.value,depth+1),
           enumerable:true,writable:true,configurable:true});
       }
@@ -282,7 +321,7 @@ function snapshotInput(input){
   };
   const stable=copy(input,0);
   const encoded=canonicalBytes(stable);
-  if(encoded.length>262144)throw new TypeError('oversized trust input');
+  if(encoded.length!==MAX_TRUST_BYTES-remaining)throw new TypeError('trust input size mismatch');
   return parseCanonical(encoded);
 }
 
