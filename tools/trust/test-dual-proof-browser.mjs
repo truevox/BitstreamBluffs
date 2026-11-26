@@ -64,7 +64,20 @@ const proxyCase=(original,adjudicate)=>{
  const result=adjudicate(shifting);
  return {reads,...check(result,'none')};
 };
+const consentProxyCase=(original,adjudicate)=>{
+ const denied={...original.consent,status:'denied',audienceGate:'failed'};
+ let reads=0;
+ const shifting=new Proxy({...original,consent:denied},{get(target,key,receiver){
+  if(key==='consent'){reads++;return original.consent;}
+  return Reflect.get(target,key,receiver);
+ }});
+ const result=adjudicate(shifting);
+ return {reads,...check(result,'none')};
+};
 const nodeProxy=proxyCase(baseline,adjudicateDualProof);
+const nodeConsent=consentProxyCase(baseline,adjudicateDualProof);
+assert.equal(nodeProxy.reads,0,'Node must not read Proxy.get authorization');
+assert.equal(nodeConsent.reads,0,'Node must not read Proxy.get consent');
 const origin=process.env.GAME_URL;
 if(!origin)throw Error('GAME_URL required');
 const browser=await chromium.launch({headless:true,args:['--no-sandbox'],executablePath:process.env.CHROMIUM_EXECUTABLE||undefined});
@@ -91,15 +104,28 @@ try{
    return Reflect.get(target,key,receiver);
   }});
   const hostile={reads:0,...cv(adjudicateDualProof(proxy))};hostile.reads=reads;
-  return {vectors,hostile};
+  const deniedConsent={...baseline.consent,status:'denied',audienceGate:'failed'};
+  let consentReads=0;
+  const consentProxy=new Proxy({...baseline,consent:deniedConsent},{get(target,key,receiver){
+   if(key==='consent'){consentReads++;return baseline.consent;}
+   return Reflect.get(target,key,receiver);
+  }});
+  const consentHostile={reads:0,...cv(adjudicateDualProof(consentProxy))};
+  consentHostile.reads=consentReads;
+  return {vectors,hostile,consentHostile};
  },{cases,baseline});
  assert.deepEqual(fromBrowser.vectors,fromNode);
  assert.deepEqual(fromBrowser.hostile,nodeProxy);
+ assert.deepEqual(fromBrowser.consentHostile,nodeConsent);
+ assert.equal(fromBrowser.hostile.reads,0,'Chromium must not read Proxy.get authorization');
+ assert.equal(fromBrowser.consentHostile.reads,0,'Chromium must not read Proxy.get consent');
  assert.deepEqual(errors,[]);
  assert.deepEqual(writes,[]);
  console.log('PASS_DUAL_PROOF_BROWSER_HOSTED_PARITY',JSON.stringify({
-  caseCount:cases.length,vectors:fromNode,proxy:{reads:nodeProxy.reads,
+  caseCount:cases.length,vectors:fromNode,authorizationProxy:{reads:nodeProxy.reads,
    publication:nodeProxy.publication,rank:nodeProxy.rank,reward:nodeProxy.reward},
+  consentProxy:{reads:nodeConsent.reads,publication:nodeConsent.publication,
+   rank:nodeConsent.rank,reward:nodeConsent.reward},
   errors,writes,fixture:'synthetic-only',officialServiceEnabled:false,
  }));
  await context.close();

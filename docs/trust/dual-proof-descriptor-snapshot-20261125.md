@@ -25,7 +25,7 @@ This is a programmatic time-of-check/time-of-use flaw in a trust-policy library.
 
 1. `npm test -- --runInBand tests/trust/dualProof.test.js`: **42/42 PASS**, including original 37 checks with updated descriptor-only semantics and five new adversarial tests. The four existing pinned canonical verdict digests are **unchanged**.
 2. Targeted trust/canonical JSON/replay ruleset verifier suite: **264/264 PASS across 6 suites** on the modified source.
-3. `GAME_URL=http://127.0.0.1:18420/ node tools/trust/test-dual-proof-browser.mjs`: actual Chromium and Node execute nine shared synthetic input cases; all verdict byte digests, publication, rank/reward flags **match exactly**. Denied-to-authorized `Proxy` fails to influence either environment; no page errors or mutating network calls. Synthetic fixtures simulate already-authenticated receipts and are **never** proof of actual authenticated receipts or people.
+3. `GAME_URL=http://127.0.0.1:18420/ node tools/trust/test-dual-proof-browser.mjs`: actual Chromium and Node execute nine shared synthetic input cases; all verdict byte digests, publication, rank/reward flags **match exactly**. Denied-to-authorized **eligibility** and denied-to-granted **consent** `Proxy` swaps fail to influence either environment; both expressly require **zero** `Proxy.get` reads in Chromium and Node. No page errors or mutating network calls. Synthetic fixtures simulate already-authenticated receipts and are **never** proof of actual authenticated receipts or people.
 4. A new source-scoped GitHub Actions workflow repeats the Jest and real Chromium/Node conformance gates on the exact PR head; the ordinary GitHub Pages PR build and source identity checks still run separately.
 
 ## Remaining #135 blockers
