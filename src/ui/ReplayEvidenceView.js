@@ -1,0 +1,432 @@
+/**
+ * Explicit LOCAL replay-evidence controls from Game Over → Course Ghosts.
+ * No background upload, wallet access, trusted scoreboard admission or automatic
+ * download/import. Filename digest is integrity only, NOT player identity.
+ */
+import { View } from './View.js';
+import { NeonText } from './Neon.js';
+import { Button } from './Button.js';
+import { uiSfx } from './Sound.js';
+import { ellipsize } from './PixelFont.js';
+import { LocalEvidenceActions } from '../systems/replay/localEvidenceActions.js';
+import { sharedEvidenceStore, EVIDENCE_STATUS_KEY, EVIDENCE_STATUS_BY_RUN_KEY, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
+import { MAX_OUTPUT_BYTES } from '../systems/replay/canonicalJson.js';
+import { digestFromLocalReplayFilename, currentRunEvidence } from '../systems/replay/archiveUiPolicy.js';
+
+const statusText = err => err?.code || err?.message || String(err || 'UNKNOWN');
+const shortArchiveWarning = warning => {
+  const unbound=warning.includes('RUN ID') || warning.includes('RUN BINDING') || warning.includes('RECOVERED BYTES');
+  return warning.includes('NOT READY') || warning.includes('SELECT REFRESH')?'REFRESH AFTER SAVE':
+    unbound?'RUN UNBOUND; EXPORT ONLY':
+    warning.includes('EXPORT NOW')?'EXPORT RUN NOW':
+    warning.includes('EXPORT ONLY')?'EXPORT ONLY; UNVERIFIED':
+    warning.includes('PIN STATUS')?'PIN STATUS UNKNOWN':
+    warning.includes('ARCHIVE READ')?'ARCHIVE READ FAILED':'ARCHIVE STATUS UNKNOWN';
+};
+
+export class ReplayEvidenceView extends View {
+  /** @param {Phaser.Scene} scene @param {object} theme
+   *  @param {{tape:object,onClose:function():void}} o */
+  constructor(scene,theme,o) {
+    super(scene,theme,{w:352,h:194,title:'LOCAL REPLAY EVIDENCE',color:'cyan',onClose:o.onClose,
+      hints:[{keys:['←','→'],label:'ACTION'},{keys:['ENTER'],label:'SELECT'}]});
+    this.tape=o.tape;
+    this.busy=false;
+    this.focus=0;
+    this.actions=null;
+    this.pinReady=false;
+    this.displayedPin=null; // immutable UI generation snapshot; never retarget Unpin from a newer cache
+    this._operationVersion=0; // reject stale async refresh after a user action
+    this._refreshPending=0; // only reconcile if a user action interrupts an actual Refresh
+    this._reconcileRequested=false; // stale Unpin needs immediate read-only pin-state reconciliation
+    const text=(x,y,v,color='text')=>this.panel.add(new NeonText(scene,theme,x,y,v,{color,outline:'none'}));
+    text(12,24,'PRIVATE TO THIS DEVICE. NEVER UPLOADED.','cyan');
+    text(12,38,'A CHECKSUM DOES NOT PROVE WHO PLAYED.','amber');
+    this.digestText=new NeonText(scene,theme,12,53,'EVIDENCE: CHECKING',{color:'text',outline:'none'});
+    this.panel.add(this.digestText);
+    const specs=[
+      {x:12,label:'KEEP',run:()=>this._keepOrUnpin()},
+      {x:94,label:'EXPORT',run:()=>this._export()},
+      {x:176,label:'IMPORT',run:()=>this._import()},
+      {x:258,label:'REFRESH',run:()=>this._refresh()},
+    ];
+    this.buttons=specs.map(({x,label,run},i)=>{
+      const button=new Button(scene,theme,{x,y:76,w:77,h:17,label,color:'lime',onClick:()=>{
+        this.focus=i;this.buttons.forEach((b,j)=>b.setHover(i===j));run();
+      }});
+      this.panel.add(button);
+      return button;
+    });
+    this.status=new NeonText(scene,theme,12,109,'READING LOCAL EVIDENCE...', {color:'lime',outline:'none'});
+    this.detail=new NeonText(scene,theme,12,124,'', {color:'text',outline:'none'});
+    this.panel.add(this.status);this.panel.add(this.detail);
+    this.buttons[0].setDisabled(true);
+    this.buttons[1].setDisabled(true);
+    this.buttons[0].setHover(true);
+    text(12,144,'IMPORTS REMAIN LOCAL AND UNVERIFIED.','amber');
+    text(12,156,'KEEP DOES NOT PREVENT CLEARING SITE DATA.','text');
+    this._installNativeImportInput();
+    this._refresh({retryPending:false}); // opening the panel is NOT an explicit retry request
+  }
+
+  _show(message,details='') {
+    if (!this.alive) return;
+    this.status.setText(ellipsize(String(message),250));
+    this.detail.setText(ellipsize(String(details),320));
+  }
+
+  _captureStatus() {
+    const byRun=this.scene.registry.get(EVIDENCE_STATUS_BY_RUN_KEY);
+    const s=byRun instanceof Map && byRun.has(this.tape.runId)
+      ? byRun.get(this.tape.runId)
+      : this.scene.registry.get(EVIDENCE_STATUS_KEY);
+    if (!s || s.runId !== this.tape.runId) return null;
+    return s;
+  }
+
+  async _getActions({reconnect=true,retryPending=reconnect}={}) {
+    if (this.actions) {
+      // A first open may have failed during an IndexedDB upgrade. Refresh is
+      // the explicit recovery gesture: reopen IDB and flush pending evidence.
+      if (this.actions.store.backend!=='idb') {
+        const recovered=reconnect?await sharedEvidenceStore({retryPending}):this.actions.store;
+        if (this.alive) {
+          this.actions.store=recovered;
+          // Import may reopen a previously unavailable IDB backend. Its
+          // current-run controls were disabled before recovery; re-read them
+          // after the import without implicitly flushing unrelated packages.
+          if (reconnect && !retryPending && recovered.backend==='idb')
+            this._reconcileRequested=true;
+        }
+      }
+      return this.actions;
+    }
+    const store=await sharedEvidenceStore({retryPending});
+    const rs=this.scene.registry.get(RULESET_KEY);
+    const actions=new LocalEvidenceActions(store,{currentRulesetId:rs?.rulesetId || null});
+    if (this.alive) this.actions=actions;
+    return actions;
+  }
+
+  async _refresh({retryPending=true}={}) {
+    if (this.busy || !this.alive) return false;
+    this._refreshPending++;
+    try {
+    const version=++this._operationVersion;
+    const live=()=>this.alive && version===this._operationVersion;
+    this.pinReady=false;
+    this.displayedPin=null;
+    this.buttons[0].setDisabled(true);
+    this.buttons[1].setDisabled(true);
+    const status=this._captureStatus();
+    const capture=currentRunEvidence(status,this.tape.runId,{allowFailed:true});
+    if (!status) {
+      this.digestText.setText('EVIDENCE: STILL SAVING / RETRY');
+      this._show('NOT READY','SELECT REFRESH AFTER THE RUN IS SAVED');return;
+    }
+    if (!capture) {
+      this.digestText.setText('EVIDENCE: NOT AVAILABLE');
+      this._show(`SAVE FAILED: ${status.code || 'UNAVAILABLE'}`,'NO RECOVERABLE INPUT PACKAGE');return;
+    }
+    this.digestText.setText(`SHA256: ${capture.digest.slice(7,31).toUpperCase()}...`);
+    try {
+      // Action-triggered reconciliation must never reopen IndexedDB or flush
+      // pending bytes. Only an explicitly selected Refresh may do that.
+      const control=await this._getActions({reconnect:retryPending,retryPending});
+      if(!control){this._show('ARCHIVE STATUS UNAVAILABLE','SELECT REFRESH TO RECONNECT STORAGE');return false;}
+      if (!live() || this._captureStatus()!==status) return;
+      // An IDB backend can retain a quota-failed bundle in session RAM even
+      // after space comes back. An EXPLICIT Refresh retries those pending bytes.
+      if (retryPending && control.store.pending.has(capture.digest))
+        await control.store.retryPending({digest:capture.digest}); // prioritize the run on screen
+      if (!live() || this._captureStatus()!==status) return;
+      // One persisted snapshot / digest check establishes readable bytes,
+      // durability and the exact run binding. Do not hash 16 MiB three times.
+      const inspection=await control.store.inspectBundle(capture.digest,{runId:this.tape.runId});
+      if (!live() || this._captureStatus()!==status) return;
+      if (!inspection.readable) throw new Error('canonical evidence bytes not available');
+      // Even if pin-index lookup fails, verified readable bytes remain
+      // exportable on an explicit click (which hashes again at download time).
+      this.buttons[1].setDisabled(false);
+      const persisted=inspection.durable;
+      const boundToCurrentRun=inspection.runBound;
+      let held=false;
+      try {
+        const refs=persisted ? await control.store.persistedProtections(capture.digest) : [];
+        if (!live() || this._captureStatus()!==status) return;
+        const pin=refs.find(r=>r.runId===this.tape.runId && r.role==='pinned');
+        this.displayedPin=pin ? Object.freeze({key:pin.key,generation:pin.generation}) : null;
+        held=Boolean(pin);
+      } catch (e) {
+        if (!live() || this._captureStatus()!==status) return;
+        this._show('PIN STATUS UNAVAILABLE — EXPORT WORKS',statusText(e));
+        // Keep/Unpin remain disabled; no guessed pin state from stale cache.
+        return;
+      }
+      this.pinReady=Boolean(boundToCurrentRun);
+      this.buttons[0].setDisabled(!this.pinReady);
+      this.buttons[0].setLabel(held?'UNPIN':'KEEP');
+      if (!status.ok && boundToCurrentRun)
+        this._show('RECOVERED — KEPT ON THIS DEVICE', 'KEEP AVAILABLE; BROWSER SITE DATA CAN STILL BE CLEARED');
+      else if (!status.ok && persisted)
+        this._show('RECOVERED BYTES — EXPORT ONLY','RUN ID DOES NOT MATCH THE FINISHED RUN');
+      else if (!status.ok)
+        this._show('DISK SAVE FAILED — EXPORT NOW',`STILL IN SESSION MEMORY: ${status.code || 'STORAGE ERROR'}`);
+      else if (!boundToCurrentRun && persisted)
+        this._show('RUN ID NOT CONFIRMED — EXPORT ONLY','CURRENT DEVICE BINDING DOES NOT MATCH');
+      else this._show(held?'LOCAL EVIDENCE PINNED':persisted?'SAVED LOCALLY':'SESSION ONLY — EXPORT NOW',
+        persisted?'CAN BE LOST IF BROWSER SITE DATA IS CLEARED':'DISK NOT CONFIRMED: EXPORT TO A FILE');
+      // Preserve interrupted-action feedback only when refresh recovered
+      // healthy and current-run-bound durable controls. Otherwise its more
+      // important storage warning must remain visible to the player.
+      return persisted && boundToCurrentRun;
+    } catch(e) {
+      if (live() && this._captureStatus()===status)
+        this._show('ARCHIVE READ FAILED',statusText(e));
+      return false;
+    }
+    } finally {this._refreshPending--;}
+  }
+
+  async _run(task) {
+    if (this.busy || !this.alive) return;
+    const interruptedRefresh=this._refreshPending>0;
+    this.busy=true;
+    this._operationVersion++; // supersede any in-flight Refresh result
+    if(this._nativeInput)this._nativeInput.disabled=true;
+    let actionError=null;
+    try{await task();}
+    catch(e){
+      actionError=statusText(e);
+      this._show(`LOCAL ARCHIVE ERROR: ${actionError}`);
+      uiSfx(this.scene,'uiBack');
+    }
+    finally{
+      this.busy=false;
+      if(this._nativeInput && this.alive)this._nativeInput.disabled=false;
+      if(this.alive && (interruptedRefresh || this._reconcileRequested)){
+        this._reconcileRequested=false;
+        // Only an action that superseded an in-flight Refresh needs to undo
+        // its disabled controls. This is a read-only reconciliation: explicit
+        // player Refresh is the sole UI gesture that retries pending writes.
+        const message=this.status.main.text, details=this.detail.main.text;
+        const reconcile=this._refresh({retryPending:false});
+        const refreshVersion=this._operationVersion;
+        const healthy=await reconcile;
+        if(this.alive && !this.busy && this._operationVersion===refreshVersion){
+          const keepOriginal=String(message).includes('KEEP ORIGINAL FILE') || String(details).includes('KEEP ORIGINAL FILE');
+          if(healthy){
+            this.status.setText(message);
+            this.detail.setText(details);
+          }else if(actionError){
+            // The selected file may have failed digest/grammar admission.
+            // Never overwrite that rejection with a separate run's warning.
+            this._show('LOCAL ARCHIVE ERROR',`${actionError}; ${shortArchiveWarning(`${this.status.main.text} ${this.detail.main.text}`)}`);
+          }else if(keepOriginal){
+            // Preserving a selected file is more urgent than the current-run
+            // archive read, but show BOTH warnings, not stale success.
+            const archiveWarning=this.status.main.text;
+            // The import may have committed before its confirmation read
+            // failed: never claim either durable success or definite loss.
+            this._show('KEEP ORIGINAL FILE',`IMPORT UNCONFIRMED; ${shortArchiveWarning(archiveWarning)}`);
+          }else if(String(message).includes('IMPORTED LOCAL EVIDENCE')){
+            // Current-run storage may be unhealthy independently of the
+            // selected import. Keep the import result alongside that warning.
+            const archiveWarning=this.status.main.text;
+            const importState=String(details).includes('SAVED ON DEVICE')?'IMPORT SAVED':
+              String(details).includes('PIN STATUS UNKNOWN')?'IMPORT PIN UNKNOWN':'IMPORT UNVERIFIED';
+            this._show('IMPORTED — UNVERIFIED',`${shortArchiveWarning(archiveWarning)}; ${importState}`);
+          }
+        }
+      }
+    }
+  }
+
+  _keepOrUnpin() {return this._run(async()=>{
+    if (!this.pinReady) {this._show('KEEP/UNPIN NOT READY','REFRESH ARCHIVE STATUS FIRST');return;}
+    const capture=currentRunEvidence(this._captureStatus(),this.tape.runId,{allowFailed:true});
+    if (!capture) {this._show('EVIDENCE NOT SAVED YET','REFRESH AFTER THE RUN FINISHES');return;}
+    const control=await this._getActions({reconnect:false});
+    if (!(await control.store.isBundleDurable(capture.digest,{runId:this.tape.runId}))) {
+      this.pinReady=false;this.buttons[0].setDisabled(true);
+      this._show('RUN BINDING NOT CONFIRMED — EXPORT','REFRESH AFTER DURABLE STORAGE RECOVERS');
+      return;
+    }
+    // The player's visible action is the authority. Never interpret a stale
+    // KEEP label as permission to UNPIN a reference created in another tab.
+    const wantsUnpin=this.buttons[0].label.main.text==='UNPIN';
+    if (wantsUnpin){
+      const displayed=this.displayedPin;
+      if (!displayed?.generation) {this._show('PIN STATUS CHANGED','REFRESH BEFORE UNPINNING');return;}
+      let result;
+      try{result=await control.unpin(displayed.key,{expectedGeneration:displayed.generation});}
+      catch(e){
+        if(e?.code!=='stale-protection')throw e;
+        // A different IndexedDB connection can invalidate this tab's pin
+        // generation by throwing rather than returning a false receipt.
+        this._reconcileRequested=true;
+        this._show('PIN STATUS CHANGED','ANOTHER TAB CHANGED THE PIN — RECHECKING');
+        return;
+      }
+      if(!result.ok){
+        this._reconcileRequested=true;
+        this._show('PIN STATUS CHANGED','ANOTHER TAB MAY HAVE REMOVED IT — RECHECKING');
+        return;
+      }
+      this.displayedPin=null;
+      this._show('PIN RELEASED','BUNDLE MAY BE REMOVED OR CLEARED');
+    } else {
+      const result=await control.keep({digest:capture.digest,runId:this.tape.runId,role:'pinned'});
+      this.displayedPin=Object.freeze({key:result.reference.key,generation:result.reference.generation});
+      this._show('KEPT LOCALLY',result.browserPersistence===true?'BROWSER PERSISTENCE GRANTED':'BROWSER MAY STILL CLEAR SITE DATA');
+    }
+    if (this.alive) this.buttons[0].setLabel(wantsUnpin?'KEEP':'UNPIN');
+  });}
+
+  _export() {return this._run(async()=>{
+    const capture=currentRunEvidence(this._captureStatus(),this.tape.runId,{allowFailed:true});
+    if(!capture){this._show('NO CURRENT RUN EVIDENCE TO EXPORT');return;}
+    const control=await this._getActions({reconnect:false});
+    const result=await control.export(capture.digest);
+    if(!this.alive)return;
+    const blob=new Blob([result.bytes],{type:'application/octet-stream'});
+    const url=URL.createObjectURL(blob);
+    try{
+      const a=document.createElement('a');a.href=url;a.download=result.filename;
+      a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+      this._show('LOCAL FILE EXPORT REQUESTED','CHECK YOUR DOWNLOADS — NO NETWORK UPLOAD');
+    } finally {setTimeout(()=>URL.revokeObjectURL(url),15000);}
+  });}
+
+  /** A native browser input covers the Import Phaser button. The browser,
+   * not a synthetic gamepad/pointerdown event, opens a trusted file chooser.
+   * Touch, mouse and Tab+Enter therefore work without a transient-activation
+   * race. Gamepad cannot activate a privileged browser picker directly.
+   */
+  _installNativeImportInput() {
+    if (typeof document==='undefined' || typeof window==='undefined') return;
+    const input=document.createElement('input');
+    input.type='file';input.accept='.bbreplay';
+    input.setAttribute('data-role','replay-evidence-import');
+    input.setAttribute('aria-label','Import local replay evidence file');
+    Object.assign(input.style,{
+      position:'fixed',opacity:'0.002',zIndex:'10000',cursor:'pointer',
+      padding:'0',border:'0',margin:'0',background:'transparent',
+    });
+    input.onfocus=()=>{
+      if(!this.alive)return;
+      this.focus=2;this.buttons.forEach((b,i)=>b.setHover(i===2));
+      // Phaser's MenuInput has a second keyboard path beyond InputRouter.
+      // While a native picker is focused, make it ignore keyboard actions.
+      const menu=this.scene.input_;
+      if(menu && !this._nativeMenuGuard){
+        this._previousRawKeyHandler=menu.rawKeyHandler;
+        this._nativeMenuGuard=()=>true;
+        menu.rawKeyHandler=this._nativeMenuGuard;
+      }
+    };
+    input.onblur=()=>this._releaseNativeMenuGuard();
+    input.onchange=()=>{
+      const file=input.files?.[0];input.value='';
+      this._restoreGameFocus();
+      if (!file) return;
+      if (this.busy) {this._show('ARCHIVE BUSY — FILE NOT IMPORTED','CHOOSE THE FILE AGAIN AFTER THIS ACTION');return;}
+      this._processImportFile(file);
+    };
+    input.oncancel=()=>{this._restoreGameFocus();this._show('IMPORT CANCELLED');};
+    input.onkeydown=e=>{
+      // Keep file-picker activation, Space and arrows out of the game's Retry
+      // hotkeys. Stop propagation WITHOUT blocking the browser's native
+      // Enter/Space activation. Escape returns to Ghost Favorites.
+      e.stopPropagation();
+      if(e.key==='Escape'){
+        e.preventDefault();
+        this._restoreGameFocus();
+        if(this.alive)this.close();
+      }
+    };
+    input.onkeyup=e=>e.stopPropagation();
+    document.body.appendChild(input);
+    this._nativeInput=input;
+    this._positionNativeInput=()=>{
+      if(!this.alive || !this.panel || !this.scene.game?.canvas)return;
+      const rect=this.scene.game.canvas.getBoundingClientRect();
+      const sx=rect.width/this.scene.game.config.width;
+      const sy=rect.height/this.scene.game.config.height;
+      Object.assign(input.style,{
+        left:`${rect.left+(this.panel.x+176)*sx}px`,
+        top:`${rect.top+(this.panel.y+76)*sy}px`,
+        width:`${77*sx}px`,height:`${17*sy}px`,
+      });
+    };
+    this._positionNativeInput();
+    window.addEventListener('resize',this._positionNativeInput);
+    this.scene.scale?.on('resize',this._positionNativeInput);
+  }
+
+  _releaseNativeMenuGuard() {
+    const menu=this.scene.input_;
+    if (menu && this._nativeMenuGuard && menu.rawKeyHandler===this._nativeMenuGuard)
+      menu.rawKeyHandler=this._previousRawKeyHandler;
+    this._nativeMenuGuard=null;
+    this._previousRawKeyHandler=null;
+  }
+
+  _restoreGameFocus() {
+    if(this._nativeInput && document.activeElement===this._nativeInput)this._nativeInput.blur();
+    this._releaseNativeMenuGuard();
+  }
+
+  /** Gamepad/synthetic events have no browser file-picker privilege. Focus
+   * the native control and give an actionable instruction instead of hanging.
+   */
+  _import() {
+    if(this.busy || !this.alive)return;
+    if(!this._nativeInput){this._show('BROWSER FILE PICKER NOT AVAILABLE');return;}
+    if(navigator.userActivation?.isActive) this._nativeInput.click();
+    else this._show('USE MOUSE/TOUCH OR TAB+ENTER','BROWSER REQUIRES ITS NATIVE FILE PICKER');
+  }
+
+  _processImportFile(file) {return this._run(async()=>{
+    if(!file){this._show('IMPORT CANCELLED');return;}
+    const expectedDigest=digestFromLocalReplayFilename(file.name);
+    if(!expectedDigest){this._show('INVALID FILENAME','EXPECTED 64-HEX-DIGEST.BBREPLAY');return;}
+    if(file.size>MAX_OUTPUT_BYTES){this._show('FILE TOO LARGE','MAXIMUM 16 MIB CANONICAL EVIDENCE');return;}
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    // Import may reconnect IndexedDB, but must not flush OTHER pending runs.
+    const control=await this._getActions({reconnect:true,retryPending:false});
+    let imported;
+    try { imported=await control.import(bytes,{expectedDigest}); }
+    catch(e) {
+      if(['quota-exceeded','write-failed','not-durable'].includes(e?.code)){
+        this._show('KEEP ORIGINAL FILE','IMPORT STORAGE NOT CONFIRMED — DO NOT DELETE SOURCE');
+        return;
+      }
+      throw e;
+    }
+    this._show('IMPORTED LOCAL EVIDENCE — UNVERIFIED',
+      imported.localDurable!==true?'KEEP ORIGINAL FILE — IMPORT NOT DURABLE':
+        imported.protectionCount===null?'PIN STATUS UNKNOWN — REFRESH LATER':'SAVED ON DEVICE, NOT VERIFIED');
+  });}
+
+  destroy() {
+    this._restoreGameFocus();
+    if(this._nativeInput){this._nativeInput.remove();this._nativeInput=null;}
+    if(this._positionNativeInput){
+      window.removeEventListener('resize',this._positionNativeInput);
+      this.scene.scale?.off('resize',this._positionNativeInput);
+    }
+    super.destroy();
+  }
+
+  handleAction(action) {
+    if(action==='cancel'||action==='ghost'){this.close();return true;}
+    if(action==='left'||action==='up'||action==='right'||action==='down'){
+      const delta=action==='left'||action==='up'?-1:1;
+      this.focus=(this.focus+delta+this.buttons.length)%this.buttons.length;
+      this.buttons.forEach((b,i)=>b.setHover(i===this.focus));
+      uiSfx(this.scene,'uiMove');
+    } else if(action==='confirm') this.buttons[this.focus].zone.emit('pointerdown');
+    return true;
+  }
+}

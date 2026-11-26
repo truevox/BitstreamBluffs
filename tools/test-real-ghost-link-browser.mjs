@@ -104,11 +104,40 @@ try{
  await p.locator('textarea').fill(await p.evaluate(()=>window.__ghostCopies[0]));
  const filled=await p.evaluate(()=>({loaded:!!window.__bbGame.scene.getScene('TitleScene').view?.tape,field:document.querySelector('textarea')?.value.length}));
  if(filled.loaded||filled.field!==ui.copiedLength)throw Error('Filling input performed an implicit import '+JSON.stringify(filled));
- // Press the genuine on-screen PREVIEW button.
- const previewPoint=await clickPoint('previewBtn');
- await p.waitForTimeout(750);
- await p.mouse.click(previewPoint.x,previewPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:12000});
+ // Press the genuine on-screen PREVIEW button. Mobile/CI display scaling
+ // and Phaser panel transitions can move its real hit zone between sampling
+ // and pointerdown. Never fake a preview, invoke its handler, or claim success
+ // until the actual rendered button has accepted a real Playwright click.
+ let previewAccepted=false;
+ for(let attempt=0;attempt<4;attempt++){
+  const ready=await p.evaluate(()=>{
+   const v=window.__bbGame.scene.getScene('TitleScene')?.view;
+   return {preview:!!v?.preview?.count,busy:v?.busy===true,button:!!v?.previewBtn?.zone?.scene};
+  });
+  if(ready.preview){previewAccepted=true;break;}
+  if(!ready.button)throw Error('PREVIEW button disappeared before pointer consent');
+  if(ready.busy){
+   // An already accepted asynchronous preview should settle before we
+   // consider sending another gesture; retries must not cancel valid work.
+   await p.waitForTimeout(1600);
+   continue;
+  }
+  const previewPoint=await clickPoint('previewBtn');
+  await p.mouse.move(previewPoint.x,previewPoint.y);
+  await p.mouse.click(previewPoint.x,previewPoint.y);
+  try{
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count>0,null,{timeout:3300});
+   previewAccepted=true;break;
+  }catch(e){if(e.name!=='TimeoutError')throw e;}
+ }
+ if(!previewAccepted){
+  const state=await p.evaluate(()=>{
+   const v=window.__bbGame.scene.getScene('TitleScene')?.view;
+   return {status:v?.status?.main?.text,disabled:v?.previewBtn?.disabled,
+    previewCount:v?.preview?.count||0,button:!!v?.previewBtn?.zone?.scene};
+  });
+  throw Error('Real PREVIEW pointer never produced a decoded guest after four bounded attempts '+JSON.stringify(state));
+ }
  const previewed=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,count:v.preview?.count,localCount:v.localPreview?.count,localRole:v.localRole,traceX:v.preview?.trace[0],status:v.status.main.text,
@@ -233,7 +262,8 @@ try{
  if(pendingEdit.busy||pendingEdit.loaded||stale.loaded||stale.preview||
    !stale.status.includes('LINK CHANGED'))
   throw Error('Stale async guest validation restored edited-away content '+JSON.stringify({pendingEdit,stale}));
- await p.mouse.click(previewPoint.x,previewPoint.y);
+ const invalidPreviewPoint=await clickPoint('previewBtn');
+ await p.mouse.click(invalidPreviewPoint.x,invalidPreviewPoint.y);
  await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.status?.main?.text?.includes('INCOMPATIBLE'),null,{timeout:10000});
  const invalid=await p.evaluate(()=>{
   const v=window.__bbGame.scene.getScene('TitleScene').view;

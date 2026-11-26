@@ -17,6 +17,7 @@ import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
 import { activeUpgradeRanks } from './PermanentUpgrades.js';
 import { DEFAULT_CONTROL_LAYOUT, normalizeControlLayout } from './ControlLayouts.js';
+import { DEFAULT_ATTEMPT_KEEP, DEFAULT_MONTAGE_STYLE, sanitizeAttemptKeep, sanitizeMontageStyle } from './ghost/montageSettings.js';
 import { isRankable, isModdedOnly, countsForDailyBest,countsForDraftDailyBest, countsForStreak } from './Ranking.js';
 import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './DailyDraft.js';
 
@@ -37,6 +38,8 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
  * @property {boolean} ghostLatest       show the Latest ghost on its course (issue #56).
+ * @property {number} attemptHistoryKeep  past attempts kept per course for the Cemetery Montage (#68), 0..MAX_ATTEMPT_KEEP; 0 = keep none.
+ * @property {'montage'|'swarm'|'off'} cemeteryMontage  Cemetery Montage style at Game Over (#68).
  * @property {'same'|'mixed'} kodiakPacks  Kodiak packs of one type or mixed types (issue #47 playtest switch).
  * @property {'auto'|'on'|'off'} reduceMotion  menu motion (accessibility). 'auto' follows the OS
  *           prefers-reduced-motion query; resolved by ui/Motion.js isReducedMotion().
@@ -79,6 +82,7 @@ export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
     ghostBest: true, ghostLatest: true, kodiakPacks: 'same',
+    attemptHistoryKeep: DEFAULT_ATTEMPT_KEEP, cemeteryMontage: DEFAULT_MONTAGE_STYLE,
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     offlineMusicQuality: 'high',
@@ -118,6 +122,8 @@ export function sanitizeSettings(raw) {
     ghostBest: typeof raw.ghostBest === 'boolean' ? raw.ghostBest : d.ghostBest,
     ghostLatest: typeof raw.ghostLatest === 'boolean' ? raw.ghostLatest : d.ghostLatest,
     kodiakPacks: raw.kodiakPacks === 'mixed' ? 'mixed' : d.kodiakPacks,
+    attemptHistoryKeep: sanitizeAttemptKeep(raw.attemptHistoryKeep),
+    cemeteryMontage: sanitizeMontageStyle(raw.cemeteryMontage),
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     controlLayout: normalizeControlLayout(raw.controlLayout),
     touchOverlay: ['auto', 'on', 'off'].includes(raw.touchOverlay) ? raw.touchOverlay : d.touchOverlay,
