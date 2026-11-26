@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.9 — #119 explicit canonical Matter V3 state section (2026-11-26)
+
+- Introduce an opt-in, strictly typed **Matter-only** section codec in `src/systems/savestate/matterState.js` with exact current-build, run and tick binding; bounded body/part/vertex/contact arrays, current V3 relational preflight, explicit detector order/retired terrain projection, and finite binary64 strings for every physical double. Hidden/unknown fields, invalid references, duplicate IDs, unsupported constraints, noncanonical bytes, incompatible builds and malformed state fail closed. The section cannot execute constructors or mutate the current Matter world.
+- Real Chromium file-backed Matter transport tests the native fresh-world seam at tick **481** and **936**, with **399,357 / 442,998** canonical bytes and exact byte recapture; all **537** subsequent native fingerprints and final tape/record/score match, zero simulation ticks during restoration and existing hostile controls intact. Production-browser, deterministic/replay and CI safety gates remain mandatory.
+- **Not a complete persisted savestate or Save/Resume feature:** other scene-owned causal fields still use an internal diagnostic graph; there is no registered whole-world layout, atomic player-scene publication, one-use slot consumption, public rank eligibility or gameplay UI. The current v2.25.8 independent private proof work is preserved unchanged. #119 stays open. [skip netlify]
+
 ## v2.25.8 — #135 server-only signed independent admission reference (2026-11-26)
 
 - Preserve draft #406's original source in a non-force merge onto the v2.25.7 main source. Add private, server-only Ed25519 issuer-role signing verification (simulation, authorization, consent), an atomic SQLite challenge/admission ledger, exact account/challenge/claim/expiry/verifier bindings, replay/duplicate/forgery rejection and private receipt audit digests. No HTTP endpoint, key material or production issuer is deployed.
