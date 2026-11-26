@@ -1,11 +1,13 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-26 14:34 UTC. GitHub main `f2e02aac170ffa09645db10388224afbccbbb73b` (#405), v2.25.6/SIM9. Native recorder continuity is inert; no live Save/Resume or ranking authority. Guest practice remains unverified and unranked; #58/#81 and trusted restore remain open.
+Last verified: 2026-11-26 18:29 UTC. GitHub main `64d5a14f862430c1c289c0c12c98a7af0c3043ca`, v2.25.15/SIM9; exact Pages build and deploy passed (served bytes not compared). No trusted live Save/Resume or public ranking authority.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
+
+- **#74/#75 prerequisite reconciliation:** shipped #392 includes #67 Postcards and #72 Replay Takeover. Postcards already offer a same-build reproducible prefix, an explicit unranked timed survival objective, and a reply code. Do not duplicate that codec or hold all #74 work on #119. Remaining #74 delta is picking/classifying a highlight and supporting explicit event-specific objectives, not a proof or leaderboard change; get design scope before adding a new objective or player flow. #75 can evaluate a developer-only recorded title/tutorial playback plus unranked interruption without inventing restore. It does not yet ship either recorded scene; #119 still gates saved-state persistence and #100. #58/#60 remain open for their distinct publishing/identity scope.
 
 - **Shipped #391/#392 Ghost consent follow-up:** `39a83c15` requires a fresh press; consolidated #392 shipped v2.25.0 in `3e15dd98` (Pages deploy verified). #396 later hardened the mobile browser test against a moving hit zone. #395 is CI-only and remains open; no physical Chromebook/Android acceptance yet. #69 sharing shipped; #172 physical PWA QA remains open.
 
@@ -84,7 +86,7 @@ means resume this queue, not take over another lane or merge a draft.
    0/2, identity, build and 81 focused Jest tests passed. [Updated Gal handoff](https://github.com/truevox/BitstreamBluffs/pull/338#issuecomment-7174428665).
    Exact-head [identity CI](https://github.com/truevox/BitstreamBluffs/actions/runs/45699867541) green;
    still waiting for fresh review. No player data or runtime change.
-   **#79 / [#381](https://github.com/truevox/BitstreamBluffs/pull/381)** developer-only terrain marker draft, `morgan/issue-79-fatal-event-witness` @ `408e542ef19cf6b82e55a2a57dae666b510d4015` on v2.25.6. Five compiled Chromium contexts verify tick 937 against 234 stored poses ending tick 936, 2.592px gap, seven checks, and refusal of shifted-pose or nonfatal cutoff markers. Wrong build refused; 40 tests, identity and all 4,884 production files unchanged. Draft requests current-head Gal review; prior v2.22.7 proof historical, not cross-version playback. No player surface, release, or scoring change.
+   **#79 / [#381](https://github.com/truevox/BitstreamBluffs/pull/381)** developer-only terrain marker draft, `morgan/issue-79-fatal-event-witness` @ `408e542ef19cf6b82e55a2a57dae666b510d4015` on v2.25.6. Five compiled Chromium contexts verify tick 937 against 234 stored poses ending tick 936, 2.592px gap, seven checks, and refusal of shifted-pose or nonfatal cutoff markers. Wrong build refused; 40 tests, identity and all 4,884 production files unchanged. Exact-head identity and lifecycle are green; no current-head independent review. Prior v2.22.7 proof historical, not cross-version playback. No player surface, release, or scoring change.
 3. **#126 / #341**: open five-file developer-only draft
    `morgan/issue-126-paired-fatigue-report` @ `a560cec88bc835877620e808dd30d270d70b2722`, based on
    `044ebd4b`. Opt-in comparator matches classic/fatigue by course, reaction
