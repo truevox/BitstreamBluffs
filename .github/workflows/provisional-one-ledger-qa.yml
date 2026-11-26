@@ -1,0 +1,58 @@
+name: One-ledger UNVERIFIED provisional authority QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/provisional-one-ledger-qa.yml'
+      - 'server/trust/**'
+      - 'tests/server/provisional-one-ledger.test.mjs'
+      - 'src/systems/trust/**'
+      - 'src/systems/replay/**'
+      - 'tools/trust/boundAdmissionFixture.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/provisional-one-ledger-qa.yml'
+      - 'server/trust/provisional.mjs'
+      - 'tests/server/provisional-one-ledger.test.mjs'
+permissions:
+  contents: read
+jobs:
+  provisional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact head source checkout
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Signed admission, canonical wallet and provisional fail-closed database QA
+        run: node --test server/trust/admission.test.mjs tests/server/provisional-one-ledger.test.mjs
+      - name: Exact ruleset source and build identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: One verdict for paid/free and provisional negative controls
+        run: npm test -- --runInBand tests/trust/dualProof.test.js
+      - name: Real Chromium independent compiled replay with signed wallet fixture
+        run: |
+          npx playwright install --with-deps chromium
+          node tools/trust/test-real-independent-replay.mjs
+      - name: Public bundle never contains the private provisional or wallet ledger
+        run: |
+          npm run build
+          if grep -l -E '(openProvisionalLedger|openPublicWallet|public_provisional_submissions)' dist/assets/*.js; then
+            echo 'Private public-authority server code leaked into browser build' >&2
+            exit 1
+          fi
+          echo 'PASS: server-only public authority absent from client build'
