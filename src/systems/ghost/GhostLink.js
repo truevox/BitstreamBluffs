@@ -20,6 +20,10 @@ export const GHOST_LINK_RECOMMENDED_URL=1900;
 export const GHOST_LINK_MAX_URL=8192;
 export const GHOST_LINK_MAX_GZIP=20000;
 export const GHOST_LINK_MAX_JSON=96000;
+/** Explicit local download, not an automatic cloud-hosting path. */
+export const GHOST_FILE_NAME='bitstream-ghost.bbghost';
+export const GHOST_FILE_HEADER='BBGHOST1\n';
+export const GHOST_FILE_MAX_BYTES=GHOST_FILE_HEADER.length+24+1+GHOST_LINK_MAX_GZIP;
 const MAX_TICKS=120*600,MAX_CHANGES=30000,MAX_CHECKPOINTS=600,MAX_TRACE_CHARS=85000;
 const TAPE_FIELDS=[
  'format','version','physicsVersion','simTickHz','runRandomVersion','edgeRows',
@@ -149,13 +153,32 @@ async function ungzip(bytes){
  catch(e){if(e instanceof GhostLinkError)throw e;reject('bad-gzip','Cannot decompress ghost data');}
 }
 
-/** Explicit export. A URL fragment is local to the browser until someone shares it. */
-export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL}={}){
+/** Both transports carry exactly the same allowlisted, bounded payload.
+ * The SHA-256 prefix catches corruption; it DOES NOT authenticate the sender. */
+async function encodePackage(tape){
  if(!plain(tape))reject('invalid-tape');
  const payload={format:GHOST_LINK_FORMAT,version:GHOST_LINK_VERSION,tape:selected(tape)};
  const raw=new TextEncoder().encode(JSON.stringify(payload));if(raw.length>GHOST_LINK_MAX_JSON)reject('oversize');
- const zipped=await gzip(raw);if(zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
- const checksum=(await digest(zipped)).slice(0,24); // integrity check, NOT producer authentication
+ const zipped=await gzip(raw);if(!zipped.length||zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
+ return {zipped,checksum:(await digest(zipped)).slice(0,24)};
+}
+async function decodePackage(zipped,checksum,sourceName,corruptionCode){
+ if(!(zipped instanceof Uint8Array)||!zipped.length||zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
+ const check=(await digest(zipped)).slice(0,24);
+ if(check!==checksum)reject(corruptionCode,'Compressed replay checksum mismatch');
+ const raw=await ungzip(zipped);
+ let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));}catch{reject('invalid-json');}
+ if(!plain(body)||body.format!==GHOST_LINK_FORMAT||body.version!==GHOST_LINK_VERSION||!plain(body.tape))reject('unsupported-link');
+ const t=selected(body.tape);
+ // The original run ID/timestamps and any publisher claims NEVER survive.
+ return {trust:'unverified-local-practice',source:sourceName,
+  digest:check,tape:{...t,runId:`shared:${check}`,startedAt:0,endedAt:0},
+  canCreditScore:false,canCreditWallet:false,canSubmitOfficial:false};
+}
+
+/** Explicit export. A URL fragment is local to the browser until someone shares it. */
+export async function createGhostLink(tape,baseUrl,{maxLength=GHOST_LINK_MAX_URL}={}){
+ const {zipped,checksum}=await encodePackage(tape);
  const encoded=`${GHOST_LINK_VERSION}.${checksum}.${base64url(zipped)}`;
  let target;try{target=new URL(baseUrl);}catch{reject('invalid-url');}
  if(target.username||target.password||!(['https:','http:'].includes(target.protocol))||
@@ -177,15 +200,32 @@ export async function parseGhostLink(url,{maxLength=GHOST_LINK_MAX_URL}={}){
  const match=/^1\.([a-f0-9]{24})\.([A-Za-z0-9_-]+)$/.exec(fragment.slice(prefix.length));
  if(!match)reject('unsupported-link','Malformed or future ghost-link version');
  const zipped=fromUrl64(match[2]);if(zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
- const check=(await digest(zipped)).slice(0,24);
- if(check!==match[1])reject('corrupt-link','Compressed replay checksum mismatch');
- const raw=await ungzip(zipped);
- let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));}catch{reject('invalid-json');}
- if(!plain(body)||body.format!==GHOST_LINK_FORMAT||body.version!==GHOST_LINK_VERSION||!plain(body.tape))reject('unsupported-link');
- const t=selected(body.tape);
- // Never carry over remotely supplied names, original run ID or timestamps.
- // This is explicitly an UNVERIFIED local-practice import candidate only.
- return {trust:'unverified-local-practice',source:'user-pasted-url-fragment',
-  digest:check,tape:{...t,runId:`shared:${check}`,startedAt:0,endedAt:0},
-  canCreditScore:false,canCreditWallet:false,canSubmitOfficial:false};
+ return decodePackage(zipped,match[1],'user-pasted-url-fragment','corrupt-link');
+}
+
+/** This file is ONLY prepared by the sender's explicit SHARE action. The
+ * filename intentionally contains no seed, score, name or player identity. */
+export async function createGhostFile(tape){
+ const {zipped,checksum}=await encodePackage(tape);
+ const header=new TextEncoder().encode(`${GHOST_FILE_HEADER}${checksum}\n`);
+ const bytes=new Uint8Array(header.length+zipped.length);
+ bytes.set(header);bytes.set(zipped,header.length);
+ if(bytes.length>GHOST_FILE_MAX_BYTES)reject('oversize');
+ return {filename:GHOST_FILE_NAME,bytes,digest:checksum};
+}
+
+/** Explicit native file-picker input, never URL/file-system/network fetch.
+ * All trust, stripping, version and size rules are shared with URL previews. */
+export async function parseGhostFile(bytes){
+ if(!ArrayBuffer.isView(bytes)||Object.prototype.toString.call(bytes)!=='[object Uint8Array]'||
+    bytes.byteLength>GHOST_FILE_MAX_BYTES||bytes.byteLength<GHOST_FILE_HEADER.length+24+2)
+  reject('invalid-file','Not a supported bounded .bbghost file');
+ const head=new TextEncoder().encode(GHOST_FILE_HEADER);
+ for(let i=0;i<head.length;i++)if(bytes[i]!==head[i])reject('unsupported-file','Unsupported ghost file format/version');
+ const offset=head.length;
+ const checksum=String.fromCharCode(...bytes.subarray(offset,offset+24));
+ if(!/^[0-9a-f]{24}$/.test(checksum)||bytes[offset+24]!==10)reject('invalid-file','Invalid ghost file header');
+ const zipped=bytes.subarray(offset+25);
+ if(!zipped.length||zipped.length>GHOST_LINK_MAX_GZIP)reject('oversize');
+ return decodePackage(zipped,checksum,'user-chosen-local-file','corrupt-file');
 }

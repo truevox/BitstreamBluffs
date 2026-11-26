@@ -51,6 +51,9 @@ import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
+import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
+import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
+import { launchTakeover } from '../ui/TakeoverLauncher.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -113,6 +116,7 @@ export class TitleScene extends Phaser.Scene {
       this._closeView();
     });
     this.cameras.main.fadeIn(180, 5, 6, 15);
+    showTakeoverNotice(this, theme); // #72: why a takeover was refused or aborted, shown once
   }
 
   // ------------------------------------------------------------------ logo
@@ -516,6 +520,26 @@ export class TitleScene extends Phaser.Scene {
     const h = TITLE_BANDS.help;
     // The touch / mouse route to HOW TO PLAY (keyboard: H; pad: X / Y or SELECT).
     this.helpButton = new Button(this, theme, { x: h.x, y: h.y, w: h.w, h: h.h, label: '? HOW TO PLAY', color: 'amber', onClick: () => this._openHelp(true) });
+    // #67: open a postcard (keyboard: O). The title menu is full, so it is a chip above HOW TO PLAY.
+    const pc = POSTCARD_CHIP;
+    this.postcardButton = new Button(this, theme, { x: pc.x, y: pc.y, w: pc.w, h: pc.h, label: 'O POSTCARD', color: 'magenta', onClick: () => this._openPostcard(true) });
+  }
+
+  /** #67: the open-postcard view. Nothing is read or started until the player presses OPEN. */
+  _openPostcard(fromButton) {
+    if (this.starting || this.view) return;
+    if (!fromButton) uiSfx(this, 'uiSelect');
+    if (fromButton && this.attract) { this._exitAttract(); return; }
+    this._openView(new PostcardOpenView(this, this.theme, { onClose: () => this._closeView(), onOpen: (d) => this._launchPostcard(d) }));
+  }
+
+  /** #67: hand a validated postcard descriptor to RunScene (an UNRANKED takeover; RunScene re-validates it and checks the fingerprint at N). */
+  _launchPostcard(descriptor) {
+    if (this.starting) return;
+    this.starting = true;
+    uiSfx(this, 'uiSelect', { pitch: 1.3 });
+    this._closeView();
+    launchTakeover(this, descriptor);
   }
 
   /** @param {boolean} [fromButton] the chip already played its own click */
@@ -599,6 +623,7 @@ export class TitleScene extends Phaser.Scene {
       const e = ev && (ev.originalEvent || ev);
       if (this._wakeGate()) return;
       if (e && (e.key === 'h' || e.key === 'H') && !e.repeat && !this.view && !this.starting) this._openHelp();
+      if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
     };
     this._onPointer = () => { this._wakeGate(); };
     this._onRouter = (p) => { if (p && p.pressed) this._wakeGate(); };
@@ -630,7 +655,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.sub].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {
@@ -828,5 +853,5 @@ function launchFx(scene, ms) {
   };
   slide(scene.menuPanel, -240);
   slide(scene.cardPanel, 180);
-  for (const o of [scene.hint, scene.helpButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
+  for (const o of [scene.hint, scene.helpButton, scene.postcardButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
 }

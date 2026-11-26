@@ -9,7 +9,7 @@ import { uiSfx } from './Sound.js';
 import { fmtInt } from './Format.js';
 import { ellipsize } from './PixelFont.js';
 import { copyText } from './Clipboard.js';
-import { createGhostLink, GHOST_LINK_RECOMMENDED_URL, GhostLinkError } from '../systems/ghost/GhostLink.js';
+import { createGhostLink, createGhostFile, GHOST_LINK_RECOMMENDED_URL, GhostLinkError } from '../systems/ghost/GhostLink.js';
 import { GHOST_COURSE_ROWS, readGhostCourseRows } from './ghost-course-rows.js';
 
 const ROW_Y = 49;
@@ -35,6 +35,7 @@ export class GhostFavoritesView extends View {
     this._shareBusy = false;
     this._shareArmed = false;
     this._shareLink = null;
+    this._shareFile = null;
     this._shareEpoch = 0;
     const text = (x, y, value, color = 'text') => this.panel.add(
       new NeonText(scene, theme, x, y, value, { color, outline: 'none' }));
@@ -117,6 +118,7 @@ export class GhostFavoritesView extends View {
     this._shareEpoch++;
     this._shareArmed = false;
     this._shareLink = null;
+    this._shareFile = null;
     this.shareBtn?.setLabel('SHARE LINK');
   }
 
@@ -140,22 +142,62 @@ export class GhostFavoritesView extends View {
         this.status.setText('SHARES INPUTS + SCORE. SELECT AGAIN.');
       } catch (e) {
         if (!this.alive || epoch !== this._shareEpoch) return;
-        this._disarmShare();
-        this.status.setText(e instanceof GhostLinkError && e.code === 'url-too-long'
-          ? 'LINK TOO LONG: NO UPLOAD PERFORMED' : 'CANNOT SHARE THIS GHOST');
+        if (e instanceof GhostLinkError && e.code === 'url-too-long') {
+          // Never upload, truncate, or copy a broken 8k+ URL. A separate
+          // local download is prepared only after the user's first action.
+          // Still requires the SECOND deliberate user activation to download.
+          try {
+            const file = await createGhostFile(this.tape);
+            if (!this.alive || epoch !== this._shareEpoch) return;
+            this._shareArmed = true;
+            this._shareFile = file;
+            this.shareBtn.setLabel('SAVE FILE');
+            this.status.setText('FILE SHARES INPUTS + SCORE. SELECT AGAIN.');
+          } catch {
+            if (!this.alive || epoch !== this._shareEpoch) return;
+            this._disarmShare();
+            this.status.setText('GHOST TOO LARGE EVEN FOR LOCAL FILE');
+          }
+        } else {
+          this._disarmShare();
+          this.status.setText('CANNOT SHARE THIS GHOST');
+        }
       } finally {
         this._shareBusy = false;
         if (this.alive) this.shareBtn.setDisabled(false);
       }
       return;
     }
-    // Clipboard permission is gesture-sensitive: initiate writing directly
-    // in the second user click, before any awaiting or other interaction.
-    const link = this._shareLink;
+    // Download/clipboard permission is gesture-sensitive. This code starts
+    // the browser request directly inside the SECOND user event, with no
+    // await, redirect, network call or access to the sender's private path.
+    const link = this._shareLink, file = this._shareFile;
     this._disarmShare();
     this._shareBusy = true;
     this.shareBtn.setDisabled(true);
     try {
+      if (file) {
+        let url = null;
+        try {
+          url = URL.createObjectURL(new Blob([file.bytes], {type:'application/octet-stream'}));
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = file.filename;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          try { a.click(); } finally { a.remove(); }
+          // A requested browser download is not proof that the user saved
+          // the file; do not report a cloud share or durable export.
+          this.status.setText('LOCAL FILE DOWNLOAD REQUESTED - NO UPLOAD');
+          uiSfx(this.scene, 'uiSelect');
+        } catch {
+          // Blocked object URLs/CSP/download restrictions must not produce an
+          // unhandled rejected Button promise or a false saved-file claim.
+          if(this.alive)this.status.setText('LOCAL DOWNLOAD BLOCKED - FILE NOT SAVED');
+          uiSfx(this.scene, 'uiBack');
+        } finally {if(url)setTimeout(()=>URL.revokeObjectURL(url),15000);}
+        return;
+      }
       const copied = await copyText(link);
       if (!this.alive) return;
       this.status.setText(!copied ? 'CLIPBOARD BLOCKED: NO LINK COPIED'

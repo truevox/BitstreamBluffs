@@ -43,7 +43,12 @@
     // We explicitly REFUSE guest practice capture/restore below; only false is admitted.
     '_replayTape', 'guestPractice'];
   // METADATA: wall-clock or recording state; not simulation (but a resumed run's ghost tape needs it, see doc).
-  const METADATA = ['runId', 'startedAt', 'ghostRecorder', 'tapePlayer', '_ghostToken', '_bsodObserverErrorLogged'];
+  // #72/#69: guestPractice, guestPracticeTape, takeover and unrankedPractice select the unranked write policy; _seeking only
+  // gates presentation during a takeover re-simulation. None is simulation state.
+  const METADATA = ['runId', 'startedAt', 'ghostRecorder', 'tapePlayer', '_ghostToken', '_bsodObserverErrorLogged',
+    'takeover', 'unrankedPractice', '_seeking',
+    // #66: coachSim marks a hidden candidate re-simulation; crashInfo is the cause the coach reads back after a crash
+    'coachSim', 'crashInfo'];
   // PRESENTATION: render-only objects and per-frame visual state.
   // look/palette are re-resolved when the biome sector changes (RunScene ~L2383): derived presentation, not CONFIG.
   const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',

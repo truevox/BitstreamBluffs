@@ -241,7 +241,8 @@ export class GhostLibrary {
    * @returns {Promise<object>} the updated course entry
    */
   async saveRun(tape) {
-    if (!tape?.runId || tape.mode === 'gym') return null;
+    // Gym practice and #72 takeover tapes (unranked practice / TAS) are never library ghosts.
+    if (!tape?.runId || tape.mode === 'gym' || tape.mode === 'takeover') return null;
     if (this._db) return this._idbChange('save', { tape });
     const key = courseKey(tape.seed, tape.biomeMask);
     // Memory fallback is synchronous until course+tape are both committed:

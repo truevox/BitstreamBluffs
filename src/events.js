@@ -27,6 +27,10 @@ export const EVT = Object.freeze({
   RUN_END: 'bb:runEnd',
   /** Emitter: PauseScene on restart/quit; additive {runId,reason,pauseToken}. Never a manual resume. */
   RUN_ABORT: 'bb:runAbort',
+  /** Emitter: RunScene during a Replay Takeover (#72). Payload: {phase:'seeking'|'ready'|'live', tick, target, pct}. HUD only. */
+  TAKEOVER_STATE: 'bb:takeoverState',
+  /** Emitter: RunScene once, when a takeover seek reaches tick N (#72). Payload: RunScene.hudSnapshot(). Heard only by UIScene (no SFX, no popups). */
+  HUD_RESYNC: 'bb:hudResync',
   /** Emitter: RunScene. Payload: CrashPayload. */
   CRASH: 'bb:crash',
   /** Emitter: RunScene, only on a non-ranked Gym catch. Payload: {attempt,readyMs}. */

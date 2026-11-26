@@ -23,6 +23,8 @@ export const EVIDENCE_ACTIVE_RUN_KEY = 'activeEvidenceRunId';
 export const EVIDENCE_STORE_KEY = 'evidenceStore';
 /** Registry key holding `{doc, rulesetId}`: the ruleset of this build (set by services.js). */
 export const RULESET_KEY = 'currentRuleset';
+/** Registry key holding this build's `bb-build-identity` buildId string (set by services.js once the ruleset has loaded; #72 tape stamp). */
+export const BUILD_ID_KEY = 'currentBuildId';
 
 let shared = null;
 let sharedRetry = null;

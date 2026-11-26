@@ -92,10 +92,23 @@ try{
    pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),rect=document.querySelector('canvas').getBoundingClientRect();
   return {x:rect.left+pt.x/g.scale.gameSize.width*rect.width,y:rect.top+pt.y/g.scale.gameSize.height*rect.height};
  },which);
- const openPoint=await clickPoint('ghostLinkBtn');
- await p.waitForTimeout(500);
- await p.mouse.click(openPoint.x,openPoint.y);
- await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:8000});
+ // The title menu uses an entrance tween. A click can hit the prior
+ // translucent scene on a slower runner. Reacquire the real active button
+ // center and observe the destination before ANY retry, never issuing extra
+ // pointer events after it opens.
+ let openedGuest=false;
+ for(let attempt=0;attempt<4;attempt++){
+  await p.waitForTimeout(420);
+  const openPoint=await clickPoint('ghostLinkBtn');
+  await p.mouse.click(openPoint.x,openPoint.y);
+  try{
+   await p.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.previewBtn,null,{timeout:2500});
+   openedGuest=true;break;
+  }catch{
+   if(await p.evaluate(()=>Boolean(window.__bbGame.scene.getScene('TitleScene').view?.previewBtn))){openedGuest=true;break;}
+  }
+ }
+ if(!openedGuest)throw Error('Open Ghost Link did not respond after genuine pointer attempts');
  const beforehand=await p.evaluate(()=>{
   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,lib=g.registry.get('ghostLibrary'),store=g.registry.get('saveStore');
   return {loaded:!!v.tape,preview:!!v.preview,courses:lib?.courses?.size,tapes:lib?.tapes?.size,runs:store?.runs?.length};
@@ -376,6 +389,21 @@ try{
      live.recorder||live.tapePlayer||live.ghosts!==1||live.guestRoles?.[0]!=='guest'||
      live.dailyOfficial||live.registryPending||!live.tag)
    throw Error('Guest run admitted to ranking/replay or not visible '+JSON.stringify(live));
+  // Both the short-URL and local-file guest transport share this RunScene
+  // admission: session hints may change in RAM but cannot consume device-wide
+  // normal-play tutorial progress or the tuck reminder limit.
+  const guestHints=await recipient.evaluate(()=>{
+   const r=window.__bbGame.scene.getScene('RunScene');
+   localStorage.removeItem('bb.tutorialDone');
+   localStorage.removeItem('bb.tuckShows');
+   r.tutDone.delete('push');r.tutDoneId('push');
+   r.applyHintEvents([{id:'tuck',show:true}]);
+   return {inMemoryDone:r.tutDone.has('push'),inMemoryShows:r.tuckShows,
+    tutorial:localStorage.getItem('bb.tutorialDone'),tuck:localStorage.getItem('bb.tuckShows')};
+  });
+  if(!guestHints.inMemoryDone||guestHints.inMemoryShows<1||guestHints.tutorial!==null||guestHints.tuck!==null)
+   throw Error('Short-link guest practice leaked device tutorial/tuck history '+JSON.stringify(guestHints));
+  console.log('PASS_SHORT_GHOST_PRACTICE_HINTS_EPHEMERAL',JSON.stringify(guestHints));
   await recipient.waitForFunction(()=>window.__bbGame.scene.getScene('RunScene').simClock.tick>=85,null,{timeout:30000});
   const tick=await recipient.evaluate(()=>{
    const r=window.__bbGame.scene.getScene('RunScene');
@@ -393,12 +421,17 @@ try{
     lastTape:r.get('lastGhostTape')?.runId||null,
     events:window.__practiceEvents,gameOver:g.scene.isActive('GameOverScene')};
   });
+  const guestHintDisk=await recipient.evaluate(()=>({
+   tutorial:localStorage.getItem('bb.tutorialDone'),tuck:localStorage.getItem('bb.tuckShows')
+  }));
+  if(guestHintDisk.tutorial!==null||guestHintDisk.tuck!==null)
+   throw Error('Short-link guest practice wrote first-run hints after exit '+JSON.stringify(guestHintDisk));
   const {events,gameOver,...durable}=after;
   if(JSON.stringify(durable)!==JSON.stringify(before)||events.includes('RUN_END')||
      !events.includes('RUN_ABORT:guest-practice-ended')||gameOver)
    throw Error('Guest run mutated persistent profile/records or leaked ranked end '+JSON.stringify({before,after}));
   practiceAcceptance={before:{runs:before.runs,profileBytes:before.profile.length,courses:before.courses,tapes:before.tapes},
-   armedRace,live,tick,after:{runs:after.runs,profileBytes:after.profile.length,courses:after.courses,tapes:after.tapes,
+   armedRace,live,guestHints,tick,after:{runs:after.runs,profileBytes:after.profile.length,courses:after.courses,tapes:after.tapes,
    events,gameOver},zeroDurableMutation:true};
   if(process.env.BSB_GUEST_PRACTICE_RESTART==='1'){
    // Reopen the SAME verified link, then restart/quit through genuine PauseScene

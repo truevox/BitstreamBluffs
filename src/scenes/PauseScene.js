@@ -26,6 +26,7 @@ import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
+import { pauseRestartTakeover, pauseQuitTakeover } from '../ui/TakeoverLauncher.js';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -39,12 +40,15 @@ export class PauseScene extends Phaser.Scene {
     this.manualPauseToken = (data && data.pauseToken) || '';
     this.manualPauseGym = data?.gym === true;
     this.manualPauseGuest = data?.practice === true;
+    this.manualPauseTakeover = data?.takeover === true;
   }
 
   create() {
     this.leaving = false;
     this.guestPractice = this.manualPauseGuest || this.scene?.get?.(SCENES.RUN)?.guestPractice === true;
-    this.gymPractice = this.registry.get(REG.BSOD_GYM) === true || this.guestPractice;
+    // #72: a takeover is UNRANKED PRACTICE / TAS: no ranked items, RESTART = retry from the same tick, QUIT = the takeover end screen.
+    this.takeoverRun = this.manualPauseTakeover || !!this.scene?.get?.(SCENES.RUN)?.takeover;
+    this.gymPractice = this.registry.get(REG.BSOD_GYM) === true || this.guestPractice || this.takeoverRun;
     this.view = null;
     this.dim = null;
     const theme = (this.theme = new Theme(this));
@@ -59,7 +63,7 @@ export class PauseScene extends Phaser.Scene {
     this._buildHeader(theme);
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.takeoverRun ? 'TAKEOVER // UNRANKED' : this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
@@ -84,7 +88,7 @@ export class PauseScene extends Phaser.Scene {
     };
     if (this.gymPractice) {
       // No seed-sharing, Daily-rule or progression promises inside a sandbox.
-      col(24, 'MODE', 'PRACTICE', 'lime', 2);
+      col(24, 'MODE', this.takeoverRun ? 'TAKEOVER' : 'PRACTICE', 'lime', 2);
       col(54, 'RETRIES', 'UNLIMITED', 'cyan');
       col(80, 'XP / SHARDS', 'NONE', 'amber');
       panel.add(new NeonText(this, theme, 236, 110, 'NOT RANKED', {
@@ -286,6 +290,7 @@ export class PauseScene extends Phaser.Scene {
   /** Abort this run and start a new one with the same seed. @returns {void} */
   restart() {
     if (this.leaving) return;
+    if (this.takeoverRun) { this.leaving = true; uiSfx(this, 'uiSelect'); pauseRestartTakeover(this); return; }
     if(this.guestPractice){
       const guest=this.scene.get(SCENES.RUN)?.guestPracticeTape;
       // A missing/stale guest cannot silently become a ranked restart.
@@ -311,6 +316,7 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiBack');
+    if (this.takeoverRun && pauseQuitTakeover(this)) return;
     try {
       this.game.events.emit(EVT.RUN_ABORT, {
         runId: this._runId(), reason: 'quit', pauseToken: this.manualPauseToken,
