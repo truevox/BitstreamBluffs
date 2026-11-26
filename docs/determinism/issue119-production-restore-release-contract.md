@@ -17,3 +17,11 @@
 5. Chromium QA must include 300/300 contact, 280/280 hazard, long natural contact, double-tab claim race, stale build/layout, altered payload, interrupted save, quota, held keys and no double reward; real PWA reopen, storage and postmerge deployment.
 
 **Release sequencing:** v2.25.3 shipped an inert single-use slot; real restore is a new versioned PR after this gate. This contract author is Gal Friday, not a claim of prior detailed implementation approval. Parent #119 stays OPEN until all acceptance steps are met.
+
+## Implementation checkpoint (2026-11-25 ET, source-only)
+
+The first importable runtime module lives at `src/systems/savestate/RunSceneRestoreKit.js`: an explicit Phaser/Matter dependency-injected port of the full source-tested V3 diagnostic mechanism, with no automatic global hook. `createRunSceneRestoreKit` exposes **only** strict full snapshot and fresh normal-run restore; it explicitly refuses Guest/Gym/Takeover/Coach/ended runs and refuses incomplete Matter audit or missing recorder. The separate `createDiagnosticRunSceneRestoreKit` exists only for test parity and never authorizes rewards. The original experiment implementation remains independently available in `tools/savestate-experiment/game-state-kit.js`.
+
+A new `--runtime-module` flag in the existing real Chromium harness exercises the exported module on genuine contact and hazard fixtures with strict negative controls and exact recorder suffix comparisons; `.github/workflows/runscene-restore-runtime-qa.yml` gates the full 300-contact / 280-hazard fixture before any merge. The first unrestricted module version completed both real browser cases with zero divergence. The later strict operational wrapper passed the contact run locally, but a concurrent CT223 resource interruption prevented a final local hazard completion—**do not count it as a pass until exact-head GitHub CI is green**.
+
+This checkpoint still emits a diagnostic structure, **not** a registered client serialisation layout. It has no wired RunScene UI, no durable slot claim integration, no validated fresh-world handoff, and no authority to mark a run ranked. Parent #119 MUST remain OPEN. No user-visible gameplay or public verifier change is shipped by this draft.
