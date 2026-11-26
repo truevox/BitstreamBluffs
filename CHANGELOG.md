@@ -3,7 +3,7 @@
 ## v2.25.7 — #119 strict full-Matter RunScene restore mechanism (2026-11-26)
 
 - Non-force-integrate the existing #404 real RunScene/Matter V3 contact and recorder restoration code onto shipped v2.25.6 RNG/clock and native GhostRecorder infrastructure. Internal opt-in ES-module interface supports complete normal-run capture and fresh-world full restore; no automatic global hook, storage, UI, ranking, or network writes.
-- Added strict pre-mutation completeness checks against the reviewed SIM field inventory, core fields, terrain/telegraph/Matter/camera sections and recorder snapshot; refuse truncated/unclassified content before mutation. Experimental partial/ablation paths remain excluded from the operational API.
+- Added strict pre-mutation completeness checks against the reviewed SIM field inventory, core fields, terrain/telegraph/Matter/camera sections and recorder snapshot; refuse truncated/unclassified content before mutation. Removed obsolete legacy pooled-collider reconstruction; nonempty old pools now fail closed and cannot violate SIM9 terrain-body creation. Experimental partial/ablation paths remain excluded from the operational API.
 - Real compiled browser regression checks contact-heavy and hazard-heavy 300/280-tick strict equality, recorder suffix and corruption controls. Version and source identity remain explicit; SIM9 physics unchanged.
 - This is **not** player Save/Resume: no registered serializable production layout, atomic fresh-scene lifecycle, one-time slot consumption after verified resume, UI, or public leaderboard authorization. Parent #119 stays OPEN. [skip netlify]
 
