@@ -39,7 +39,7 @@
   const CONFIG = ['seed', 'biomeMask', 'dailyOfficial', 'dailyRuleId', 'dailyMode', 'dailyMods', 'bsodGym', 'loadout',
     'unlockedBoosts', 'upgradeRun', 'upgradeFx', 'magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'gymSetup', 'startX',
     'gymStartX', 'boostFx', 'modded', 'appliedBoosts', 'opening', 'content', 'settings', 'bestM', 'tuner',
-    '_replayTape'];
+    '_replayTape', 'guestPractice'];
   // METADATA: wall-clock or recording state; not simulation (but a resumed run's ghost tape needs it, see doc).
   const METADATA = ['runId', 'startedAt', 'ghostRecorder', 'tapePlayer', '_ghostToken', '_bsodObserverErrorLogged'];
   // PRESENTATION: render-only objects and per-frame visual state.
@@ -49,7 +49,10 @@
     'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake',
     // SIM9: bridge look/veil and cached span are visual; marker height reads joined mesh,
     // not speculative terrain. Matches the shipped RunScene fingerprint exclusions.
-    '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn'];
+    '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn',
+    // #69 unverified guest visual-opponent tape is presentation only; NEVER an
+    // authoritative score/input driver or candidate trusted savestate.
+    'guestPracticeTape'];
   // INFRA: Phaser scene systems, handlers, services.
   const INFRA = ['add', 'anims', 'cache', 'cameras', 'children', 'data', 'events', 'game', 'input', 'lights', 'load',
     'make', 'matter', 'plugins', 'registry', 'renderer', 'scale', 'scene', 'sound', 'sys', 'textures', 'time', 'tweens',
@@ -294,6 +297,10 @@
     const ix = bodyIndex(run);
     const classes = classifyScene(run);
     const audit = [];
+    // #69 visual guest sessions have no recorder, ranked RunRecord or replay
+    // proof. Refuse their snapshots rather than granting trusted save status.
+    if (run.guestPractice === true || run.guestPracticeTape != null)
+      audit.push('unranked guest practice is not eligible for authoritative savestate capture');
     if (classes.unclassified.length) audit.push(`RunScene fields not classified: ${classes.unclassified.join(',')}`);
     const { enc, audit: encAudit, skipped } = makeEncoder(run, ix.keyOf);
     const fields = {};
