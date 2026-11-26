@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.2 — #56 repeatable Course Archive Slots (2026-11-25)
+
+- The fixed display stays **Best, Latest and three Favorites** (at most five distinct ghosts) for each exact seed+biome course. Added capacity buys **more distinct retained courses**, never extra on-screen riders. Provisional pre-alpha economics: 8 included archives, +1 per deliberate shop purchase and an increasing Shard price (40 at first rank). These values were Friday-selected for implementation, **not** a historical Marvin economy decision.
+- Grandfather the full historical course inventory once, DURABLY before enabling a cap; an interrupted migration cannot mark the default as finished. On full capacity, decline only a NEW course's Ghost Library write, visibly explain SHOP > UPGRADES > COURSE SLOTS, and NEVER evict or silently discard pinned Favorites. Protected local replay evidence, RunRecords, physics and official rankings are untouched.
+- Shop > Permanent Upgrades now offers COURSES SLOT +1 and MANAGE COURSE ARCHIVES. Separate explicit select and CONFIRM DELETE rows prevent a repeated Enter from destroying stored data accidentally. A delete clears only that course's GhostLibrary metadata and unreferenced tapes atomically in IndexedDB; independent protected evidence remains separate. No automatic uploads or account requirement.
+- Unit and real two-tab Chromium gates test atomic last-slot races, pinned Ghost ID immutability, Shard bank write failure and purchased-slot persistence, migration, normal course updates, no network writes, and real in-game Shop manager confirmation. SIM9 unchanged. Future #135 trusted public verification and #119 production savestates remain separate.
+
 ## v2.25.1 — #69 real mobile Guest Race browser QA stability (2026-11-25)
 
 - Prevent the compiled Pages browser acceptance test from clicking the RACE GUEST button while the CRT modal is still opening. The test waits for real Phaser scene time and a fully expanded, visible panel before sending the first genuine pointer activation. A real diagnostic recorded the panel at scaleY 1 during coordinate sampling but scaleY 0.108 at pointerdown, which struck the modal dim background instead of the Race Guest hitzone.

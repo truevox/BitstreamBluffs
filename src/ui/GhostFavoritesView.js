@@ -215,6 +215,10 @@ export class GhostFavoritesView extends View {
     const settings = this.scene.registry.get(REG.SETTINGS) || {};
     const models = await readGhostCourseRows(this.library, this.tape, settings);
     if (!this.alive || id !== this._refreshId) return;
+    // A full capacity gate blocks only this new course's GHOST save. Do not
+    // imply the RunRecord/protected replay evidence were erased or credited.
+    if (!this._course() && this.library.archiveStatus?.().lastFailure === 'full')
+      this.status.setText('ARCHIVE FULL - SHOP > UPGRADES > COURSE SLOTS');
     for (let i = 0; i < models.length; i++) {
       const row = this.rows[i], model = models[i];
       row.info.setText(ellipsize(model.info, 88));

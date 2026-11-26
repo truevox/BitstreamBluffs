@@ -1,0 +1,54 @@
+name: Course Archive capacity and two-tab safety
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/course-archive-qa.yml'
+      - 'src/systems/ghost/**'
+      - 'src/systems/ProfileStore.js'
+      - 'src/systems/Progression.js'
+      - 'src/services.js'
+      - 'src/ui/Views.js'
+      - 'src/ui/ShopLayout.js'
+      - 'tests/src/course-archive-capacity.test.js'
+      - 'tools/test-course-archive-browser.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/course-archive-qa.yml'
+      - 'src/systems/ghost/**'
+      - 'src/systems/ProfileStore.js'
+      - 'src/systems/Progression.js'
+      - 'src/services.js'
+      - 'src/ui/Views.js'
+      - 'src/ui/ShopLayout.js'
+      - 'tests/src/course-archive-capacity.test.js'
+      - 'tools/test-course-archive-browser.mjs'
+permissions:
+  contents: read
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Pure price, purchase, migration, Ghost integrity and Shop regressions
+        run: npm test -- --runInBand tests/src/course-archive-capacity.test.js tests/src/ghost-tapes.test.js tests/src/ghost-runid-immutable.test.js tests/src/permanent-upgrades.test.js tests/src/shop-layout.test.js tests/src/shop-paging.test.js
+      - name: Install actual Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Two-tab serializable last-slot race and real Shop confirmation
+        run: |
+          npx vite --host 127.0.0.1 --port 18791 --strictPort >/tmp/course-archive-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18791/ >/dev/null && break; sleep 1; done
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";process.stdout.write(chromium.executablePath())')"
+          GAME_URL=http://127.0.0.1:18791/ node tools/test-course-archive-browser.mjs
