@@ -213,12 +213,20 @@ describe('butterflyData', () => {
     expect(d.points[0]).toMatchObject({ offsetTicks: -2, kind: 'hop-shift', outcome: 'survived', divergence: 210 });
     expect(butterflyData([r('hop-shift', -2, 'crashed')]).points[0].divergence).toBeNull();
   });
-  it('butterflyBars orders by offset and maps outcome to colour and height', () => {
-    const bars = butterflyBars(butterflyData([r('hop-shift', 3, 'crashed'), r('hop-shift', -3, 'survived'), r('hop-shift', 0, 'unstable'), r('hop-drop', null, 'crashed')]), { maxHeight: 40 });
+  it('butterflyBars orders by offset; colour is the outcome, height is the divergence (earlier divergence = taller)', () => {
+    const d = butterflyData([
+      r('hop-shift', 3, 'crashed', 'hop 3 ticks later', 700), r('hop-shift', -3, 'survived', 'hop 3 ticks earlier', 650),
+      r('hop-shift', 0, 'unstable', 'x', null), r('hop-drop', null, 'crashed', 'y', 1000),
+    ], { branchTick: 640 });
+    const bars = butterflyBars(d, { maxHeight: 40, horizonTicks: 600 });
     expect(bars.map((b) => b.x)).toEqual([-3, 0, 3, null]);
-    expect(bars[0]).toMatchObject({ outcome: 'survived', height: 40 });
+    expect(bars[0]).toMatchObject({ outcome: 'survived', divergence: 10 });
+    expect(bars[0].height).toBeCloseTo(40 * (1 - 10 / 600), 5); // diverged 10 ticks after the branch: nearly the full horizon
+    expect(bars[2].height).toBeCloseTo(40 * (1 - 60 / 600), 5);
+    expect(bars[0].height).toBeGreaterThan(bars[2].height);
+    expect(bars[1].height).toBeCloseTo(40 * 0.12, 5); // never measured: a stub
+    expect(bars[3].height).toBeCloseTo(40 * 0.4, 5);
+    expect(new Set(bars.map((b) => b.color)).size).toBe(4);
     expect(bars[0].color).not.toBe(bars[2].color);
-    expect(bars[2].height).toBeLessThan(bars[1].height);
-    expect(bars[1].height).toBeLessThan(bars[0].height);
   });
 });

@@ -53,24 +53,27 @@ export function butterflyData(results, { branchTick } = {}) {
   return { points, summary, changedAtTicks };
 }
 
-/** Bar colours and relative heights by outcome (a survivor is the tallest bar; a plain crash is a stub). */
-export const BAR_STYLE = Object.freeze({
-  survived: { color: '#3fb950', height: 1 },
-  unstable: { color: '#d29922', height: 0.5 },
-  error: { color: '#8b949e', height: 0.25 },
-  crashed: { color: '#f85149', height: 0.15 },
-});
+/** Bar colour by outcome (a survivor is green, a plain crash red). Height is NOT outcome: see butterflyBars. */
+export const BAR_COLOR = Object.freeze({ survived: '#3fb950', unstable: '#d29922', error: '#8b949e', crashed: '#f85149' });
+/** Shortest bar: a variation whose divergence was not measured (or that never diverged) still shows as a stub. */
+export const MIN_BAR = 0.12;
 
 /**
- * Optional renderer helper: maps butterflyData().points to bars, ordered by offset (then id), heights scaled to maxHeight.
+ * Optional renderer helper: maps butterflyData().points to bars, ordered by offset (then id). The colour is the outcome;
+ * the height is the DIVERGENCE: how much of the horizon the variation spent on a visibly different path, so a bar is tall
+ * when a small change moved the run early and short when it hardly mattered or was never measured.
+ * @param {{points:Array}} data
+ * @param {{maxHeight?:number, horizonTicks?:number}} [o] horizonTicks = ticks from the branch to the end of the judged span
  * @returns {Array<{x:number|null, id:string|null, label:string, kind:string, outcome:Outcome, color:string, height:number, divergence:number|null}>}
  */
-export function butterflyBars(data, { maxHeight = 1 } = {}) {
+export function butterflyBars(data, { maxHeight = 1, horizonTicks = 600 } = {}) {
   const pts = data && Array.isArray(data.points) ? data.points : [];
+  const horizon = Math.max(1, horizonTicks);
   return [...pts]
     .sort((a, b) => (a.offsetTicks ?? Infinity) - (b.offsetTicks ?? Infinity) || String(a.id).localeCompare(String(b.id)))
     .map((p) => {
-      const s = BAR_STYLE[p.outcome] || BAR_STYLE.error;
-      return { x: p.offsetTicks, id: p.id, label: p.label, kind: p.kind, outcome: p.outcome, color: s.color, height: s.height * maxHeight, divergence: p.divergence };
+      const frac = p.divergence === null ? MIN_BAR : Math.min(1, Math.max(MIN_BAR, 1 - p.divergence / horizon));
+      return { x: p.offsetTicks, id: p.id, label: p.label, kind: p.kind, outcome: p.outcome, color: BAR_COLOR[p.outcome] || BAR_COLOR.error,
+        height: frac * maxHeight, divergence: p.divergence };
     });
 }
