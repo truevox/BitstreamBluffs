@@ -179,21 +179,50 @@ try{
  if(rejected.canRace||rejected.preview)throw Error('Corrupt file retained previous guest authorization '+JSON.stringify(rejected));
  await choose(actualBytes);
  await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view?.preview?.count===1200,null,{timeout:15000});
- // Same TWO explicit guest-practice confirmations as URL, with no recorder.
- const racePoint=await page.evaluate(()=>{
-  const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v.practiceBtn.zone,
-   p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=document.querySelector('canvas').getBoundingClientRect();
-  return {x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
- });
- let armed=false;
- for(let i=0;i<4;i++){
-  await page.mouse.click(racePoint.x,racePoint.y);await page.waitForTimeout(400);
-  armed=await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view?.practiceArmed===true);
-  if(armed)break;
-  if(await page.evaluate(()=>window.__bbGame.scene.isActive('RunScene')))throw Error('Practice started before observed first consent');
+ // Two distinct actions are required. The desktop path uses the real
+ // browser keyboard: a second keydown while Enter is held is auto-repeat.
+ if(!mobile){
+  await page.evaluate(()=>{
+   const v=window.__bbGame.scene.getScene('TitleScene').view;
+   v.box.focus();
+  });
+  const assertArmed=async()=>{
+   const state=await page.evaluate(()=>{
+    const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
+    return {armed:v?.practiceArmed===true,preview:v?.preview?.count,
+     busy:v?.busy,run:g.scene.isActive('RunScene')};
+   });
+   if(!state.armed||state.preview!==1200||state.busy||state.run)
+    throw Error('Expected armed guest preview with no run or preview reload '+JSON.stringify(state));
+  };
+  await page.keyboard.down('Control');
+  await page.keyboard.down('Alt');
+  await page.keyboard.down('Enter');
+  await assertArmed();
+  await page.keyboard.down('Enter');
+  await assertArmed();
+  await page.keyboard.up('Enter');
+  await assertArmed();
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await page.keyboard.up('Alt');
+  await page.keyboard.up('Control');
+ }else{
+  const racePoint=await page.evaluate(()=>{
+   const g=window.__bbGame,v=g.scene.getScene('TitleScene').view,z=v.practiceBtn.zone,
+    p=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2),r=document.querySelector('canvas').getBoundingClientRect();
+   return {x:r.left+p.x/g.scale.gameSize.width*r.width,y:r.top+p.y/g.scale.gameSize.height*r.height};
+  });
+  let armed=false;
+  for(let i=0;i<4;i++){
+   await page.mouse.click(racePoint.x,racePoint.y);await page.waitForTimeout(400);
+   armed=await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view?.practiceArmed===true);
+   if(armed)break;
+   if(await page.evaluate(()=>window.__bbGame.scene.isActive('RunScene')))throw Error('Practice started before observed first consent');
+  }
+  if(!armed)throw Error('File practice first consent did not register');
+  await page.mouse.click(racePoint.x,racePoint.y);
  }
- if(!armed)throw Error('File practice first consent did not register');
- await page.mouse.click(racePoint.x,racePoint.y);
  await page.waitForFunction(()=>window.__bbGame.scene.isActive('RunScene')&&window.__bbGame.scene.getScene('RunScene').guestPractice===true,
   null,{timeout:35000});
  const run=await page.evaluate(()=>{
