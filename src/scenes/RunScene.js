@@ -170,6 +170,10 @@ export class RunScene extends Phaser.Scene {
   create(data) {
     const reg = this.registry;
     const desc = data && data.coachSim;
+    // Phaser preserves scene start data when a later start omits it. Consume
+    // this private one-shot descriptor so a normal retry cannot reuse it.
+    if (desc && this.sys?.settings) this.sys.settings.data = {};
+
     this.coachSim = null;
     this.crashInfo = null;
     if (!desc) { this.sys?.setVisible?.(true); return this._create(); }
