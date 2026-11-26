@@ -78,6 +78,12 @@ function installHelpers() {
     },
     releaseAll() { tk.hold(new Set()); },
     scenes: () => g.scene.getScenes(true).map((s) => s.sys.settings.key),
+    /** What the player SEES on the HUD (UIScene's own state/text), for the handoff comparison. */
+    hudFacts() {
+      const ui = g.scene.getScene('UIScene');
+      return { power: [...ui.powerups].map(([id, p]) => ({ id, charges: p.charges || 0, remaining: p.remaining, total: p.total })).sort((a, b) => (a.id < b.id ? -1 : 1)),
+        effects: [...ui.effects.keys()].sort(), zones: ui.zones.map((z) => z.modId), score: ui.scoreText.main.text, combo: ui.comboText.main.text, dist: ui.distText.main.text, flow: ui.flow };
+    },
     async snapshot() {
       const out = { ls: {}, idb: {}, reg: {} };
       for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); out.ls[k] = localStorage.getItem(k); }
@@ -188,7 +194,7 @@ async function recordRun() {
     const run = tk.run();
     tk.R = run.ghostRecorder.constructor; // the compiled recorder class: gives us the game's own fingerprint method
     const before = { hold: 0 };
-    const fps = [], gaps = [];
+    const fps = [], gaps = [], hudTicks = [];
     const ev = { hazardHit: [], nearMiss: [], landing: [] };
     for (const k of Object.keys(ev)) window.__bbGame.events.on({ hazardHit: 'bb:hazardHit', nearMiss: 'bb:nearMiss', landing: 'bb:landing' }[k], () => ev[k].push(run.simClock.tick));
     let n = 0;
@@ -197,10 +203,11 @@ async function recordRun() {
       tk.hold(wanted, edge);
       tk.step(1); n++;
       fps[run.simClock.tick] = tk.fp(run);
+      if (run.simClock.tick % 30 === 0) { const h = run.hudSnapshot(); if (h.power.length || h.effects.length || h.zones.length) hudTicks.push({ tick: run.simClock.tick, power: h.power.map((p) => [p.id, p.remainingMs, p.charges]), effects: h.effects.map((e) => e.effect), zones: h.zones }); }
       gaps[run.simClock.tick] = run.bsodState ? run.bsodState.gapPx : null;
     }
     tk.releaseAll();
-    return { ticks: run.simClock.tick, crashed: run.crashed, fps, gaps, ev, n };
+    return { ticks: run.simClock.tick, crashed: run.crashed, fps, gaps, ev, n, hudTicks };
   }, SEED);
   await until(page, '(tk)=>tk.g.registry.get("lastGhostTape") && tk.g.scene.isActive("GameOverScene")', 6000);
   // let the deferred evidence write settle before the baseline
@@ -250,6 +257,8 @@ async function main() {
 
     // ============================================================ 3. per-N fresh pages: (a) (b) (c)
     if (want('cases')) for (const [kind, N] of Object.entries(Ns)) if (!NCASES || NCASES.has(kind)) report.cases.push(await guarded(`case ${kind}`, () => perNCase(kind, N, tape, rec, info)));
+
+    if (want('hud')) await guarded('hud handoff', () => hudCase(tape, rec));
 
     // ============================================================ 4. negative controls
     if (want('neg')) report.negatives = await guarded('negative controls', () => negativeControls(main, tape, Ns));
@@ -448,6 +457,42 @@ async function perNCase(kind, N, tape, rec, info) {
   out.oracleFp = oracle.fp; out.takeoverFp = a1.fp; out.crashTick = b.crashTick; out.cause = b.cause; out.divergedAt = c.diverged; out.seekTicks = a1.seekTicks; out.seekMs = Math.round(a1.seekMs);
   void base;
   return out;
+}
+
+/** (fix 3) the HUD after handoff equals the HUD of an uninterrupted replay at the same tick, at an N where timers are active. */
+async function hudCase(tape, rec) {
+  console.log('hud case');
+  const cands = rec.hudTicks.filter((h) => h.tick > 400 && h.tick < tape.endTick - 5);
+  // prefer a tick with a power-up whose timer is still well under way, then any power-up / effect
+  const pick = cands.find((h) => h.power.some((p) => p[1] > 1500)) || cands.find((h) => h.power.length) || cands.find((h) => h.effects.length) || cands[0];
+  if (!pick) { check('(fix 3) HUD handoff: the recording has a tick with active HUD timers to test', false, { hudTicks: rec.hudTicks.length }); return; }
+  const N = pick.tick;
+  const descriptor = buildTakeoverDescriptor({ tape, tick: N, source: 'hud' });
+  const O = await freshPage({ kit: false });
+  const oracle = await O.page.evaluate(({ tape, N }) => {
+    const tk = window.__tk; tk.startRun(tape.seed); tk.g.scene.stop('RunScene'); tk.g.registry.set('ghostReplay', tape); tk.g.scene.start('RunScene'); tk.g.headlessStep(0, 0);
+    const run = tk.run(); while (run.simClock.tick < N) tk.step(1);
+    return { facts: tk.hudFacts(), snap: JSON.parse(JSON.stringify(run.hudSnapshot())) };
+  }, { tape, N });
+  await O.close();
+  const takeover = async (disableResync) => {
+    const T = await freshPage({ kit: false });
+    await T.page.evaluate((seed) => window.__tk.startRun(seed), tape.seed);
+    if (disableResync) await T.page.evaluate(() => { const ev = window.__bbGame.events, orig = ev.emit; ev.emit = function (n, ...a) { return n === 'bb:hudResync' ? true : orig.call(this, n, ...a); }; });
+    await launchTakeoverInPage(T.page, descriptor);
+    const ph = await seekToReady(T.page);
+    const out = await T.page.evaluate(() => { window.__tk.step(2); return window.__tk.hudFacts(); });
+    await T.close();
+    return { ph, facts: out };
+  };
+  const real = await takeover(false), ctl = await takeover(true);
+  const same = (a, b) => JSON.stringify([a.effects, a.zones, a.score, a.combo, a.dist, a.power.map((p) => [p.id, p.charges])]) === JSON.stringify([b.effects, b.zones, b.score, b.combo, b.dist, b.power.map((p) => [p.id, p.charges])]) &&
+    a.power.every((p, i) => Math.abs(p.remaining - b.power[i].remaining) <= 450);
+  const nonTrivial = oracle.facts.power.length > 0 || oracle.facts.effects.length > 0 || oracle.facts.zones.length > 0;
+  check(`(fix 3) HUD handoff at N=${N}: the uninterrupted replay shows active timers (${oracle.facts.power.map((p) => p.id).join(',') || '-'}; effects ${oracle.facts.effects.join(',') || '-'}; zones ${oracle.facts.zones.join(',') || '-'})`, nonTrivial && real.ph === 'ready', { N, oracle: oracle.facts });
+  check(`(fix 3) HUD handoff at N=${N}: power-up chips + timers, effects, zones, score, combo and distance after takeover == the uninterrupted replay's HUD`, same(oracle.facts, real.facts), { oracle: oracle.facts, takeover: real.facts });
+  check(`(fix 3) negative control: with the HUD resync disabled the takeover HUD does NOT match (the check can fail)`, nonTrivial && !same(oracle.facts, ctl.facts), { control: ctl.facts });
+  return { N, oracle: oracle.facts, takeover: real.facts };
 }
 
 /** Differing leaves between two kit captures, and which of them are NOT presentation per the game's own NON_CAUSAL table. */

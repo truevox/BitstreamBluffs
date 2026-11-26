@@ -103,7 +103,7 @@ describe('seek: state at N equals the uninterrupted run', () => {
   test('the seek is silent: no presentation events leak out of the muted re-simulation', () => {
     const s = takeoverScene(TAPE, 700);
     seekReady(s);
-    const leaked = s.__events.filter((e) => ![H.EVT.RUN_START, H.EVT.TAKEOVER_STATE, H.EVT.SCORE_CHANGED, H.EVT.DISTANCE_CHANGED, H.EVT.BSOD_STATE_CHANGED].includes(e[0]));
+    const leaked = s.__events.filter((e) => ![H.EVT.RUN_START, H.EVT.TAKEOVER_STATE, H.EVT.SCORE_CHANGED, H.EVT.DISTANCE_CHANGED, H.EVT.BSOD_STATE_CHANGED, H.EVT.HUD_RESYNC].includes(e[0]));
     expect(leaked).toEqual([]);
     expect(s._seeking).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(s.game.events, 'emit')).toBe(true); // our test wrapper, restored (not the mute no-op)

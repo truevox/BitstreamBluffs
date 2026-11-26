@@ -7,6 +7,8 @@ const { CURRENT_RULESET_ID } = await import('../../src/systems/replay/currentRul
 const { takeTakeoverNotice } = await import('../../src/ui/TakeoverNotice.js');
 const { TakeoverPicker, PICKER_BANNER } = await import('../../src/ui/TakeoverPicker.js');
 const { TakeoverEndScene } = await import('../../src/scenes/TakeoverEndScene.js');
+const { applyHudResync } = await import('../../src/ui/HudResync.js');
+const { addWard } = await import('../../src/systems/Wards.js');
 const { takeoverKeyAllowed, takeoverHintVisible } = await import('../../src/ui/TakeoverHook.js');
 
 jest.spyOn(Date, 'now').mockReturnValue(1_767_000_000_000);
@@ -254,5 +256,73 @@ describe('Game Over T key vs initials entry', () => {
     const open = { ...idle(), takeoverPicker: {} };
     expect(takeoverKeyAllowed(open)).toBe(false);
     expect(takeoverHintVisible(open)).toBe(true);
+  });
+});
+
+describe('HUD rebuilt from authoritative sim state at handoff (#72)', () => {
+  test('hudSnapshot of a fresh run is empty of timers (negative control)', () => {
+    const r = H.createRun(H.RunScene, H.REG, { seed: 'A' });
+    const s = r.hudSnapshot();
+    expect(s.power).toEqual([]);
+    expect(s.effects).toEqual([]);
+    expect(s.zones).toEqual([]);
+    expect(s.multiplier).toBeGreaterThanOrEqual(1);
+  });
+  test('hudSnapshot reports every active power-up / ward / glide / stabilize / magnet / shield chip, hazard effect and zone', () => {
+    const r = H.createRun(H.RunScene, H.REG, { seed: 'A' });
+    r.boostMs = 2500; r.boostId = 'packetBurst';
+    r.slowmoMs = 900;
+    r.shieldCharges = 2; r.shieldSources = ['hashedBackup', 'heatShield'];
+    r.wards = addWard(r.wards, 'slickWax', { durationMs: 5000, mods: ['x'] });
+    r.glideMs = 3000; r.glideId = 'glider';
+    r.stabilizeMs = 2000; r.stabilizeId = 'rails';
+    r.magnetMs = 4000; r.magnetId = 'shardMagnet';
+    r.slowMs = 700; r.scrambleMs = 600; r.blindMs = 500;
+    r.activeZones = new Map([['icePatch:10', { modId: 'icePatch' }], ['spring:50', { modId: 'bouncySpring' }]]);
+    const s = r.hudSnapshot();
+    const byId = Object.fromEntries(s.power.map((p) => [p.id, p]));
+    expect(Object.keys(byId).sort()).toEqual(['clockPulse', 'glider', 'hashedBackup', 'heatShield', 'packetBurst', 'rails', 'shardMagnet', 'slickWax']);
+    expect(byId.packetBurst.remainingMs).toBe(2500);
+    expect(byId.hashedBackup).toMatchObject({ charges: 1, remainingMs: 0 });
+    expect(byId.heatShield.charges).toBe(1);
+    expect(byId.slickWax.remainingMs).toBe(5000);
+    expect(s.effects.map((e) => e.effect).sort()).toEqual(['blind', 'scramble', 'slow']);
+    expect(s.zones).toEqual(['icePatch', 'bouncySpring']);
+    expect(Object.isFrozen(s)).toBe(false); // plain data, a pure read
+  });
+  test('applyHudResync clears stale chips and rebuilds powerups, effects, zones, combo, distance, flow (UIScene painters, no popups)', () => {
+    const calls = [];
+    const ui = {
+      powerups: new Map([['stale', { text: {} }]]), effects: new Map([['oldfx', { text: {} }]]), zones: [{ modId: 'stale' }], multiplier: 3,
+      _removePowerup(id) { calls.push(['rmP', id]); this.powerups.delete(id); }, _removeEffect(k) { calls.push(['rmE', k]); this.effects.delete(k); },
+      onScore(p) { calls.push(['score', p.total]); }, onCombo(p) { calls.push(['combo', p.multiplier, this.multiplier]); }, onDistance(p) { calls.push(['dist', p.meters]); },
+      onSpeed(p) { calls.push(['speed', p.flow]); }, _t() { return { setText() {} }; }, _paintPowerups() { calls.push(['paintP']); }, _layoutPowerups() { calls.push(['layoutP']); },
+      onHazard(p) { this.effects.set(p.effect, { remaining: p.durationMs, text: {} }); calls.push(['hazard', p.effect]); }, _updateEffect(k, e) { calls.push(['upd', k, e.remaining]); },
+      _refreshZone() { calls.push(['zone', this.zones.map((z) => z.modId).join()]); },
+      _popup() { calls.push(['POPUP']); },
+    };
+    applyHudResync(ui, { power: [{ id: 'packetBurst', remainingMs: 1500, totalMs: 3000, charges: 0 }, { id: 'hashedBackup', remainingMs: 0, totalMs: 0, charges: 2 }], effects: [{ effect: 'slow', remainingMs: 400 }], zones: ['icePatch'], score: 1234, meters: 77, speedPxS: 500, multiplier: 2, tricks: [], pendingPoints: 0, flow: 1.5, flowFrac: 0.5 });
+    expect(calls).toContainEqual(['rmP', 'stale']);
+    expect(calls).toContainEqual(['rmE', 'oldfx']);
+    expect(ui.powerups.get('packetBurst')).toMatchObject({ total: 3000, remaining: 1500 });
+    expect(ui.powerups.get('hashedBackup')).toMatchObject({ total: 0, charges: 2 });
+    expect(ui.powerups.has('stale')).toBe(false);
+    expect(calls).toContainEqual(['upd', 'slow', 400]);
+    expect(calls).toContainEqual(['zone', 'icePatch']);
+    expect(calls).toContainEqual(['combo', 2, 1]);
+    expect(calls).toContainEqual(['dist', 77]);
+    expect(calls.some((c) => c[0] === 'POPUP')).toBe(false);
+  });
+  test('the takeover seek publishes exactly one HUD_RESYNC at READY, from the live sim (control: an ordinary run never does)', () => {
+    const { s } = liveTakeover(640);
+    const resyncs = s.__events.filter((e) => e[0] === H.EVT.HUD_RESYNC);
+    expect(resyncs).toHaveLength(1);
+    expect(resyncs[0][1].score).toBe(s.score.getTotal());
+    expect(resyncs[0][1].meters).toBe(Math.floor(s.score.distanceM));
+    const ord = H.createRun(H.RunScene, H.REG, { seed: 'A' });
+    const seen = []; ord.game.events.on(H.EVT.HUD_RESYNC, (p) => seen.push(p));
+    ord.inputRouter = { poll: () => H.livePad(), setEnabled() {} };
+    for (let i = 0; i < 200; i++) ord.update(0, TICK_MS);
+    expect(seen).toEqual([]);
   });
 });

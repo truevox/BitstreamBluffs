@@ -2904,6 +2904,43 @@ export class RunScene extends Phaser.Scene {
     if (polled.pressed.hop || polled.pressed.confirm) this._takeoverGo();
   }
 
+  /**
+   * Everything the player-facing HUD shows, read from the AUTHORITATIVE sim state (#72): active power-up / ward / glide /
+   * stabilize / magnet / shield chips with their remaining time, timed hazard effects, terrain zones, combo, flow, score,
+   * distance and speed. UIScene is event driven and heard none of the muted seek, so it is rebuilt from this at tick N.
+   * Pure read: changes nothing.
+   */
+  hudSnapshot() {
+    const power = [];
+    const add = (id, remainingMs, charges = 0) => {
+      if (!id) return;
+      const eff = (this.content && this.content.powerups && this.content.powerups[id] && this.content.powerups[id].effect) || {};
+      const total = Math.max(remainingMs, Number.isFinite(eff.durationMs) ? eff.durationMs : 0);
+      power.push({ id, remainingMs: Math.round(remainingMs), totalMs: Math.round(total), charges });
+    };
+    if (this.boostMs > 0) add(this.boostId || 'packetBurst', this.boostMs);
+    if (this.slowmoMs > 0) add('clockPulse', this.slowmoMs);
+    for (const id of new Set(this.shieldSources || [])) {
+      const c = shieldChargesFor(this.shieldSources, id, this.shieldCharges);
+      if (c > 0) add(id, 0, c);
+    }
+    for (const w of (this.wards && this.wards.wards) || []) add(w.id, w.msLeft);
+    if (this.glideMs > 0) add(this.glideId, this.glideMs);
+    if (this.stabilizeMs > 0) add(this.stabilizeId, this.stabilizeMs);
+    if (this.magnetMs > 0) add(this.magnetId, this.magnetMs);
+    const effects = [];
+    if (this.slowMs > 0) effects.push({ effect: 'slow', remainingMs: Math.round(this.slowMs) });
+    if (this.scrambleMs > 0) effects.push({ effect: 'scramble', remainingMs: Math.round(this.scrambleMs) });
+    if (this.blindMs > 0) effects.push({ effect: 'blind', remainingMs: Math.round(this.blindMs) });
+    const snap = this.score.getSnapshot();
+    return {
+      power, effects, zones: [...(this.activeZones ? this.activeZones.values() : [])].map((z) => z.modId),
+      score: this.score.getTotal(), meters: Math.floor(this.score.distanceM), speedPxS: this.sled.speed,
+      multiplier: snap.multiplier, tricks: snap.comboTricks, pendingPoints: snap.pendingPoints,
+      flow: this.score.getFlow(), flowFrac: this.score.getFlowTimeoutFraction(),
+    };
+  }
+
   /** Seek reached tick N: drop the presentation debris of the re-simulation, draw the frame, wait for the player. */
   _finishSeek() {
     const t = this.takeover;
@@ -2916,9 +2953,10 @@ export class RunScene extends Phaser.Scene {
     // No frame is drawn here: the first READY update draws it (renderFrame(0)), so the state reached at N is left untouched.
     // Keys pressed while the seek ran must not auto-confirm READY: only a fresh press after this point counts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
-    // The seek ran muted: bring the HUD to the state at tick N.
+    // The seek ran muted: bring EVERY HUD element to the state at tick N (UIScene only: no SFX, no popups).
     this.emitScore();
     this.game.events.emit(EVT.DISTANCE_CHANGED, { meters: Math.floor(this.score.distanceM) });
+    try { this.game.events.emit(EVT.HUD_RESYNC, this.hudSnapshot()); } catch (e) { console.warn('HUD resync failed; continuing', e); }
     if (this.bsodState) this.publishBsodState(this.bsodState);
     this.game.events.emit(EVT.TAKEOVER_STATE, { phase: 'ready', tick: this.simClock.tick, target: t.targetTick, pct: 100 });
   }

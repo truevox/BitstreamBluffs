@@ -32,6 +32,7 @@ import { killerName } from '../systems/CrashReport.js';
 import { RunMinimap } from '../ui/RunMinimap.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { TakeoverHud } from '../ui/TakeoverHud.js';
+import { applyHudResync } from '../ui/HudResync.js';
 
 /** #72: the HUD tag of a Replay Takeover run (guest practice keeps its own). */
 const TAKEOVER_TAG = 'TAKEOVER // UNRANKED PRACTICE';
@@ -238,6 +239,7 @@ export class UIScene extends Phaser.Scene {
     // W2: toast the moment a mission is met, not just at run end.
     on(EVT.MISSION_COMPLETED, this.onMissionCompleted);
     on(EVT.MUSIC_TRACK_CHANGED, this.onMusicTrackChanged);
+    on(EVT.HUD_RESYNC, (s) => applyHudResync(this, s)); // #72: takeover handoff rebuilds the whole HUD from sim state
     this.takeoverHud = new TakeoverHud(this, this.theme, this.hud); // #72: SEEKING n% / READY banner
 
     const cleanup = () => {
