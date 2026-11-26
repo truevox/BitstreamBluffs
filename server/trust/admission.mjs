@@ -43,7 +43,9 @@ function trustedKeys(entries) {
 function verifyReceipt(envelope, role, context, registry, now) {
   if (!keys(envelope,['body','signature'])) return null;
   const b = envelope.body;
-  if (!keys(b,['format','version','role','keyId','accountId','challengeId','claimDigest','issuedAt','expiresAt','payload']) ||
+  const fields=['format','version','role','keyId','accountId','challengeId','claimDigest','issuedAt','expiresAt','payload'];
+  if(context.evidenceDigest!==null)fields.push('evidenceDigest');
+  if (!keys(b,fields) || (context.evidenceDigest!==null&&b.evidenceDigest!==context.evidenceDigest) ||
       b.format!=='bb-authority-receipt' || b.version!==1 || b.role!==role || !id(b.keyId) ||
       b.accountId!==context.accountId || b.challengeId!==context.challengeId || b.claimDigest!==context.claimDigest ||
       !integer(b.issuedAt) || !integer(b.expiresAt) || b.issuedAt<context.createdAt || b.issuedAt>now ||
@@ -79,7 +81,7 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
     CREATE TABLE IF NOT EXISTS admissions(
       challenge TEXT PRIMARY KEY REFERENCES challenges(id),
       account TEXT NOT NULL, run TEXT NOT NULL UNIQUE, claim TEXT NOT NULL,
-      tape TEXT NOT NULL UNIQUE, accepted INTEGER NOT NULL, verdict TEXT NOT NULL, receipt_audit TEXT NOT NULL
+      tape TEXT NOT NULL UNIQUE, accepted INTEGER NOT NULL, verdict TEXT NOT NULL, receipt_audit TEXT NOT NULL, evidence_digest TEXT
     ) STRICT;
   `);
   initWallet(db);
@@ -139,7 +141,7 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
       if (db.prepare('SELECT 1 FROM admissions WHERE challenge=? OR run=? OR tape=?').get(r.challengeId,r.runId,r.tapeDigest))
         return fail('already-admitted');
       const context={accountId:authenticatedAccount,challengeId:r.challengeId,claimDigest,
-        createdAt:challenge.created,expiresAt:challenge.expires};
+        createdAt:challenge.created,expiresAt:challenge.expires,evidenceDigest:evidence?.identity.bundleDigest??null};
       const proofs={};
       for(const role of ROLES){
         const payload=verifyReceipt(bundle.receipts[role],role,context,registry,now);
@@ -152,9 +154,9 @@ export function openAdmissionLedger({databasePath, issuers, clock=Date.now, chal
       const verdict=adjudicateDualProof({request:r,...proofs});
       if (!verdict.verifiedRankEligible || !verdict.publicRewardEligible) return {admitted:false,reason:'policy-denied',verdict};
       const audit=ROLES.map(role=>({role,keyId:bundle.receipts[role].body.keyId,receiptDigest:hash(canonicalBytes(bundle.receipts[role]))}));
-      db.prepare('INSERT INTO admissions VALUES (?,?,?,?,?,?,?,?)').run(r.challengeId,authenticatedAccount,
+      db.prepare('INSERT INTO admissions VALUES (?,?,?,?,?,?,?,?,?)').run(r.challengeId,authenticatedAccount,
         r.runId,claimDigest,r.tapeDigest,now,Buffer.from(canonicalBytes(verdict)).toString('utf8'),
-        Buffer.from(canonicalBytes(audit)).toString('utf8'));
+        Buffer.from(canonicalBytes(audit)).toString('utf8'),context.evidenceDigest);
       return {admitted:true,verdict};
     });
   }
