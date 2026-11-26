@@ -25,3 +25,51 @@ The first importable runtime module lives at `src/systems/savestate/RunSceneRest
 A new `--runtime-module` flag in the existing real Chromium harness exercises the exported module on genuine contact and hazard fixtures with strict negative controls and exact recorder suffix comparisons; `.github/workflows/runscene-restore-runtime-qa.yml` gates the full 300-contact / 280-hazard fixture before any merge. The first unrestricted module version completed both real browser cases with zero divergence. The later strict operational wrapper passed the contact run locally, but a concurrent CT223 resource interruption prevented a final local hazard completion—**do not count it as a pass until exact-head GitHub CI is green**.
 
 This checkpoint still emits a diagnostic structure, **not** a registered client serialisation layout. It has no wired RunScene UI, no durable slot claim integration, no validated fresh-world handoff, and no authority to mark a run ranked. Parent #119 MUST remain OPEN. No user-visible gameplay or public verifier change is shipped by this draft.
+
+
+## Reconciliation and native component integration (2026-11-26)
+
+Original #404 exact-head CI passed the strict compiled contact/hazard
+restore job. Identity and Cemetery each failed the same determinism
+test, because the extracted copy retained retired collider-pool
+construction using Bodies.fromVertices outside TerrainMesh. Removed
+that entire obsolete branch instead of weakening the sim-math gate.
+Any nonempty old pool refuses before mutation.
+
+Restacked on v2.25.6 main f2e02aac, including the released #400 RNG/clock
+and #405 native recorder. The new createNativeRunSceneRestoreKit internal
+seam verifies exact build, run identity and tick agreement; validates
+detached native SimClock and RNG state and checks the reconstructed
+references retain identical state; prepares a genuine detached
+GhostRecorder with the shipped canonical prefix codec before Matter
+reconstruction, then reattaches after the candidate restore. Verifies
+all causal fingerprints and native prefix before returning. No ranked
+claim, no storage or UI wiring, no imported snapshot files. The world
+graph is still the explicitly internal diagnostic format, not a
+registered production per-class serialized schema. Do not treat its
+shape checks as hostile-input admission. Same-realm scene lifecycle and
+Matter module statics must be managed by the future transaction owner.
+
+Source-game real Chromium proof in independent isolated contexts:
+stock sim-05@0 normal run capture at tick 481 and tick 936 (retired
+terrain detector transition), separate fresh tick-zero destinations,
+with simTick actively trapped during the restore itself. Zero replay
+ticks during both reconstructions. Identical capture fingerprints,
+496 and 41 per-tick suffix fingerprints, native fatal tick 977, tape
+end tick 976, eight recorder fingerprints, score 166, and exact native
+record/tape in both cases. Eighteen early refusal controls (build, tick,
+clock, RNG seed, recorder prefix, retired pool, unsafe prototype field,
+missing configuration, missing SIM section) leave the fresh candidate
+unchanged. One deliberately mismatched final fingerprint reconstructs
+but refuses the candidate; disposing its independent browser context
+leaves source and untouched candidate unchanged. Zero page errors.
+No physical device, user-facing Save/Resume, or production same-realm
+publication is established.
+
+Additional graph field/array/prototype checks, safe own-content references,
+typed array whitelist and exact config/SIM inventory are defense in depth
+on the internal mechanism only. Native graph preflight rejects unsafe
+prototype keys; this does not authorize arbitrary data or replace the
+remaining explicit per-class schema. New CI runs the full-world native
+test separately from the existing compiled contact/hazard QA. All
+retained physics gates remain in force.

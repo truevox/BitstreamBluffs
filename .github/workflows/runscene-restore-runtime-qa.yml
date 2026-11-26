@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/runscene-restore-runtime-qa.yml'
-      - 'src/systems/savestate/RunSceneRestoreKit.js'
+      - 'src/systems/savestate/**'
       - 'tests/determinism/runscene-runtime-kit.test.js'
       - 'tools/savestate-experiment/**'
       - 'src/scenes/RunScene.js'
@@ -11,14 +11,14 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/runscene-restore-runtime-qa.yml'
-      - 'src/systems/savestate/RunSceneRestoreKit.js'
+      - 'src/systems/savestate/**'
       - 'tests/determinism/runscene-runtime-kit.test.js'
 permissions:
   contents: read
 jobs:
   restore:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +31,7 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
       - name: Pure strict snapshot admission and existing single-use slot protections
-        run: npm test -- --runInBand tests/determinism/runscene-runtime-kit.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-envelope.test.js
+        run: npm test -- --runInBand tests/determinism/runscene-runtime-kit.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-envelope.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-primitive-state.test.js tests/determinism/sim-math-boundary.test.js
       - name: Native source tripwire and exact build identity
         run: |
           node tools/ruleset/build-ruleset.mjs --check
@@ -49,3 +49,5 @@ jobs:
           export CHROMIUM_PATH="$(node --input-type=module -e 'import {chromium} from "playwright";process.stdout.write(chromium.executablePath())')"
           GAME_URL=http://127.0.0.1:18793/ node tools/savestate-experiment/browser-experiment.mjs --strict-suffix --quick --runtime-module --json /tmp/runscene-runtime-restored-qa.json
           echo 'PASS: operational full-Matter restore matches source and replay suffix'
+      - name: Fresh full-world native restore with no replay, exact terminal and all suffix fingerprints
+        run: node tools/savestate-experiment/test-native-world-restore-browser.mjs
