@@ -10,11 +10,12 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const matterWire=process.argv.includes('--matter-section');
 const entityWire=process.argv.includes('--entity-section');
+const sceneWire=process.argv.includes('--scene-subsystems');
 let scratch;
 let vite,browser;
 const errors=[];
 try {
-  if(matterWire||entityWire)scratch=await mkdtemp(join(tmpdir(),'bb-matter-section-'));
+  if(matterWire||entityWire||sceneWire)scratch=await mkdtemp(join(tmpdir(),'bb-matter-section-'));
   vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true}});
   await vite.listen();
   const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
@@ -33,6 +34,7 @@ try {
       const {createNativeRunSceneRestoreKit}=await import('/src/systems/savestate/RunSceneRestoreKit.js');
       const {encodeMatterState,decodeMatterState}=await import('/src/systems/savestate/matterState.js');
       const {encodeEntityState,decodeEntityState,ENTITY_STATE_FIELDS}=await import('/src/systems/savestate/entityState.js');
+      const {encodeSceneSubsystemState,decodeSceneSubsystemState,SCENE_SUBSYSTEM_FIELDS}=await import('/src/systems/savestate/sceneSubsystemState.js');
       const {captureCausalState}=await import('/src/systems/replay/fingerprintCapture.js');
       const {fingerprintState}=await import('/src/systems/replay/fingerprint.js');
       const g=window.__bbGame,r=g.scene.getScene('RunScene');
@@ -47,7 +49,20 @@ try {
       const matterContext=snapshot=>({runId:snapshot.ctx.runId,tick:snapshot.ctx.tick,buildId:snapshot.ctx.buildId});
       const Matter=window.Phaser.Physics.Matter.Matter;
       const entityContext=snapshot=>({...matterContext(snapshot),randomId:snapshot.world.game.runRandom.__id});
+      const sceneContext=snapshot=>({...matterContext(snapshot),seed:r.seed});
       window.__nativeWorld={g,r,kit,fp,t:0,
+        encodeScene(snapshot){
+          return new TextDecoder().decode(encodeSceneSubsystemState(snapshot.world.game,sceneContext(snapshot)));
+        },
+        stripScene(snapshot){
+          for(const k of SCENE_SUBSYSTEM_FIELDS)delete snapshot.world.game[k];
+        },
+        decodeScene(snapshot,wire){
+          if(wire===undefined)return;
+          if(SCENE_SUBSYSTEM_FIELDS.some(k=>Object.hasOwn(snapshot.world.game,k)))throw Error('raw subsystems bypassed byte transport');
+          Object.assign(snapshot.world.game,decodeSceneSubsystemState(new TextEncoder().encode(wire),sceneContext(snapshot)));
+          if(this.encodeScene(snapshot)!==wire)throw Error('subsystem wire mismatch');
+        },
         encodeEntities(snapshot){
           return new TextDecoder().decode(encodeEntityState(snapshot.world.game,entityContext(snapshot)));
         },
@@ -73,9 +88,10 @@ try {
           this.t+=1000/120;g.headlessStep(this.t,1000/120);
           frames.push([r.simClock.tick,fp().combined]);
         }return frames;},
-        reconstruct(snapshot,frameTime,wire,entities){
+        reconstruct(snapshot,frameTime,wire,entities,subWire){
           this.decodeMatter(snapshot,wire);
           this.decodeEntities(snapshot,entities);
+          this.decodeScene(snapshot,subWire);
           if(r.simClock.tick!==0)throw Error('candidate advanced before restore');
           const proto=Object.getPrototypeOf(r),sim=proto.simTick;
           let calls=0;
@@ -87,7 +103,10 @@ try {
           const exactMatter=wire===undefined?null:this.encodeMatter(kit.capture(r))===wire;
           if(wire!==undefined&&!exactMatter)throw Error('restored Matter bytes differ');
           if(r.sled.random!==r.runRandom)throw Error('sled RNG alias lost');
-          return {tick:r.simClock.tick,calls,runId:r.runId,fingerprint:fp(),exactMatter};
+          const exactScene=subWire===undefined?null:this.encodeScene(kit.capture(r))===subWire;
+          if(subWire!==undefined&&!exactScene)throw Error('restored scene subsystem bytes differ');
+          if(r.hints.done!==r.tutDone)throw Error('tutorial alias lost');
+          return {tick:r.simClock.tick,calls,runId:r.runId,fingerprint:fp(),exactMatter,exactScene};
         },
       };
     });
@@ -96,7 +115,7 @@ try {
   for(const captureTick of [481,936]) {
     const a=await boot(time),b=await boot(time+1000);
     try {
-      const captured=await a.page.evaluate(({tick,matterWire,entityWire})=>{
+      const captured=await a.page.evaluate(({tick,matterWire,entityWire,sceneWire})=>{
         const p=window.__nativeWorld;p.stepTo(tick);
         if(p.r.simClock.tick!==tick||p.r.crashed)throw Error('source did not reach capture boundary');
         const snapshot=p.kit.capture(p.r);
@@ -106,8 +125,10 @@ try {
         if(matterWire)delete snapshot.world.matter;
         const entities=entityWire?p.encodeEntities(snapshot):undefined;
         if(entityWire)p.stripEntities(snapshot);
-        return {snapshot,frameTime:p.t,wire,entities,retired,bodies};
-      },{tick:captureTick,matterWire,entityWire});
+        const subWire=sceneWire?p.encodeScene(snapshot):undefined;
+        if(sceneWire)p.stripScene(snapshot);
+        return {snapshot,frameTime:p.t,wire,entities,subWire,retired,bodies};
+      },{tick:captureTick,matterWire,entityWire,sceneWire});
       if(matterWire){
         const path=join(scratch,'matter-'+captureTick+'.bbmatter');
         // Real byte transport through a file; B receives no raw Matter data.
@@ -121,12 +142,17 @@ try {
         await writeFile(path,captured.entities,{flag:'wx'});
         captured.entities=await readFile(path,'utf8');
       }
+      if(sceneWire){
+        const path=join(scratch,'scene-'+captureTick+'.bbsubsystems');
+        await writeFile(path,captured.subWire,{flag:'wx'});
+        captured.subWire=await readFile(path,'utf8');
+      }
       const before=await b.page.evaluate(()=>({tick:window.__nativeWorld.r.simClock.tick,
         fp:window.__nativeWorld.fp(),runId:window.__nativeWorld.r.runId}));
       assert.equal(before.tick,0);
       assert.notEqual(before.runId,captured.snapshot.ctx.runId);
-      const negatives=await b.page.evaluate(({snapshot,wire,entities})=>{
-        const p=window.__nativeWorld; p.decodeMatter(snapshot,wire);p.decodeEntities(snapshot,entities);
+      const negatives=await b.page.evaluate(({snapshot,wire,entities,subWire})=>{
+        const p=window.__nativeWorld; p.decodeMatter(snapshot,wire);p.decodeEntities(snapshot,entities);p.decodeScene(snapshot,subWire);
         const before=JSON.stringify({fp:p.fp(),runId:p.r.runId,
           tick:p.r.simClock.tick,rec:p.r.ghostRecorder.lastTick});
         const controls={
@@ -154,9 +180,9 @@ try {
         const before=await Promise.all([a.page,b.page].map(measured));
         const c=await boot(time+2000);
         try{
-          const refusal=await c.page.evaluate(({snapshot,frameTime,wire,entities})=>{
+          const refusal=await c.page.evaluate(({snapshot,frameTime,wire,entities,subWire})=>{
             snapshot.fingerprint.combined='xxh32x2:0000000000000000';
-            try{window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities);return null;}
+            try{window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities,subWire);return null;}
             catch(e){return {error:String(e.message),tick:window.__nativeWorld.r.simClock.tick};}
           },captured);
           assert.equal(refusal?.error,'native restore: reconstructed world mismatch; discard candidate');
@@ -165,10 +191,11 @@ try {
         assert.deepEqual(await Promise.all([a.page,b.page].map(measured)),before);
         console.log('PASS_NATIVE_WORLD_LATE_DISCARD');
       }
-      const restored=await b.page.evaluate(({snapshot,frameTime,wire,entities})=>window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities),captured);
+      const restored=await b.page.evaluate(({snapshot,frameTime,wire,entities,subWire})=>window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities,subWire),captured);
       assert.equal(restored.tick,captureTick);
       assert.equal(restored.calls,0);
       if(matterWire)assert.equal(restored.exactMatter,true);
+      if(sceneWire)assert.equal(restored.exactScene,true);
       assert.equal(restored.runId,captured.snapshot.ctx.runId);
       assert.deepEqual(restored.fingerprint,captured.snapshot.fingerprint);
       // Metadata for the original native run is restored; align the test
@@ -192,7 +219,7 @@ try {
         score:left.record.score,restoreSimTicks:restored.calls,negativeControls:negatives,
         exactNativeTape:true,exactNativeRecord:true,exactEverySuffixFingerprint:true,errors,
         matterWireBytes:matterWire?Buffer.byteLength(captured.wire):null,exactMatterRecapture:restored.exactMatter,
-        bodies:captured.bodies,retiredDetector:captured.retired,entityWireBytes:entityWire?Buffer.byteLength(captured.entities):null}));
+        bodies:captured.bodies,retiredDetector:captured.retired,entityWireBytes:entityWire?Buffer.byteLength(captured.entities):null,sceneWireBytes:sceneWire?Buffer.byteLength(captured.subWire):null,exactSceneRecapture:restored.exactScene}));
     }finally{await a.context.close();await b.context.close();}
   }
 }finally{await browser?.close();await vite?.close();if(scratch)await rm(scratch,{recursive:true,force:true});}
