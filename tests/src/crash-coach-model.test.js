@@ -54,7 +54,7 @@ describe('claimRows / wrapText / progressLine / buttons', () => {
   });
   test('wrapText wraps by measured width and ellipsises past maxLines', () => {
     const m = (s) => s.length * 6;
-    expect(M.wrapText('AAA BBB CCC DDD', 40, m)).toEqual(['AAA BBB', 'CCC DDD']);
+    expect(M.wrapText('AAA BBB CCC DDD', 50, m)).toEqual(['AAA BBB', 'CCC DDD']);
     expect(M.wrapText('A B C D E F G H', 20, m, 2)).toEqual(['A B', 'C D...']);
     expect(M.wrapText('', 40, m)).toEqual([]);
   });
