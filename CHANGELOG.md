@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.22.11 — #135 dual-proof trust snapshot input hardening (2026-11-25)
+
+- Harden the **pure, non-deployed** dual-proof adjudicator (#384): copy only validated own-data descriptors into a bounded, fresh JSON snapshot *before* making the decision. Stop post-inspection Proxy getter swaps from changing denied authorization/consent receipts into authorized ones. Malformed, accessor, inherited hook, symbol, cycle, exotic array and nonfinite inputs fail closed without granting public rank/rewards.
+- Reject prototype-disguised native objects with internal slots (Date, Map/Set, weak collections, typed-array/DataView, ArrayBuffer and SharedArrayBuffer) rather than treating them as ordinary `{}`. Cumulative 256 KiB escaped UTF-8 accounting applies before serialization. Include new near-limit, hostile Proxy, Node/Chromium and trust/canonicalization regressions; four original pinned free/paid verdict hashes remain unchanged.
+- **Owner-approved review of exact security source commit `460a135f`** recorded on #384, including red-to-green negative proof, Proxy-trap parity and green CI. A non-exploitable strictness inconsistency for other disguised built-ins is tracked separately as non-blocking #388; this release does not expand the brand-check denylist.
+- **Library only:** no authenticated verifier, issuer/consent/wallet adapter, public API, leaderboard publication, fee pathway, Shard settlement or change to game physics/replay semantics. The full public-verification system remains #135. Package and lockfile advance together to v2.22.11.
+
 ## v2.22.10 — #68 Cemetery Montage / Graveyard Swarm + local attempt history (2026-11-25)
 
 - **Owner-approved local attempt history** (Marvin, #68, 2026-11-25): a separate IndexedDB store `bitstream-attempt-history` keeps each finished ordinary run's 30 Hz pose trace plus compatibility metadata only (no inputs, checkpoints, fingerprints or ledger data). **Default 5 per course**, Settings → PAST ATTEMPTS → *PAST ATTEMPTS TO KEEP* 0..40 (0 keeps none; the maximum is shown). FIFO eviction of this store only, ≤ 256 KB per attempt and ≤ 12 MB overall, quota recovery from its own oldest rows, damaged rows dropped, two-press CLEAR HISTORY. Lowering trims at once; raising cannot restore. Never uploaded.
