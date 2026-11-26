@@ -17,6 +17,7 @@
 import { captureCausalState } from '../replay/fingerprintCapture.js';
 import { fingerprintState } from '../replay/fingerprint.js';
 import { traceOf } from '../replay/Takeover.js';
+import { hypot } from '../pmath.js';
 import { TRACE_EVERY } from '../ghost/GhostTape.js';
 
 /** Wall time one slice of simulation may take before the page gets a frame back (the coach should not freeze the screen). */
@@ -61,7 +62,7 @@ export function createEngineSimulator({ host, sliceMs = SLICE_MS, sliceMaxTicks 
         xy.push(b.position.x, b.position.y);
         if (ref && divergenceAt === null) {
           const i = (tick / TRACE_EVERY - 1) * 3;
-          if (i + 1 < ref.length && Math.hypot(Math.fround(b.position.x) - ref[i], Math.fround(b.position.y) - ref[i + 1]) > DIVERGE_PX) divergenceAt = tick;
+          if (i + 1 < ref.length && hypot(Math.fround(b.position.x) - ref[i], Math.fround(b.position.y) - ref[i + 1]) > DIVERGE_PX) divergenceAt = tick;
         }
       };
       const marks = [...new Set([branchTick, crashTick, untilTick].filter((t) => isInt(t) && t >= 1 && t <= untilTick))].sort((a, b) => a - b);
