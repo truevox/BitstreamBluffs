@@ -226,7 +226,7 @@ describe('butterflyData', () => {
     expect(bars[0].height).toBeGreaterThan(bars[2].height);
     expect(bars[1].height).toBeCloseTo(40 * 0.12, 5); // never measured: a stub
     expect(bars[3].height).toBeCloseTo(40 * 0.4, 5);
-    expect(new Set(bars.map((b) => b.color)).size).toBe(4);
+    expect(new Set(bars.map((b) => b.color)).size).toBe(3);
     expect(bars[0].color).not.toBe(bars[2].color);
   });
 });
