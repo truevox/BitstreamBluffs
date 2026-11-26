@@ -1,7 +1,8 @@
-# P0 #135 — exact evidence-bound, server-authoritative signed admission
+# P0 #135 — v2.25.10 exact evidence-bound, server-authoritative signed admission
 
 **Provenance:** Gal Friday integration/release proposal, not an additional
-Marvin policy decision. Source is the new #406 author commits 17a9a62c and
+Marvin policy decision. v2.25.9 is occupied by the shipped #119 Matter section;
+this security reference follows in v2.25.10. Source is the new #406 author commits 17a9a62c and
 ce2c67ba, added AFTER original #406 head 62218063 was released in #408.
 Preserve authorship via non-force, original commits; no duplicate merge.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.10 — #135 signed evidence-bound server Shard and entitlement reference (2026-11-26)
+
+- Non-force preserve the original later #406 wallet/evidence-authority commits after the merged v2.25.9 canonical Matter section. Introduce private server-only `publicWallet` with zero public Shards initially, signed award settlement tied to prior authenticated admission, once-only per-run rewards, atomic server-catalogue upgrades and account-owned equipment frozen at challenge issuance.
+- Strict admission now binds each of three role-separated Ed25519 receipts to the exact independently replayed canonical evidence-bundle digest, pinned current ruleset and server-frozen effective modifiers. Changed checkpoints with otherwise valid signed headers and forged local wealth or unattained upgrade ranks refuse. Test-only unbound claim mode remains disabled by default; never enable it on real storage.
+- Keep original private dual-proof policy, local/offline play and v2.25.9 SIM9 world unchanged. No live HTTP API, key material, account issuer, public verifier, peer/paid route, actual payout or automatic uploads. #135 remains OPEN; the competing #410 provisional/public wallet remains on hold pending a single canonical authority. [skip netlify]
+
 ## v2.25.9 — #119 explicit canonical Matter V3 state section (2026-11-26)
 
 - Introduce an opt-in, strictly typed **Matter-only** section codec in `src/systems/savestate/matterState.js` with exact current-build, run and tick binding; bounded body/part/vertex/contact arrays, current V3 relational preflight, explicit detector order/retired terrain projection, and finite binary64 strings for every physical double. Hidden/unknown fields, invalid references, duplicate IDs, unsupported constraints, noncanonical bytes, incompatible builds and malformed state fail closed. The section cannot execute constructors or mutate the current Matter world.
