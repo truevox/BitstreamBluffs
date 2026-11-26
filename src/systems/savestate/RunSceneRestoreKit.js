@@ -52,7 +52,7 @@ export function createRunSceneRestoreKit(Phaser) {
         snap.classes.unclassified.length || !record(snap.config) ||
         !record(snap.matter) || !record(snap.camera) || !record(snap.telegraph) ||
         !Array.isArray(snap.meshOrder) || !Array.isArray(snap.ghost) ||
-        snap.ghost.length !== 8) return false;
+        snap.ghost.length !== 8 || !Array.isArray(snap.pool) || snap.pool.length) return false;
     const declared = snap.classes.SIM;
     const actual = Object.keys(snap.game);
     if (declared.length !== actual.length ||
@@ -73,7 +73,7 @@ export function createRunSceneRestoreKit(Phaser) {
       return snap;
     },
     restore(run,snap) {
-      if (!normal(run) || run.simClock?.tick!==0 || run.ghostRecorder.lastTick!==0 ||
+      if (!normal(run) || run.mesh?._bodyPool || run.simClock?.tick!==0 || run.ghostRecorder.lastTick!==0 ||
           run.ghostRecorder.inputs.length || !snap || typeof snap!=='object' ||
           snap.kind!=='bb-runscene-diagnostic-snapshot'||snap.diagnosticOnly!==true||
           !Array.isArray(snap.audit)||snap.audit.length || !snap.recorder || !complete(snap))
@@ -510,36 +510,20 @@ function installRunSceneStateKit(global) {
     const msnapW = { ...msnap, ids: Object.fromEntries(Object.entries(msnap.ids).filter(([k]) => worldKeys(k))), bodies: Object.fromEntries(Object.entries(msnap.bodies).filter(([k]) => worldKeys(k))) };
     const mres = MKit().restore(engine, msnapW, ix.keyOf, mlevel, { skip: [...skip], completePreflight: !!global.__ssCanonical });
     run.sled._sync();
-    if (L >= 4 && !skip.has('pool')) restorePool(run, snap.pool, !skip.has('ids'));
+    if (L >= 4 && !skip.has('pool')) restorePool(run, snap.pool);
     if (L >= 4 && !skip.has('ids')) Matter.Common._nextId = snap.matter.nextId;
     if (L >= 4 && !skip.has('camera')) restoreCamera(run, snap.camera);
     if (preparedRecorder) global.__ssRecorderKit.applyRecorderPrefix(run,preparedRecorder);
     return { level, matter: mres, log: dcd.log };
   }
 
-  function restorePool(run, pool, withIds) {
-    // Canonical collider construction (#222) retired the body pool. A snapshot
-    // containing retired pooled bodies is incompatible, not silently discarded.
-    if (!run.mesh._bodyPool) {
-      if (!Array.isArray(pool) || pool.length) {
-        throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
-      }
-      return;
+  function restorePool(run, pool) {
+    // SIM9 has canonical terrain colliders; an old pooled-body snapshot is
+    // incompatible even if this were a compatible-looking exact-build wrapper.
+    // Never recreate legacy pooled geometry in a production-importable module.
+    if (!Array.isArray(pool) || pool.length || run.mesh._bodyPool) {
+      throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
     }
-    const B = Matter.Bodies;
-    const fresh = pool.map((p) => {
-      const sq = [{ x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 16 }, { x: 0, y: 16 }].slice(0, p.verts);
-      const b = B.fromVertices(8, 8, [sq], { isStatic: true, label: 'terrain', collisionFilter: run.mesh._bodyPool[0]?.collisionFilter }, false);
-      if (b.vertices.length !== p.verts) throw new Error('restore: pool vertex count mismatch');
-      MKit().restoreBodyRawInto(b, p.raw);
-      [b.area, b.mass, b.inertia, b.inverseMass, b.inverseInertia, b.density] = p.mass;
-      b._original = p.original ? { ...p.original } : null;
-      b.friction = 1; b.frictionStatic = 0;
-      if (withIds) b.id = p.id;
-      return b;
-    });
-    run.mesh._bodyPool.length = 0;
-    run.mesh._bodyPool.push(...fresh);
   }
 
   // ------------------------------------------------------------------ diagnostics

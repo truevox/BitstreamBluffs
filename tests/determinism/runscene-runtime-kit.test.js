@@ -34,13 +34,15 @@ test('truncated or inconsistent causal sections refuse before touching fresh wor
   const base={kind:'bb-runscene-diagnostic-snapshot',diagnosticOnly:true,
     audit:[],recorder:{},config:{},classes:{SIM:names,unclassified:[]},
     game,ghost:Array(8).fill(0),matter:{},camera:{},
-    telegraph:{},meshOrder:[]};
+    telegraph:{},meshOrder:[],pool:[]};
   const broken=[
     {...base,game:{...game,unreviewedState:{}}},
     {...base,game:{simClock:{},runRandom:{},sled:{},score:{}}},
     {...base,classes:{SIM:[...names,'unknown'],unclassified:[]}},
     {...base,classes:{SIM:names,unclassified:['unreviewedState']}},
     {...base,telegraph:null},
+    {...base,pool:[{id:'legacy-body'}]},
+    {...base,pool:null},
     {...base,meshOrder:null},
     {...base,ghost:[0]},
   ];
