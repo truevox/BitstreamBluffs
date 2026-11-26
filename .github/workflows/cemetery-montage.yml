@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'tests/src/attempt-history.test.js'
       - 'tests/src/cemetery-montage.test.js'
+      - 'tests/src/attempt-history-settings-write.test.js'
       - 'tools/ghosts/cemetery-montage-browser.mjs'
       - '.github/workflows/cemetery-montage.yml'
       - 'package.json'
@@ -31,7 +32,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Unit tests (history store, montage plan, renderer, Game Over data)
-        run: npm test -- --runInBand tests/src/attempt-history.test.js tests/src/cemetery-montage.test.js tests/determinism/sim-math-boundary.test.js
+        run: npm test -- --runInBand tests/src/attempt-history.test.js tests/src/attempt-history-settings-write.test.js tests/src/cemetery-montage.test.js tests/determinism/sim-math-boundary.test.js
       - name: Production build
         run: npm run build
       - name: Install Chromium for Playwright
