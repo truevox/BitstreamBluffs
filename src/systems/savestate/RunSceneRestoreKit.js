@@ -15,14 +15,28 @@
  */
 import {createMatterSnapshotKit} from '../../../tools/savestate-experiment/matter-snapshot-kit.js';
 import * as recorderKit from '../../../tools/savestate-experiment/recorder-snapshot-kit.js';
+import {captureRecorderState, restoreRecorderState} from './recorderState.js';
+import {captureRunRandomState, restoreRunRandomState, captureSimClockState, restoreSimClockState} from './primitiveState.js';
+import {runRandomStreams} from '../RunRandom.js';
+import {SimClock} from '../SimClock.js';
+import {canonicalBytes, parseCanonical} from '../replay/canonicalJson.js';
+import {digestOf} from '../replay/canonicalSha256.js';
+import {captureCausalState} from '../replay/fingerprintCapture.js';
+import {fingerprintState} from '../replay/fingerprint.js';
+import {CURRENT_RULESET_ID} from '../replay/currentRulesetId.js';
+import {SIM_REVISION} from '../replay/ruleset.js';
 
 /** Explicit dependency injection: no mutation of window/globalThis/Phaser. */
 export function createDiagnosticRunSceneRestoreKit(Phaser) {
+  return createInternalKit(Phaser,recorderKit);
+}
+
+function createInternalKit(Phaser,recorderAdapter) {
   if (!Phaser?.Physics?.Matter?.Matter) throw Error('RunScene restore: missing Phaser Matter engine');
   const injected = Object.freeze({
     Phaser,
     __ssMatterKit: createMatterSnapshotKit(Phaser.Physics.Matter.Matter),
-    __ssRecorderKit: recorderKit,
+    __ssRecorderKit: recorderAdapter,
     __ssCanonical: true,
     Float32Array, Float64Array, Uint8Array, Uint16Array, Uint32Array,
     Int8Array, Int16Array, Int32Array,
@@ -38,14 +52,16 @@ export function createDiagnosticRunSceneRestoreKit(Phaser) {
  */
 export function createRunSceneRestoreKit(Phaser) {
   const kit = createDiagnosticRunSceneRestoreKit(Phaser);
-  const normal = run => !!run && !run.unrankedPractice && !run.bsodGym &&
+  return strictWorldKit(kit);
+}
+
+const normal = run => !!run && !run.unrankedPractice && !run.bsodGym &&
     !run.guestPractice && !run.coachSim && !run.takeover && !run.crashed &&
-    !!run.ghostRecorder && !run.tapePlayer && !run._replayTape;
+    !run._leaving && !!run.ghostRecorder && !run.tapePlayer && !run._replayTape;
+function strictWorldKit(kit) {
   const record = v => !!v && typeof v === 'object' && !Array.isArray(v);
-  // Fail visibly BEFORE any world mutation when a caller hands us a truncated
-  // diagnostic snapshot. A future serialized layout must independently check
-  // exact-build identity, types and hostile input; this is only an internal
-  // completeness guard, never a trust boundary or an authentication result.
+  // Reject truncated or inconsistent internal causal sections before any
+  // disposable-world mutation. This is NOT a stored-file trust boundary.
   const complete = snap => {
     if (!record(snap?.game) || !record(snap?.classes) ||
         !Array.isArray(snap.classes.SIM) || !Array.isArray(snap.classes.unclassified) ||
@@ -55,8 +71,7 @@ export function createRunSceneRestoreKit(Phaser) {
         snap.ghost.length !== 8) return false;
     const declared = snap.classes.SIM;
     const actual = Object.keys(snap.game);
-    if (declared.length !== actual.length ||
-        new Set(declared).size !== declared.length ||
+    if (declared.length !== actual.length || new Set(declared).size !== declared.length ||
         !declared.every(k => typeof k === 'string' &&
           kit.CLASS[k] === 'SIM' && Object.prototype.hasOwnProperty.call(snap.game,k))) return false;
     return ['simClock','runRandom','terrain','sled','score'].every(k =>
@@ -83,6 +98,119 @@ export function createRunSceneRestoreKit(Phaser) {
       return kit.restore(run,snap,'full',{strict:true,skip:[]});
     },
     digests: kit.digests,
+  });
+}
+
+// Defense in depth for INTERNAL diagnostic data only. This is not a
+// registered per-class schema or an authorization to accept external bytes.
+const unsafeKey=k=>k==='__proto__'||k==='prototype'||k==='constructor';
+function assertInternalGraph(root){
+  const pending=[[root,0]],seen=new Set();
+  let budget=1000000;
+  while(pending.length){
+    const [v,depth]=pending.pop();
+    if(--budget<0||depth>80)throw Error('native restore: graph limit');
+    if(v===null||v===undefined||typeof v==='boolean'||typeof v==='string')continue;
+    if(typeof v==='number'&&Number.isFinite(v))continue;
+    if(!v||typeof v!=='object'||seen.has(v))throw Error('native restore: invalid graph value/alias');
+    seen.add(v);
+    const arr=Array.isArray(v),proto=Object.getPrototypeOf(v);
+    if(arr?proto!==Array.prototype:proto!==Object.prototype&&proto!==null)
+      throw Error('native restore: invalid graph prototype');
+    const props=Object.getOwnPropertyDescriptors(v),keys=Reflect.ownKeys(props);
+    if(arr&&keys.length!==v.length+1)throw Error('native restore: sparse/extra graph array');
+    for(const k of keys){
+      if(arr&&k==='length')continue;
+      const d=props[k];
+      if(typeof k!=='string'||unsafeKey(k)||!Object.hasOwn(d,'value')||!d.enumerable||
+         (arr&&(!/^(0|[1-9][0-9]*)$/.test(k)||Number(k)>=v.length)))
+        throw Error('native restore: unsafe graph field');
+      pending.push([d.value,depth+1]);
+    }
+  }
+}
+function exactKeys(obj,keys){
+  return !!obj&&typeof obj==='object'&&!Array.isArray(obj)&&
+    Object.keys(obj).length===keys.length&&keys.every(k=>Object.hasOwn(obj,k));
+}
+
+/** Native component integration for a disposable internal fresh-world candidate.
+ * The reflective scene/Matter graph is STILL diagnostic and may only originate
+ * from trusted application capture. Do not connect this to bytes from storage
+ * or an untrusted file. A production per-class schema and transaction owner
+ * must replace that graph admission before a player UI may call it.
+ */
+export function createNativeRunSceneRestoreKit(Phaser) {
+  const context=(run,runId=run.runId,tick=run.simClock.tick)=>({
+    runId,tick,buildId:run.registry.get('currentBuildId'),
+    rulesetId:CURRENT_RULESET_ID,simRevision:SIM_REVISION,
+  });
+  const exactDigest=(value)=>digestOf(value);
+  const fp=run=>fingerprintState(captureCausalState(run));
+  const nativeRecorder={
+    captureRecorderPrefix(run){
+      return parseCanonical(captureRecorderState(run.ghostRecorder,context(run)));
+    },
+    prepareRecorderPrefix(run,section,tick){
+      if(!section||typeof section.runId!=='string'||section.tick!==tick)
+        throw Error('native restore: recorder boundary mismatch');
+      const recorder=restoreRecorderState(canonicalBytes(section),run.ghostRecorder,context(run,section.runId,tick));
+      return {recorder,runId:section.runId,startedAt:recorder.header.startedAt};
+    },
+    applyRecorderPrefix(run,prepared){
+      run.ghostRecorder=prepared.recorder;
+      run.runId=prepared.runId;
+      run.startedAt=prepared.startedAt;
+    },
+  };
+  const world=strictWorldKit(createInternalKit(Phaser,nativeRecorder));
+  const boundary=run=>{
+    if(!normal(run)||run.dailyOfficial||run.dailyMode==='draft'||run.guestPracticeTape!=null||
+       !run.registry||run.ghostRecorder.lastTick!==run.simClock?.tick)
+      throw Error('native restore: only complete normal tick boundary');
+  };
+  return Object.freeze({
+    capture(run){
+      boundary(run);
+      const ctx=context(run);
+      const clock=captureSimClockState(run.simClock);
+      const rng=captureRunRandomState(run.runRandom);
+      const snap={kind:'bb-internal-native-world-candidate',version:1,ctx,clock,rng,
+        fingerprint:fp(run),world:world.capture(run)};
+      assertInternalGraph(snap);
+      return snap;
+    },
+    restore(run,snap){
+      boundary(run);
+      assertInternalGraph(snap);
+      if(run.simClock.tick!==0||!exactKeys(snap,['kind','version','ctx','clock','rng','fingerprint','world'])||snap.kind!=='bb-internal-native-world-candidate'||snap.version!==1)
+        throw Error('native restore: fresh candidate required');
+      const ctx=context(run,snap.ctx?.runId,snap.ctx?.tick);
+      if(exactDigest(ctx)!==exactDigest(snap.ctx)||!Number.isSafeInteger(ctx.tick)||ctx.tick<0||
+         snap.world?.ghost?.[0]!==ctx.tick||snap.clock?.tick!==ctx.tick||
+         snap.world?.recorder?.runId!==ctx.runId)
+        throw Error('native restore: identity/tick mismatch');
+      // Validate through the shipped native class adapters into detached
+      // fresh objects BEFORE any scene mutation. The graph restore must
+      // preserve its native references, so verify their state rather than
+      // replacing the objects and breaking aliases.
+      const clock=new SimClock(run.simClock.tickMs,run.simClock.maxTicks);
+      const rng=runRandomStreams(run.seed);
+      restoreSimClockState(clock,snap.clock);
+      restoreRunRandomState(rng,snap.rng);
+      const wantClock=exactDigest(captureSimClockState(clock));
+      const wantRng=exactDigest(captureRunRandomState(rng));
+      const result=world.restore(run,snap.world);
+      if(run.runId!==ctx.runId||run.simClock.tick!==ctx.tick||
+         exactDigest(captureSimClockState(run.simClock))!==wantClock||
+         exactDigest(captureRunRandomState(run.runRandom))!==wantRng||
+         exactDigest(fp(run))!==exactDigest(snap.fingerprint))
+        throw Error('native restore: reconstructed world mismatch; discard candidate');
+      const got=parseCanonical(captureRecorderState(run.ghostRecorder,ctx));
+      if(exactDigest(got)!==exactDigest(snap.world.recorder))
+        throw Error('native restore: reconstructed recorder mismatch; discard candidate');
+      return result;
+    },
   });
 }
 
@@ -211,7 +339,11 @@ function installRunSceneStateKit(global) {
   }
   function resolveContent(run, path) {
     let v = run.content;
-    for (const part of path.split('/').slice(1)) v = v[part];
+    if(typeof path!=='string'||(path!==''&&!path.startsWith('/')))throw Error('restore: invalid content path');
+    for (const part of path.split('/').slice(1)) {
+      if(unsafeKey(part)||!v||!Object.hasOwn(v,part))throw Error('restore: invalid content reference');
+      v=v[part];
+    }
     if (v === undefined) throw new Error(`restore: content path ${path} missing`);
     return v;
   }
@@ -330,7 +462,11 @@ function installRunSceneStateKit(global) {
         for (const x of vals) s.add(x);
         return s;
       }
-      if ('__ta' in n) { const T = global[n.__ta]; const t = new T(n.data); restored.set(n.__id, t); return t; }
+      if ('__ta' in n) {
+        if(!['Float32Array','Float64Array','Uint8Array','Uint16Array','Uint32Array','Int8Array','Int16Array','Int32Array'].includes(n.__ta))
+          throw Error('restore: unsupported typed array');
+        const T=global[n.__ta],t=new T(n.data);restored.set(n.__id,t);return t;
+      }
       // object
       let target = live && typeof live === 'object' && ctorName(live) === n.__c ? live : null;
       if (!target) {
@@ -344,6 +480,7 @@ function installRunSceneStateKit(global) {
       }
       restored.set(n.__id, target);
       for (const k of Object.keys(n.__obj)) {
+        if(unsafeKey(k))throw Error('restore: unsafe object field');
         const sn = n.__obj[k];
         if (sn && typeof sn === 'object' && sn.__skip && !(k in target)) continue; // nothing live to keep
         target[k] = dec(sn, target[k], `${path}.${k}`);
@@ -450,6 +587,14 @@ function installRunSceneStateKit(global) {
     const preparedRecorder = global.__ssCanonical
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
     if (global.__ssCanonical) {
+      const configKeys=CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner');
+      if(!exactKeys(snap.config,configKeys)||configKeys.some(k=>JSON.stringify(run[k])!==snap.config[k]))
+        throw Error('restore: CONFIG differs from fresh scene');
+      if(!Array.isArray(snap.classes?.SIM)||new Set(snap.classes.SIM).size!==snap.classes.SIM.length||
+         !snap.classes.SIM.every(k=>SIM.includes(k))||!exactKeys(snap.game,snap.classes.SIM))
+        throw Error('restore: incomplete SIM field inventory');
+      if (!Array.isArray(snap.pool) || snap.pool.length || run.mesh._bodyPool?.length)
+        throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
       MKit().preflight(snap.matter);
       // Retired detector terrain entries are validated by the V3 Matter preflight.
     }
@@ -517,29 +662,11 @@ function installRunSceneStateKit(global) {
     return { level, matter: mres, log: dcd.log };
   }
 
-  function restorePool(run, pool, withIds) {
-    // Canonical collider construction (#222) retired the body pool. A snapshot
-    // containing retired pooled bodies is incompatible, not silently discarded.
-    if (!run.mesh._bodyPool) {
-      if (!Array.isArray(pool) || pool.length) {
-        throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
-      }
-      return;
-    }
-    const B = Matter.Bodies;
-    const fresh = pool.map((p) => {
-      const sq = [{ x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 16 }, { x: 0, y: 16 }].slice(0, p.verts);
-      const b = B.fromVertices(8, 8, [sq], { isStatic: true, label: 'terrain', collisionFilter: run.mesh._bodyPool[0]?.collisionFilter }, false);
-      if (b.vertices.length !== p.verts) throw new Error('restore: pool vertex count mismatch');
-      MKit().restoreBodyRawInto(b, p.raw);
-      [b.area, b.mass, b.inertia, b.inverseMass, b.inverseInertia, b.density] = p.mass;
-      b._original = p.original ? { ...p.original } : null;
-      b.friction = 1; b.frictionStatic = 0;
-      if (withIds) b.id = p.id;
-      return b;
-    });
-    run.mesh._bodyPool.length = 0;
-    run.mesh._bodyPool.push(...fresh);
+  function restorePool(run, pool) {
+    // SIM9 canonical construction retired the collider pool. Do not
+    // reconstruct it, even on the experimental path.
+    if (!Array.isArray(pool) || pool.length || run.mesh._bodyPool?.length)
+      throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
   }
 
   // ------------------------------------------------------------------ diagnostics
