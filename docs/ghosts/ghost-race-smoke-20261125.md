@@ -19,8 +19,8 @@ the original GhostLinkView.
 
 Controlled red on a compiled Pages-subpath v2.25.0 game (Chromium
 412x915 mobile emulation, NixVox, 2026-11-25): pause the real opening
-tween, obtain the full-geometry Race center, seek the actual tween to
-122 ms, render, then use a real Playwright pointer click at the stale
+tween, obtain the full-geometry Race center, seek the actual tween until its partial-open Back hitbox overlaps
+the original Race center, render, then use a real Playwright pointer click at the stale
 coordinate. Observed:
 
 - stale Race center: CSS (330.4583, 522.1083)
@@ -42,7 +42,8 @@ failure.
 
 The compiled browser smoke now holds the actual mobile Ghost open
 tween at the measured intermediate scale, asserts the stale
-full-size Race point is inside Back, and requires the stable-target
+full-size Race point is inside Back (selecting measured geometry, not
+assuming a fixed seek timestamp), and requires the stable-target
 wait to reject partial-open geometry before releasing the tween.
 It then waits for three consecutive visible, settled geometry
 samples and a real canvas DOM target, preserves the original view

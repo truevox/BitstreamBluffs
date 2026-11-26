@@ -372,12 +372,21 @@ try{
     if(!tween)throw Error('Missing real Ghost CRT open tween');
     const center=b=>{const z=b.zone;return z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);};
     const stale=center(v.practiceBtn);
+    const backZone=v.back.zone;
+    let back,scale,staleHitsBack=false,seekMs;
     t.tweens.timeScale=1;
-    try{tween.seek(122,1,true);}finally{t.tweens.timeScale=0;}
-    const back=center(v.back);
-    const backZone=v.back.zone,scale=v.panel.scaleY;
-    return {scale,alpha:v.panel.alpha,stale:{x:stale.x,y:stale.y},back:{x:back.x,y:back.y},
-     staleHitsBack:Math.abs(stale.x-back.x)<backZone.width/2&&Math.abs(stale.y-back.y)<backZone.height*scale/2};
+    try{
+     // Phaser's seek setup can consume different initial ticks. Select the
+     // actual measured overlap, not a fixed assumed animation timestamp.
+     for(seekMs=110;seekMs<=155;seekMs++){
+      tween.seek(seekMs,1,true);
+      back=center(v.back);scale=v.panel.scaleY;
+      staleHitsBack=scale>0&&scale<1&&Math.abs(stale.x-back.x)<backZone.width/2&&
+       Math.abs(stale.y-back.y)<backZone.height*scale/2;
+      if(staleHitsBack&&v.panel.alpha===1)break;
+     }
+    }finally{t.tweens.timeScale=0;}
+    return {seekMs,scale,alpha:v.panel.alpha,stale:{x:stale.x,y:stale.y},back:{x:back.x,y:back.y},staleHitsBack};
    });
    if(!(held.scale>0&&held.scale<1)||!held.staleHitsBack)
     throw Error('Slow-open control did not reproduce stale Race -> BACK geometry '+JSON.stringify(held));
