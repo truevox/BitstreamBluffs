@@ -245,7 +245,11 @@ function snapshotInput(input){
     }
     if(typeof v!=='object'||ancestors.has(v))throw new TypeError('non-JSON trust input');
     const array=Array.isArray(v);
-    if(!array&&!isObj(v))throw new TypeError('exotic trust input');
+    // Arrays also need the native JSON-shaped prototype. Otherwise Array
+    // subclasses or prototype-swizzled arrays bypass the object check.
+    if(array){
+      if(Object.getPrototypeOf(v)!==Array.prototype)throw new TypeError('exotic trust array');
+    }else if(!isObj(v))throw new TypeError('exotic trust input');
     ancestors.add(v);
     try{
       const descriptors=Object.getOwnPropertyDescriptors(v);

@@ -74,8 +74,14 @@ const consentProxyCase=(original,adjudicate)=>{
  const result=adjudicate(shifting);
  return {reads,...check(result,'none')};
 };
+const exoticArrayCase=(original,adjudicate)=>{
+ const exotic=[1];
+ Object.setPrototypeOf(exotic,Object.create(Array.prototype));
+ return check(adjudicate({...original,ignored:exotic}),'none');
+};
 const nodeProxy=proxyCase(baseline,adjudicateDualProof);
 const nodeConsent=consentProxyCase(baseline,adjudicateDualProof);
+const nodeExoticArray=exoticArrayCase(baseline,adjudicateDualProof);
 assert.equal(nodeProxy.reads,0,'Node must not read Proxy.get authorization');
 assert.equal(nodeConsent.reads,0,'Node must not read Proxy.get consent');
 const origin=process.env.GAME_URL;
@@ -112,11 +118,15 @@ try{
   }});
   const consentHostile={reads:0,...cv(adjudicateDualProof(consentProxy))};
   consentHostile.reads=consentReads;
-  return {vectors,hostile,consentHostile};
+  const exotic=[1];
+  Object.setPrototypeOf(exotic,Object.create(Array.prototype));
+  const exoticArray=cv(adjudicateDualProof({...baseline,ignored:exotic}));
+  return {vectors,hostile,consentHostile,exoticArray};
  },{cases,baseline});
  assert.deepEqual(fromBrowser.vectors,fromNode);
  assert.deepEqual(fromBrowser.hostile,nodeProxy);
  assert.deepEqual(fromBrowser.consentHostile,nodeConsent);
+ assert.deepEqual(fromBrowser.exoticArray,nodeExoticArray);
  assert.equal(fromBrowser.hostile.reads,0,'Chromium must not read Proxy.get authorization');
  assert.equal(fromBrowser.consentHostile.reads,0,'Chromium must not read Proxy.get consent');
  assert.deepEqual(errors,[]);
@@ -126,6 +136,8 @@ try{
    publication:nodeProxy.publication,rank:nodeProxy.rank,reward:nodeProxy.reward},
   consentProxy:{reads:nodeConsent.reads,publication:nodeConsent.publication,
    rank:nodeConsent.rank,reward:nodeConsent.reward},
+  exoticArray:{publication:nodeExoticArray.publication,rank:nodeExoticArray.rank,
+   reward:nodeExoticArray.reward},
   errors,writes,fixture:'synthetic-only',officialServiceEnabled:false,
  }));
  await context.close();

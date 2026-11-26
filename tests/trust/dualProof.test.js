@@ -521,13 +521,22 @@ describe('canonical dual-proof decision contract (#245)', () => {
     }
   });
 
-  test('sparse arrays, decorated/symbol properties, non-finite numbers, cycles and hidden fields refuse publication',()=>{
+  test('sparse/exotic arrays, decorated/symbol properties, invalid numbers, cycles and hidden fields refuse publication',()=>{
     const evidence=good();
     const invalid=[];
     const holes=[,1];
     invalid.push({...evidence,garbage:holes});
     const decorated=[1];decorated.extra=2;
     invalid.push({...evidence,garbage:decorated});
+    // JSON.parse never constructs Array subclasses or arrays with foreign
+    // prototypes; even ignored envelope fields must not smuggle exotics.
+    class HostileArray extends Array {}
+    const subclassed=new HostileArray(1);
+    subclassed[0]='data';
+    invalid.push({...evidence,garbage:subclassed});
+    const changedPrototype=[1];
+    Object.setPrototypeOf(changedPrototype,Object.create(Array.prototype));
+    invalid.push({...evidence,garbage:changedPrototype});
     const symbols={...evidence};symbols[Symbol('hidden')]='untrusted';
     invalid.push(symbols);
     const hidden={...evidence};Object.defineProperty(hidden,'invisible',{value:1,enumerable:false});
