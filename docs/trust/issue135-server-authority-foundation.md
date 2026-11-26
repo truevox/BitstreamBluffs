@@ -1,0 +1,30 @@
+# #135 — server-owned provisional challenge, wallet and equipment authority (draft)
+
+**Engineering stage: server-side core only. Not deployed, no HTTP endpoint, no Verified leaderboard, no player account integration, no paid service.** `main` remains fully local/offline playable. This draft adds *nothing* to the client build.
+
+## Marvin's canonical owner constraints (2026-11-20; GBrain source)
+
+- **PUBLIC leaderboard integrity first**, broader Shard economy second. Editing `bb.profile.bank` to one billion may buy local toys but MUST NOT authorize upgraded public score eligibility. Independently issue challenge, course/rules/seed, server-owned credits, receipts, and frozen gear. Public STOCK ignores local gear. Upgraded board needs authenticated server-paid inventory proof.
+- **Free blind peer verification and optional paid developer/server verification MUST produce exactly the SAME decision, Verified status, leaderboard eligibility and in-game rewards** for equal authentic evidence. Paying buys only verification compute/latency convenience; never positive verdicts, currency, equipment, higher rank or weaker tests.
+- Immediate explicit public submission appears only as **Unverified**, then a genuine exact-build replay check runs alongside randomly assigned, private, bounded peer checks. Verifier identities and assignment mapping must never be shown. User can select strong, truly recorded races for offline portfolio; base Idle earnings never require verification, but eligible verified evidence may award a separate future positive bonus. Server time and bank are authoritative only for the eventual ONLINE account; do not retroactively convert LOCAL bank or claimed idle hours.
+
+## Current source-only implementation
+
+`server/trust/PublicChallengeLedger.mjs` is a Node-only, SQLite-backed durable coordinator **with no network listener or client import**. Its methods are for a separately authenticated SERVER adapter, *never a browser endpoint*. It provides:
+
+1. Account ledger default balance zero; unique trusted issuer grant IDs and signed-off catalogue price, transactional debit before one-time purchased loadout receipt. No local `bank`, identity, or gear flag is trusted. **No automatic trusted credits exist** in this module; `creditFromTrustedIssuer` is a privileged server-side hook, not a client-sourced grant.
+2. Server-created, unpredictable 192-bit challenge token, 15-minute server-clock expiry, account binding and immutable seed/biome/lane/build/ruleset/loadout identity. STOCK fixes the server's empty loadout digest. MODDED requires an exact equipment receipt owned by the authenticated account.
+3. Explicitly authenticated user/audience consent enables **only provisional Unverified** publication. V1 strict `adjudicateDualProof` rejects unknown client fields (wallet/bank, claimed Verified, issuer, `paidVerifier`, rank flags). Original evidence identifiers are preserved in private DB metadata, not exposed publicly. A submitted challenge is consumed atomically with its submission; multiple tabs/processes/restarts cannot credit it twice. Public read strips account identities and replay digests.
+4. Transactional SQLite row constraints forbid `VERIFIED`, verified rank or reward state by any method in this phase. The server owns `receivedAtMs` for future competition deadlines; no client timestamp is authoritative. No new gameplay physics or PWA dependency.
+
+**Security boundary is still INCOMPLETE:** this class does not authenticate a session or consent; it assumes the *server adapter* authenticated the account and user approval before invoking methods. There is no HTTP route and therefore no exposed account setup, Shard grant, issue-challenge, upload or reward API. Node `node:sqlite` is experimental in Node 22; production storage choice, migrations and load testing require review. It is not yet a safe internet-facing competition service.
+
+## Non-negotiable remaining #135 gates (issue remains OPEN)
+
+- Authenticated account/session provider with anti-CSRF, abuse budgets, replay-proof server-issued authorizations, secure custody/rotation of verifier and pseudonym keys (no secrets in browser, GBrain or repo).
+- Actual evidence bytes/storage, source-pinned deterministic replay of the frozen brain and physics, authenticity/assistance verdicts, server-issued receipts bound to the exact same request. Provisional status must never silently become Verified after a local checksum or self-report.
+- Private randomly assigned blind peer jobs with bounded resources during own self-check, independent/quorum checks, honest network/compute privacy disclosure and server spot checks. Pseudonym mapping and provider routing remain server-private. An anonymous peer cannot be falsely promised that it learns nothing from executing a run locally.
+- Same free/paid adjudication and award pathway; fee is only compute convenience, no status or reward parameter. Time-based online Idle settlement uses server clock, locked evidence portfolio and atomic cursor; local unverified earnings remain local; verified bonus coefficients await playtest policy.
+- Full abuse/adversarial test matrix for forged balance/loadout, stale challenge, mismatched tape/manifest, duplicate grant/receipt/settlement, clock shift, Sybil/collusion, leaked identities, privacy consent, arbitrary model code and rollback/restart. Actual deployment only after owner-authorized account and privacy model, independent source review and penetration testing.
+
+**Provenance:** The competitive goals above are Marvin's decisions recorded in canonical GBrain, pages `projects/truevox-bitstreambluffs/evolution-mode/public-competition-integrity` and `projects/truevox-bitstreambluffs/evolution-mode/peer-verification`. The exact SQLite storage/class interfaces, 15-minute challenge expiry, stock loadout digest and provisional ledger schema are *Gal Friday engineering proposals*, not past Marvin implementation choices. #119 authoritative local savestates and #56 course archives remain distinct.

@@ -1,0 +1,46 @@
+name: Public competition authority foundation QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/public-authority-foundation-qa.yml'
+      - 'server/trust/**'
+      - 'tests/server/**'
+      - 'src/systems/trust/**'
+      - 'src/systems/replay/canonicalJson.js'
+      - 'src/systems/replay/canonicalSha256.js'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-authority-foundation-qa.yml'
+      - 'server/trust/**'
+      - 'tests/server/**'
+      - 'src/systems/trust/**'
+permissions:
+  contents: read
+jobs:
+  authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Server ledger, crypto nonce, one-time admission and forged wallet negative controls
+        run: node --test tests/server/public-challenge-ledger.test.mjs
+      - name: Independent dual-proof free/paid policy parity regressions
+        run: npm test -- --runInBand tests/trust/dualProof.test.js
+      - name: Client build must not contain the private authority implementation
+        run: |
+          npm run build
+          if grep -l 'PublicChallengeLedger' dist/assets/*.js; then
+            echo 'Server authority leaked into public client bundle' >&2
+            exit 1
+          fi
+          echo 'PASS: server authority is absent from the public bundle'
