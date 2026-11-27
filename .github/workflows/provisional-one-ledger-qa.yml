@@ -5,6 +5,7 @@ on:
       - '.github/workflows/provisional-one-ledger-qa.yml'
       - 'server/trust/**'
       - 'tests/server/provisional-one-ledger.test.mjs'
+      - 'tests/fixtures/trust/**'
       - 'src/systems/trust/**'
       - 'src/systems/replay/**'
       - 'tools/trust/boundAdmissionFixture.mjs'
@@ -14,6 +15,7 @@ on:
       - '.github/workflows/provisional-one-ledger-qa.yml'
       - 'server/trust/provisional.mjs'
       - 'tests/server/provisional-one-ledger.test.mjs'
+      - 'tests/fixtures/trust/**'
 permissions:
   contents: read
 jobs:
@@ -37,7 +39,7 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
       - name: Signed admission, canonical wallet and provisional fail-closed database QA
-        run: node --test server/trust/admission.test.mjs tests/server/provisional-one-ledger.test.mjs
+        run: node --test server/trust/admission.test.mjs server/trust/blindPeerCoordinator.test.mjs tests/server/provisional-one-ledger.test.mjs
       - name: Exact ruleset source and build identity
         run: |
           node tools/ruleset/build-ruleset.mjs --check
@@ -51,7 +53,7 @@ jobs:
       - name: Public bundle never contains the private provisional or wallet ledger
         run: |
           npm run build
-          if grep -l -E '(openProvisionalLedger|openPublicWallet|public_provisional_submissions)' dist/assets/*.js; then
+          if grep -l -E '(openProvisionalLedger|openPublicWallet|openBlindPeerCoordinator|public_provisional_submissions)' dist/assets/*.js; then
             echo 'Private public-authority server code leaked into browser build' >&2
             exit 1
           fi
