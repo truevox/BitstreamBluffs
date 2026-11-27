@@ -11,7 +11,9 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 let vite,browser,scratch;
 const errors=[],time=Date.UTC(2026,0,5,12);
-const suspendEnvelope=process.argv.includes('--suspend-envelope');
+const pausedCapture=process.argv.includes('--paused-capture');
+const reopenProof=process.argv.includes('--suspend-reopen');
+const suspendEnvelope=process.argv.includes('--suspend-envelope')||reopenProof;
 try{
  scratch=await mkdtemp(join(tmpdir(),'bb-candidate-file-'));
  vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true,watch:null,hmr:false}});
@@ -19,14 +21,15 @@ try{
  const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),
   headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- async function boot(ms){
-  const context=await browser.newContext({viewport:{width:960,height:540}}),page=await context.newPage();
+ async function boot(ms,existingContext=null){
+  const context=existingContext||await browser.newContext({viewport:{width:960,height:540}}),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date(ms));
   await page.goto(url,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
    typeof window.__bbGame.registry.get('currentBuildId')==='string',null,{timeout:60000});
   await page.evaluate(async()=>{
    const {createCandidateStateCodec}=await import('/src/systems/savestate/candidateState.js');
+   const {captureManualPauseCandidate}=await import('/src/systems/savestate/pausedCandidate.js');
    const {createNativeRunSceneRestoreKit}=await import('/src/systems/savestate/RunSceneRestoreKit.js');
    const {captureCausalState}=await import('/src/systems/replay/fingerprintCapture.js');
    const {fingerprintState}=await import('/src/systems/replay/fingerprint.js');
@@ -43,6 +46,7 @@ try{
    const signature=()=>JSON.stringify({fp:fp(),runId:r.runId,tick:r.simClock.tick,rec:r.ghostRecorder.lastTick});
    window.__candidate={g,r,codec,kit,fp,signature,t:0,
     capture(){return new TextDecoder().decode(codec.capture(r));},
+    capturePaused(){return new TextDecoder().decode(captureManualPauseCandidate(r,window.Phaser));},
     stepTo(n){const out=[];while(r.simClock.tick<n&&!r.crashed){this.t+=1000/120;g.headlessStep(this.t,1000/120);out.push([r.simClock.tick,fp().combined]);}return out;},
     negative(wire){
      const before=signature(),controls={
@@ -94,11 +98,34 @@ try{
  for(const tick of [481,936]){
   const a=await boot(time),b=await boot(time+1000);
   try{
-   const cap=await a.page.evaluate(tick=>{
+   const cap=await a.page.evaluate(({tick,pausedCapture})=>{
     const p=window.__candidate;p.stepTo(tick);
     if(p.r.simClock.tick!==tick||p.r.crashed)throw Error('capture boundary');
-    return {wire:p.capture(),frameTime:p.t,fp:p.fp(),runId:p.r.runId};
-   },tick);
+    if(pausedCapture){
+     p.r.pauseRun();
+     // Phaser queues scene pause/launch until its next game step; advance
+     // the scene manager with zero delta, never the causal 120 Hz clock.
+     p.g.headlessStep(p.t,0);
+     if(!p.r.scene.isPaused('RunScene')||!p.r._manualPausePending)
+      throw Error('actual native pause not established '+JSON.stringify({pending:p.r._manualPausePending,
+       status:p.r.sys?.settings?.status,scenePaused:p.r.scene.isPaused('RunScene'),
+       pauseActive:p.g.scene.isActive('PauseScene'),pausePending:p.g.scene.isSleeping('PauseScene')}));
+    }
+    const captured=pausedCapture?p.capturePaused():p.capture();
+    if(pausedCapture&&p.r._manualPausePending!==true)throw Error('pause source flag changed by capture');
+    return {wire:captured,frameTime:p.t,fp:p.fp(),runId:p.r.runId,
+      pending:p.r._manualPausePending,paused:p.r.scene.isPaused('RunScene')};
+   },{tick,pausedCapture});
+   if(pausedCapture){
+    // Source resumes its original manual pause without advancing a sim tick.
+    const resumed=await a.page.evaluate(()=>{
+     const p=window.__candidate,r=p.r,ps=r.scene.get('PauseScene');
+     ps._doResume();
+     p.g.headlessStep(p.t,0);
+     return {pending:r._manualPausePending,paused:r.scene.isPaused('RunScene')};
+    });
+    if(resumed.pending||resumed.paused)throw Error('source manual resume did not clear pause state');
+   }
    const path=join(scratch,'candidate-'+tick+'.bbcandidate');
    await writeFile(path,cap.wire,{flag:'wx'});const wire=await readFile(path,'utf8');
    const negatives=await b.page.evaluate(w=>window.__candidate.negative(w),wire);
@@ -115,8 +142,8 @@ try{
    // after the same fresh native world restoration is observed successful.
    let resumeWire=wire;
    if(suspendEnvelope){
-    const claimed=await b.page.evaluate(async raw=>{
-     const [{candidateSuspendEnvelopeBytes,inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+    const prepared=await b.page.evaluate(async raw=>{
+     const [{candidateSuspendEnvelopeBytes,candidateSuspendLayout},
       {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
       import('/src/systems/savestate/candidateSuspendEnvelope.js'),
       import('/src/systems/savestate/runtimeIdentity.js'),
@@ -127,15 +154,37 @@ try{
      const bytes=candidateSuspendEnvelopeBytes(new TextEncoder().encode(raw),identity);
      const stored=await slot.put(bytes,identity,candidateSuspendLayout);
      if(!stored.ok)throw Error('candidate slot write failed '+stored.code);
+     return {saved:stored.saved,bytes:stored.bytes};
+    },wire);
+    assert.equal(prepared.saved,true);
+    if(reopenProof){
+     // Destroy the original page and create a new page in the SAME storage
+     // partition. The new page has not received a candidate or claim token.
+     await b.page.close();
+     b.page=(await boot(time+1000,b.context)).page;
+     assert.equal(await b.page.evaluate(()=>window.__candidate.r.simClock.tick),0);
+    }
+    const claimed=await b.page.evaluate(async()=>{
+     const [{inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+      {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
+      import('/src/systems/savestate/candidateSuspendEnvelope.js'),
+      import('/src/systems/savestate/runtimeIdentity.js'),
+      import('/src/systems/savestate/localSuspendSlot.js')]);
+     const identity=await loadCurrentBuildDescriptor(),slot=new LocalSuspendSlot();
+     if(identity.buildId!==window.__candidate.g.registry.get('currentBuildId'))
+      throw Error('reopen build identity mismatch');
      const claim=await slot.claim(identity,candidateSuspendLayout);
      if(!claim.ok)throw Error('candidate slot claim failed '+claim.code);
+     const competitor=await new LocalSuspendSlot().claim(identity,candidateSuspendLayout);
+     if(competitor.code!=='slot-claimed')throw Error('two-owner protection failed '+JSON.stringify(competitor));
      const admitted=inspectCandidateSuspendEnvelope(claim.bytes,identity);
      if(!admitted.ok||admitted.admission!=='envelope-only')throw Error('candidate envelope admission');
      window.__localClaim={slot,token:claim.token,identity,layout:candidateSuspendLayout};
-     return {wire:new TextDecoder().decode(admitted.candidateBytes),admission:admitted.admission};
-    },wire);
+     return {wire:new TextDecoder().decode(admitted.candidateBytes),admission:admitted.admission,competitor:competitor.code};
+    });
     assert.equal(claimed.wire,wire);
     assert.equal(claimed.admission,'envelope-only');
+    assert.equal(claimed.competitor,'slot-claimed');
     resumeWire=claimed.wire;
    }
    const result=await b.page.evaluate(({wire,frameTime})=>window.__candidate.restore(wire,frameTime),
@@ -147,10 +196,31 @@ try{
      return {result,next};
     });
     assert.deepEqual(consumed,{result:{ok:true,consumed:true},next:{ok:false,code:'empty'}});
-    console.log('PASS_IDB_CANDIDATE_ONE_USE',JSON.stringify({tick,bytes:Buffer.byteLength(wire),
-     admission:'envelope-only',consumedAfterRestore:true}));
+    console.log(reopenProof?'PASS_REOPENED_IDB_CANDIDATE_ONE_USE':'PASS_IDB_CANDIDATE_ONE_USE',
+     JSON.stringify({tick,bytes:Buffer.byteLength(wire),admission:'envelope-only',
+      reopenedFreshPage:reopenProof,competitorClaimRefused:true,consumedAfterRestore:true}));
    }
    assert.equal(result.tick,tick);assert.equal(result.calls,0);assert.equal(result.exact,true);
+   if(pausedCapture){
+    const rePaused=await b.page.evaluate(()=>{
+     const p=window.__candidate,r=p.r,beforeTick=r.simClock.tick;
+     if(r._manualPausePending||r.scene.isPaused('RunScene'))throw Error('fresh resume remained paused');
+     r.pauseRun();
+     p.g.headlessStep(p.t,0);
+     if(!r._manualPausePending||!r.scene.isPaused('RunScene')||!p.g.scene.isActive('PauseScene'))
+      throw Error('freshly resumed run refused a new manual PauseScene');
+     r.scene.get('PauseScene')._doResume();
+     p.g.headlessStep(p.t,0);
+     return {beforeTick,afterTick:r.simClock.tick,pending:r._manualPausePending,
+      paused:r.scene.isPaused('RunScene')};
+    });
+    assert.equal(rePaused.beforeTick,tick);
+    assert.equal(rePaused.afterTick,tick,'re-pause must not simulate a single causal tick');
+    assert.equal(rePaused.pending,false,'re-pause must clear transient guard');
+    assert.equal(rePaused.paused,false,'re-pause must return to active simulation');
+    console.log('PASS_REPAUSE_AFTER_FRESH_REOPEN',JSON.stringify({tick,zeroSimTicks:true,
+     resumedCanPauseAgain:true}));
+   }
    assert.deepEqual(result.fp,cap.fp);assert.equal(result.runId,cap.runId);
    await b.page.clock.setFixedTime(new Date(time));
    const terminal=page=>page.evaluate(()=>window.__candidate.terminal());
