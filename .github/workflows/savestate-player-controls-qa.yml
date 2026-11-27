@@ -1,0 +1,59 @@
+name: Player Suspend Resume UI one-use Chromium QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/savestate-player-controls-qa.yml'
+      - 'src/scenes/PauseScene.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/scenes/TitleScene.js'
+      - 'src/systems/savestate/**'
+      - 'tools/savestate-experiment/test-player-suspend-ui-browser.mjs'
+      - 'tools/savestate-experiment/test-player-suspend-live-touch.mjs'
+      - 'tests/determinism/savestate-*.test.js'
+      - 'tools/ruleset/source-digest.json'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  player-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked Node dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Source identity and signed native layout
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Native candidate, exact slots, pause and gameplay unit gates
+        run: npm test -- --runInBand tests/determinism/savestate-candidate-suspend-bridge.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-paused-candidate.test.js tests/determinism/savestate-entity-state.test.js tests/determinism/build-identity.test.js tests/src/title-howtoplay.test.js
+      - name: Compile the actual public game
+        run: npm run build
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser regression at 481 through exact final crash
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-ui-browser.mjs --reopen --ui-events --suffix
+      - name: Browser regression at 936 through exact final crash
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-ui-browser.mjs --tick936 --reopen --ui-events --suffix
+      - name: Real live-RAF touchscreen Pause Suspend and fresh-page Resume
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-live-touch.mjs
+      - name: Compiled production touchscreen Suspend and Resume (stable strict entity classes)
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-live-touch.mjs --production

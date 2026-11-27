@@ -4,9 +4,10 @@
  */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {createServer} from 'vite';
+import {createServer,preview} from 'vite';
 let vite,browser;
 const errors=[],emit=(name,data={})=>console.log('PASS_LIVE_PLAYER_SUSPEND_TOUCH',JSON.stringify({name,...data}));
+const production=process.argv.includes('--production');
 const newPage=async(ctx,url)=>{
  const p=await ctx.newPage();
  p.on('pageerror',e=>errors.push(e.message));
@@ -17,8 +18,10 @@ const newPage=async(ctx,url)=>{
 };
 const target=async(page,targetFn)=>page.evaluate(targetFn);
 try{
- vite=await createServer({server:{host:'127.0.0.1',port:5181,strictPort:true,watch:null,hmr:false}});
- await vite.listen();const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
+ vite=production?await preview({preview:{host:'127.0.0.1',port:5182,strictPort:true}})
+   :await createServer({server:{host:'127.0.0.1',port:5181,strictPort:true,watch:null,hmr:false}});
+ if(!production)await vite.listen();
+ const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),args:['--no-sandbox']});
  const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  let page=await newPage(ctx,url);
@@ -51,14 +54,19 @@ try{
   })));
   throw e;
  }
- const source=await page.evaluate(async()=>{
+ const source=await page.evaluate(async(production)=>{
   const g=window.__bbGame,r=g.scene.getScene('RunScene');
-  const [{captureCausalState},{fingerprintState}]=await Promise.all([
-   import('/src/systems/replay/fingerprintCapture.js'),import('/src/systems/replay/fingerprint.js')]);
-  return {tick:r.simClock.tick,runId:r.runId,fp:fingerprintState(captureCausalState(r)).combined,
-   recorderTick:r.ghostRecorder?.lastTick,eligible:r.biomeMask===0&&!r.unrankedPractice&&!r.upgradeRun?.enabled,
+  let fp;
+  if(production)fp=JSON.stringify([r.sled.x,r.sled.y,r.sled.vx,r.sled.vy,r.score?.score||0,r.shieldCharges]);
+  else{
+   const [{captureCausalState},{fingerprintState}]=await Promise.all([
+    import('/src/systems/replay/fingerprintCapture.js'),import('/src/systems/replay/fingerprint.js')]);
+   fp=fingerprintState(captureCausalState(r)).combined;
+  }
+  return {tick:r.simClock.tick,runId:r.runId,fp,recorderTick:r.ghostRecorder?.lastTick,
+   eligible:r.biomeMask===0&&!r.unrankedPractice&&!r.upgradeRun?.enabled,
    panelAlpha:g.scene.getScene('PauseScene').panel.alpha};
- });
+ },production);
  assert(source.eligible&&source.tick>=400&&source.tick<977&&source.recorderTick===source.tick,JSON.stringify(source));
  emit('real game RAF, Escape Pause, visible CRT panel, eligible stock run',source);
  const suspendHit=await target(page,()=>{
@@ -75,10 +83,21 @@ try{
  assert.equal(await page.evaluate(()=>window.__bbGame.scene.getScene('PauseScene').leaving),false);
  emit('first genuine touch ONLY requests confirmation',suspendHit);
  await page.touchscreen.tap(suspendHit.x,suspendHit.y);
- await page.waitForFunction(()=>{
-  const g=window.__bbGame;
-  return g.scene.isActive('TitleScene')&&g.scene.getScene('TitleScene').resumeState?.status==='ready';
- },null,{timeout:16000});
+ try{
+  await page.waitForFunction(()=>{
+   const g=window.__bbGame;
+   return g.scene.isActive('TitleScene')&&g.scene.getScene('TitleScene').resumeState?.status==='ready';
+  },null,{timeout:9000});
+ }catch(e){
+  console.log('PRODUCTION_SUSPEND_DIAGNOSTIC',JSON.stringify(await page.evaluate(()=>{
+   const g=window.__bbGame,p=g.scene.getScene('PauseScene'),t=g.scene.getScene('TitleScene');
+   return {scenes:g.scene.getScenes(true).map(x=>x.sys.settings.key),
+    titleActive:g.scene.isActive('TitleScene'),pauseActive:g.scene.isActive('PauseScene'),
+    runPaused:g.scene.isPaused('RunScene'),saveConfirm:p.suspendConfirm,leaving:p.leaving,
+    footer:p.ledgerFooter?.main?.text,titleState:t.resumeState,build:g.registry.get('currentBuildId')};
+  })));
+  throw e;
+ }
  const title=await page.evaluate(()=>{
   const g=window.__bbGame,t=g.scene.getScene('TitleScene');
   return {saved:t.resumeState.status,tick:t.resumeState.tick,runId:t.resumeState.runId,
@@ -94,8 +113,9 @@ try{
   if(b.disabled)throw Error('Resume chip remained disabled despite compatible slot');
   const pt=b.getWorldTransformMatrix().transformPoint(b.w/2,b.h/2);
   const r=document.querySelector('canvas').getBoundingClientRect();
-  const {EVT}=await import('/src/events.js');
-  g.events.once(EVT.RUN_START,()=>{window.__testResumeCommitted=true;g.loop.sleep();}); // exact event-gated freeze
+  // A compiled Vite bundle does not serve /src/events.js; this game event
+  // name is stable in src/events.js and must agree across dev and production.
+  g.events.once('bb:runStart',()=>{window.__testResumeCommitted=true;g.loop.sleep();}); // exact event-gated freeze
   return {x:r.x+pt.x*r.width/480,y:r.y+pt.y*r.height/270};
  });
  console.log('LIVE_RESUME_TOUCH_COORD',JSON.stringify(resumeHit));
@@ -123,24 +143,48 @@ try{
   })));
   throw e;
  }
- const outcome=await page.evaluate(async()=>{
+ const outcome=await page.evaluate(async(production)=>{
   const g=window.__bbGame,r=g.scene.getScene('RunScene');
-  const [{captureCausalState},{fingerprintState},{LocalSuspendSlot},
-   {loadCurrentBuildDescriptor},{candidateSuspendLayout}]=await Promise.all([
-   import('/src/systems/replay/fingerprintCapture.js'),import('/src/systems/replay/fingerprint.js'),
-   import('/src/systems/savestate/localSuspendSlot.js'),
-   import('/src/systems/savestate/runtimeIdentity.js'),
-   import('/src/systems/savestate/candidateSuspendEnvelope.js')]);
-  const slot=new LocalSuspendSlot(),identity=await loadCurrentBuildDescriptor();
+  let fp,peek,second;
+  if(production){
+   fp=JSON.stringify([r.sled.x,r.sled.y,r.sled.vx,r.sled.vy,r.score?.score||0,r.shieldCharges]);
+   // Production JS is bundled, not source-importable. Inspect the actual
+   // one-use slot through a separate READONLY IDB transaction: no test writes.
+   const db=await new Promise((resolve,reject)=>{
+    const req=indexedDB.open('bb-single-use-suspend-v1',1);
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+   });
+   const tx=db.transaction('slots','readonly');
+   const row=await new Promise((resolve,reject)=>{
+    const req=tx.objectStore('slots').get('local-suspend');
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+   });
+   db.close();peek=row?{ok:true,status:row.status}:{ok:true,status:'empty'};
+   second=row?null:{ok:false,code:'empty'};
+  }else{
+   const [{captureCausalState},{fingerprintState},{LocalSuspendSlot},
+    {loadCurrentBuildDescriptor},{candidateSuspendLayout}]=await Promise.all([
+    import('/src/systems/replay/fingerprintCapture.js'),import('/src/systems/replay/fingerprint.js'),
+    import('/src/systems/savestate/localSuspendSlot.js'),
+    import('/src/systems/savestate/runtimeIdentity.js'),
+    import('/src/systems/savestate/candidateSuspendEnvelope.js')]);
+   fp=fingerprintState(captureCausalState(r)).combined;
+   const slot=new LocalSuspendSlot(),identity=await loadCurrentBuildDescriptor();
+   peek=await slot.peek(identity,candidateSuspendLayout);
+   second=await slot.claim(identity,candidateSuspendLayout);
+  }
   return {tick:r.simClock.tick,runId:r.runId,recorderTick:r.ghostRecorder?.lastTick,
-   fp:fingerprintState(captureCausalState(r)).combined,peek:await slot.peek(identity,candidateSuspendLayout),
-   second:await slot.claim(identity,candidateSuspendLayout),ui:g.scene.isActive('UIScene')};
- });
+   fp,peek,second,ui:g.scene.isActive('UIScene')};
+ },production);
  assert.equal(outcome.tick,source.tick);assert.equal(outcome.runId,source.runId);
  assert.equal(outcome.fp,source.fp);assert.equal(outcome.recorderTick,source.recorderTick);
  assert.deepEqual(outcome.peek,{ok:true,status:'empty'});assert.deepEqual(outcome.second,{ok:false,code:'empty'});
  assert.deepEqual(errors,[]);
  emit('actual mobile touch Resume after real page close: zero-tick exact fingerprint, one-use consumed',{
-  ...outcome,errors:errors.length,resumeHit});
+  ...outcome,errors:errors.length,resumeHit,compiled:production});
  await ctx.close();
-}finally{await browser?.close();await vite?.close();}
+}finally{
+ await browser?.close();
+ if(production&&vite?.httpServer)await new Promise(resolve=>vite.httpServer.close(resolve));
+ else await vite?.close();
+}

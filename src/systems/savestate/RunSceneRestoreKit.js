@@ -25,6 +25,13 @@ import {captureCausalState} from '../replay/fingerprintCapture.js';
 import {fingerprintState} from '../replay/fingerprint.js';
 import {CURRENT_RULESET_ID} from '../replay/currentRulesetId.js';
 import {SIM_REVISION} from '../replay/ruleset.js';
+// Stable simulator entity identities must survive production JS class-name
+// minification. Imported constructors are trusted local types, not string
+// tags supplied by a saved file or by user content.
+import {Hazard} from '../../entities/Hazard.js';
+import {PowerUp} from '../../entities/PowerUp.js';
+import {Sled} from '../../entities/Sled.js';
+import {ShardField} from '../../entities/Shard.js';
 
 /** Explicit dependency injection: no mutation of window/globalThis/Phaser. */
 export function createDiagnosticRunSceneRestoreKit(Phaser) {
@@ -327,6 +334,14 @@ function installRunSceneStateKit(global) {
 
   // ------------------------------------------------------------------ generic encode / decode
   function ctorName(v) {
+    // Entity schemas use explicit immutable `Hazard`/`PowerUp`/`Sled` tags.
+    // esbuild shortens runtime constructor.name in production. Derive these
+    // exact identities from the classes themselves instead of trusting a
+    // minified name or loosening the strict native saved-state schema.
+    if (v instanceof Hazard) return 'Hazard';
+    if (v instanceof PowerUp) return 'PowerUp';
+    if (v instanceof Sled) return 'Sled';
+    if (v instanceof ShardField) return 'ShardField';
     const p = Object.getPrototypeOf(v);
     return !p || p === Object.prototype ? null : (p.constructor && p.constructor.name) || '?';
   }
