@@ -27,6 +27,19 @@ try{
     r.bsod.wallX=r.sled.body.bounds.min.x-2;r.bsod.wallSpeedPxS=10000;});
   await page.waitForFunction(()=>window.__bbGame.registry.get('lastGhostTape')&&
     window.__bbGame.scene.isActive('GameOverScene'),null,{timeout:35000});
+  // Saving/validating replay evidence is deferred after the fatal tick.
+  // A correct Game Over can predate the archive; wait for the run-matched
+  // capture status rather than racing a manual REFRESH requirement.
+  await page.waitForFunction(()=>{
+    const g=window.__bbGame,runId=g.registry.get('lastGhostTape')?.runId;
+    const status=g.registry.get('evidenceStatusByRun')?.get(runId);
+    return status?.runId===runId && status.ok===true &&
+      typeof status.digest==='string';
+  },null,{timeout:20000});
+  await page.waitForFunction(()=>{
+    const s=window.__bbGame.scene.getScene('GameOverScene');
+    return s?._reportButtonReady() === true;
+  },null,{timeout:12000});
   const before=await page.evaluate(()=>{
     const g=window.__bbGame,s=g.scene.getScene('GameOverScene');
     return {recordId:s.rec.id,tapeId:g.registry.get('lastGhostTape')?.runId,
@@ -96,6 +109,26 @@ try{
   assert.match(afterExport.status,/LOCAL FILE EXPORT REQUESTED/);
   await page.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView.close());
   await page.waitForFunction(()=>!window.__bbGame.scene.getScene('GameOverScene').ghostView);
+  // A real initials input owns Enter/Escape while active. REPORT must be
+  // disabled rather than opening a modal behind its raw keyboard handler.
+  const guarded=await page.evaluate(()=>{
+    const s=window.__bbGame.scene.getScene('GameOverScene');
+    s._showEntry();
+    const blocked=!!s.entry && s.reportBtn.disabled===true;
+    s._openLocalReport();
+    const noModal=!!s.ghostView===false;
+    s.skipEntry();
+    const restored=s.reportBtn.disabled===false;
+    const savedAlpha=s.left.alpha;
+    s.left.setAlpha(0);
+    const hiddenRejected=s._reportButtonReady()===false;
+    s._openLocalReport();
+    const noHiddenModal=!!s.ghostView===false;
+    s.left.setAlpha(savedAlpha);
+    return {blocked,noModal,restored,hiddenRejected,noHiddenModal};
+  });
+  assert.deepEqual(guarded,{blocked:true,noModal:true,restored:true,
+    hiddenRejected:true,noHiddenModal:true});
   assert.deepEqual(errors,[]);
   console.log('REAL_GAME_OVER_LOCAL_REPORT_EXPORT_PASS',before,opened,afterExport);
 }finally{

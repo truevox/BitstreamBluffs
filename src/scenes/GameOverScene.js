@@ -180,6 +180,10 @@ export class GameOverScene extends Phaser.Scene {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
       if (this.shopOpen || this.ghostView || this.takeoverPicker || this.coachView) return;
+      // Test visibility BEFORE skipReveal() changes panel geometry. A tap on
+      // still-hidden REPORT coordinates was intended for the original Game
+      // Over screen, not consent to open a new evidence overlay.
+      const reportWasVisible=this._reportButtonReady();
       this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
@@ -190,7 +194,7 @@ export class GameOverScene extends Phaser.Scene {
       const zone=this.reportBtn?.zone;
       if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
         const pt=zone.getWorldTransformMatrix().applyInverse(pointer.x,pointer.y);
-        if(pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height){
+        if(reportWasVisible && pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height){
           this._openLocalReport();
           return;
         }
@@ -732,6 +736,7 @@ export class GameOverScene extends Phaser.Scene {
     this.right.add([hint, hint2]);
     this.entryGroup = [t1, hint, hint2];
     this.input_.rawKeyHandler = (e) => this._rawKey(e);
+    this.reportBtn?.setDisabled(true); // never route report hotkeys through initials entry
     // While typing, keyboard B is a letter, not the shop key, so the hint would be a lie (audit UI-A).
     // _leaveEntry() puts it back once the entry is saved or skipped.
     this._hideShopHint();
@@ -767,6 +772,7 @@ export class GameOverScene extends Phaser.Scene {
   _leaveEntry() {
     if (this.entry) this.entry.destroy();
     this.entry = null;
+    this.reportBtn?.setDisabled(false);
     for (const t of this.entryGroup || []) t.destroy();
     this.entryGroup = [];
     this.input_.rawKeyHandler = null;
@@ -1016,6 +1022,14 @@ export class GameOverScene extends Phaser.Scene {
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
   }
 
+  /** Never interpret a tap on a still-hidden animated button as consent. */
+  _reportButtonReady() {
+    const panel=this.left;
+    return Boolean(this.reportBtn?.zone?.scene && !this.reportBtn.disabled &&
+      panel?.scene && panel.visible !== false && panel.alpha >= 0.995 &&
+      Math.abs(panel.scaleX-1)<0.005 && Math.abs(panel.scaleY-1)<0.005);
+  }
+
   /** #78: a visible REPORT entry for the exact finished run. This is a
    * *local export entry*, not a report submission or proof of verification.
    * Reuse the existing read-only, run-bound evidence controls: the player
@@ -1023,7 +1037,8 @@ export class GameOverScene extends Phaser.Scene {
    */
   _openLocalReport() {
     const tape=this.registry.get(REG.LAST_GHOST_TAPE);
-    if (!this.reportBtn || this.ghostView || this.takeoverPicker || this.coachView ||
+    if (!this._reportButtonReady() || this.entry || this.ghostView ||
+        this.takeoverPicker || this.coachView ||
         this.shopOpen || !this.alive || this.leaving || !tape ||
         tape.runId !== this.rec.id) return;
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
