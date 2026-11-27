@@ -6,6 +6,7 @@ import { REG } from './constants.js';
 import { EVT } from './events.js';
 import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
+import { createWebPlatform } from './platform/adapter.js';
 import { GhostLibrary } from './systems/ghost/GhostLibrary.js';
 import { AttemptHistory } from './systems/ghost/AttemptHistory.js';
 import { installAttemptHistory, protectOwnedSettings, ATTEMPT_HISTORY_KEY } from './systems/ghost/attemptHistoryService.js';
@@ -24,6 +25,9 @@ import { RULESET_KEY, BUILD_ID_KEY } from './systems/replay/evidenceCapture.js';
  */
 export async function createServices(game) {
   if (game.registry.get(REG.SAVE_STORE)) return;
+  // Own-site production is always the ad-free web adapter; SDK ports must be
+  // explicitly reviewed, never guessed from the host or URL.
+  game.registry.set(REG.PLATFORM,createWebPlatform());
   const saveStore = new SaveStore();
   await saveStore.init();
   // Issue #56: local ghost tapes per course (IndexedDB, memory fallback; never rejects).

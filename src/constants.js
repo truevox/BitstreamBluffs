@@ -44,6 +44,8 @@ export const REG = Object.freeze({
   SETTINGS: 'settings',
   /** @type {import('./systems/SaveStore.js').SaveStore} */
   SAVE_STORE: 'saveStore',
+  /** #441: explicit platform capability boundary; no SDK or reward authority in own-site Ride. */
+  PLATFORM: 'platformAdapter',
   /** @type {import('./systems/ghost/GhostLibrary.js').GhostLibrary} local ghost tapes per course (issue #56). Additive. */
   GHOSTS: 'ghostLibrary',
   /** One-shot ghost tape for RunScene to replay instead of live input (verification / replay viewer). Additive. */

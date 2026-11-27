@@ -28,8 +28,8 @@ jobs:
         run: node tools/ruleset/build-ruleset.mjs --check
       - name: Verify exact build identity against fresh source
         run: node tools/ruleset/build-ruleset.mjs --check-identity
-      - name: Verify full determinism suite including identity negatives
-        run: npm test -- --runInBand tests/determinism
+      - name: Verify full determinism and all four platform adapter contracts
+        run: npm test -- --runInBand tests/determinism tests/platform/adapter-contract.test.js
       - name: Reject accidental historical replay fixture overwrite
         run: npm test -- --runInBand tests/conformance
       - name: Verify production build

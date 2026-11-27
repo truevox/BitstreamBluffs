@@ -3,12 +3,12 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: #424 opt-in private one-shot RunScene staging hides and pauses pre-commit; normal run physics/recorder unchanged; native Chromium 481/936 and fatal suffix verified",
+  "attestation": "no-behavior-change: additive platform capability bridge and game registry; simulation physics/rules unmodified",
   "changedFiles": [
-    "src/scenes/RunScene.js"
+    "src/constants.js"
   ],
   "files": {
-    "src/constants.js": "sha256:3abae229bb25b4b2d78b6c8439bd9e6758f91091617e0d5cb16893b9a7680adb",
+    "src/constants.js": "sha256:81ce8f067105c14c1f15ccc29304983dd6e4cfa0e46a89c173b13198173338fa",
     "src/entities/Hazard.js": "sha256:95ec763127d49b4dcbdd260695f8cd6136ca70b1e1204bda48d0a008a31fa5a8",
     "src/entities/PowerUp.js": "sha256:9c3965f9c7fe074bfe4fba4abaf80139c637755487fa885195b6ded208a61752",
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
