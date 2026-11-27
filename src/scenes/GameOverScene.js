@@ -142,6 +142,7 @@ export class GameOverScene extends Phaser.Scene {
     this.entry = null;
     this.saved = false;
     this.rows = [];
+    this.reportBtn=null; // scene reuse must not retain a previous run's evidence entry
     this.rec = this.registry.get(REG.LAST_RECORD) || this._emptyRecord();
     const rec = this.rec;
     const theme = (this.theme = new Theme(this));
@@ -183,6 +184,17 @@ export class GameOverScene extends Phaser.Scene {
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
       if (this.jukebox?.ownsPointer(pointer)) return;
+      // A native Phaser pointerdown can reach this scene-wide retry handler
+      // before its nested REPORT Zone is included in `over`. Do not turn a
+      // deliberate report click into an unrequested restart.
+      const zone=this.reportBtn?.zone;
+      if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
+        const pt=zone.getWorldTransformMatrix().applyInverse(pointer.x,pointer.y);
+        if(pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height){
+          this._openLocalReport();
+          return;
+        }
+      }
       this._cancelShopAutoprompt();
       if (!this.entry && over.length === 0) this.retry();
     };
@@ -331,9 +343,17 @@ export class GameOverScene extends Phaser.Scene {
     // Issue #56: pin this run as a ghost favorite. In the panel's title row (right of the tab), the only
     // free band of a full report; shown only when this run actually recorded a ghost tape.
     const tape = this.registry.get(REG.LAST_GHOST_TAPE);
-    if (tape && tape.runId === rec.id && this.registry.get(REG.GHOSTS)) {
-      this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
-      p.add(this.ghostBtn);
+    if (tape && tape.runId === rec.id) {
+      // #78: direct entry to the existing explicit, local-only evidence
+      // export. Player must still choose EXPORT; nothing is uploaded.
+      // The title-tab gap ends at x155, where GHOST FAV begins.
+      this.reportBtn = new Button(this, theme, { x: 105, y: 1, w: 49, h: 12,
+        label: 'REPORT', color: 'amber', onClick: () => this._openLocalReport() });
+      p.add(this.reportBtn);
+      if (this.registry.get(REG.GHOSTS)) {
+        this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
+        p.add(this.ghostBtn);
+      }
     }
     // The score is built at its final value; _startReveal() counts it up from zero (and shows the final
     // value at once under reduced motion or when the player skips).
@@ -994,6 +1014,25 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
+  }
+
+  /** #78: a visible REPORT entry for the exact finished run. This is a
+   * *local export entry*, not a report submission or proof of verification.
+   * Reuse the existing read-only, run-bound evidence controls: the player
+   * must explicitly click EXPORT and chooses whether to share the file.
+   */
+  _openLocalReport() {
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!this.reportBtn || this.ghostView || this.takeoverPicker || this.coachView ||
+        this.shopOpen || !this.alive || this.leaving || !tape ||
+        tape.runId !== this.rec.id) return;
+    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
+    this.ghostDim=this.add.rectangle(0,0,GAME_WIDTH,GAME_HEIGHT,0x000000,0.6)
+      .setOrigin(0,0).setDepth(400).setInteractive();
+    this.ghostView=new ReplayEvidenceView(this,this.theme,{
+      tape,onClose:()=>this._closeGhosts(),
+    });
   }
 
   /** Keep the existing dimmed Game Over screen; only swap the overlay panel. */
