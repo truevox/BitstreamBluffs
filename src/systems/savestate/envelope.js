@@ -148,7 +148,7 @@ export function inspectSnapshotEnvelope(bytes, expectedIdentity, registeredLayou
     // A future production schema registry must audit every SIM field and every
     // reference; a truthy-but-not-true return is deliberately not admission.
     let accepted = false;
-    try { accepted = registeredLayout.validateSections(envelope.payload.sections) === true; }
+    try { accepted = registeredLayout.validateSections(envelope.payload.sections,envelope) === true; }
     catch { fail('invalid-section', '/payload/sections'); }
     if (!accepted) fail('invalid-section', '/payload/sections');
     return { ok:true, admission:'envelope-only', envelope };

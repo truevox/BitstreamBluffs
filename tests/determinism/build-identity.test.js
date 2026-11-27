@@ -20,7 +20,7 @@ import {
   sourceTextDigest,
   sourceTripwireIdOf,
 } from '../../src/systems/savestate/buildIdentity.js';
-import { SAVESTATE_LAYOUT_DESCRIPTOR } from '../../src/systems/savestate/layoutDeclaration.js';
+import { SAVESTATE_LAYOUT_DESCRIPTOR, SAVESTATE_LAYOUT_DECLARATION_VERSION } from '../../src/systems/savestate/layoutDeclaration.js';
 import { savestateLayoutIdOf } from '../../src/systems/savestate/layout.js';
 import {
   snapshotEnvelopeBytes, inspectSnapshotEnvelope, SAVESTATE_ENVELOPE_KIND, SAVESTATE_ENVELOPE_VERSION,
@@ -472,9 +472,10 @@ describe('build identity CLI: reporting and --check-identity', () => {
       fs.cpSync(path.join(root, 'src'), path.join(dir, 'src'), { recursive: true });
       const layout = path.join(dir, 'src', 'systems', 'savestate', 'layoutDeclaration.js');
       const original = fs.readFileSync(layout, 'utf8');
-      expect(original).toContain('SAVESTATE_LAYOUT_DECLARATION_VERSION = 1');
-      fs.writeFileSync(layout, original.replace('SAVESTATE_LAYOUT_DECLARATION_VERSION = 1',
-        'SAVESTATE_LAYOUT_DECLARATION_VERSION = 2'));
+      const current = `SAVESTATE_LAYOUT_DECLARATION_VERSION = ${SAVESTATE_LAYOUT_DECLARATION_VERSION}`;
+      const changed = `SAVESTATE_LAYOUT_DECLARATION_VERSION = ${SAVESTATE_LAYOUT_DECLARATION_VERSION + 1}`;
+      expect(original).toContain(current);
+      fs.writeFileSync(layout, original.replace(current, changed));
 
       const reference = cli('--identity');
       expect(reference.status).toBe(0);
