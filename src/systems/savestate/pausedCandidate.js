@@ -18,6 +18,14 @@ function supported(run) {
  return true;
 }
 
+/** Conservative preflight for a menu affordance only; actual capture runs
+ * this check again and serializes strictly under the paused-scene guard.
+ */
+export function canCaptureManualPauseCandidate(run){
+ return supported(run)&&run._manualPausePending===true&&
+  run.scene?.isPaused?.('RunScene')===true;
+}
+
 /** Return complete internal candidate bytes or throw before a storage write.
  * Only the transient manual-pause guard is normalized during capture;
  * the original scene's guard is always restored, even if the codec fails.
