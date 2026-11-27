@@ -230,7 +230,11 @@ export class AudioSynth {
             if (!this.ctx) return;
             try {
               if (document.hidden) this.ctx.suspend();
-              else if (this._unlocked) this.ctx.resume();
+              else if (this._unlocked) {
+                const pending = this.ctx.resume();
+                if (pending?.then) pending.then(() => this._afterResume()).catch(() => {});
+                else this._afterResume();
+              }
             } catch (e) { /* ignore */ }
           };
           document.addEventListener('visibilitychange', vis);
@@ -408,7 +412,8 @@ export class AudioSynth {
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
     if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
-      if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode)
+      if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode &&
+          !this._paused && !this._stemMusic?.started)
         this._startScheduler();
     }
   }
@@ -687,7 +692,8 @@ export class AudioSynth {
           if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
         } else if (this._musicWanted && this.ctx) {
           if (!this._activateStemMusic() && !this._musicTimer &&
-              this.ctx.state === 'running' && !this._jukeboxMode) {
+              this.ctx.state === 'running' && !this._jukeboxMode &&
+              !this._paused && !this._stemMusic?.started) {
             this._startScheduler();
           }
         }
@@ -876,20 +882,29 @@ export class AudioSynth {
               session.procedural = false;
             } else this._musicWanted = false;
           }
-        } else if (d?.transportPaused && !d.started &&
+        } else if (this.ctx?.state === 'running' &&
+            d?.transportPaused && !d.started &&
             d._token === session.token && d.trackIndex === session.trackIndex &&
             d._resumeOffset === session.offset &&
             this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
           if (d.transportPlay()) {
             this._musicWanted = true;
             session.shouldResume = false;
+            // Loading stems have no playback clock yet. If the player flips
+            // ON→OFF before decode completes, don't reset this saved position
+            // to zero merely because transportPause() cannot measure it.
+            session.pendingOffset = session.offset;
           }
         }
       }
     } else if (!session.shouldResume && this._musicWanted) {
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx);
+      const pendingOffset = live && (!d.pack || d.clockStart == null) &&
+        d.trackIndex === session.trackIndex && Number.isFinite(session.pendingOffset)
+        ? session.pendingOffset : null;
       const frozen = live && d.transportPause();
+      if (frozen && pendingOffset !== null) d._resumeOffset = pendingOffset;
       const procedural = !frozen && this._musicTimer !== null;
       if (frozen || procedural) {
         this._musicWanted = false;
@@ -898,6 +913,7 @@ export class AudioSynth {
         Object.assign(session, {
           shouldResume: true, procedural,
           token: d?._token, trackIndex: d?.trackIndex, offset: d?._resumeOffset,
+          pendingOffset: null,
         });
       }
     }

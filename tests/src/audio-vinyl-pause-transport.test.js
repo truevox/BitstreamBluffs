@@ -199,6 +199,56 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('ON then OFF during async stem reload preserves original saved song offset',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const saved=d._resumeOffset;
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession.pendingOffset).toBe(saved);
+    // Director consumed its resume offset while loading, before it owns a
+    // pack/clockStart. Another OFF must not silently seek back to song zero.
+    d.pack=null;d.clockStart=null;d.activeNodes.clear();
+    d._resumeOffset=0;d._loading=Promise.resolve('loading');
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(d.transportPause).toHaveBeenCalledTimes(2);
+    expect(d._resumeOffset).toBe(saved);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,offset:saved});
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(205);
+    expect(d.transportPlay).toHaveBeenCalledTimes(2);
+    a.destroy();
+  });
+
+  test('suspended stem context does not consume pending ON restore until real unlock',()=>{
+    const {a,d,ctx,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    ctx.state='suspended';
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    ctx.state='running';
+    a._afterResume();
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(1000);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('no duplicate procedural scheduler while an opted-in stem transport is active',()=>{
+    const {a,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a._jukeboxMode=false; // fail-safe even if an unusual mode toggle races
+    a._activateStemMusic=jest.fn(()=>false);
+    a._startScheduler=jest.fn();
+    a.applySettings({...a.settings,musicDuringPause:true,musicVolume:.35});
+    expect(a._startScheduler).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
   test('music preference never overrides an explicit pause-menu jukebox PAUSE',()=>{
     const {a,d,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});
