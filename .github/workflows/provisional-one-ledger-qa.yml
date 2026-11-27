@@ -13,7 +13,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/provisional-one-ledger-qa.yml'
-      - 'server/trust/provisional.mjs'
+      - 'server/trust/**'
       - 'tests/server/provisional-one-ledger.test.mjs'
       - 'tests/fixtures/trust/**'
 permissions:
@@ -39,7 +39,7 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
       - name: Signed admission, canonical wallet and provisional fail-closed database QA
-        run: node --test server/trust/admission.test.mjs server/trust/blindPeerCoordinator.test.mjs tests/server/provisional-one-ledger.test.mjs
+        run: node --test server/trust/admission.test.mjs server/trust/blindPeerCoordinator.test.mjs server/trust/privateVerificationHttp.test.mjs tests/server/provisional-one-ledger.test.mjs
       - name: Exact ruleset source and build identity
         run: |
           node tools/ruleset/build-ruleset.mjs --check

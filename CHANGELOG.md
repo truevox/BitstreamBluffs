@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.23 — #135 authenticated private-verifier HTTP adapter reference (2026-11-26)
+
+- Add a **source-only, opt-in Node HTTP handler** for an externally authenticated account to request server-issued challenges, submit a pinned replay, receive random blinded peer work, provide observed local/peer results, privately check its own status, and request visibly UNVERIFIED publication after the local creator-clear gate. No listener or actual identity service is configured.
+- Exact canonical JSON/strict base64url wire contract; bearer identity comes exclusively from a trusted injected verifier, and both legal challenge issuance and publication consent/audience must be supplied by separate trusted callbacks. Default CORS deny, body bounds, origin allowlisting, per-account in-process abuse budget, no wallet/Verified/reward endpoint or client-visible peer identities.
+- Six real loopback HTTP tests plus 38 existing signed-admission/peer/provisional tests pass; 243 trust/replay regressions, current ruleset/build identity and production build isolation pass locally. This is NOT a deployable public Verified/Shard authority: no real account provider, externally signed run-origin witness, hosted evaluator, persistent abuse controls, privacy/consent rollout or independent security review. Keep #135 OPEN. [skip netlify]
+
 ## v2.25.22 — issue 1D render-never-writes-sim guard (2026-11-27)
 
 - In dev and test builds, `RunScene.renderFrame` now runs under a deny-by-default guard: every own field of the live simulation owners (sled, scene, score, tricks, BSOD, hazards, pickups, terrain, kodiaks) becomes read-only for the frame, nested sim data comes back as read-only proxies, and any write throws a `RenderWriteError` naming `Class.field` at the offending line. Fields render legitimately owns are an explicit, justified allowlist (`RENDER_OWNED`). Production builds fold the guard away.
