@@ -1,8 +1,8 @@
 /**
  * Versioned ID for the *declared schema* of one production savestate layout.
  * A layout identity is not a causal fingerprint, a state digest or proof of play.
- * This layer intentionally registers NO production layouts: schema/matter work
- * must land before any runtime can accept a savestate for restoration (#119).
+ * This layer only checks registrations. A separately supplied strict local
+ * candidate registration grants format admission, not permission to restore.
  */
 import { canonicalBytes, CJSONError } from '../replay/canonicalJson.js';
 import { digestOf } from '../replay/canonicalSha256.js';

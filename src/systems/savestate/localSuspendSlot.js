@@ -1,7 +1,7 @@
 /** #119: LOCAL-ONLY single-use suspend-slot transaction boundary.
  *
- * Inert until a trusted production snapshot *layout*, strict Matter fresh-world
- * restore and complete GhostRecorder tick-zero continuation are shipped.
+ * The typed candidate layout can now be supplied explicitly by a trusted
+ * host. A separate transaction must restore a quarantined candidate.
  * This module NEVER accepts an envelope as a trusted, restorable run: the
  * existing inspector only returns `admission: envelope-only`.
  *
@@ -71,7 +71,7 @@ export class LocalSuspendSlot{
  }
  /** Explicitly keep a *pure-format-admitted* suspended envelope. The caller
   * must supply the expected exact-build identity and trusted shipped schema;
-  * no default production registration is provided by the current game.
+  * no automatic registration or activation is installed on scene boot.
   */
  async put(bytes,expectedIdentity,layout,{replace=false}={}){
   if(!(bytes instanceof Uint8Array)||bytes.length===0||bytes.length>MAX_OUTPUT_BYTES)

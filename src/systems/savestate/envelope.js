@@ -125,7 +125,7 @@ export function snapshotEnvelopeBytes(unsignedEnvelope) {
  * exact-build identity and a trusted locally registered schema validator.
  * Does NOT perform restoration. Returns { ok:true, admission:'envelope-only',
  * envelope } or {ok:false,code,pointer}; malformed input never mutates state.
- * No valid production layout is shipped by this foundation PR.
+ * The local candidate registration grants envelope-only admission, never a live world.
  */
 export function inspectSnapshotEnvelope(bytes, expectedIdentity, registeredLayout) {
   try {
@@ -148,7 +148,7 @@ export function inspectSnapshotEnvelope(bytes, expectedIdentity, registeredLayou
     // A future production schema registry must audit every SIM field and every
     // reference; a truthy-but-not-true return is deliberately not admission.
     let accepted = false;
-    try { accepted = registeredLayout.validateSections(envelope.payload.sections) === true; }
+    try { accepted = registeredLayout.validateSections(envelope.payload.sections, envelope) === true; }
     catch { fail('invalid-section', '/payload/sections'); }
     if (!accepted) fail('invalid-section', '/payload/sections');
     return { ok:true, admission:'envelope-only', envelope };

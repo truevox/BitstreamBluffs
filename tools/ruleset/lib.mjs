@@ -268,6 +268,13 @@ export function assertArtifactOverlayRoot(root = repoRoot()) {
  */
 export function currentBuildIdentity(root = repoRoot()) {
   assertArtifactOverlayRoot(root);
+  // Artifact overlays reuse THIS checkout's executable source; do not
+  // certify a stale generated savestate codec closure even if the physics
+  // tripwire is unchanged. Overlay-specific artifact files are read below.
+  for (const [file, expected] of SAVESTATE_LAYOUT_DESCRIPTOR.schemaSources || []) {
+    if (sourceTextDigest(readText(repoRoot(), file)) !== expected)
+      throw Error('stale savestate schema source identity: '+file+'; regenerate layout-source-identity.mjs --write');
+  }
   const pkg = JSON.parse(readText(root, 'package.json'));
   const { doc, rulesetId } = readCurrentRuleset(root);
   const parts = {

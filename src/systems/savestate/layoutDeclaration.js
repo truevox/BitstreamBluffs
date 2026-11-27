@@ -1,16 +1,13 @@
-/**
- * The *declared* savestate layout schema of this build, for build-identity composition (#238).
- *
- * This is NOT a layout registration: it carries no `validateSections`, and `layout.js` still
- * registers zero production layouts, so `inspectSnapshotEnvelope()` cannot admit a snapshot with
- * it. It exists because `buildId` must bind the layout schema (`savestateLayoutId`) and the
- * currently-shipped layout registry declares no sections. Every production schema addition MUST
- * extend this descriptor in the same change; because `buildId` hashes `savestateLayoutId`, any
- * change here produces a different build identity, which is the intended fail-closed behaviour.
- */
+/** Exact layout declaration for envelope-only local suspend admission.
+ * Bind the actual typed codec source closure, not only section names.
+ * This does not authorize world publication or official play. */
+import {SAVESTATE_SCHEMA_SOURCES} from './layoutSources.js';
 export const SAVESTATE_LAYOUT_DECLARATION_VERSION = 1;
-
-export const SAVESTATE_LAYOUT_DESCRIPTOR = Object.freeze({
-  version: SAVESTATE_LAYOUT_DECLARATION_VERSION,
-  sections: Object.freeze({}),
+const freeze=v=>{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;};
+export const SAVESTATE_LAYOUT_DESCRIPTOR=freeze({
+ version:SAVESTATE_LAYOUT_DECLARATION_VERSION,
+ sections:{candidate:{kind:'bb-internal-candidate-file',version:1,
+  sections:['clock','rng','recorder','terrain','matter','entities','subsystems','remainder'],
+  numeric:'BB-CJSON canonical F64',integrity:'sha256',admission:'envelope-only'}},
+ schemaSources:SAVESTATE_SCHEMA_SOURCES,
 });

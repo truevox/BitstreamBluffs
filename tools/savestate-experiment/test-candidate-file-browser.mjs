@@ -18,8 +18,14 @@ try{
  const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),
   headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- async function boot(ms){
-  const context=await browser.newContext({viewport:{width:960,height:540}}),page=await context.newPage();
+ async function newContext(){
+  const context=await browser.newContext({viewport:{width:960,height:540},serviceWorkers:'block'});
+  // QA runs must not send synthetic playtest telemetry or any other external requests.
+  await context.route('**/*',route=>new URL(route.request().url()).origin===new URL(url).origin?route.continue():route.abort());
+  return context;
+ }
+ async function boot(ms,shared){
+  const context=shared||await newContext(),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date(ms));
   await page.goto(url,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
@@ -90,7 +96,86 @@ try{
   });
   return {context,page};
  }
- for(const tick of [481,936]){
+ if(process.argv.includes('--suspend-slot')){
+  const context=await newContext(),tick=936;
+  try{
+   const a=await boot(time,context);
+   const source=await a.page.evaluate(async tick=>{
+    const p=window.__candidate;
+    const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+    const {createCandidateLayoutRegistration,sealSuspendCandidate}=await import('/src/systems/savestate/candidateAdmission.js');
+    const {loadCurrentBuildDescriptor}=await import('/src/systems/savestate/runtimeIdentity.js');
+    const identity=await loadCurrentBuildDescriptor(),layout=createCandidateLayoutRegistration(window.Phaser.Physics.Matter.Matter);
+    p.stepTo(tick);
+    const file=p.codec.capture(p.r),envelope=sealSuspendCandidate(file,identity,layout);
+    const saved=await new LocalSuspendSlot().put(envelope,identity,layout);
+    if(!saved.ok)throw Error('actual save admission '+JSON.stringify(saved));
+    return {saved,frameTime:p.t,signature:p.signature(),runId:p.r.runId};
+   },tick);
+   assert.equal(source.saved.tick,tick);
+   async function resume(page,fail){
+    return page.evaluate(async({frameTime,fail})=>{
+     const p=window.__candidate;
+     const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+     const {createCandidateLayoutRegistration}=await import('/src/systems/savestate/candidateAdmission.js');
+     const {loadCurrentBuildDescriptor}=await import('/src/systems/savestate/runtimeIdentity.js');
+     const {resumeLocalSuspend}=await import('/src/systems/savestate/suspendTransaction.js');
+     const identity=await loadCurrentBuildDescriptor(),layout=createCandidateLayoutRegistration(window.Phaser.Physics.Matter.Matter);
+     const slot=new LocalSuspendSlot(),consume=slot.consume.bind(slot);
+     let staged=0,published=false,discarded=false,durable=false,restoreTicks=null;
+     slot.consume=async token=>{const result=await consume(token);durable=result.ok&&result.consumed;return result;};
+     const result=await resumeLocalSuspend({slot,identity,layout,createStage:meta=>{
+      staged++;
+      if(meta.tick!==936||meta.seed!=='sim-05')throw Error('claim setup');
+      return {
+       isQuarantined:()=>!published&&!discarded&&!p.g.loop.running,
+       restore:file=>{const r=p.restore(new TextDecoder().decode(file),frameTime,fail);restoreTicks=r.calls;},
+       capture:()=>p.codec.capture(p.r),
+       discard:()=>{
+        // Each tab has its own game/JS/Matter realm. Stop the isolated run
+        // permanently; do not leave a partially restored scene callable.
+        p.g.scene.stop('RunScene');p.g.headlessStep(0,0);p.g.loop.sleep();
+        discarded=!p.r.sys.isActive()&&!published;
+        if(discarded)p.stepTo=()=>{throw Error('discarded');};
+        return discarded;
+       },
+       publish:()=>{if(!durable||published||discarded)throw Error('premature publish');published=true;return true;},
+      };
+     }});
+     return {result,staged,published,discarded,durable,restoreTicks,tick:p.r.simClock?.tick};
+    },{frameTime:source.frameTime,fail});
+   }
+   const b=await boot(time+1000,context);
+   const failed=await resume(b.page,true);
+   assert.equal(failed.result.claimState,'released',JSON.stringify(failed));
+   assert.equal(failed.discarded,true);assert.equal(failed.published,false);
+   assert.equal(await a.page.evaluate(()=>window.__candidate.signature()),source.signature);
+   await b.page.close();
+   const c=await boot(time+2000,context),d=await boot(time+3000,context);
+   const results=await Promise.all([resume(c.page,false),resume(d.page,false)]);
+   assert.equal(results.filter(x=>x.result.ok).length,1,JSON.stringify(results));
+   assert.equal(results.reduce((n,x)=>n+x.staged,0),1);
+   const index=results.findIndex(x=>x.result.ok),winner=[c,d][index],loser=[c,d][1-index];
+   const won=results[index];assert.equal(won.published,true);assert.equal(won.durable,true);
+   assert.equal(won.restoreTicks,0);assert.equal(won.tick,tick);
+   assert.equal(won.result.runId,source.runId);
+   assert.equal(results[1-index].published,false);
+   assert.match(results[1-index].result.code,/slot-claimed|empty/);
+   const empty=await loser.page.evaluate(async()=>{
+    const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+    return new LocalSuspendSlot().claim(null,null);
+   });
+   assert.equal(empty.code,'empty');
+   assert.equal(await a.page.evaluate(()=>window.__candidate.signature()),source.signature);
+   await winner.page.clock.setFixedTime(new Date(time));
+   const terminal=p=>p.evaluate(()=>window.__candidate.terminal());
+   const left=await terminal(a.page),right=await terminal(winner.page);
+   assert.deepEqual(right,left);assert.deepEqual(errors,[]);
+   console.log('PASS_REAL_SUSPEND_TRANSACTION',JSON.stringify({tick,envelopeBytes:source.saved.bytes,
+    failed,results,empty:empty.code,sourceUnchangedBeforePublish:true,suffixTicks:left.frames.length,
+    terminalTick:left.tick,exactTerminal:true,errors}));
+  }finally{await context.close();}
+ }else for(const tick of [481,936]){
   const a=await boot(time),b=await boot(time+1000);
   try{
    const cap=await a.page.evaluate(tick=>{

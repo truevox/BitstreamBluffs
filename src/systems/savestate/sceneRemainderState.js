@@ -193,10 +193,20 @@ export function encodeSceneRemainderState(game,meta,expected){
  return canonicalBytes({kind:KIND,version:VERSION,...c,state,camera:cam,telegraph:tel,
   ghost:ghost(m.ghost,false,c),fingerprint:fingerprint(m.fingerprint,c),configDigest:digestOf(m.config)});
 }
-export function decodeSceneRemainderState(bytes,expected,freshConfig){
+function decodeRemainder(bytes,expected){
  const c=context(expected),s=exact(parseCanonical(asUint8Array(bytes,'scene remainder')),['kind','version',...Object.keys(c),'state','camera','telegraph','ghost','fingerprint','configDigest'],'section');
  need(s.kind===KIND&&s.version===VERSION&&Object.keys(c).every(k=>Object.is(c[k],s[k])),'identity');
- need(hash(s.configDigest)&&digestOf(freshConfig)===s.configDigest,'config');
- return {game:relations(transformGame(s.state,true),c),camera:camera(s.camera,true),telegraph:telegraph(s.telegraph,true),
+ need(hash(s.configDigest),'config');
+ return {configDigest:s.configDigest,game:relations(transformGame(s.state,true),c),camera:camera(s.camera,true),telegraph:telegraph(s.telegraph,true),
   ghost:ghost(s.ghost,true,c),fingerprint:fingerprint(s.fingerprint,c)};
+}
+
+/** Pure format check, never accepts a digest as a fresh-world witness. */
+export function inspectSceneRemainderState(bytes,expected){
+ return decodeRemainder(bytes,expected);
+}
+export function decodeSceneRemainderState(bytes,expected,freshConfig){
+ const {configDigest,...result}=decodeRemainder(bytes,expected);
+ need(digestOf(freshConfig)===configDigest,'config');
+ return result;
 }

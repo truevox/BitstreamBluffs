@@ -140,6 +140,11 @@ function validate(input,c){
   scratch._cx.length>=16&&scratch._tx.length===362&&scratch._ty.length===362,'scratch-length');
  s.scratch=scratch;return s;
 }
+/** Pure structural admission only. Regeneration remains a runtime gate. */
+export function inspectTerrainState(bytes,expected){
+ const s=validate(parseCanonical(asUint8Array(bytes,'terrain section')),context(expected));
+ return {config:s.config,boundsCount:s.boundsCount};
+}
 /** Restore a detached generator from application-owned options. Geometry
  * and bounds must independently match the source witnesses. Never attach
  * this to a live scene without rebuilding all references. */

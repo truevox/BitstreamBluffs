@@ -7,6 +7,9 @@ on:
       - 'src/systems/replay/canonicalJson.js'
       - 'src/systems/replay/canonicalSha256.js'
       - 'tests/determinism/savestate-local-suspend-slot.test.js'
+      - 'tests/determinism/savestate-suspend-transaction.test.js'
+      - 'tools/savestate-experiment/test-candidate-file-browser.mjs'
+      - 'tools/savestate-experiment/layout-source-identity.mjs'
       - 'tests/determinism/savestate-envelope.test.js'
       - 'tests/determinism/savestate-recorder-prefix.test.js'
       - 'tests/determinism/savestate-native-recorder.test.js'
@@ -38,7 +41,7 @@ jobs:
       - name: Require exact build source identity
         run: node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Pure format, recorder prefix, single-use storage and hostile-input tests
-        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-recorder-prefix.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-local-suspend-slot.test.js
+        run: npm test -- --runInBand tests/determinism/savestate-envelope.test.js tests/determinism/savestate-recorder-prefix.test.js tests/determinism/savestate-native-recorder.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/savestate-suspend-transaction.test.js
       - name: Install real Chromium
         run: npx playwright install --with-deps chromium
       - name: Cross-tab, page-reload and atomic-claim acceptance in real browser
@@ -50,3 +53,5 @@ jobs:
           GAME_URL=http://127.0.0.1:18410/ node tools/savestate-experiment/test-local-suspend-slot-browser.mjs
       - name: Native recorder prefix to real fatal result in Chromium
         run: node tools/savestate-experiment/test-native-recorder-browser.mjs
+      - name: Registered full native save, real IndexedDB failure/retry and cross-tab consumption
+        run: node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-slot
