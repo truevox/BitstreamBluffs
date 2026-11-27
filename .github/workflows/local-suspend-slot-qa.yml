@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   suspend-slot:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 16
     steps:
       - uses: actions/checkout@v4
