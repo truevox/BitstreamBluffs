@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.21 — #85 offline Museum of Bad Physics player preview (2026-11-26)
+
+- Expose the bounded, **local-file-only** Museum of Bad Physics static GhostTape v1 pose gallery through a new `M MUSEUM` Title chip and keyboard M. The Vite production-built gallery has Back to Game and never automatically reads saved games, uploads selected files, executes prior physics, accepts official scores or changes ranking.
+- An installed PWA explicitly precaches **only the Museum HTML** and existing first-party hashed JS, never user files or optional audio. Under the 8 MiB verified offline-shell budget, the title-to-gallery and return path work **with network disabled** at both `/` and `/BitstreamBluffs/` bases. Browser tests verify safe filenames/notes, malformed JSON rejection, Blob URL cleanup, pointer/keyboard/touch entry and no file-selection HTTP requests.
+- Preserve source from current v2.25.20 #135 creator-clear/private peer queue, v2.25.19 #119 dormant eight-section save foundation, and #425 test-only storage consent animation correction. This is a **preview of static unverified recorded poses**; #85 remains OPEN for genuine historical playback/provenance. [skip netlify]
+
 ## v2.25.20 — local creator qualification and blind peer verification reference (2026-11-26)
 
 - #135: Add a **server-only private** player-requested local creator-clear and blind peer queue. A run may enter visible Unverified publication only after a reported local replay observation matches its pinned canonical evidence; 2–4 other server-selected peers can be assigned concurrently but never issue a Verified grant. Separate private Human/TAS challenge categories are guarded; the existing Human public trust policy is unchanged.
