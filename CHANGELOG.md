@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.25.29 — #119 actual local one-use player Suspend and Resume controls (2026-11-27)
+
+- Add real **SUSPEND RUN** to the Pause menu for eligible unmodified stock runs only, retaining their exact original GhostTape, run ID, live Matter state and causal tick. Write an existing exact-build one-use IndexedDB slot BEFORE stopping the original run; if unavailable or occupied, the game stays paused and reports an error.
+- Add a readonly-detected **R RESUME SAVE** chip to Title. Explicit player click atomically claims the existing slot, checks the identity/layout/header, stages a fresh, hidden and paused RunScene, restores full typed native state with zero replay ticks, and consumes only after successful reconstruction, before releasing the scene and issuing exactly ONE resumed RUN_START. Failure discards the altered stage, restores registry values, and releases the original claim for retry.
+- Add explicit two-click CLEAR OLD SAVE / CLEAR BAD SAVE control only for incompatible or corrupt READY saves; never silently delete a save or override a claimed slot. Catch postcommit observer errors without destroying the uniquely consumed continuation. No public Verified status, uploads or ranking authority are minted here.
+- Expand dedicated exact-head Chromium gate: physically mouse-click Pause > SUSPEND, page reload, mouse-click Title > RESUME, same run ID/tick and one-use consumption; intentionally corrupt native restore after mutating stage, assert exact registry rollback and subsequent successful retry; hostile observer after consume; and real corrupt IDB save requires TWO separate physical clicks to erase. Source and simulation revision unchanged.
+- Keep P0 #119 and child #424 OPEN for physical Chromebook and installed PWA lifecycle verification, more full state/config coverage, and claimed-slot crash recovery; #135 public peer Verified remains independent. [skip netlify]
+
 ## v2.25.28 — #424 opt-in private game-owned RunScene stage, still no player UI (2026-11-27)
 
 - Register an application-only one-shot staging capability keyed by the actual Phaser Game (private WeakMap, never serialized, exposed in scene data, stored in the registry, or available to an untrusted file). Only Title-active, Run-inactive applications may arm it; a subsequent genuine RunScene.create consumes it exactly once. Ordinary game starts remain unchanged.
