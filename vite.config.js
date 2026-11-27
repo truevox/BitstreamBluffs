@@ -12,7 +12,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: { game: fileURLToPath(new URL('./index.html', import.meta.url)), bsodQa: fileURLToPath(new URL('./bsod-qa.html', import.meta.url)) }, // Main HTML moved to public/
+      input: { game: fileURLToPath(new URL('./index.html', import.meta.url)), bsodQa: fileURLToPath(new URL('./bsod-qa.html', import.meta.url)), museum: fileURLToPath(new URL('./tools/museum-of-bad-physics.html', import.meta.url)) }, // Main HTML moved to public/
     },
   },
   server: {
