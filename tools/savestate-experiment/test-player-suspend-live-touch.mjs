@@ -182,6 +182,58 @@ try{
  assert.deepEqual(errors,[]);
  emit('actual mobile touch Resume after real page close: zero-tick exact fingerprint, one-use consumed',{
   ...outcome,errors:errors.length,resumeHit,compiled:production});
+ // Version upgrades and corrupt READY data must not strand the player. A
+ // separate literal READY row with malformed bytes is test-injected into the
+ // same local slot (not a scored run); the Title must require TWO actual taps
+ // before explicit deletion, then refuse any D key on a CLAIMED slot.
+ await page.close();
+ page=await newPage(ctx,url);
+ const setRow=async(status)=>page.evaluate(async(status)=>{
+  const db=await new Promise((resolve,reject)=>{
+   const req=indexedDB.open('bb-single-use-suspend-v1',1);
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+  const tx=db.transaction('slots','readwrite');
+  tx.objectStore('slots').put({id:'local-suspend',status,bytes:new Uint8Array([0xff,0x00])});
+  await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
+  db.close();
+ },status);
+ const storedRow=async()=>page.evaluate(async()=>{
+  const db=await new Promise((resolve,reject)=>{
+   const req=indexedDB.open('bb-single-use-suspend-v1',1);
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+  const tx=db.transaction('slots','readonly');
+  const row=await new Promise((resolve,reject)=>{
+   const req=tx.objectStore('slots').get('local-suspend');
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });db.close();return row?.status||'empty';
+ });
+ await setRow('ready');await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+  window.__bbGame.scene.getScene('TitleScene').resumeState?.status==='corrupt',null,{timeout:15000});
+ const discardHit=await page.evaluate(()=>{
+  const g=window.__bbGame,t=g.scene.getScene('TitleScene'),b=t.resumeButton;
+  if(b.disabled||b.label?.main?.text!=='D DISCARD')throw Error('corrupt READY slot did not expose explicit D DISCARD');
+  const pt=b.getWorldTransformMatrix().transformPoint(b.w/2,b.h/2);
+  const r=document.querySelector('canvas').getBoundingClientRect();
+  return {x:r.x+pt.x*r.width/480,y:r.y+pt.y*r.height/270};
+ });
+ await page.touchscreen.tap(discardHit.x,discardHit.y);
+ assert.equal(await storedRow(),'ready','first discard tap must not delete');
+ assert.equal(await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').discardConfirm),true);
+ await page.touchscreen.tap(discardHit.x,discardHit.y);
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').resumeState?.status==='empty',null,{timeout:10000});
+ assert.equal(await storedRow(),'empty');
+ emit('corrupt/incompatible local slot requires two real touch taps to discard; never automatic',{discardHit});
+ await setRow('claimed');await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+  window.__bbGame.scene.getScene('TitleScene').resumeState?.status==='claimed',null,{timeout:15000});
+ assert.equal(await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').resumeButton.disabled),true);
+ await page.keyboard.press('d');
+ assert.equal(await storedRow(),'claimed','claimed slot must be retained, even after explicit D');
+ assert.deepEqual(errors,[]);
+ emit('claimed slot remains locked and cannot be discarded by keyboard or touch',{claimedRetained:true});
  await ctx.close();
 }finally{
  await browser?.close();

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.25.27 — #424 player-facing one-use local Suspend/Resume (2026-11-27)
+
+- Add explicit double-confirm **SUSPEND RUN** to the normal Pause menu; on success atomically save one strict current-build, eight-section native base-run candidate into the existing one-use IndexedDB slot, then return to Title **without awarding a run**. Refused writes leave the original paused run intact; a previous slot is never silently overwritten or deleted.
+- Add a compact **R RESUME** Title chip and keyboard R. The chip only enables after an inspection-only compatible slot lookup. Resume atomically claims once, initializes a hidden fresh RunScene with **zero gameplay ticks**, strictly restores Matter world/terrain/RNG/recorder and all eight sections, consumes the slot only after successful native restore, then makes the scene and HUD visible. Two tabs cannot each claim the same saved run. A failed restore disposes the world before releasing a claim or leaves the slot locked rather than resuming unverified/partial state.
+- Restrict this pre-alpha feature to **unmodified base-biome** runs. No Gym, daily official, guest/takeover, modifiers, boosts, cosmetics changing physics, Kodiaks or magnets; no cross-version migration, remote verification, Verified rank/Shard promotion, server upload or automatic checkpoints. Other #119/#424 goals remain open.
+- Stabilize four **strict native entity class names** across JS minification using tagged trusted local constructor metadata, not permissive string matching; a real compiled-production browser test exposed and now gates this failure mode.
+- Add strict one-use IDB and hostile schema tests and a dedicated Chromium gate proving real Pause menu + keyboard R, true page close/reopen, complete future-sim fingerprint parity to terminal tick 977 (496 ticks from 481 and 41 from 936), matching native GhostTape/RunRecord/score and no extra physics ticks. Separate **390×844 touch** QA exercises live RAF, Escape Pause, visible CRT panel, touch SUSPEND twice, fresh page, touch Resume and exact one-use recovery. [skip netlify]
+
+- **Recovery:** a double-confirm **D DISCARD** action is available for an incompatible or damaged unclaimed save; claimed slots cannot be stolen or cleared. No automatic deletions.
+
 ## v2.25.26 — #424 read-only, non-reserving local Suspend slot preview foundation (2026-11-26)
 
 - Add a read-only IndexedDB status hint for the existing one-use local Suspend slot: empty / ready / claimed or incompatible / corrupt / unavailable. It validates a detached envelope snapshot outside the IDB read transaction, so merely opening a future Title/Resume view cannot reserve a token, mutate a slot or hold the cross-tab claim lock through large-file parsing.

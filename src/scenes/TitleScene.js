@@ -54,7 +54,7 @@ import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
 import { launchTakeover } from '../ui/TakeoverLauncher.js';
-import {peekPlayerSuspend,claimPlayerSuspend,suspendMessage} from '../systems/savestate/playerSuspendFlow.js';
+import {peekPlayerSuspend,claimPlayerSuspend,discardPlayerSuspend,suspendMessage} from '../systems/savestate/playerSuspendFlow.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -535,8 +535,9 @@ export class TitleScene extends Phaser.Scene {
     this.museumButton = new Button(this, theme, { x:m.x, y:m.y, w:m.w, h:m.h, label:'M MUSEUM', color:'amber', onClick: () => this._openMuseum(true) });
     const r=RESUME_CHIP;
     this.resumeState={ok:false,status:'checking'};
+    this.discardConfirm=false;
     this.resumeButton=new Button(this,theme,{x:r.x,y:r.y,w:r.w,h:r.h,
-      label:'R RESUME',color:'lime',onClick:()=>void this._resumeSavedRun(true)}).setDisabled(true);
+      label:'R RESUME',color:'lime',onClick:()=>void this._savedSlotAction(true)}).setDisabled(true);
     this.resumeNote=new NeonText(this,theme,266,177,'CHECKING SAVE',{
       color:'text',anchor:'center',outline:'dark',
     }).setAlpha(0.75);
@@ -554,11 +555,44 @@ export class TitleScene extends Phaser.Scene {
     if(!this.sys?.isActive?.()||!this.resumeButton?.scene)return;
     this.resumeState=result;
     const ready=result?.ok&&result.status==='ready';
-    this.resumeButton.setDisabled(!ready);
+    const discardable=!result?.ok&&['corrupt','incompatible'].includes(result.status);
+    this.discardConfirm=false;
+    this.resumeButton.setLabel(discardable?'D DISCARD':'R RESUME');
+    this.resumeButton.colorKey=discardable?'amber':'lime';
+    this.resumeButton._paint();
+    this.resumeButton.setDisabled(!ready&&!discardable);
     const message=this.lastSuspendNotice||
-      (ready?'ONE USE - THIS VERSION':suspendMessage(result.ok?result.status:result.code));
+      (discardable?'INCOMPATIBLE / DAMAGED SAVE':
+       ready?'ONE USE - THIS VERSION':suspendMessage(result?.ok?result.status:result?.code));
     this.resumeNote.setText(ellipsize(message,79));
     this.lastSuspendNotice=null;
+  }
+
+  _savedSlotAction(fromButton=false){
+    if(!this.resumeState?.ok&&['incompatible','corrupt'].includes(this.resumeState?.status))
+      return this._discardSavedRun();
+    return this._resumeSavedRun(fromButton);
+  }
+
+  /** Explicit double-confirm cleanup ONLY for incompatible/corrupt READY.
+   * No automatic cleanup or clearing of a claimed slot can occur. */
+  async _discardSavedRun(){
+    if(this.view||this.starting||this.attract||
+      !['incompatible','corrupt'].includes(this.resumeState?.status))return;
+    if(!this.discardConfirm){
+      this.discardConfirm=true;
+      this.resumeNote?.setText('TAP D AGAIN TO DISCARD');
+      return;
+    }
+    this.starting=true;
+    this.resumeButton?.setDisabled(true);
+    let result;
+    try{result=await discardPlayerSuspend();}
+    catch{result={ok:false,code:'storage-unavailable'};}
+    this.starting=false;
+    this.discardConfirm=false;
+    this.lastSuspendNotice=result?.ok?'SAVED SLOT DISCARDED':suspendMessage(result?.code);
+    await this._refreshSuspendSlot();
   }
 
   /** #424 single-use resume. A claimed token cannot be reused in another tab.
@@ -707,6 +741,7 @@ export class TitleScene extends Phaser.Scene {
       if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
       if (e && (e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openMuseum();
       if (e && (e.key === 'r' || e.key === 'R') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) void this._resumeSavedRun();
+      if (e && (e.key === 'd' || e.key === 'D') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) void this._discardSavedRun();
     };
     this._onPointer = () => { this._wakeGate(); };
     this._onRouter = (p) => { if (p && p.pressed) this._wakeGate(); };

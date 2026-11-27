@@ -53,6 +53,15 @@ export async function peekPlayerSuspend({slot=new LocalSuspendSlot(),identityLoa
  return id.ok?slot.peek(id.identity,candidateSuspendLayout):id;
 }
 
+/** Explicit destructive cleanup of a READY, incompatible/corrupt save.
+ * Never auto-erase or steal CLAIMED tokens; requires double player consent
+ * at the Title UI, not triggered on opening game or version mismatch.
+ */
+export async function discardPlayerSuspend({slot=new LocalSuspendSlot()}={}){
+ try{return await slot.clearReady();}
+ catch{return fail('storage-unavailable');}
+}
+
 /** While the actual RunScene is paused, preserve an immutable canonical full
  * candidate inside the existing atomically owned single-use IndexedDB slot.
  * Never overwrite existing data; a failed save leaves the original live run.
