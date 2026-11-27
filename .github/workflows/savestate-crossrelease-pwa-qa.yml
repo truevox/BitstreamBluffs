@@ -1,0 +1,74 @@
+name: Cross-release PWA save retention
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/savestate-crossrelease-pwa-qa.yml'
+      - 'tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs'
+      - 'tools/pwa/**'
+      - 'src/scenes/TitleScene.js'
+      - 'src/scenes/PauseScene.js'
+      - 'src/systems/savestate/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/savestate-crossrelease-pwa-qa.yml'
+      - 'tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs'
+      - 'tools/pwa/**'
+      - 'src/scenes/TitleScene.js'
+      - 'src/scenes/PauseScene.js'
+      - 'src/systems/savestate/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  crossrelease:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact triggering commit
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Validate source and compile real new Pages PWA
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-v31-dist"
+      - name: Build valid old READY fixture from exact v2.25.30 source
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/bb-v30-source" 87874c610a0ce5846d1bf37506f9a73bd8dda31a
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/bb-v30-source/node_modules"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p=Path(os.environ['RUNNER_TEMP'])/'bb-v30-source'/'vite.config.js'
+          s=p.read_text()
+          assert "  root: '.'," in s
+          p.write_text(s.replace("  root: '.',","  root: '.',\n  // QA fixture only: preserve names when constructing a valid V30 save.\n  esbuild: {keepNames:true},"))
+          PY
+          cd "$RUNNER_TEMP/bb-v30-source"
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-v30-dist"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check old READY survives actual waiting-worker update and offline incompatible confirmation
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-v30-dist" "$RUNNER_TEMP/bb-v31-dist"
