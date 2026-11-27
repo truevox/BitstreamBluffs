@@ -2,10 +2,6 @@ import fs from 'node:fs';
 import {encodeEntityState,decodeEntityState,ENTITY_STATE_DESCRIPTOR,ENTITY_STATE_FIELDS} from '../../src/systems/savestate/entityState.js';
 import {canonicalBytes,parseCanonical,f64Encode} from '../../src/systems/replay/canonicalJson.js';
 const fixture=JSON.parse(fs.readFileSync(new URL('../fixtures/savestate/entity-projection-stock-936.json',import.meta.url),'utf8'));
-// The fixture predates the render-only shield mirror removal (#1D).
-// Current Sled no longer stores 'shield'; shield visual is derived from
-// RunScene.shieldCharges. Keep the raw recorded fixture for provenance.
-delete fixture.sled.__obj.shield;
 const ctx={runId:'1234-entity-fixture',tick:936,buildId:'sha256:'+'a'.repeat(64),randomId:1};
 const fresh=()=>JSON.parse(JSON.stringify(fixture));
 const wire=encodeEntityState(fresh(),ctx);
@@ -58,7 +54,6 @@ test.each([
  ['wrong tick',s=>s.tick++],['wrong RNG context',s=>s.randomId++],
  ['unknown root',s=>s.state.unknown=1],['missing root',s=>delete s.state.sled],
  ['wire class selection',s=>s.state.sled.__c='Rng'],
- ['obsolete shield mirror',s=>sled(s).shield=true],
  ['unknown sled field',s=>sled(s).unknown=1],['missing sled field',s=>delete sled(s).airtimeMs],
  ['wrong shared RNG',s=>sled(s).random=9],['duplicate node ID',s=>s.state.sled.id=s.state.hazards.id],
  ['wrong sled body',s=>sled(s).body='hazard:1:0'],['false active sled',s=>sled(s).inWorld=false],
