@@ -1,10 +1,15 @@
 # Changelog
 
-## v2.25.24 — #135 authenticated private-verifier HTTP adapter reference (2026-11-26)
+## v2.25.25 — #135 authenticated private-verifier HTTP adapter reference (2026-11-26)
 
 - Add a **source-only, opt-in Node HTTP handler** for an externally authenticated account to request server-issued challenges, submit a pinned replay, receive random blinded peer work, provide observed local/peer results, privately check its own status, and request visibly UNVERIFIED publication after the local creator-clear gate. No listener or actual identity service is configured.
 - Exact canonical JSON/strict base64url wire contract; bearer identity comes exclusively from a trusted injected verifier, and both legal challenge issuance and publication consent/audience must be supplied by separate trusted callbacks. Default CORS deny, body bounds, origin allowlisting, per-account in-process abuse budget, no wallet/Verified/reward endpoint or client-visible peer identities.
 - Six real loopback HTTP tests plus 38 existing signed-admission/peer/provisional tests pass; 243 trust/replay regressions, current ruleset/build identity and production build isolation pass locally. This is NOT a deployable public Verified/Shard authority: no real account provider, externally signed run-origin witness, hosted evaluator, persistent abuse controls, privacy/consent rollout or independent security review. Keep #135 OPEN. [skip netlify]
+## v2.25.24 — #424 actual paused-run fresh-page one-use native restore acceptance (2026-11-26)
+
+- Extend the one-use browser diagnostic to close the original game page, reopen the SAME IndexedDB storage partition in a new page, fresh-boot a tick-zero RunScene, atomically claim the original candidate, reconstruct the complete live Matter world/recorder with zero simulated restore ticks and consume only after a successful, exact native proof. Competing claims fail and replay suffix, terminal score, GhostTape and RunRecord stay identical.
+- Exercise a real manual PauseScene transition at ticks 481 and 936. Capture only stock, unmodified, eligible runs; temporarily normalize the pending pause-only marker to a resumable state **during capture**, restore the original source's pause marker even if capture fails, and reject replay, takeover, daily, boosted and upgraded sources. Both source and new page continue to match the original native suffix.
+- Dedicated exact-head Chromium CI runs ordinary reopened-page and real manual PauseScene capture variants plus guards; no player-visible Suspend/Resume menu, crash-recovery policy, automated storage lease release, official verification, ranking change or network feature. #119 and #424 remain OPEN. [skip netlify]
 
 ## v2.25.23 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
 

@@ -1,0 +1,52 @@
+name: Savestate real page-reopen one-use IndexedDB QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/savestate-reopened-page-qa.yml'
+      - 'tools/savestate-experiment/test-candidate-file-browser.mjs'
+      - 'src/systems/savestate/**'
+      - 'tests/determinism/savestate-candidate-suspend-bridge.test.js'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/savestate-reopened-page-qa.yml'
+      - 'tools/savestate-experiment/test-candidate-file-browser.mjs'
+permissions:
+  contents: read
+jobs:
+  reopened:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact triggering source
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Strict identity and signed layout declaration
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Atomic local slot, candidate envelope and build identity
+        run: npm test -- --runInBand tests/determinism/savestate-candidate-suspend-bridge.test.js tests/determinism/savestate-paused-candidate.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/build-identity.test.js
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Closed page, reopened fresh game, one-use claim and exact native suffix
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen
+      - name: Real PauseScene capture, actual page close and exact native resume
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture
