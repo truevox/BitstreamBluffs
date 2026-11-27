@@ -84,6 +84,105 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+
+  test('opted-in manual pause keeps the exact playing source moving without vinyl scratches',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._paused).toBe(true);
+    expect(a._vinylPauseSession?.pauseToken).toBe('R:1');
+    expect(d.transportPause).not.toHaveBeenCalled();
+    expect(d.started).toBe(true);
+    expect(a._musicWanted).toBe(true);
+    expect(a.nodes.musicFilter.frequency.setTargetAtTime.mock.lastCall[0]).toBe(18000);
+    expect(a._vinylScratch.play).not.toHaveBeenCalled();
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._paused).toBe(false);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    expect(d.trackIndex).toBe(0);
+    expect(a._vinylScratch.play).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
+  test('pause preference enables the same frozen song immediately without a vinyl scratch',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    const offset=d._resumeOffset;
+    const token=d._token;
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(d._token).toBe(token);
+    expect(d._resumeOffset).toBe(offset);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    expect(a._musicWanted).toBe(true);
+    expect(a.nodes.musicFilter.frequency.setTargetAtTime.mock.lastCall[0]).toBe(18000);
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    jest.advanceTimersByTime(500);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(a._vinylScratch.play).toHaveBeenCalledTimes(1); // original pause only
+    a.destroy();
+  });
+
+  test('disabling continuous music mid-pause freezes source and restores it on resume',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(d.transportPause).toHaveBeenCalledTimes(1);
+    expect(d.transportPaused).toBe(true);
+    expect(a._musicWanted).toBe(false);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall[0]).toBe(0);
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(205);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(d.trackIndex).toBe(0);
+    a.destroy();
+  });
+
+  test('music preference never overrides an explicit pause-menu jukebox PAUSE',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a.jukeboxPause();
+    expect(a._vinylPauseSession.manualOverride).toBe(true);
+    a.applySettings({...a.settings,musicDuringPause:false});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    expect(a._musicWanted).toBe(false);
+    a.destroy();
+  });
+
+  test('stale source generation cannot be restarted by enabling music during pause',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    d._token++;
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    expect(a._musicWanted).toBe(false);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(500);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
+  test('continuous music remains the same song on Quit, and does not affect fatal music',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    events.emit(EVT.RUN_ABORT,{reason:'quit',runId:'R',pauseToken:'R:1'});
+    expect(a._paused).toBe(false);
+    expect(a._musicMode).toBe('menu');
+    expect(d.transportPause).not.toHaveBeenCalled();
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    expect(a._vinylScratch.play).not.toHaveBeenCalled();
+    events.emit(EVT.RUN_END,{});
+    expect(a._vinylScratch.play).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
   test('rapid pause/resume supersedes scheduled old starts; never duplicates streams',()=>{
     const {a,d,events}=setup();
     events.emit(EVT.GAME_PAUSE,{});

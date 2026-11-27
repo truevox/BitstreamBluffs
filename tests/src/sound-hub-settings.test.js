@@ -100,3 +100,14 @@ describe('owner-approved crossfade default',()=>{
 			expect(sanitizeSettings({musicCrossfade:value}).musicCrossfade).toBe(true);
 	});
 });
+
+
+describe('P1 #389 continuous music during manual pause',()=>{
+  test('default OFF; malformed stored values are never accidentally enabled',()=>{
+    expect(defaultSettings().musicDuringPause).toBe(false);
+    expect(sanitizeSettings({musicVolume:.4}).musicDuringPause).toBe(false);
+    for(const value of [undefined,null,0,1,'true',{},[]])
+      expect(sanitizeSettings({musicDuringPause:value}).musicDuringPause).toBe(false);
+    expect(sanitizeSettings({musicDuringPause:true}).musicDuringPause).toBe(true);
+  });
+});

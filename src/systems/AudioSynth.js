@@ -648,6 +648,7 @@ export class AudioSynth {
     try {
       if (settings) {
         const hadMusic = this._hasEnabledSongs(this.settings?.musicEnabledSongs);
+        const previouslyPlayingDuringPause = this.settings?.musicDuringPause === true;
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -663,8 +664,11 @@ export class AudioSynth {
           dynamicOrchestra: false, // Gameplay always uses original accompaniment.
           musicShuffle: settings.musicShuffle === true,
           musicCrossfade: settings.musicCrossfade !== false,
+          musicDuringPause: settings.musicDuringPause === true,
         };
         this._stemMusic?.applySettings(this.settings);
+        if (previouslyPlayingDuringPause !== this.settings.musicDuringPause)
+          this._reconcileManualPauseMusic(this.settings.musicDuringPause);
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
         if (this._autoStartAttempted && this._musicMode === 'menu' &&
@@ -725,15 +729,14 @@ export class AudioSynth {
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
-      // Only manual gameplay pauses silence the source. Title/GameOver
-      // still play continuous full-bandwidth music, and explicit PauseScene
-      // jukebox actions can play during pause without a low-pass filter.
-      const manualJukebox = !!(paused && this._vinylPauseSession?.manualOverride &&
-        this._jukeboxMode && this._musicWanted);
+      // Gameplay pauses are quiet by default. An opted-in session stays
+      // full bandwidth, as do explicit pause-menu jukebox actions.
+      const pauseMusic = !!(paused && (this.settings?.musicDuringPause === true ||
+        (this._vinylPauseSession?.manualOverride && this._jukeboxMode && this._musicWanted)));
       const fadeTime = paused ? 0.025 : 0.05;
       this.nodes.musicFilter.frequency.setTargetAtTime(
-        paused && !manualJukebox ? 500 : 18000, t, fadeTime);
-      const sourceGain = paused && !manualJukebox ? 0 :
+        paused && !pauseMusic ? 500 : 18000, t, fadeTime);
+      const sourceGain = paused && !pauseMusic ? 0 :
         this._stemMusic?.started ? 0 : this._musicWanted ? 1 : 0;
       this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, fadeTime);
       this._applyWindFromBsod();
@@ -820,9 +823,10 @@ export class AudioSynth {
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
       const audible = this._vinylAudible() && originallyWanted && live;
-      const frozen = live ? d.transportPause() :
-        !!(old?.shouldResume && d?.transportPaused);
-      const procedural = originallyWanted && !live && !frozen &&
+      const keepPlaying = this.settings?.musicDuringPause === true;
+      const frozen = !keepPlaying && (live ? d.transportPause() :
+        !!(old?.shouldResume && d?.transportPaused));
+      const procedural = !keepPlaying && originallyWanted && !live && !frozen &&
         this._musicTimer !== null;
       if (frozen || procedural) {
         this._musicWanted = false; // tab unlock cannot restart a paused song
@@ -837,8 +841,52 @@ export class AudioSynth {
       };
       this._enterMenuMusic(); // neutral menu arrangement, same source clock
       this._setPaused(true);
-      if (audible) this._vinylScratch?.play('pause');
+      if (audible && !keepPlaying) this._vinylScratch?.play('pause');
     } catch { /* audio failure must not block Control's physical pause */ }
+  }
+
+  /** Apply an ON/OFF change made in Settings while the manual Pause screen is
+   * open. Never override a deliberate pause-menu jukebox choice or a changed
+   * source generation. The existing run's pause token remains authoritative.
+   */
+  _reconcileManualPauseMusic(keepPlaying) {
+    const session = this._vinylPauseSession;
+    if (!this._paused || !session || session.manualOverride) return;
+    const d = this._stemMusic;
+    if (keepPlaying) {
+      if (session.shouldResume) {
+        if (session.procedural) {
+          this._musicWanted = true;
+          if (this.ctx?.state === 'running' &&
+              !this._activateStemMusic() && !this._musicTimer) this._startScheduler();
+          session.shouldResume = false;
+          session.procedural = false;
+        } else if (d?.transportPaused && !d.started &&
+            d._token === session.token && d.trackIndex === session.trackIndex &&
+            d._resumeOffset === session.offset &&
+            this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+          if (d.transportPlay()) {
+            this._musicWanted = true;
+            session.shouldResume = false;
+          }
+        }
+      }
+    } else if (!session.shouldResume && this._musicWanted) {
+      const live = !!(d?.started && !d.transportPaused &&
+        d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
+      const frozen = live && d.transportPause();
+      const procedural = !frozen && this._musicTimer !== null;
+      if (frozen || procedural) {
+        this._musicWanted = false;
+        if (this._musicTimer !== null) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+        Object.assign(session, {
+          shouldResume: true, procedural,
+          token: d?._token, trackIndex: d?.trackIndex, offset: d?._resumeOffset,
+        });
+      }
+    }
+    this._setPaused(true);
   }
 
   _finishVinylResume(pending) {
