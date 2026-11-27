@@ -163,6 +163,75 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('OFF pause all-songs-off then re-enabled only starts music AFTER gameplay resumes',()=>{
+    const {a,d,events}=setup();
+    a._autoStartAttempted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(id=>[id,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    // The director intentionally invalidates the original frozen source
+    // when the last enabled song turns OFF.
+    d.transportPaused=false;d._token++;d._resumeOffset=0;
+    a.jukeboxPlay=jest.fn();
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a.jukeboxPlay).not.toHaveBeenCalled();
+    expect(a._vinylPauseSession).toMatchObject({
+      shouldResume:true,manualOverride:false,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._paused).toBe(false);
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._musicWanted).toBe(true);
+    expect(d.transportPlay).not.toHaveBeenCalled(); // never revive stale source
+    a.destroy();
+  });
+
+  test('turning continuous Pause ON after re-enabling all songs starts only the new source',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(id=>[id,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    d.transportPaused=false;d._token++;d._resumeOffset=0;
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._vinylPauseSession.restartOnResume).toBe(true);
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({
+      restartOnResume:false,shouldResume:false,manualOverride:false});
+    expect(a._musicWanted).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(activate).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('original stem loading failure during opted-in Pause activates audible fallback',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._jukeboxMode).toBe(true);
+    expect(a._musicWanted).toBe(true);
+    d.started=false; // real decoder reports a failed original pack
+    // This is the first run; music started in Title, so startMusic() never
+    // initialized the fallback RNG before the source fails mid-pause.
+    a._baseRng=null;a._progOrder=undefined;a._musicSeed=null;
+    a._startScheduler=jest.fn(()=>{a._musicTimer=71;});
+    a.musicProviderFailed();
+    expect(a._baseRng).toBeTruthy();
+    expect(a._progOrder).toHaveLength(4);
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall[0]).toBe(1);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._musicWanted).toBe(true);
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    a._musicTimer=null;
+    a.destroy();
+  });
+
   test('re-enabling songs during default OFF pause is NOT a manual jukebox PLAY',()=>{
     const {a,d,events}=setup();
     a._autoStartAttempted=true;
