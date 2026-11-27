@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.19 — local creator qualification and blind peer verification reference (2026-11-26)
+
+- #135: Add a **server-only private** player-requested local creator-clear and blind peer queue. A run may enter visible Unverified publication only after a reported local replay observation matches its pinned canonical evidence; 2–4 other server-selected peers can be assigned concurrently but never issue a Verified grant. Separate private Human/TAS challenge categories are guarded; the existing Human public trust policy is unchanged.
+- Work allocation samples the complete eligible set using cryptographic randomness by default, with server-private HMAC verifier tags, bounded assignments, restart-safe leases and per-device concurrency limits. Reject repeated causal replays by the same account even when challenge IDs or cosmetic manifest data change. No arbitrary client match votes are accepted.
+- Tests include 38 native server crypto/peer/provisional checks, a simultaneous cross-connection assignment test, and a **real three-Chromium-context** creator-plus-two-peers replay proof. The code does not enable any live public service, user account authentication, real trusted remote issuer, extra-track model verification, paid route or Shard payout. #135 remains OPEN. [skip netlify]
+
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
 - Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
