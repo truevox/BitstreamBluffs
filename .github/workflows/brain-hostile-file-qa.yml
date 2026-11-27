@@ -1,0 +1,40 @@
+name: AlphaBluffs hostile brain file preflight
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/brain-hostile-file-qa.yml'
+      - 'src/systems/brain/**'
+      - 'tests/brain/**'
+      - 'docs/brain/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/brain-hostile-file-qa.yml'
+      - 'src/systems/brain/**'
+      - 'tests/brain/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hostile-brain-input:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact source version
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked test dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Reject hostile JSON and prove bounded safe roundtrip
+        run: npm test -- --runInBand tests/brain/brain-file-preflight.test.js
