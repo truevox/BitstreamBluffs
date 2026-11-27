@@ -25,6 +25,12 @@ test('golden deterministic training result ignores callback delays and concurren
  const baseline=await runEpisodeBatch({campaignSeed:'training-golden-v1',count:16,
   concurrency:1,runEpisode:({index,seed})=>train({index,seed})});
  expect(baseline.ok).toBe(true);
+ // Fixed source-grounded golden vector, not merely one live run compared
+ // against another. If the seed ABI or simulation policy changes, fail here.
+ expect(baseline.results.map(r=>r.score)).toEqual([
+  1430,1374,1255,1700,1482,1714,1525,1449,
+  1500,1595,1344,1526,1383,1533,1172,1617,
+ ]);
  for(const concurrency of [1,2,3,7,16]){
   let active=0,peak=0;
   const got=await runEpisodeBatch({campaignSeed:'training-golden-v1',count:16,concurrency,
