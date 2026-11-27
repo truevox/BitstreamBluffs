@@ -132,11 +132,29 @@ try{
     const noPendingModal=!!s.ghostView===false;
     s._reportBoardPending=false;
     s.reportBtn.setDisabled(false);
+    // Simulate the physical pointer's game coordinates while the panel
+    // has already become visible but is not fully unfolded. It must be
+    // consumed instead of launching a destructive Retry.
+    const z=s.reportBtn.zone;
+    const center=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
+    const oldRetry=s.retry;
+    let retries=0;
+    s.retry=()=>{retries++;};
+    s.left.setAlpha(0.45);
+    s._onPointer({x:center.x,y:center.y},[]);
+    const partialConsumed=retries===0&&!s.ghostView;
+    // A completely invisible REPORT location is still blank background.
+    s.left.setAlpha(0);
+    s._onPointer({x:center.x,y:center.y},[]);
+    const hiddenStillRetries=retries===1&&!s.ghostView;
+    s.retry=oldRetry;
+    s.left.setAlpha(savedAlpha);
     return {blocked,noModal,restored,hiddenRejected,noHiddenModal,
-      pendingRejected,noPendingModal};
+      pendingRejected,noPendingModal,partialConsumed,hiddenStillRetries};
   });
   assert.deepEqual(guarded,{blocked:true,noModal:true,restored:true,
-    hiddenRejected:true,noHiddenModal:true,pendingRejected:true,noPendingModal:true});
+    hiddenRejected:true,noHiddenModal:true,pendingRejected:true,noPendingModal:true,
+    partialConsumed:true,hiddenStillRetries:true});
   assert.deepEqual(errors,[]);
   console.log('REAL_GAME_OVER_LOCAL_REPORT_EXPORT_PASS',before,opened,afterExport);
 }finally{

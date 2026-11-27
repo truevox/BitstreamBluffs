@@ -181,29 +181,33 @@ export class GameOverScene extends Phaser.Scene {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
       if (this.shopOpen || this.ghostView || this.takeoverPicker || this.coachView) return;
-      // Test visibility BEFORE skipReveal() changes panel geometry. A tap on
-      // still-hidden REPORT coordinates was intended for the original Game
-      // Over screen, not consent to open a new evidence overlay.
-      const reportWasVisible=this._reportButtonReady();
+      // Capture the rendered REPORT hit BEFORE skipReveal changes alpha and
+      // geometry. A partially revealed visible control must never become a
+      // destructive background retry even while still non-activatable.
+      const reportWasReady=this._reportButtonReady();
+      const reportWasRendered=this._reportButtonRendered();
+      const zone=this.reportBtn?.zone;
+      let hitReport=false;
+      if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
+        const pt=zone.getWorldTransformMatrix().applyInverse(pointer.x,pointer.y);
+        hitReport=pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height;
+      }
       this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
       if (this.jukebox?.ownsPointer(pointer)) return;
-      // A native Phaser pointerdown can reach this scene-wide retry handler
-      // before its nested REPORT Zone is included in `over`. Do not turn a
-      // deliberate report click into an unrequested restart.
-      const zone=this.reportBtn?.zone;
-      if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
-        const pt=zone.getWorldTransformMatrix().applyInverse(pointer.x,pointer.y);
-        if(reportWasVisible && pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height){
-          this._openLocalReport();
-          return;
-        }
+      // Native pointerdown can reach this scene-wide retry handler before
+      // the nested button's own event. A visible REPORT hit is consumed even
+      // while its panel is still unfolding; the player can select it once
+      // fully ready. No click should silently switch to Retry.
+      if(hitReport && reportWasRendered){
+        if(reportWasReady)this._openLocalReport();
+        return;
       }
       this._cancelShopAutoprompt();
-      // An invisible/disabled REPORT zone is not a visible control. Phaser
-      // can still list it in `over` during the staged results reveal.
-      const visibleTargets=reportWasVisible ? over : over.filter(o=>o!==zone);
+      // A *completely invisible* REPORT zone is not a visible target:
+      // preserve the original tap-to-retry behavior on blank background.
+      const visibleTargets=reportWasRendered ? over : over.filter(o=>o!==zone);
       if (!this.entry && visibleTargets.length === 0) this.retry();
     };
     this.input.on('pointerdown', this._onPointer);
@@ -1027,6 +1031,14 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
+  }
+
+  /** Partially unfolded panel: consume a hit, but do not yet activate it. */
+  _reportButtonRendered() {
+    const panel=this.left;
+    return Boolean(this.reportBtn?.zone?.scene && panel?.scene &&
+      panel.visible!==false && panel.alpha>0.02 &&
+      this.reportBtn.visible!==false && this.reportBtn.alpha>0.02);
   }
 
   /** Never interpret a tap on a still-hidden animated button as consent. */
