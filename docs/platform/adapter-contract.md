@@ -1,5 +1,7 @@
 # #441 Platform capability bridge — ABI 1 (web/fake foundation)
 
+For external-distribution eligibility and actual publisher submission gates, see [#445 portal preflight](portal-distribution-readiness.md). This document is the ABI implementation contract, not authorization for ad SDKs or partner submission.
+
 The game registry has one shared `REG.PLATFORM` adapter initialized once by
 `createServices`. Own-site Ride *always* chooses the explicit **web** adapter;
 no hostname sniffing or SDK autoload. **Ride is always ad-free.** The
