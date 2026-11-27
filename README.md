@@ -81,7 +81,7 @@ npm test -- tests/src           # current-game unit tests
 npm run sim -- --seeds 24 --policy handsOff --out result.json
 ```
 
-The full Jest suite also includes historical tests under `tests/`; see the changelog and CI for actual baseline/test results. Browser tools use Playwright/Chromium; install the required browser with `npx playwright install chromium` if necessary.
+The Jest suite includes current game, replay, integration, and tooling tests under `tests/`. Tests targeting the retired pre-`src/` game were archived with its code (see below). Browser tools use Playwright/Chromium; install the required browser with `npx playwright install chromium` if necessary.
 
 ### Controls
 
@@ -119,7 +119,8 @@ Replay takeovers, postcards, guest practice and training simulations do not earn
 - `public/` — static assets, manifest and bundled music/fallback content; additional soundtrack delivery is versioned separately.
 - `tools/` — simulation, replay and other development/QA tooling.
 - `server/` — experimental server-reference work; not a live public competition backend.
-- `tests/src/` — current-game tests; `js/` and historical tests are legacy reference, not loaded by the current game.
+- `tests/src/` — current-game tests; other maintained `tests/` folders cover replay, simulation, tooling, and integration.
+- The retired pre-`src/` engine, its engine-only tests, and obsolete root test-repair scripts are recoverable at [the pre-retirement Git tag](https://github.com/truevox/BitstreamBluffs/tree/archive/pre-legacy-js-retirement-20261127) (commit `10137b0f`), but are not active code. The historical `/docs/` playground now links to the current game. The old `todo.txt` is retained as a historical planning note, not a current sprint tracker.
 - `docs/` — design, engineering and experiment records. [CHANGELOG.md](CHANGELOG.md) records release slices and limitations.
 
 ### Contributing and releases
