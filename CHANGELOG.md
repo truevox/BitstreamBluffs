@@ -2,7 +2,7 @@
 
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
-- Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator, Frequency and education scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
+- Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
 
 ## v2.25.17 — coarse pre-alpha geography (2026-11-26)
 

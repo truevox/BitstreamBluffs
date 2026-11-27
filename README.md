@@ -6,9 +6,9 @@
 
 Bitstream Bluffs is a local-first, browser-based downhill sledding, trick and racing game with a neon arcade aesthetic, procedural mountains, and a pursuing wall of corrupted data (the BSOD). Carve, hop, flip, helicopter, corkscrew, tuck, divebomb and parachute your way down increasingly strange terrain. Chase distance and tricks, earn progression and upgrades, race ghosts, and explore the mountain's secrets.
 
-The longer-term project adds **AlphaBluffs**: real artificial-life training, an idle/incremental game driven by frozen neural pilots, a community exchange for brains and runs, and a school-year evolving AI art installation. It is one game with shared deterministic physics, not a collection of unrelated simulations.
+The longer-term project adds **AlphaBluffs**: real artificial-life training, an idle/incremental game driven by frozen neural pilots, and a community exchange for brains and runs. It is one game with shared deterministic physics, not a collection of unrelated simulations.
 
-> **Pre-alpha:** Ride is playable. AlphaBluffs, public competitions and creator/education services are future scope. This document describes the intended product as well as the current build; it is not a promise that every roadmap idea has been implemented or approved for release. The changelog and linked issues are authoritative for exact release and review status.
+> **Pre-alpha:** Ride is playable. AlphaBluffs, public competitions and creator services are future scope. This document describes the intended product as well as the current build; it is not a promise that every roadmap idea has been implemented or approved for release. The changelog and linked issues are authoritative for exact release and review status.
 
 ## Playable now
 
@@ -51,11 +51,6 @@ See the [AlphaBluffs epic #23](https://github.com/truevox/BitstreamBluffs/issues
 - **The Frequency:** future character music packs and radio playlists, plus independently selectable host announcers for real gameplay/training milestones. Listen to one host's music and choose another host's voice (e.g. Stella); optional follow-current-host, off, independent volume and frequency. Maxi's current music is not a restriction on future artist or announcer choice ([#28](https://github.com/truevox/BitstreamBluffs/issues/28)).
 - Additional replay/gameplay research covers daily mountain curation, constraint challenges, machine medals, glitch bounties, skill maps, time/route experimentation, ghost pelotons and live racing. The [83-opportunity index #151](https://github.com/truevox/BitstreamBluffs/issues/151) tracks candidates, not automatic implementation approvals.
 
-### Education
-
-- **School-year evolving AI art installation:** managed Chromebox/kiosk showing a genuinely developing pilot with a July 1 annual rebirth, archived lineage, measured developmental governor and carefully bounded ambient-radio entropy research; no fake milestones or student tracking ([#26](https://github.com/truevox/BitstreamBluffs/issues/26)).
-- **Classroom Edition:** keep individual school access free; explore optional teacher lesson plans on fitness, overfitting, exploration, imitation and artificial selection, with a privacy-conscious class dashboard and paid district tools/licensing. Curriculum, privacy, procurement, accessibility and business terms require validation; no paid product is shipped ([#420](https://github.com/truevox/BitstreamBluffs/issues/420)).
-
 ## Major work status
 
 Status is a snapshot of the documented repository scope, not a live task board. An open issue may have merged partial work; a research proposal is not an implementation commitment.
@@ -72,7 +67,6 @@ Status is a snapshot of the documented repository scope, not a live task board. 
 | Brain Bazaar, shared competitions, Bluff Codes | **Planned; not started as product services** | Publish/import contracts, compatibility, moderation, hosted resolution, verified public rankings; [#40](https://github.com/truevox/BitstreamBluffs/issues/40), [#27](https://github.com/truevox/BitstreamBluffs/issues/27) |
 | Creator Studio, Evolution Reel, audience control | **Planned; not implemented as features** | Video/OBS and replay export, milestone capture, audience adapters; [#62](https://github.com/truevox/BitstreamBluffs/issues/62), [#421](https://github.com/truevox/BitstreamBluffs/issues/421) |
 | Frequency packs and host announcers | **Planned; not started as player features** | Other artist packs, voice lines, independent soundtrack/announcer controls; [#28](https://github.com/truevox/BitstreamBluffs/issues/28) |
-| Education and district tools | **Planned; not implemented** | Kiosk runtime, curriculum, classroom dashboard, privacy and licensing; [#26](https://github.com/truevox/BitstreamBluffs/issues/26), [#420](https://github.com/truevox/BitstreamBluffs/issues/420) |
 
 ## Running and developing locally
 
