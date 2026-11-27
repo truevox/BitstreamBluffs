@@ -60,11 +60,12 @@ export function openBlindPeerCoordinator({
   id TEXT PRIMARY KEY,
   challenge TEXT NOT NULL UNIQUE REFERENCES challenges(id),
   owner TEXT NOT NULL, board TEXT NOT NULL CHECK(board IN ('human','tas')),
-  evidence BLOB NOT NULL, evidence_digest TEXT NOT NULL,
+  evidence BLOB NOT NULL, evidence_digest TEXT NOT NULL, causal_digest TEXT NOT NULL,
   local_state TEXT NOT NULL CHECK(local_state IN ('running','passed','failed')),
   publication TEXT NOT NULL CHECK(publication IN ('private','unverified','disputed','consensus-candidate','failed-local')),
   opted_in INTEGER NOT NULL CHECK(opted_in=1),
-  created INTEGER NOT NULL, updated INTEGER NOT NULL
+  created INTEGER NOT NULL, updated INTEGER NOT NULL,
+  UNIQUE(owner,causal_digest)
  ) STRICT;
  CREATE TABLE IF NOT EXISTS private_peer_assignment(
   id TEXT PRIMARY KEY,
@@ -138,6 +139,7 @@ export function openBlindPeerCoordinator({
    if(c.verifier!==verifierBuildId)return no('verifier-build-mismatch');
    if(now<c.created||now>=c.expires)return no('challenge-expired');
    if(db.prepare('SELECT 1 FROM private_verification WHERE challenge=?').get(challengeId))return no('already-requested');
+   if(db.prepare('SELECT 1 FROM private_verification WHERE owner=? AND causal_digest=?').get(account,prepared.identity.causalDigest))return no('already-submitted-causal-run');
    const course=read(c.course);
    if(course.rulesetId!==trustedRuleset.rulesetId||course.seed!==prepared.tape.seed||
       course.biomeMask!==prepared.tape.biomeMask||
@@ -149,8 +151,9 @@ export function openBlindPeerCoordinator({
    if(!frozen||frozen.digest!==course.loadoutDigest||
       equipmentDigest(frozen.loadout)!==frozen.digest)return no('unbound-equipment');
    const submissionId=randomUUID();
-   db.prepare("INSERT INTO private_verification VALUES (?,?,?,?,?,?,'running','private',1,?,?)")
-    .run(submissionId,challengeId,account,board,Buffer.from(evidenceBytes),prepared.identity.bundleDigest,now,now);
+   db.prepare("INSERT INTO private_verification VALUES (?,?,?,?,?,?,?,'running','private',1,?,?)")
+    .run(submissionId,challengeId,account,board,Buffer.from(evidenceBytes),
+      prepared.identity.bundleDigest,prepared.identity.causalDigest,now,now);
    return {ok:true,submissionId,status:'checking-locally',board};
   });
  }

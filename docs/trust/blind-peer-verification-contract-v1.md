@@ -50,8 +50,11 @@ The assignment RNG selects over the ENTIRE current eligible queue, not merely
 the oldest 32 entries. Count and indexed offset are read inside the same SQLite
 BEGIN IMMEDIATE transaction. Fixed-size 256-bit lease tokens are bounded and
 validated on submission. A >32-request fixture specifically prevents the old
-silent selection bias from returning. This is uniform selection of eligible
-submissions, not yet fairness scheduling or Sybil resistance. Expiry and restart cannot let one identity endlessly reroll the same
+silent selection bias from returning. A per-account unique causal replay digest
+prevents the same run from being republished with a different challenge ID or
+cosmetic manifest metadata; another legitimate account may still submit an
+identical causal run. These are pre-alpha anti-spam constraints, not yet a
+full fairness scheduler, account anti-Sybil guarantee or final policy. Expiry and restart cannot let one identity endlessly reroll the same
 submission.
 
 Both creator and peer return a canonical *observed* simulation state. The

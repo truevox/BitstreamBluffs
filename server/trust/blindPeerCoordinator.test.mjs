@@ -245,3 +245,14 @@ test('selection spans the entire population, including entries beyond the former
  assert.deepEqual(got.job.evidence,runs[36].bytes);
  assert.equal(h.status(verifier).publication,'NONE');
 });
+
+test('same account cannot re-submit same causal run by changing informational manifest metadata',t=>{
+ const h=harness(t),first=h.submit('alice',0);
+ assert.equal(first.started.ok,true);
+ const replay=h.submit('alice',1);
+ assert.equal(replay.started.reason,'already-submitted-causal-run');
+ // Another real account is not suppressed for an independent identical run.
+ const another=h.submit('bob',2);
+ assert.equal(another.started.ok,true);
+ assert.equal(h.inspect(db=>db.prepare('SELECT count(*) AS n FROM private_verification').get().n),2);
+});
