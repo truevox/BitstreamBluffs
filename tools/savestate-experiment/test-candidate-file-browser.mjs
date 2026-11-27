@@ -11,7 +11,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 let vite,browser,scratch;
 const errors=[],time=Date.UTC(2026,0,5,12);
-const suspendEnvelope=process.argv.includes('--suspend-envelope');
+const reopenProof=process.argv.includes('--suspend-reopen');
+const suspendEnvelope=process.argv.includes('--suspend-envelope')||reopenProof;
 try{
  scratch=await mkdtemp(join(tmpdir(),'bb-candidate-file-'));
  vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true,watch:null,hmr:false}});
@@ -19,8 +20,8 @@ try{
  const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),
   headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- async function boot(ms){
-  const context=await browser.newContext({viewport:{width:960,height:540}}),page=await context.newPage();
+ async function boot(ms,existingContext=null){
+  const context=existingContext||await browser.newContext({viewport:{width:960,height:540}}),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date(ms));
   await page.goto(url,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
@@ -115,8 +116,8 @@ try{
    // after the same fresh native world restoration is observed successful.
    let resumeWire=wire;
    if(suspendEnvelope){
-    const claimed=await b.page.evaluate(async raw=>{
-     const [{candidateSuspendEnvelopeBytes,inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+    const prepared=await b.page.evaluate(async raw=>{
+     const [{candidateSuspendEnvelopeBytes,candidateSuspendLayout},
       {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
       import('/src/systems/savestate/candidateSuspendEnvelope.js'),
       import('/src/systems/savestate/runtimeIdentity.js'),
@@ -127,15 +128,37 @@ try{
      const bytes=candidateSuspendEnvelopeBytes(new TextEncoder().encode(raw),identity);
      const stored=await slot.put(bytes,identity,candidateSuspendLayout);
      if(!stored.ok)throw Error('candidate slot write failed '+stored.code);
+     return {saved:stored.saved,bytes:stored.bytes};
+    },wire);
+    assert.equal(prepared.saved,true);
+    if(reopenProof){
+     // Destroy the original page and create a new page in the SAME storage
+     // partition. The new page has not received a candidate or claim token.
+     await b.page.close();
+     b.page=(await boot(time+1000,b.context)).page;
+     assert.equal(await b.page.evaluate(()=>window.__candidate.r.simClock.tick),0);
+    }
+    const claimed=await b.page.evaluate(async()=>{
+     const [{inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+      {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
+      import('/src/systems/savestate/candidateSuspendEnvelope.js'),
+      import('/src/systems/savestate/runtimeIdentity.js'),
+      import('/src/systems/savestate/localSuspendSlot.js')]);
+     const identity=await loadCurrentBuildDescriptor(),slot=new LocalSuspendSlot();
+     if(identity.buildId!==window.__candidate.g.registry.get('currentBuildId'))
+      throw Error('reopen build identity mismatch');
      const claim=await slot.claim(identity,candidateSuspendLayout);
      if(!claim.ok)throw Error('candidate slot claim failed '+claim.code);
+     const competitor=await new LocalSuspendSlot().claim(identity,candidateSuspendLayout);
+     if(competitor.code!=='slot-claimed')throw Error('two-owner protection failed '+JSON.stringify(competitor));
      const admitted=inspectCandidateSuspendEnvelope(claim.bytes,identity);
      if(!admitted.ok||admitted.admission!=='envelope-only')throw Error('candidate envelope admission');
      window.__localClaim={slot,token:claim.token,identity,layout:candidateSuspendLayout};
-     return {wire:new TextDecoder().decode(admitted.candidateBytes),admission:admitted.admission};
-    },wire);
+     return {wire:new TextDecoder().decode(admitted.candidateBytes),admission:admitted.admission,competitor:competitor.code};
+    });
     assert.equal(claimed.wire,wire);
     assert.equal(claimed.admission,'envelope-only');
+    assert.equal(claimed.competitor,'slot-claimed');
     resumeWire=claimed.wire;
    }
    const result=await b.page.evaluate(({wire,frameTime})=>window.__candidate.restore(wire,frameTime),
@@ -147,8 +170,9 @@ try{
      return {result,next};
     });
     assert.deepEqual(consumed,{result:{ok:true,consumed:true},next:{ok:false,code:'empty'}});
-    console.log('PASS_IDB_CANDIDATE_ONE_USE',JSON.stringify({tick,bytes:Buffer.byteLength(wire),
-     admission:'envelope-only',consumedAfterRestore:true}));
+    console.log(reopenProof?'PASS_REOPENED_IDB_CANDIDATE_ONE_USE':'PASS_IDB_CANDIDATE_ONE_USE',
+     JSON.stringify({tick,bytes:Buffer.byteLength(wire),admission:'envelope-only',
+      reopenedFreshPage:reopenProof,competitorClaimRefused:true,consumedAfterRestore:true}));
    }
    assert.equal(result.tick,tick);assert.equal(result.calls,0);assert.equal(result.exact,true);
    assert.deepEqual(result.fp,cap.fp);assert.equal(result.runId,cap.runId);
