@@ -1,4 +1,6 @@
-import {captureManualPauseCandidate} from '../../src/systems/savestate/pausedCandidate.js';
+import {jest} from "@jest/globals";
+import {captureManualPauseCandidate,canCaptureManualPauseCandidate} from '../../src/systems/savestate/pausedCandidate.js';
+import {suspendManualRun} from '../../src/systems/savestate/manualSuspendController.js';
 
 const eligible=()=>({
  crashed:false,unrankedPractice:false,tapePlayer:null,_replayTape:null,
@@ -50,4 +52,55 @@ test('malformed caller or absent scene fails before attempting a capture',()=>{
  expect(()=>captureManualPauseCandidate(null,{})).toThrow('suspend:unsupported-active-run');
  const r=eligible();r.scene=null;
  expect(()=>captureManualPauseCandidate(r,{})).toThrow('suspend:manual-pause-required');
+});
+
+/** A rejected mode must never enter the async identity/IDB phase. In particular,
+ * changing a live run to an unsupported mode between opening Pause and clicking
+ * Suspend must not create a READY slot or retire the existing paused scene.
+ */
+test.each([
+ ['crashed',r=>r.crashed=true],
+ ['unranked practice',r=>r.unrankedPractice=true],
+ ['tape replay',r=>r.tapePlayer={}],
+ ['replay source',r=>r._replayTape={}],
+ ['replay takeover',r=>r.takeover={}],
+ ['coach simulation',r=>r.coachSim={}],
+ ['guest practice',r=>r.guestPractice=true],
+ ['BSOD Gym',r=>r.bsodGym=true],
+ ['official daily',r=>r.dailyOfficial=true],
+ ['modded run',r=>r.modded=true],
+ ['purchased upgrade',r=>r.upgradeRun.enabled=true],
+ ['applied boost',r=>r.appliedBoosts=['headStart']],
+ ['magnet modifier',r=>r.magnetsDrop=true],
+ ['Kodiak modifier',r=>r.kodiaksOn=true],
+ ['zero tick',r=>r.simClock.tick=0],
+ ['negative tick',r=>r.simClock.tick=-1],
+ ['fractional tick',r=>r.simClock.tick=481.5],
+ ['missing clock',r=>r.simClock=null],
+ ['missing recorder',r=>r.ghostRecorder=null],
+])('unsupported %s never reaches storage and leaves the real run paused',async(_,modify)=>{
+ const run=eligible();
+ modify(run);
+ const rejectedTick=run.simClock?.tick;
+ const identity=jest.fn(async()=>{throw Error('identity must not be inspected');});
+ const slot={put:jest.fn(async()=>{throw Error('storage must not be touched');})};
+ const pause={scene:{get:key=>key==='RunScene'?run:null,
+  isActive:key=>key==='PauseScene'}};
+ expect(canCaptureManualPauseCandidate(run)).toBe(false);
+ await expect(suspendManualRun(pause,{}, {slot,loadIdentity:identity}))
+  .resolves.toEqual({ok:false,code:'suspend-refused'});
+ expect(identity).not.toHaveBeenCalled();
+ expect(slot.put).not.toHaveBeenCalled();
+ expect(run._manualPausePending).toBe(true);
+ expect(run.scene.isPaused('RunScene')).toBe(true);
+ expect(run.simClock?.tick).toBe(rejectedTick);
+});
+
+test('closed Pause refuses even a stock run without a storage call',async()=>{
+ const run=eligible(),slot={put:jest.fn()},identity=jest.fn();
+ const pause={scene:{get:()=>run,isActive:()=>false}};
+ await expect(suspendManualRun(pause,{}, {slot,loadIdentity:identity}))
+  .resolves.toEqual({ok:false,code:'not-manually-paused'});
+ expect(identity).not.toHaveBeenCalled();
+ expect(slot.put).not.toHaveBeenCalled();
 });
