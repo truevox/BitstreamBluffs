@@ -143,6 +143,7 @@ export class GameOverScene extends Phaser.Scene {
     this.saved = false;
     this.rows = [];
     this.reportBtn=null; // scene reuse must not retain a previous run's evidence entry
+    this._reportBoardPending=true; // leaderboard qualifier owns keyboard until resolved
     this.rec = this.registry.get(REG.LAST_RECORD) || this._emptyRecord();
     const rec = this.rec;
     const theme = (this.theme = new Theme(this));
@@ -200,7 +201,10 @@ export class GameOverScene extends Phaser.Scene {
         }
       }
       this._cancelShopAutoprompt();
-      if (!this.entry && over.length === 0) this.retry();
+      // An invisible/disabled REPORT zone is not a visible control. Phaser
+      // can still list it in `over` during the staged results reveal.
+      const visibleTargets=reportWasVisible ? over : over.filter(o=>o!==zone);
+      if (!this.entry && visibleTargets.length === 0) this.retry();
     };
     this.input.on('pointerdown', this._onPointer);
     this.events.once('shutdown', () => {
@@ -353,6 +357,7 @@ export class GameOverScene extends Phaser.Scene {
       // The title-tab gap ends at x155, where GHOST FAV begins.
       this.reportBtn = new Button(this, theme, { x: 105, y: 1, w: 49, h: 12,
         label: 'REPORT', color: 'amber', onClick: () => this._openLocalReport() });
+      this.reportBtn.setDisabled(true); // asynchronous qualification must resolve first
       p.add(this.reportBtn);
       if (this.registry.get(REG.GHOSTS)) {
         this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
@@ -650,6 +655,8 @@ export class GameOverScene extends Phaser.Scene {
         : (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10)), []),
     ]).then(([qualifies, rows]) => {
       if (!this.alive || this.leaving) return;
+      this._reportBoardPending=false;
+      this.reportBtn?.setDisabled(false);
       this.rows = Array.isArray(rows) ? rows : [];
       const already = this.rows.some((r) => r.id === rec.id);
       const worthy = this.rows.length >= 3 || (rec.score || 0) >= 200;
@@ -1026,6 +1033,7 @@ export class GameOverScene extends Phaser.Scene {
   _reportButtonReady() {
     const panel=this.left;
     return Boolean(this.reportBtn?.zone?.scene && !this.reportBtn.disabled &&
+      this._reportBoardPending !== true && !this.entry &&
       panel?.scene && panel.visible !== false && panel.alpha >= 0.995 &&
       Math.abs(panel.scaleX-1)<0.005 && Math.abs(panel.scaleY-1)<0.005);
   }

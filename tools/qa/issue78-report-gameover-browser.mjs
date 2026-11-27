@@ -125,10 +125,18 @@ try{
     s._openLocalReport();
     const noHiddenModal=!!s.ghostView===false;
     s.left.setAlpha(savedAlpha);
-    return {blocked,noModal,restored,hiddenRejected,noHiddenModal};
+    s._reportBoardPending=true;
+    s.reportBtn.setDisabled(true);
+    const pendingRejected=s._reportButtonReady()===false;
+    s._openLocalReport();
+    const noPendingModal=!!s.ghostView===false;
+    s._reportBoardPending=false;
+    s.reportBtn.setDisabled(false);
+    return {blocked,noModal,restored,hiddenRejected,noHiddenModal,
+      pendingRejected,noPendingModal};
   });
   assert.deepEqual(guarded,{blocked:true,noModal:true,restored:true,
-    hiddenRejected:true,noHiddenModal:true});
+    hiddenRejected:true,noHiddenModal:true,pendingRejected:true,noPendingModal:true});
   assert.deepEqual(errors,[]);
   console.log('REAL_GAME_OVER_LOCAL_REPORT_EXPORT_PASS',before,opened,afterExport);
 }finally{
