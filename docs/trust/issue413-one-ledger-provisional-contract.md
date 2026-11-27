@@ -6,6 +6,31 @@ a decision from Marvin about server rollout, prices, TTL or reward rates.
 **Prerequisite:** #411 one canonical `publicWallet`/signed admission source;
 #410's separate wallet and challenge tables must **NOT** ship as another bank.
 
+## Superseding owner clarification — 2026-11-26
+
+Marvin clarified that a player's FINAL local check is a Mario Maker-style
+qualification gate: uploading a publicly visible Unverified result is forbidden
+until that exact run has passed its local replay. Peers may work concurrently
+in the background while the local check runs; their results do not override a
+failed creator check. A private server-submitted pending record is not a
+public result.
+
+The one-ledger provisional adapter now *requires* a qualified,
+account-owned private submission for the same challenge and a complete,
+matching canonical evidence bundle. It rechecks score, terminal tick, seed,
+ruleset, exact manifest/tape identity and frozen gear before any Unverified
+public record is admitted. Its server received timestamp is the ORIGINAL
+opt-in request time, not when a verifier finishes, so a timely request is not
+disqualified merely because local/peer computation ran past the challenge
+issuance deadline. All Verified-only rank/reward constraints remain zero.
+
+The private blind coordinator recognizes separate Human and TAS queues. The
+existing pure dual-proof public admission is still human-only, and this
+provisional adapter must not accept a TAS challenge as Human. Additional-track
+evaluation requires frozen replayable controller provenance and is NOT
+conflated with exact-run replay. The public network service and actual
+frontend flow are still absent. Keep #135 OPEN.
+
 ## Source-only implementation boundary
 
 - A trusted server adapter authenticates account, consent and audience.

@@ -10,7 +10,9 @@ import {randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {canonicalBytes,parseCanonical} from '../../src/systems/replay/canonicalJson.js';
 import {adjudicateDualProof} from '../../src/systems/trust/dualProof.js';
-import {equipmentDigest} from './publicWallet.mjs';
+import {equipmentDigest,equipmentProjection} from './publicWallet.mjs';
+import {prepareReplayEvidence} from './replayEvidence.mjs';
+import {digestOf} from '../../src/systems/replay/canonicalSha256.js';
 
 const ACCOUNT=/^[\w.\-:@/]{1,120}$/;
 const COURSE=['runId','buildId','rulesetId','seed','biomeMask','lane','loadoutDigest','assistance'];
@@ -28,8 +30,9 @@ const consentFor=r=>({
 });
 
 /** A private adapter, not a browser request handler or a public verifier. */
-export function openProvisionalLedger({databasePath,clock=Date.now}) {
-  if(typeof databasePath!=='string'||!databasePath||typeof clock!=='function')
+export function openProvisionalLedger({databasePath,trustedRuleset,clock=Date.now}) {
+  if(typeof databasePath!=='string'||!databasePath||typeof clock!=='function'||
+     !trustedRuleset||digestOf(trustedRuleset.ruleset)!==trustedRuleset.rulesetId)
     throw Error('invalid provisional ledger configuration');
   const db=new DatabaseSync(databasePath);
   db.exec(`
@@ -83,11 +86,31 @@ export function openProvisionalLedger({databasePath,clock=Date.now}) {
         .get(request.challengeId);
       if(!challenge||challenge.account!==authenticatedAccount)
         return deny('challenge-not-owned');
-      const received=now();
+      // #135 Mario-Maker-style local creator qualification is the PRIVATE
+      // upload gate. The server receivedAt is when verification began,
+      // not when the local worker (or the free peer queue) finished.
+      const submitted=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='private_verification'").get();
+      if(!submitted)return deny('local-qualification-required');
+      const qualified=db.prepare('SELECT owner,board,local_state,publication,created,evidence,evidence_digest FROM private_verification WHERE challenge=?')
+        .get(request.challengeId);
+      if(!qualified||qualified.owner!==authenticatedAccount||
+         qualified.board!=='human'||qualified.local_state!=='passed'||
+         !['unverified','disputed','consensus-candidate'].includes(qualified.publication))
+        return deny('local-qualification-required');
+      const received=qualified.created;
       if(received<challenge.created||received>=challenge.expires)
         return deny('challenge-expired');
       if(challenge.course!==text(ownCourse(request)))
         return deny('challenge-course-mismatch');
+      const observed=prepareReplayEvidence(Uint8Array.from(qualified.evidence),trustedRuleset);
+      if(!observed.ok||observed.identity.bundleDigest!==qualified.evidence_digest||
+         observed.identity.manifestDigest!==request.manifestDigest||
+         observed.identity.tapeDigest!==request.tapeDigest||
+         observed.identity.rulesetId!==request.rulesetId||
+         observed.expected.score!==request.score||observed.expected.endTick!==request.endTick||
+         observed.tape.seed!==request.seed||observed.tape.biomeMask!==request.biomeMask||
+         equipmentDigest(equipmentProjection(observed.causal))!==request.loadoutDigest)
+        return deny('local-evidence-mismatch');
       const frozen=db.prepare('SELECT loadout,digest FROM public_equipment WHERE challenge=? AND account=?')
         .get(request.challengeId,authenticatedAccount);
       if(!frozen||frozen.digest!==request.loadoutDigest||
