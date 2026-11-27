@@ -1,10 +1,10 @@
 # Changelog
 
-## v2.25.19 — #85 Museum of Bad Physics player-preview route (2026-11-26)
+## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
 
-- Expose the local-file-only **Museum of Bad Physics** static pose gallery to players through an `M MUSEUM` Title chip and keyboard **M**, with a Back to Game link. The gallery is a bundled production HTML entry, not an additional game menu row or an automatic import of prior local data.
-- Preserve the original DSH Servo/Gal Friday-bounded GhostTape v1 validator and SVG gallery with eight-file/2 MiB per-file/8 MiB total limits, no selected-file upload/storage, strict UTF-8, inert user filenames and `LOCAL FILES / UNVERIFIED` labeling. No historic physics playback or official score/ranking claims.
-- Add exact-build Chromium regression coverage for keyboard and pointer navigation, Back to Game, local GhostTape import, image URL cleanup, malicious filename/invalid JSON handling and zero selected-file HTTP requests. The public preview remains subject to explicit source and security review before release.
+- Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
+- Native real Chromium candidate transport at ticks 481 and 936: 458,306 and 513,874 bytes; zero replay ticks, identical fatal tick 977, scores, full run records and tapes, and 537 exact subsequent fingerprints. Twenty-four early malformed/forged refusal controls pass; detached terrain reconstructs 40/40 future streaming/query batches. Source identity and 439 focused regression tests passed locally before this version bump.
+- **Internal dormant source only**: not a registered final production save layout, not an actual player Save/Resume button, cross-browser stored-slot lifecycle, atomic scene publish, general modified-configuration acceptance or public Verified run. Keep parent #119 OPEN. No new gameplay scoring, telemetry, account, Shard, service or network upload behavior. [skip netlify]
 
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
