@@ -44,3 +44,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Real browser Title keyboard, pointer, local-only gallery and back navigation
         run: node tools/test-museum-public-browser.mjs
+      - name: Verify GitHub Pages preview subpath navigation
+        run: |
+          npx vite build --base /BitstreamBluffs/
+          MUSEUM_PREVIEW_BASE=/BitstreamBluffs/ node tools/test-museum-public-browser.mjs

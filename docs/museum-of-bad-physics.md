@@ -46,10 +46,12 @@ This gallery keeps a browser-safe snapshot of `SIM_REVISION` and an automated te
 
 ## Player preview release boundary
 
-`vite.config.js` bundles the Museum HTML as an explicitly tracked multi-page entry. The Title-screen **M MUSEUM** chip (also the **M** key) navigates to this route only from Title, not during a run. **Back to game** returns to `index.html`. The gallery performs no file discovery, automatic downloads, network uploads or score changes; its `LOCAL / UNVERIFIED` disclaimer describes the **recordings**, not the page hosting.
+`vite.config.js` bundles the Museum HTML as an explicitly tracked multi-page entry. Title navigation uses a path relative to the running game, so a Pages subpath such as `/BitstreamBluffs/` remains correctly scoped. The Title-screen **M MUSEUM** chip (also the **M** key) navigates to this route only from Title, not during a run. **Back to game** returns to `index.html`. The gallery performs no file discovery, automatic downloads, network uploads or score changes; its `LOCAL / UNVERIFIED` disclaimer describes the **recordings**, not the page hosting.
 
 This is a visual inspection tool for GhostTape v1 JSON exports, not historical physics playback, official proof, a replay-verified museum or a claim about a tape's provenance. Do not close #85 on this prototype alone. The public integration must receive source security review and exact-head CI including the compiled route before release; source-only/local tests do not establish public readiness.
 
 ## Automated production-route test
 
 After `npm run build`, run `CHROMIUM_EXECUTABLE=/usr/bin/chromium node tools/test-museum-public-browser.mjs` (or omit the environment variable if Playwright's matching Chromium is installed). This uses the real compiled game and asserts Title keyboard `M`, pointer chip, entry/back navigation, local GhostTape and static SVG rendering, malicious filename inertness, clear-time Blob revocation, invalid JSON rejection, zero HTTP requests when selecting tapes, and zero page exceptions. The dedicated `.github/workflows/museum-public-preview-qa.yml` runs this independently on PRs.
+
+GitHub CI additionally builds with `--base /BitstreamBluffs/` and runs the same actual Chromium test with `MUSEUM_PREVIEW_BASE=/BitstreamBluffs/`; a root-relative link would fail this case. User-selected tapes remain local; the Museum is not required to be available offline before its shell HTML has been loaded/cached.

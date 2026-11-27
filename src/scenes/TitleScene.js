@@ -71,7 +71,7 @@ const VERSION_LABEL_ALPHA = 0.65;
 const HINT_TEXT = '↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY';
 // #85 limited Museum preview: no saved-data reads or physics execution.
 export const MUSEUM_CHIP = Object.freeze({x:226,y:204,w:80,h:14});
-export const MUSEUM_GALLERY_PATH = '/tools/museum-of-bad-physics.html';
+export const MUSEUM_GALLERY_PATH = 'tools/museum-of-bad-physics.html';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {

@@ -11,13 +11,15 @@ const tape=JSON.stringify({format:'bb-ghost-tape',version:1,simTickHz:120,
  simRevision:9,physicsVersion:1,rulesetId:'sha256:'+'a'.repeat(64)});
 const fixture=(name,content=tape)=>({name,mimeType:'application/json',buffer:Buffer.from(content)});
 try {
- server=await preview({preview:{host:'127.0.0.1',port:0,strictPort:true}});
+ server=await preview({base:process.env.MUSEUM_PREVIEW_BASE||'/',preview:{host:'127.0.0.1',port:0,strictPort:true}});
  const origin='http://127.0.0.1:'+server.httpServer.address().port;
+ const base=process.env.MUSEUM_PREVIEW_BASE||'/';
+ if(!/^\/(?:[a-zA-Z0-9_-]+\/)*$/.test(base))throw Error('Invalid test preview base');
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||chromium.executablePath(),headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:960,height:540}});
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
  const boot=async()=>{
-  await page.goto(origin+'/index.html',{waitUntil:'domcontentloaded'});
+  await page.goto(origin+base+'index.html',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
     window.__bbGame.scene.getScene('TitleScene').museumButton?.scene,null,{timeout:60000});
  };

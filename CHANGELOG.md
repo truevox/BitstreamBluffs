@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.20 — #85 Museum of Bad Physics player-preview route (2026-11-26)
+
+- Expose the user-selected, local-file-only **Museum of Bad Physics** static GhostTape v1 pose gallery through a new `M MUSEUM` Title chip and keyboard M. The gallery is a dedicated production-built HTML entry with a Back to Game link; no game menu row, physics or ranking change.
+- Preserve the original DSH Servo/Gal Friday validator/gallery code and the existing v2.25.19 #119 eight-section savestate source. Eight exhibits maximum, 2 MiB per file / 8 MiB total, strict UTF-8, inert filenames/notes, SVG Blob image URLs revoked on clear, and no automatic tape import, uploaded player files or official historical score/provenance claims.
+- Add dedicated compiled Chromium gate for keyboard/pointer navigation, valid GhostTape import, malicious filenames, malformed JSON, cleanup, zero selected-file HTTP requests and Back to Game. Pending independent security review before public publication. [skip netlify]
+
 ## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
 
 - Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
