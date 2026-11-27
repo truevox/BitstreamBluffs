@@ -11,6 +11,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 let vite,browser,scratch;
 const errors=[],time=Date.UTC(2026,0,5,12);
+const pausedCapture=process.argv.includes('--paused-capture');
 const reopenProof=process.argv.includes('--suspend-reopen');
 const suspendEnvelope=process.argv.includes('--suspend-envelope')||reopenProof;
 try{
@@ -28,6 +29,7 @@ try{
    typeof window.__bbGame.registry.get('currentBuildId')==='string',null,{timeout:60000});
   await page.evaluate(async()=>{
    const {createCandidateStateCodec}=await import('/src/systems/savestate/candidateState.js');
+   const {captureManualPauseCandidate}=await import('/src/systems/savestate/pausedCandidate.js');
    const {createNativeRunSceneRestoreKit}=await import('/src/systems/savestate/RunSceneRestoreKit.js');
    const {captureCausalState}=await import('/src/systems/replay/fingerprintCapture.js');
    const {fingerprintState}=await import('/src/systems/replay/fingerprint.js');
@@ -44,6 +46,7 @@ try{
    const signature=()=>JSON.stringify({fp:fp(),runId:r.runId,tick:r.simClock.tick,rec:r.ghostRecorder.lastTick});
    window.__candidate={g,r,codec,kit,fp,signature,t:0,
     capture(){return new TextDecoder().decode(codec.capture(r));},
+    capturePaused(){return new TextDecoder().decode(captureManualPauseCandidate(r,window.Phaser));},
     stepTo(n){const out=[];while(r.simClock.tick<n&&!r.crashed){this.t+=1000/120;g.headlessStep(this.t,1000/120);out.push([r.simClock.tick,fp().combined]);}return out;},
     negative(wire){
      const before=signature(),controls={
@@ -95,11 +98,34 @@ try{
  for(const tick of [481,936]){
   const a=await boot(time),b=await boot(time+1000);
   try{
-   const cap=await a.page.evaluate(tick=>{
+   const cap=await a.page.evaluate(({tick,pausedCapture})=>{
     const p=window.__candidate;p.stepTo(tick);
     if(p.r.simClock.tick!==tick||p.r.crashed)throw Error('capture boundary');
-    return {wire:p.capture(),frameTime:p.t,fp:p.fp(),runId:p.r.runId};
-   },tick);
+    if(pausedCapture){
+     p.r.pauseRun();
+     // Phaser queues scene pause/launch until its next game step; advance
+     // the scene manager with zero delta, never the causal 120 Hz clock.
+     p.g.headlessStep(p.t,0);
+     if(!p.r.scene.isPaused('RunScene')||!p.r._manualPausePending)
+      throw Error('actual native pause not established '+JSON.stringify({pending:p.r._manualPausePending,
+       status:p.r.sys?.settings?.status,scenePaused:p.r.scene.isPaused('RunScene'),
+       pauseActive:p.g.scene.isActive('PauseScene'),pausePending:p.g.scene.isSleeping('PauseScene')}));
+    }
+    const captured=pausedCapture?p.capturePaused():p.capture();
+    if(pausedCapture&&p.r._manualPausePending!==true)throw Error('pause source flag changed by capture');
+    return {wire:captured,frameTime:p.t,fp:p.fp(),runId:p.r.runId,
+      pending:p.r._manualPausePending,paused:p.r.scene.isPaused('RunScene')};
+   },{tick,pausedCapture});
+   if(pausedCapture){
+    // Source resumes its original manual pause without advancing a sim tick.
+    const resumed=await a.page.evaluate(()=>{
+     const p=window.__candidate,r=p.r,ps=r.scene.get('PauseScene');
+     ps._doResume();
+     p.g.headlessStep(p.t,0);
+     return {pending:r._manualPausePending,paused:r.scene.isPaused('RunScene')};
+    });
+    if(resumed.pending||resumed.paused)throw Error('source manual resume did not clear pause state');
+   }
    const path=join(scratch,'candidate-'+tick+'.bbcandidate');
    await writeFile(path,cap.wire,{flag:'wx'});const wire=await readFile(path,'utf8');
    const negatives=await b.page.evaluate(w=>window.__candidate.negative(w),wire);
@@ -175,6 +201,10 @@ try{
       reopenedFreshPage:reopenProof,competitorClaimRefused:true,consumedAfterRestore:true}));
    }
    assert.equal(result.tick,tick);assert.equal(result.calls,0);assert.equal(result.exact,true);
+   if(pausedCapture){
+    const hasPending=await b.page.evaluate(()=>window.__candidate.r._manualPausePending);
+    assert.equal(hasPending,false,'resumed gameplay must accept future Pause inputs');
+   }
    assert.deepEqual(result.fp,cap.fp);assert.equal(result.runId,cap.runId);
    await b.page.clock.setFixedTime(new Date(time));
    const terminal=page=>page.evaluate(()=>window.__candidate.terminal());
