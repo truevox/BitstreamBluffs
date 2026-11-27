@@ -85,3 +85,22 @@ tampered reports and zero trusted public admissions or reward grants. The
 fixtures do not establish human input or trust in arbitrary peer browsers.
 
 #135 remains OPEN. No client gameplay or public trust services changed.
+
+## Compiled three-way integration proof (development fixture)
+
+The executable tools/trust/test-peer-compiled-pipeline.mjs records a real
+Chromium hazard run into IndexedDB, freezes its exact native evidence, issues
+three independent account-bound challenges, and starts the creator plus two
+server-assigned peer jobs in **three separate concurrently running Chromium
+contexts**. The test makes the assignment picker deterministic so it can be
+reproduced; the private coordinator defaults to cryptographically randomized
+selection. It verifies each browser independently observes identical first
+pose/RNG/BSOD, all 12 fingerprints, fatal tick 1528, score 328 and 313m.
+
+The original submission stays private even when peers finish; the existing
+public provisional ledger refuses it until the creator's own local replay
+passes. Only then may a publicly UNVERIFIED result be created. No Verified
+ranking or public Shards are ever added. This is a valuable real-engine
+integration test, not hosted multiplayer, distributed anti-cheat proof, or
+attestation that browser reports are authentic. Actual sign-in/network
+adapters, live settlement and trusted issuer remain separate.

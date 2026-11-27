@@ -65,6 +65,8 @@ jobs:
         run: node --test server/trust/blindPeerCoordinator.test.mjs
       - name: Install Chromium for real client/host verdict byte parity
         run: npx playwright install --with-deps chromium
+      - name: Real three-context creator plus two blind peer verification and publication gate
+        run: node tools/trust/test-peer-compiled-pipeline.mjs
       - name: Real browser versus Node parity, including hostile Proxy
         run: |
           npm exec vite -- --host 127.0.0.1 --port 18420 --strictPort >/tmp/dual-proof-vite.log 2>&1 &

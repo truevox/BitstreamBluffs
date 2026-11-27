@@ -256,3 +256,39 @@ test('same account cannot re-submit same causal run by changing informational ma
  assert.equal(another.started.ok,true);
  assert.equal(h.inspect(db=>db.prepare('SELECT count(*) AS n FROM private_verification').get().n),2);
 });
+
+test('three independent worker connections cannot over-assign the same target beyond its two-peer budget',{timeout:20000},async t=>{
+ const h=harness(t,{peerTarget:2});
+ const target=h.submit('alice',0);
+ const accounts=['bob','carol','dave'];
+ for(const [i,account] of accounts.entries())assert.equal(h.submit(account,i+1).started.ok,true);
+ const {Worker}=await import('node:worker_threads');
+ const barrier=new Int32Array(new SharedArrayBuffer(4));
+ const moduleUrl=new URL('./blindPeerCoordinator.mjs',import.meta.url).href;
+ const workerCode=`
+  import {parentPort,workerData} from 'node:worker_threads';
+  import {openBlindPeerCoordinator} from ${JSON.stringify(moduleUrl)};
+  const barrier=new Int32Array(workerData.barrier);
+  const c=openBlindPeerCoordinator({...workerData.options,
+   pseudonymKey:Buffer.from(workerData.options.pseudonymKey),chooseIndex:()=>0,clock:()=>10000});
+  Atomics.add(barrier,0,1);Atomics.notify(barrier,0);
+  while(Atomics.load(barrier,0)<3)Atomics.wait(barrier,0,1,5000);
+  try { const result=c.claimForAutomaticPeer(workerData.account,{deviceReady:true});
+   parentPort.postMessage({ok:result.ok,reason:result.reason,jobId:result.job?.id}); }
+  finally {c.close();}
+ `;
+ const options={databasePath:h.databasePath,trustedRuleset,
+  pseudonymKey:h.options.pseudonymKey,verifierBuildId:h.options.verifierBuildId,peerTarget:2};
+ const workers=accounts.map(account=>new Worker(new URL('data:text/javascript,'+encodeURIComponent(workerCode)),{
+  workerData:{barrier:barrier.buffer,account,options}}));
+ t.after(()=>Promise.all(workers.map(w=>w.terminate())));
+ const results=await Promise.all(workers.map(w=>new Promise((resolve,reject)=>{
+  w.once('message',resolve);w.once('error',reject);
+  w.once('exit',n=>{if(n!==0)reject(Error('worker exited '+n));});
+ })));
+ assert.ok(results.every(x=>x.ok),JSON.stringify(results));
+ const rows=h.inspect(db=>db.prepare('SELECT verifier_tag FROM private_peer_assignment WHERE submission=?').all(target.started.submissionId));
+ assert.equal(rows.length,2);
+ assert.equal(new Set(rows.map(x=>x.verifier_tag)).size,2);
+ assert.equal(h.status(target).publication,'NONE');
+});

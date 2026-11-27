@@ -5,6 +5,8 @@
  */
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
 import {boot,recordRun,freshPage,closeHarness} from '../test-takeover-browser.mjs';
 import {validateEvidenceBundle} from '../../src/systems/replay/manifest.js';
 import {canonicalBytes} from '../../src/systems/replay/canonicalJson.js';
@@ -15,7 +17,7 @@ import {prepareReplayEvidence,compareReplayObservation} from '../../server/trust
 const current=JSON.parse(readFileSync(new URL('../../tools/ruleset/current.json',import.meta.url),'utf8'));
 const ruleset=JSON.parse(readFileSync(new URL('../../'+current.archivePath,import.meta.url),'utf8'));
 const resolver=id=>id===current.rulesetId?ruleset:null;
-async function replay(bytes){
+export async function replay(bytes){
  const p=prepareReplayEvidence(bytes,{rulesetId:current.rulesetId,ruleset});if(!p.ok)return p;
  const V=await freshPage();
  try{
@@ -45,6 +47,7 @@ async function replay(bytes){
  }finally{await V.close();}
 }
 
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
 try{
  await boot();
  const {P,rec,info}=await recordRun({seed:'A',fixture:'hazard'});
@@ -80,3 +83,4 @@ try{
  console.log('PASS_REAL_REPLAY_NEGATIVES');
  exerciseBoundAdmission(bytes,{rulesetId:current.rulesetId,ruleset},info.tape.buildId);
 }finally{await closeHarness();}
+}
