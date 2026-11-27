@@ -45,7 +45,13 @@ replay evidence to execute (which is inspectable by a sophisticated browser
 user), a short opaque task token and a pinned build ID. Two or more workers can
 be assigned concurrently, with server-configured 2–4 target and per-device
 1–2 simultaneous-job limits. Worker readiness can suppress costly background
-jobs. Expiry and restart cannot let one identity endlessly reroll the same
+jobs.
+The assignment RNG selects over the ENTIRE current eligible queue, not merely
+the oldest 32 entries. Count and indexed offset are read inside the same SQLite
+BEGIN IMMEDIATE transaction. Fixed-size 256-bit lease tokens are bounded and
+validated on submission. A >32-request fixture specifically prevents the old
+silent selection bias from returning. This is uniform selection of eligible
+submissions, not yet fairness scheduling or Sybil resistance. Expiry and restart cannot let one identity endlessly reroll the same
 submission.
 
 Both creator and peer return a canonical *observed* simulation state. The

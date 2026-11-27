@@ -121,7 +121,7 @@ test('workers cannot choose or retry target, and assignment is account/lease bou
  assert.equal(j.ok,true);
  const wrong=h.api().completePeer('carol',j.job.id,j.job.leaseToken,jobReport(j.job));
  assert.equal(wrong.reason,'not-assigned');
- assert.equal(h.api().completePeer('bob',j.job.id,'wrong',jobReport(j.job)).reason,'not-assigned');
+ assert.equal(h.api().completePeer('bob',j.job.id,'wrong',jobReport(j.job)).reason,'malformed-peer-result');
  assert.equal(h.api().completePeer('bob',j.job.id,j.job.leaseToken,canonicalBytes({evidenceDigest:'bogus',observation:replayObservation})).reason,'malformed-peer-result');
  assert.equal(h.complete('bob',j.job).ok,true);
  assert.equal(h.complete('bob',j.job).reason,'lease-not-active');
@@ -231,4 +231,17 @@ test('untrusted or mismatched pinned executable cannot enroll a private public-v
  try{db.prepare('UPDATE challenges SET verifier=? WHERE id=?').run('sha256:'+'f'.repeat(64),s.challengeId);}finally{db.close();}
  assert.equal(h.api().begin('alice',s.challengeId,s.bytes,{optedIn:true}).reason,'verifier-build-mismatch');
  assert.equal(h.api().begin('alice',s.challengeId,s.bytes,{board:'cross-track',optedIn:true}).reason,'consent-or-identity-required');
+});
+
+test('selection spans the entire population, including entries beyond the former oldest-32 window',t=>{
+ const sizes=[];
+ const h=harness(t,{chooseIndex:n=>{sizes.push(n);return n-1;}});
+ const runs=[];
+ for(let i=0;i<37;i++)runs.push(h.submit('creator-'+i,i%byVariant.length));
+ const verifier=h.submit('peer-worker',8);
+ const got=h.claim('peer-worker');
+ assert.equal(got.ok,true,JSON.stringify(got));
+ assert.equal(sizes[0],37);
+ assert.deepEqual(got.job.evidence,runs[36].bytes);
+ assert.equal(h.status(verifier).publication,'NONE');
 });

@@ -185,20 +185,26 @@ export function openBlindPeerCoordinator({
    db.prepare("UPDATE private_peer_assignment SET state='expired' WHERE state='leased' AND expires<=?").run(now);
    const existing=db.prepare("SELECT count(*) AS n FROM private_peer_assignment WHERE verifier_tag=? AND state='leased'").get(tag).n;
    if(existing>=maxConcurrent)return no('device-budget-full');
-   const available=db.prepare(`
-     SELECT s.id,s.board,s.evidence
+   // Count the ENTIRE eligible population first. The old oldest-32
+   // window systematically biased assignment and could starve newer runs.
+   // BEGIN IMMEDIATE guarantees COUNT and OFFSET see the same snapshot.
+   // Keep the selection predicate identical for COUNT and retrieval.
+   const where=`
      FROM private_verification s
      WHERE s.owner<>? AND s.local_state IN ('running','passed')
        AND NOT EXISTS (SELECT 1 FROM private_peer_assignment p
            WHERE p.submission=s.id AND p.verifier_tag=?)
        AND (SELECT count(*) FROM private_peer_assignment p
             WHERE p.submission=s.id AND p.state IN ('leased','complete')) < ?
-     ORDER BY s.created,s.rowid LIMIT 32
-   `).all(account,tag,peerTarget);
-   if(!available.length)return no('no-background-work');
-   const selected=chooseIndex(available.length);
-   if(!Number.isSafeInteger(selected)||selected<0||selected>=available.length)throw Error('bad trusted random picker');
-   const job=available[selected],assignmentId=randomUUID(),leaseToken=randomBytes(32).toString('base64url');
+   `;
+   const population=db.prepare('SELECT count(*) AS n '+where).get(account,tag,peerTarget).n;
+   if(!population)return no('no-background-work');
+   const selected=chooseIndex(population);
+   if(!Number.isSafeInteger(selected)||selected<0||selected>=population)throw Error('bad trusted random picker');
+   const job=db.prepare('SELECT s.id,s.board,s.evidence '+where+' ORDER BY s.created,s.rowid LIMIT 1 OFFSET ?')
+     .get(account,tag,peerTarget,selected);
+   if(!job)throw Error('eligible peer queue changed inside transaction');
+   const assignmentId=randomUUID(),leaseToken=randomBytes(32).toString('base64url');
    const deadline=now+leaseMs;if(!ms(deadline))throw Error('invalid expiry');
    db.prepare("INSERT INTO private_peer_assignment (id,submission,verifier_tag,lease_digest,state,leased,expires) VALUES (?,?,?,?,'leased',?,?)")
      .run(assignmentId,job.id,tag,sha(Buffer.from(leaseToken)),now,deadline);
@@ -209,7 +215,8 @@ export function openBlindPeerCoordinator({
   });
  }
  function completePeer(account,assignmentId,leaseToken,reportBytes){
-  if(!id(account)||!id(assignmentId)||typeof leaseToken!=='string')
+  if(!id(account)||!id(assignmentId)||typeof leaseToken!=='string'||
+     !/^[A-Za-z0-9_-]{43}$/.test(leaseToken))
    return no('malformed-peer-result');
   const parsed=observationReport(reportBytes);
   if(!parsed)return no('malformed-peer-result');
