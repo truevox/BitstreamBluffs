@@ -163,6 +163,62 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('OFF, all-songs-off, opt-IN, then re-enable starts music while the run stays paused',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(id=>[id,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    expect(a._paused).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(activate).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('procedural source resumes AUDIBLY after toggling continuous Pause OFF',()=>{
+    const {a,d,events,ctx}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;d.activeNodes.clear();
+    a._musicTimer=71232;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,procedural:true});
+    a._activateStemMusic=jest.fn(()=>false);
+    a._startScheduler=jest.fn(()=>{a._musicTimer=77277;});
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(205); // existing reverse-vinyl scratch completes first
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall).toEqual([1,ctx.currentTime,.04]);
+    a._musicTimer=null;
+    a.destroy();
+  });
+
+  test('default-OFF all-songs-off/re-enable restarts normal fallback if catalog missing',()=>{
+    const {a,d,events,ctx}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(id=>[id,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._vinylPauseSession.restartOnResume).toBe(true);
+    d.ready=false;d.started=false;d.transportPaused=false;
+    a._activateStemMusic=jest.fn(()=>false);
+    a._ensureCtx=jest.fn(()=>true);
+    a._startScheduler=jest.fn(()=>{a._musicTimer=1221;});
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._paused).toBe(false);
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall[0]).toBe(1);
+    expect(a._baseRng).toBeTruthy();
+    a._musicTimer=null;
+    a.destroy();
+  });
+
   test('OFF pause all-songs-off then re-enabled only starts music AFTER gameplay resumes',()=>{
     const {a,d,events}=setup();
     a._autoStartAttempted=true;

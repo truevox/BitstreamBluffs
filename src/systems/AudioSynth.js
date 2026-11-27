@@ -682,10 +682,10 @@ export class AudioSynth {
         // transport, restart the selected music only after gameplay resumes.
         if (newlyEnabled && this._paused &&
             this._vinylPauseSession?.shouldResume &&
-            !this._vinylPauseSession.manualOverride &&
-            this.settings.musicDuringPause !== true)
+            !this._vinylPauseSession.manualOverride)
           this._vinylPauseSession.restartOnResume = true;
-        if (previouslyPlayingDuringPause !== this.settings.musicDuringPause)
+        if (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
+            (newlyEnabled && this._paused && this.settings.musicDuringPause))
           this._reconcileManualPauseMusic(this.settings.musicDuringPause);
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
@@ -949,7 +949,17 @@ export class AudioSynth {
     this._jukeboxMode = false;
     if (snap.procedural) {
       if (!this._activateStemMusic() && this.ctx.state === 'running' &&
-          !this._musicTimer) this._startScheduler();
+          !this._musicTimer) {
+        // Restoring the timer alone is silent: OFF muted the procedural
+        // source bus while the run was paused. The audio context is running
+        // now; restore its gain before restarting the legal fallback.
+        if (!this.game?.registry?.get?.('offlineMusicDownloads')) {
+          if (!this._baseRng || !Array.isArray(this._progOrder))
+            this._seedProceduralMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
+          this.nodes?.musicSrc?.gain?.setTargetAtTime?.(1,this.ctx.currentTime,0.04);
+        }
+        this._startScheduler(); // offline preview still refuses synthesized audio
+      }
     } else if (!d.transportPlay()) this._musicWanted = false;
   }
 
@@ -976,13 +986,11 @@ export class AudioSynth {
       const d = this._stemMusic;
       if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
       if (session.restartOnResume) {
-        // Selecting OFF for every song invalidated the previous transport.
-        // Re-enabling tracks during Pause is not an authorization to play
-        // *during* a default-OFF pause; honor the choice on actual Resume.
-        this._musicWanted = true;
-        if (this.ctx?.state === 'running') this._activateStemMusic();
-        // A late catalog is handled by _onStemCatalogReady; suspended context
-        // retries through _afterResume. Normal pack failures use fallback.
+        // The previous source was invalidated by all-songs-off. Use the
+        // standard source-first start path: when original stems are not yet
+        // available it initializes a deterministic procedural fallback,
+        // including the offline-music prohibition and WebAudio gain.
+        this.startMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
         return;
       }
       if (!session.procedural && (!d?.transportPaused || d.started ||
@@ -1221,7 +1229,8 @@ export class AudioSynth {
     // A title-started original recording can reach Run without startMusic()
     // ever initializing the procedural RNG. A late pack failure must not
     // start a silent scheduler that throws each tick for missing seed state.
-    if (!this._baseRng || !Array.isArray(this._progOrder))
+    if (!this.game?.registry?.get?.('offlineMusicDownloads') &&
+        (!this._baseRng || !Array.isArray(this._progOrder)))
       this._seedProceduralMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
     this._startScheduler();
   }
@@ -1234,7 +1243,8 @@ export class AudioSynth {
    */
   _seedProceduralMusic(seed) {
     this._musicSeed = String(seed == null ? '' : seed);
-    this._arrCache.clear();
+    if (!this._arrCache) this._arrCache=new Map();
+    else this._arrCache.clear();
     const base = new Rng(this._musicSeed).fork('music');
     this._baseBpm = 118 + base.int(0, 14);
     const order = [0, 1, 2, 3];
