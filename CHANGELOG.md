@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.31 — #424 production-only savestate constructor identity hotfix (2026-11-27)
+
+- Fix a **production-only real player Suspend failure** that was invisible to all prior development-browser and native-source tests: Vite/esbuild minification renamed semantic classes (e.g. `PowerUp` to `Gm`), while the typed native entity-state validator required canonical `PowerUp`/Hazard/Sled class IDs. A genuine stock RunScene with a power-up failed SUSPEND as `entity-state:powerups/0/0/class`. The game correctly stayed paused, but no usable save was produced.
+- Set `esbuild.keepNames: true` for the Vite build to preserve semantic constructor identities across real capture and new-world restore; retain strict schemas, source tripwire, physics/SIM_REVISION, no trust relaxation or wire format change.
+- Add a dedicated **actual compiled-production browser CI**: build real minified `dist` (NOT Vite dev), run genuine stock RunScene, manually pause, Suspend, reload, physically click Resume, verify the same run ID, exact original tick at the single resumed RUN_START event, and atomic slot consumed without network-mutating requests. Previous published bundles fail this test; corrected compiled release passes.
+- Keep #424/#119 OPEN for installed-PWA cross-release/eviction, physical Chromebook, broader upgraded/hazard/biome eligibility and old exact-build READY save migration policy. A pre-hotfix saved run is never silently deleted or treated as cross-build compatible. No public Verified or Shard entitlement. [skip netlify]
+
 ## v2.25.30 — #424 explicit crash-held one-use Suspend recovery via exclusive browser lock (2026-11-27)
 
 - Preserve the exact single-use, local-only Suspend/Resume transaction. A resume attempt on browsers supporting the standard origin-scoped Web Locks API now holds one **exclusive lock across claim, native Matter/recorder reconstruction, atomic consume and scene release**. Two tabs cannot actively resume the same save; existing token/IDB ownership remains authoritative.

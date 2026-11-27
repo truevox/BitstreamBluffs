@@ -6,6 +6,11 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: '.',
   publicDir: 'public', // Use 'public' for static assets
+  // The exact-build savestate schema uses semantic JS class identities.
+  // Esbuild's default production renaming turns PowerUp into e.g. Gm and
+  // makes canonical entity admission fail even for genuine stock gameplay.
+  // Preserve constructor.name for both capture and isolated fresh restore.
+  esbuild: {keepNames:true},
   build: {
     chunkSizeWarningLimit: 2000,
     outDir: 'dist',
