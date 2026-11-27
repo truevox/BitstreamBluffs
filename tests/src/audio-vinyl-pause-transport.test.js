@@ -163,6 +163,22 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('re-enabling songs during default OFF pause is NOT a manual jukebox PLAY',()=>{
+    const {a,d,events}=setup();
+    a._autoStartAttempted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const before=d.transportPlay.mock.calls.length;
+    a.jukeboxPlay=jest.fn();
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(id=>[id,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a.jukeboxPlay).not.toHaveBeenCalled();
+    expect(a._vinylPauseSession.manualOverride).toBe(false);
+    expect(d.transportPlay).toHaveBeenCalledTimes(before);
+    expect(a._paused).toBe(true);
+    a.destroy();
+  });
+
   test('opted-in Pause starts an original song when its catalog finishes loading late',()=>{
     const {a,d,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

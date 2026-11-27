@@ -681,7 +681,7 @@ export class AudioSynth {
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
         if (this._autoStartAttempted && this._musicMode === 'menu' &&
-            !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            !this._paused && !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
             !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.

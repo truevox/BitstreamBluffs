@@ -154,3 +154,18 @@ describe('source offset is not lost while an original stem decodes',()=>{
     } finally {if(d._timer)clearInterval(d._timer);}
   });
 });
+
+
+describe('pause before scheduled first audible source frame',()=>{
+  test('retains the saved offset instead of rewinding the silent 120 ms resume gate',()=>{
+    const {player:d}=sourceAt(40,{savedOffset:22.375,gate:true});
+    d.started=true;d.transportPaused=false;
+    d.stop=jest.fn(function(){this.started=false;this._resumeOffset=0;});
+    const expected=22.375; // no audio frame has played before the scheduled gate
+    // Resume decoder scheduled the actual song at 40.12. At 40.00 no
+    // audio frames played yet; another pause must not discard the gate.
+    expect(d.transportPause()).toBe(true);
+    expect(d._resumeOffset).toBeCloseTo(expected,6);
+    expect(d.transportPaused).toBe(true);
+  });
+});

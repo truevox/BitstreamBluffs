@@ -1473,7 +1473,7 @@ export class StemMusicDirector {
 	transportPause() {
 		if(!this.started)return false;
 		const position=this.pack&&this.ctx&&this.clockStart!==null?
-			clamp(this.ctx.currentTime-this.clockStart,0,
+			clamp(Math.max(this.ctx.currentTime,this._resumeGateAt??this.ctx.currentTime)-this.clockStart,0,
 				Math.max(0,this.pack.duration-.1)):
 			(this._pendingResumeOffset??this._resumeOffset??0);
 		this.stop();
