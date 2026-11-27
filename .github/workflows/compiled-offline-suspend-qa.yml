@@ -1,0 +1,59 @@
+name: Compiled offline PWA one-use Suspend Resume QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/compiled-offline-suspend-qa.yml'
+      - 'tools/savestate-experiment/test-player-suspend-offline-compiled-browser.mjs'
+      - 'src/scenes/**'
+      - 'src/systems/savestate/**'
+      - 'src/systems/music/OfflinePreview.js'
+      - 'tools/pwa/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/compiled-offline-suspend-qa.yml'
+      - 'tools/savestate-experiment/test-player-suspend-offline-compiled-browser.mjs'
+      - 'src/scenes/**'
+      - 'src/systems/savestate/**'
+      - 'src/systems/music/OfflinePreview.js'
+      - 'tools/pwa/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-suspend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check exact triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify native build/ruleset identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Compile real minified Pages PWA and its pinned offline shell
+        run: node tools/pwa/build-pages-site.mjs / dist-offline-suspend
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Physically Suspend and Resume after page close and cold offline PWA restart
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-offline-compiled-browser.mjs dist-offline-suspend
