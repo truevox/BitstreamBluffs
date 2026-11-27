@@ -11,7 +11,8 @@ import {createServer} from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
-const [a,b]=process.argv.slice(2);
+const [a,b,...flags]=process.argv.slice(2);
+const realV31=flags.includes('--real-v31');
 assert(a&&b,'Usage: node script OLD_KEEP_NAMES_FIXTURE NEW_V231_DIST');
 const roots={a:resolve(a),b:resolve(b)};
 const html=await Promise.all([readFile(resolve(roots.a,'index.html'),'utf8'),
@@ -168,7 +169,7 @@ try{
   coldOffline:true,incompatible:{button:incompatible.button,ready:incompatible.ready},
   preservedByteIdenticalBeforeErasure:true,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
-  caveat:'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
+  caveat:realV31?'Actual shipped v2.25.31 to v2.25.32 PWA bundles; no synthetic keepNames fixture.':'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
  }));
  await ctx.close();
 }finally{

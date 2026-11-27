@@ -72,3 +72,43 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-v30-dist" "$RUNNER_TEMP/bb-v31-dist"
+
+  # Real shipped v2.25.31 -> current exact-build boundary. The existing v30
+  # keepNames fixture above remains as a distinct pre-hotfix compatibility gate.
+  real-v31-update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Build real production v2.25.31 and current Pages PWA
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-current-dist"
+          git worktree add --detach "$RUNNER_TEMP/bb-real-v31" d836de4b78d38fbc303d1b20b6604a292e2b9c47
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/bb-real-v31/node_modules"
+          cd "$RUNNER_TEMP/bb-real-v31"
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-real-v31-dist"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real old READY remains byte-identical across PWA upgrade until two-click erase
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
