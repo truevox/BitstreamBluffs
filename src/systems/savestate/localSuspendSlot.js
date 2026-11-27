@@ -21,6 +21,23 @@ export const SUSPEND_SLOT_KEY='local-suspend';
 
 const failure=e=>e?.name==='QuotaExceededError'?'quota-exceeded':'storage-unavailable';
 
+/** Format-only admission shared by non-claiming UI previews and atomic claims.
+ * No digest, layout or build identity can authenticate a stored run.
+ */
+function inspectStoredReady(row,expectedIdentity,layout){
+ if(!(row.bytes instanceof Uint8Array))return {ok:false,code:'invalid-bytes'};
+ const inspected=inspectSnapshotEnvelope(row.bytes,expectedIdentity,layout);
+ if(!inspected.ok)return {ok:false,code:inspected.code,pointer:inspected.pointer};
+ if(inspected.admission!=='envelope-only'||inspected.envelope.purpose!=='suspend'||
+    row.integrity!==inspected.envelope.integrity||
+    row.runId!==inspected.envelope.runId||row.tick!==inspected.envelope.tick||
+    row.buildId!==inspected.envelope.build.buildId)
+  return {ok:false,code:'binding-mismatch'};
+ return {ok:true,admission:'envelope-only',runId:inspected.envelope.runId,tick:inspected.envelope.tick};
+}
+const incompatibleCodes=new Set(['missing-runtime-identity','unsupported-layout','unsupported-format-version',
+ 'build-mismatch','physics-mismatch','matter-mismatch','layout-mismatch']);
+
 export class LocalSuspendSlot{
  constructor({idb=globalThis.indexedDB,
   uuid=()=>globalThis.crypto?.randomUUID?.()}={}){
@@ -69,6 +86,39 @@ export class LocalSuspendSlot{
   }catch(e){return {ok:false,code:failure(e)};}
   finally{db?.close?.();}
  }
+ /** Read-only presentation hint, never a reservation or a restore capability.
+  * The display may become stale the instant another tab claims this READY slot.
+  * Neither sealed bytes nor ownership tokens are exposed to UI callers.
+  */
+ async peek(expectedIdentity,layout){
+  let db;
+  try{
+   db=await this._open();
+   const tx=db.transaction(SUSPEND_SLOT_STORE,'readonly');
+   let row=null;
+   const done=new Promise((resolve,reject)=>{
+    tx.oncomplete=resolve;
+    tx.onabort=()=>reject(tx.error||Error('transaction aborted'));
+    tx.onerror=()=>reject(tx.error||Error('transaction error'));
+   });
+   const request=tx.objectStore(SUSPEND_SLOT_STORE).get(SUSPEND_SLOT_KEY);
+   request.onsuccess=()=>{row=request.result||null;};
+   await done;
+   // Parse/validate the detached IDB snapshot AFTER the readonly transaction
+   // closes; a large candidate must not hold up another tab's atomic claim.
+   try{
+    if(!row)return {ok:true,status:'empty'};
+    if(row.status==='claimed')return {ok:true,status:'claimed'};
+    if(row.status!=='ready')return {ok:false,status:'corrupt',code:'invalid-slot-state'};
+    const checked=inspectStoredReady(row,expectedIdentity,layout);
+    return checked.ok?{ok:true,status:'ready',admission:'envelope-only',
+     runId:checked.runId,tick:checked.tick}:
+     {ok:false,status:incompatibleCodes.has(checked.code)?'incompatible':'corrupt',
+      code:checked.code};
+   }catch{return {ok:false,status:'corrupt',code:'inspection-failed'};}
+  }catch(e){return {ok:false,status:'unavailable',code:failure(e)};}
+  finally{db?.close?.();}
+ }
  /** Explicitly keep a *pure-format-admitted* suspended envelope. The caller
   * must supply the expected exact-build identity and trusted shipped schema;
   * no default production registration is provided by the current game.
@@ -108,14 +158,8 @@ export class LocalSuspendSlot{
   return this._modify((store,current)=>{
    if(!current)return {ok:false,code:'empty'};
    if(current.status!=='ready')return {ok:false,code:'slot-claimed'};
-   if(!(current.bytes instanceof Uint8Array))return {ok:false,code:'invalid-bytes'};
-   const inspected=inspectSnapshotEnvelope(current.bytes,expectedIdentity,layout);
-   if(!inspected.ok)return {ok:false,code:inspected.code,pointer:inspected.pointer};
-   if(inspected.admission!=='envelope-only'||inspected.envelope.purpose!=='suspend'||
-    current.integrity!==inspected.envelope.integrity||
-    current.runId!==inspected.envelope.runId||current.tick!==inspected.envelope.tick||
-    current.buildId!==inspected.envelope.build.buildId)
-    return {ok:false,code:'binding-mismatch'};
+   const checked=inspectStoredReady(current,expectedIdentity,layout);
+   if(!checked.ok)return checked;
    store.put({...current,status:'claimed',claimedBy:claimToken});
    return {ok:true,admission:'envelope-only',claimed:true,token:claimToken,
     bytes:Uint8Array.from(current.bytes),runId:current.runId,tick:current.tick};

@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   snapshot-and-parity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4

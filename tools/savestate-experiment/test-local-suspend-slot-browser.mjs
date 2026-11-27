@@ -36,6 +36,10 @@ try{
    window.__slotQa={slot:new LocalSuspendSlot(),layout,identity,bytes};
   });
  }
+ const untouched=await A.evaluate(async()=>{
+  const q=window.__slotQa;return q.slot.peek(q.identity,q.layout);
+ });
+ assert.deepEqual(untouched,{ok:true,status:'empty'});
  const saved=await A.evaluate(async()=>{
   const q=window.__slotQa;
   const wrong=await q.slot.put(q.bytes,{...q.identity,buildId:'sha256:'+'c'.repeat(64)},q.layout);
@@ -43,6 +47,14 @@ try{
   return {wrong,correct};
  });
  assert(saved.wrong.code==='build-mismatch'&&saved.correct.ok&&saved.correct.admission==='envelope-only',JSON.stringify(saved));
+ const preview=await B.evaluate(async()=>{
+  const q=window.__slotQa;
+  return {ready:await q.slot.peek(q.identity,q.layout),
+   incompatible:await q.slot.peek({...q.identity,buildId:'sha256:'+'c'.repeat(64)},q.layout)};
+ });
+ assert.deepEqual(preview.ready,{ok:true,status:'ready',admission:'envelope-only',
+  runId:'test-chromium-local-only',tick:240});
+ assert.deepEqual(preview.incompatible,{ok:false,status:'incompatible',code:'build-mismatch'});
  const afterReload=await A.reload({waitUntil:'domcontentloaded'});
  assert(afterReload);
  // Reload intentionally destroys the old JS handle; reconstruct trusted
@@ -59,6 +71,10 @@ try{
     physicsIdentity:{rulesetId:'sha256:'+'b'.repeat(64),simRevision:9},
     matterVersion:'0.20.0',savestateLayoutId:savestateLayoutIdOf(descriptor)}};
  });
+ const readyAfterReload=await A.evaluate(async()=>{
+  const q=window.__slotQa;return q.slot.peek(q.identity,q.layout);
+ });
+ assert.deepEqual(readyAfterReload,preview.ready);
  const wrongIdentity=await B.evaluate(async()=>{
   const q=window.__slotQa;
   return q.slot.claim({...q.identity,buildId:'sha256:'+'f'.repeat(64)},q.layout);
@@ -80,9 +96,10 @@ try{
  const heldAfterReload=await winner.evaluate(async()=>{
   const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
   const slot=new LocalSuspendSlot();
-  return {claim:await slot.claim(null,null),clear:await slot.clearReady(),
+  return {preview:await slot.peek(null,null),claim:await slot.claim(null,null),clear:await slot.clearReady(),
    staleRelease:await slot.release('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')};
  });
+ assert.deepEqual(heldAfterReload.preview,{ok:true,status:'claimed'});
  assert(heldAfterReload.claim.code==='slot-claimed'&&
   heldAfterReload.clear.code==='slot-claimed'&&
   heldAfterReload.staleRelease.code==='claim-mismatch',JSON.stringify(heldAfterReload));
@@ -100,6 +117,10 @@ try{
   return new LocalSuspendSlot().release(token);
  },heldToken);
  assert(released.ok&&released.released);
+ const resumedPreview=await loser.evaluate(async()=>{
+  const q=window.__slotQa;return q.slot.peek(q.identity,q.layout);
+ });
+ assert.deepEqual(resumedPreview,preview.ready);
  const second=await loser.evaluate(async()=>{
   const q=window.__slotQa,r=await q.slot.claim(q.identity,q.layout);
   window.__claimedToken=r.token||null;
@@ -115,9 +136,15 @@ try{
  assert(consumed.ok&&consumed.consumed);
  const empty=await loser.evaluate(async()=>window.__slotQa.slot.claim(window.__slotQa.identity,window.__slotQa.layout));
  assert(empty.code==='empty',JSON.stringify(empty));
+ const emptyPreview=await loser.evaluate(async()=>{
+  const q=window.__slotQa;return q.slot.peek(q.identity,q.layout);
+ });
+ assert.deepEqual(emptyPreview,{ok:true,status:'empty'});
+
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
  console.log('PASS_SINGLE_USE_SLOT_REAL_CHROMIUM',JSON.stringify({
-  saved,wrongIdentity,claims:results.map(({token,...rest})=>rest),
+  saved,untouched,preview,readyAfterReload,resumedPreview,emptyPreview,wrongIdentity,
+  claims:results.map(({token,...rest})=>rest),
   blocked,heldAfterReload,released,second,stale,consumed,empty,
   afterPageReload:true,claimedTabReloadHeld:true,errors,writes,
   admission:'envelope-only',realMatterRestore:false,scoreAuth:false,

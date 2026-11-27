@@ -21,6 +21,49 @@ const make=(idb,other={})=>new LocalSuspendSlot({idb,uuid:()=>uuid(++next),...ot
 beforeEach(()=>{next=0;});
 
 describe('inert local single-use suspend slot — cannot authorize a restore',()=>{
+ test('peek is a readonly, non-reserving, minimal status hint and never exposes save bytes',async()=>{
+  const idb=fakeIdb(),modes=[],writer=make(idb),viewer=make(idb,{uuid:()=>{throw Error('no token needed');}});
+  idb.hooks.onTransaction=(_names,mode)=>modes.push(mode);
+  expect(await viewer.peek(identity(),layout)).toEqual({ok:true,status:'empty'});
+  await writer.put(bytes(),identity(),layout);
+  idb.hooks.failPut=Object.assign(Error('peek must not write'),{name:'QuotaExceededError'});
+  idb.hooks.failDelete=Object.assign(Error('peek must not delete'),{name:'QuotaExceededError'});
+  const hint=await viewer.peek(identity(),layout);
+  expect(hint).toEqual({ok:true,status:'ready',admission:'envelope-only',runId:'synthetic-run-1',tick:120});
+  expect(hint).not.toHaveProperty('token');expect(hint).not.toHaveProperty('bytes');
+  expect(modes.at(-1)).toBe('readonly');
+  idb.hooks.failPut=null;idb.hooks.failDelete=null;
+  const claim=await writer.claim(identity(),layout);expect(claim.ok).toBe(true);
+  expect(await viewer.peek(identity(),layout)).toEqual({ok:true,status:'claimed'});
+  expect(await writer.consume(claim.token)).toEqual({ok:true,consumed:true});
+  expect(await viewer.peek(identity(),layout)).toEqual({ok:true,status:'empty'});
+ });
+ test('peek reports old build incompatible without stealing the ready slot',async()=>{
+  const idb=fakeIdb(),slot=make(idb);
+  await slot.put(bytes(),identity(),layout);
+  expect(await slot.peek({...identity(),buildId:H('c')},layout)).toEqual({ok:false,status:'incompatible',code:'build-mismatch'});
+  expect(await slot.peek(identity(),null)).toEqual({ok:false,status:'incompatible',code:'unsupported-layout'});
+  expect(await slot.peek(identity(),layout)).toMatchObject({ok:true,status:'ready',tick:120});
+  const claim=await slot.claim(identity(),layout);
+  expect(claim.ok).toBe(true);
+  await slot.release(claim.token);
+ });
+ test('peek distinguishes corrupt persisted binding and storage denied, with no repair or deletion',async()=>{
+  const idb=fakeIdb(),slot=make(idb);
+  await slot.put(bytes(),identity(),layout);
+  const db=await new Promise((resolve,reject)=>{const r=idb.open(SUSPEND_SLOT_DB,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+  const tx=db.transaction(SUSPEND_SLOT_STORE,'readwrite'),store=tx.objectStore(SUSPEND_SLOT_STORE);
+  const get=store.get(SUSPEND_SLOT_KEY);
+  get.onsuccess=()=>{const record=get.result;record.tick=121;store.put(record);};
+  await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();
+  expect(await slot.peek(identity(),layout)).toEqual({ok:false,status:'corrupt',code:'binding-mismatch'});
+  expect(await slot.claim(identity(),layout)).toEqual({ok:false,code:'binding-mismatch'});
+  idb.hooks.failGet=Object.assign(Error('browser blocked'),{name:'SecurityError'});
+  expect(await slot.peek(identity(),layout)).toEqual({ok:false,status:'unavailable',code:'storage-unavailable'});
+  idb.hooks.failGet=null;
+  expect(await slot.peek(identity(),layout)).toEqual({ok:false,status:'corrupt',code:'binding-mismatch'});
+  expect(await slot.clearReady()).toEqual({ok:true,cleared:true});
+ });
  test('requires exact build + registered layout; rejects fake/partial bytes before storage',async()=>{
   const idb=fakeIdb(),slot=make(idb);
   expect(await slot.put(bytes(),undefined,layout)).toMatchObject({ok:false,code:'missing-runtime-identity'});
