@@ -54,6 +54,13 @@ import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
 import { launchTakeover } from '../ui/TakeoverLauncher.js';
+import {peekManualSuspend,resumeManualRun,discardManualSuspend} from '../systems/savestate/manualSuspendController.js';
+
+/** Spare narrow chip in the center column, above Museum/Postcard/Help.
+ * The main six-row cabinet menu stays unchanged. Readonly peek NEVER
+ * claims a save or exposes stored bytes.
+ */
+const RESUME_CHIP=Object.freeze({x:226,y:186,w:80,h:14});
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -100,6 +107,7 @@ export class TitleScene extends Phaser.Scene {
     this._buildMenu();
     this._buildCard();
     this._buildFooter();
+    void this._refreshSuspendHint();
     // the rolling band is a menu-only flourish; the power-on plays once per page load (Scanlines.js)
     addScanlines(this, 1, { roll: true });
     playCrtPowerOn(this);
@@ -116,6 +124,7 @@ export class TitleScene extends Phaser.Scene {
       this.jukebox?.destroy();
       this.jukebox = null;
       this._unbindIdleInputs();
+      this._suspendPeekGeneration=(this._suspendPeekGeneration||0)+1;
       this._closeView();
     });
     this.cameras.main.fadeIn(180, 5, 6, 15);
@@ -530,6 +539,67 @@ export class TitleScene extends Phaser.Scene {
     // A separate route avoids adding a seventh main-menu row or loading tapes automatically.
     const m = MUSEUM_CHIP;
     this.museumButton = new Button(this, theme, { x:m.x, y:m.y, w:m.w, h:m.h, label:'M MUSEUM', color:'amber', onClick: () => this._openMuseum(true) });
+    this.suspendButton=new Button(this,theme,{...RESUME_CHIP,label:'R RESUME SAVE',color:'lime',
+      onClick:()=>this._handleSuspendChip()});
+    this.suspendButton.setVisible(false);
+  }
+
+  /** Readonly status hint. A READY result is NEVER a reservation/authority;
+   * explicit click atomically reclaims the exact same slot at resume time.
+   */
+  async _refreshSuspendHint(){
+    const generation=this._suspendPeekGeneration=(this._suspendPeekGeneration||0)+1;
+    const hint=await peekManualSuspend();
+    if(this._suspendPeekGeneration!==generation||
+      !this.scene?.isActive?.(SCENES.TITLE)||!this.suspendButton?.scene)return;
+    this._suspendStatus=hint.status;
+    this._suspendConfirm=false;
+    if(hint.status==='empty'){
+      this._suspendReady=false;this.suspendButton.setVisible(false);return;
+    }
+    const label={
+      ready:'R RESUME SAVE',claimed:'SAVE IN USE',incompatible:'CLEAR OLD SAVE',
+      corrupt:'CLEAR BAD SAVE',unavailable:'SAVE OFFLINE',
+    }[hint.status]||'SAVE UNAVAILABLE';
+    this._suspendReady=hint.status==='ready';
+    const canAct=this._suspendReady||hint.status==='incompatible'||hint.status==='corrupt';
+    this.suspendButton.setLabel(label).setDisabled(!canAct).setVisible(true);
+  }
+
+  /** Never erase silently when a build update makes a READY slot unusable.
+   * Confirm twice; the atomic clear refuses a slot claimed by another tab.
+   */
+  async _handleSuspendChip(){
+    if(this.starting||this.view)return;
+    if(this._suspendReady)return this._resumeSavedRun(true);
+    if(!['corrupt','incompatible'].includes(this._suspendStatus))return;
+    if(this.attract){this._exitAttract();return;}
+    if(!this._suspendConfirm){
+      this._suspendConfirm=true;
+      this.suspendButton.setLabel('CONFIRM ERASE');
+      this.hint?.setText('CLICK AGAIN TO DISCARD THE UNUSABLE SAVE');
+      return;
+    }
+    this.starting=true;this.suspendButton.setDisabled(true);
+    const cleared=await discardManualSuspend();
+    this.starting=false;
+    if(!this.scene?.isActive?.(SCENES.TITLE))return;
+    this._suspendConfirm=false;
+    this.hint?.setText(cleared.ok?'SAVE DISCARDED BY REQUEST':'SAVE BUSY — CLOSE OTHER TAB');
+    void this._refreshSuspendHint();
+  }
+
+  /** A real one-use local continuation, not a public Verified claim. */
+  async _resumeSavedRun(fromButton=false){
+    if(!this._suspendReady||this.starting||this.view)return;
+    if(fromButton&&this.attract){this._exitAttract();return;}
+    this.starting=true;this.suspendButton.setDisabled(true).setLabel('RESTORING...');
+    const resumed=await resumeManualRun(this,Phaser);
+    if(resumed.ok)return resumed; // Title was stopped only after a successful consume.
+    this.starting=false;
+    if(!this.scene?.isActive?.(SCENES.TITLE))return;
+    this.hint?.setText('RESUME REFUSED: '+resumed.code.replace(/-/g,' ').toUpperCase()+' — ORIGINAL SAVE KEPT IF POSSIBLE');
+    void this._refreshSuspendHint();
   }
 
   /** #85: leave Title for the local-file-only Museum page, never mid-run. */
@@ -640,6 +710,8 @@ export class TitleScene extends Phaser.Scene {
       if (e && (e.key === 'h' || e.key === 'H') && !e.repeat && !this.view && !this.starting) this._openHelp();
       if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
       if (e && (e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openMuseum();
+      if (e && (e.key === 'r' || e.key === 'R') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) void this._resumeSavedRun();
+      if (e && (e.key === 'd' || e.key === 'D') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting && ['corrupt','incompatible'].includes(this._suspendStatus)) void this._handleSuspendChip();
     };
     this._onPointer = () => { this._wakeGate(); };
     this._onRouter = (p) => { if (p && p.pressed) this._wakeGate(); };
@@ -671,7 +743,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.sub].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.suspendButton, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {

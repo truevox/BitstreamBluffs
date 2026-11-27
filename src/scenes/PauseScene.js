@@ -27,6 +27,8 @@ import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
 import { pauseRestartTakeover, pauseQuitTakeover } from '../ui/TakeoverLauncher.js';
+import {canCaptureManualPauseCandidate} from '../systems/savestate/pausedCandidate.js';
+import {suspendManualRun} from '../systems/savestate/manualSuspendController.js';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -63,7 +65,9 @@ export class PauseScene extends Phaser.Scene {
     this._buildHeader(theme);
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.takeoverRun ? 'TAKEOVER // UNRANKED' : this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
+    this.canSuspend=canCaptureManualPauseCandidate(this.scene.get(SCENES.RUN));
+    const panelH=this.canSuspend?200:180;
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: panelH, color: 'magenta', title: this.takeoverRun ? 'TAKEOVER // UNRANKED' : this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
@@ -74,6 +78,7 @@ export class PauseScene extends Phaser.Scene {
         { kind: 'action', label: 'EXPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'export', onClose: () => this._close() })) },
         { kind: 'action', label: 'IMPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'import', onClose: () => this._close() })) },
       ] : []),
+      ...(this.canSuspend?[{kind:'action',label:'SUSPEND RUN',color:'lime',onSelect:()=>this.suspend()}]:[]),
       { kind: 'action', label: 'QUIT TO TITLE', color: 'magenta', onSelect: () => this.quit() },
     ];
     this.menu = new MenuList(this, theme, { x: 6, y: 22, w: 214, rowH: 20, items, scale: 2, parent: panel });
@@ -131,11 +136,15 @@ export class PauseScene extends Phaser.Scene {
       });
     }
     // Under the menu column, clear of the panel's inner border hairline (panel floor 180, hairline at 176).
-    panel.add(new NeonText(this, theme, 10, 165,
+    panel.add(new NeonText(this, theme, 10, this.canSuspend?186:165,
       this.gymPractice ? 'LEARN. RETRY. REPEAT.' : 'THE LEDGER NEVER FORGETS.',
       { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+    this.suspendStatus=this.canSuspend?new NeonText(this,theme,236,169,'',{
+      color:'amber',outline:'none'
+    }):null;
+    if(this.suspendStatus)panel.add(this.suspendStatus);
 
-    this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + 172 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
+    this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + panelH - 8 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
     this.hint.setAlpha(0.7);
@@ -178,6 +187,17 @@ export class PauseScene extends Phaser.Scene {
 
   /** Open: shade fades in, header glitches in, the panel CRT-zips open. Reduced motion: short fades only. */
   _playIntro() {
+    // The CRT panel's geometry is animated during the opening transition.
+    // Interactive rows can physically move under a mouse click and select a
+    // NEIGHBORING destructive command (notably Quit instead of Suspend).
+    // Disable all action zones AND keyboard confirmation until layout settles.
+    this._menuOpening=true;
+    this.menu?.rows?.forEach(({zone})=>zone.disableInteractive());
+    this.time.delayedCall(motionMs(340,this.reduced),()=>{
+      if(!this.sys?.isActive?.())return;
+      this.menu?.rows?.forEach(({zone})=>{if(zone?.scene)zone.setInteractive();});
+      this._menuOpening=false;
+    });
     const panel = this.panel;
     const parts = [...this.hdrParts, this.hdrBar, this.hint];
     const targetA = parts.map((o) => o.alpha);
@@ -213,7 +233,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   _onAction(action) {
-    if (this.leaving) return;
+    if (this.leaving||this._menuOpening) return;
     if (this.view) {
       this.view.handleAction(action);
       return;
@@ -285,6 +305,28 @@ export class PauseScene extends Phaser.Scene {
     flush();
     setTimeout(flush, 0);
     setTimeout(flush, 30);
+  }
+
+  /** One-use local-only Suspend: retain ORIGINAL GhostTape and tick; never
+   * navigate away until the entire exact-build native candidate is persisted.
+   */
+  async suspend(){
+    if(this.leaving||!this.canSuspend)return;
+    this.leaving=true;
+    this.suspendStatus?.setText('SAVING...');
+    const saved=await suspendManualRun(this,Phaser);
+    if(!saved.ok){
+      this.leaving=false;
+      this.suspendStatus?.setText('SUSPEND FAILED: '+saved.code.replace(/-/g,' ').toUpperCase());
+      return;
+    }
+    uiSfx(this,'uiSelect');
+    // Do not generate RUN_ABORT: the complete causal run was saved and its
+    // original recorder will continue in a fresh scene. The old scene cannot
+    // be continued once the one-use snapshot has successfully been stored.
+    this.scene.stop(SCENES.RUN);
+    this.scene.stop(SCENES.UI);
+    this.scene.start(SCENES.TITLE);
   }
 
   /** Abort this run and start a new one with the same seed. @returns {void} */
