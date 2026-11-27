@@ -1,0 +1,57 @@
+name: Compiled Suspend genuine quota and IndexedDB eviction QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/compiled-suspend-storage-qa.yml'
+      - 'tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs'
+      - 'tools/pwa/**'
+      - 'src/scenes/**'
+      - 'src/systems/savestate/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/compiled-suspend-storage-qa.yml'
+      - 'tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs'
+      - 'tools/pwa/**'
+      - 'src/scenes/**'
+      - 'src/systems/savestate/**'
+      - 'vite.config.*'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compiled-storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checked-out triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify current native identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Build real production-minified offline Pages PWA
+        run: node tools/pwa/build-pages-site.mjs / dist-quota-eviction
+      - name: Install actual Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Genuine quota-pressure abort/retry and offline browser-IDB eviction
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs dist-quota-eviction
