@@ -1,16 +1,26 @@
 /**
- * The *declared* savestate layout schema of this build, for build-identity composition (#238).
+ * #424 — declared local savestate candidate-envelope layout.
  *
- * This is NOT a layout registration: it carries no `validateSections`, and `layout.js` still
- * registers zero production layouts, so `inspectSnapshotEnvelope()` cannot admit a snapshot with
- * it. It exists because `buildId` must bind the layout schema (`savestateLayoutId`) and the
- * currently-shipped layout registry declares no sections. Every production schema addition MUST
- * extend this descriptor in the same change; because `buildId` hashes `savestateLayoutId`, any
- * change here produces a different build identity, which is the intended fail-closed behaviour.
+ * This descriptor binds the source/section inventory into currentBuildId.
+ * It does not enable player save/load, grant rank/Verified status, or
+ * validate/activate a live Matter scene. Those are separate gates.
  */
-export const SAVESTATE_LAYOUT_DECLARATION_VERSION = 1;
-
-export const SAVESTATE_LAYOUT_DESCRIPTOR = Object.freeze({
-  version: SAVESTATE_LAYOUT_DECLARATION_VERSION,
-  sections: Object.freeze({}),
+export const SAVESTATE_LAYOUT_DECLARATION_VERSION = 2;
+export const CANDIDATE_SECTION_KEYS=Object.freeze([
+ 'clock','rng','recorder','terrain','matter','entities','subsystems','remainder',
+]);
+export const SAVESTATE_LAYOUT_DESCRIPTOR=Object.freeze({
+ version:SAVESTATE_LAYOUT_DECLARATION_VERSION,
+ sections:Object.freeze({
+  candidate:Object.freeze({
+   kind:'bb-internal-candidate-file',
+   version:1,
+   header:Object.freeze(['kind','version','runId','tick','buildId','rulesetId',
+    'simRevision','seed','sections','integrity']),
+   sections:CANDIDATE_SECTION_KEYS,
+   integrity:'sha256-over-canonical-unsigned-file',
+   identity:'exact-build-ruleset-sim-version-seed-tick',
+   constraints:'local-single-use-only-no-public-ranking-authority',
+  }),
+ }),
 });
