@@ -17,10 +17,13 @@ assert.ok(rows.every(r=>r.nativeContactPairs>=0&&r.inputRows===r.ticks+1),
  'not the native high-density recorder corpus');
 assert.ok(rows.reduce((n,r)=>n+r.bytes,0)>400000,'insufficient real bundle volume for quota test');
 const origin=new URL(url).origin;
-// Stress a fixed 128 KiB of NEW native evidence growth, not the pre-existing
-// origin databases (Cemetery adds its own separate IndexedDB metadata).
-const quotaHeadroom=128*1024;
-let quotaSize=quotaHeadroom,baselineUsage=0;
+// Calibrate the REAL current-browser quota footprint with two genuine native
+// bundles in a disposable context. Chromium can cache quota before an IDB
+// connection opens, so apply the override only in a NEW browser context,
+// before the evidence DB exists. A fixed 128 KiB limit was flaky across
+// browser builds due to variable actual IndexedDB accounting/compression.
+let quotaHeadroom=0,quotaSize=0,baselineUsage=0,firstDurableUsage=0;
+let firstGrowth=0,secondGrowth=0;
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||'/usr/bin/chromium',args:['--no-sandbox']});
 let context,cdp,overrideActive=false;
 const pageErrors=[],mutating=[];
@@ -28,22 +31,81 @@ const watch=page=>{
  page.on('pageerror',e=>pageErrors.push(String(e)));
  page.on('request',r=>{if(!['GET','HEAD','OPTIONS'].includes(r.method()))mutating.push(r.method());});
 };
+// Storage usage reporting can lag an IDB transaction's oncomplete on busy
+// CI machines. Read actual browser CDP usage, never approximate raw row bytes.
+const usageAfter=async(session,minimum)=>{
+ for(let i=0;i<40;i++){
+  const snapshot=await session.send('Storage.getUsageAndQuota',{origin});
+  if(Number.isSafeInteger(snapshot.usage)&&snapshot.usage>minimum)return snapshot.usage;
+  await new Promise(resolve=>setTimeout(resolve,50));
+ }
+ throw Error('CDP did not account for real native IndexedDB write');
+};
 try{
+ // Disposable browser profile: determine real IDB growth from two different
+ // fully validated current-build native tapes (not synthetic padding).
  context=await browser.newContext();
  let page=await context.newPage();watch(page);
  cdp=await context.newCDPSession(page);
- // First allow the game to initialize its own independent databases. The
- // origin may already occupy most of 300 KB before we save even ONE tape;
- // denying that bootstrap is not a useful evidence quota test.
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() &&
    window.__bbGame?.registry?.get('attemptHistory')?.ready,{timeout:30000});
- // CDP still enforces a REAL origin quota (no synthetic exceptions): exactly
- // 128 KiB of headroom over baseline storage, then native bundles must hit it.
+ const beforeCalibration=await cdp.send('Storage.getUsageAndQuota',{origin});
+ if(!Number.isSafeInteger(beforeCalibration.usage)||beforeCalibration.usage<0)
+  throw Error('invalid calibration origin usage');
+ const calibrated=[];
+ for(const row of rows.slice(0,2)){
+  await page.evaluate(async({row,rulesetId})=>{
+   const [{EvidenceStore},{validateEvidenceBundle},{digestOfBytes},{loadCurrentRuleset}]=await Promise.all([
+    import('/src/systems/replay/evidenceStore.js'),import('/src/systems/replay/manifest.js'),
+    import('/src/systems/replay/canonicalSha256.js'),import('/src/systems/replay/runtimeRuleset.js')]);
+   const current=await loadCurrentRuleset();
+   if(current.rulesetId!==rulesetId)throw Error('calibration ruleset mismatch');
+   const bytes=Uint8Array.from(atob(row.base64),c=>c.charCodeAt(0));
+   let store=globalThis.__nativeQuotaCalibrationStore;
+   if(!store){
+    store=await new EvidenceStore({idb:indexedDB,storage:null}).init();
+    if(store.backend!=='idb')throw Error('calibration real IndexedDB unavailable');
+    store.rulesetResolver=id=>id===current.rulesetId?current.doc:null;
+    globalThis.__nativeQuotaCalibrationStore=store;
+   }
+   const verdict=validateEvidenceBundle(bytes,store.rulesetResolver);
+   if(!verdict.ok||digestOfBytes(bytes)!==row.digest||
+      verdict.bundleDigest!==row.digest||bytes.length!==row.bytes)
+    throw Error('invalid native calibration tape '+row.seed);
+   const digest=await store.put(bytes,{runId:row.runId});
+   if(digest!==row.digest||!(await store.isBundleDurable(digest,{runId:row.runId})))
+    throw Error('native calibration tape not durable '+row.seed);
+  },{row,rulesetId});
+  calibrated.push(await usageAfter(cdp,calibrated.at(-1)??beforeCalibration.usage));
+ }
+ firstDurableUsage=calibrated[0];
+ firstGrowth=firstDurableUsage-beforeCalibration.usage;
+ secondGrowth=calibrated[1]-calibrated[0];
+ if(firstGrowth<=0||secondGrowth<=0)
+  throw Error('Chrome did not account for distinct genuine native evidence writes');
+ // Browser quota accounting may reserve more bytes than CDP's usage field
+ // exposes at the instant the first IDB transaction commits. Allow four
+ // measured additional-bundle deltas (minimum 32 KiB), enough for at least
+ // one genuine durable tape, but still well below a 32-tape corpus.
+ quotaHeadroom=firstGrowth+Math.max(32*1024,4*secondGrowth);
+ await context.close();context=null;cdp=null;
+
+ // NEW ephemeral origin: override BEFORE opening the evidence database. No
+ // original capture, browser profile or user data is ever touched.
+ context=await browser.newContext();
+ page=await context.newPage();watch(page);
+ cdp=await context.newCDPSession(page);
+ await page.goto(url,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() &&
+   window.__bbGame?.registry?.get('attemptHistory')?.ready,{timeout:30000});
  const baseline=await cdp.send('Storage.getUsageAndQuota',{origin});
  baselineUsage=baseline.usage;
- if(!Number.isSafeInteger(baselineUsage)||baselineUsage<0)throw Error('invalid baseline origin storage usage');
+ if(!Number.isSafeInteger(baselineUsage)||baselineUsage<0)
+  throw Error('invalid baseline origin storage usage');
  quotaSize=baselineUsage+quotaHeadroom;
+ console.log('NATIVE_REAL_QUOTA_CALIBRATION',JSON.stringify({firstGrowth,secondGrowth,
+  calibrationFirstUsage:firstDurableUsage,baselineUsage,quotaHeadroom,quotaSize}));
  await cdp.send('Storage.overrideQuotaForOrigin',{origin,quotaSize});overrideActive=true;
  const underLimit=await page.evaluate(async({rows,rulesetId})=>{
   const [{EvidenceStore},{validateEvidenceBundle},{digestOfBytes},{loadCurrentRuleset}]=await Promise.all([
@@ -53,7 +115,7 @@ try{
   if(current.rulesetId!==rulesetId)throw Error('different build/ruleset: refuse cross-build admission');
   const bytesOf=b64=>Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
   const store=await new EvidenceStore({idb:indexedDB,storage:null}).init();
-  if(store.backend!=='idb')throw Error('real Chromium IndexedDB unavailable');
+  if(store.backend!=='idb')throw Error('quota-phase real IndexedDB unavailable');
   store.rulesetResolver=id=>id===current.rulesetId?current.doc:null;
   const saved=[];let failed=null;
   for(const row of rows){
@@ -82,7 +144,8 @@ try{
     break;
    }
   }
-  if(!failed||saved.length<1)throw Error('did not observe bounded REAL quota after native durable saves');
+  if(!failed||saved.length<1)throw Error('did not observe bounded REAL quota after genuine native write; saved='+
+   saved.length+' of '+rows.length+', firstDurable='+(saved[0]?.bytes??'none'));
   globalThis.__nativeQuota244={store,saved,failed};
   return {count:rows.length,savedCount:saved.length,failedAt:saved.length,failed,
    storedBytes:saved.reduce((n,x)=>n+x.bytes,0),failedBytes:failed.bytes};
@@ -141,7 +204,8 @@ try{
  console.log('NATIVE_REAL_QUOTA_PASS',JSON.stringify({source:'native-source-current-SIM9',
   automatedPadNotHuman:true,captured:rows.length,storedBeforeQuota:underLimit.savedCount,
   nativeBytesStoredBeforeQuota:underLimit.storedBytes,
-  nativeFailedBytes:underLimit.failedBytes,baselineUsage,quotaHeadroom,quotaSize,overrideActive:usage.overrideActive,
+  nativeFailedBytes:underLimit.failedBytes,baselineUsage,firstDurableUsage,
+  firstGrowth,secondGrowth,quotaHeadroom,quotaSize,overrideActive:usage.overrideActive,
   quotaFailure:underLimit.failed.code,oldIntact:afterClear.oldIntact,
   explicitRetry:afterClear.receipt,restartedDurableRecords:restarted.length,
   errors:pageErrors,mutatingRequests:mutating,
