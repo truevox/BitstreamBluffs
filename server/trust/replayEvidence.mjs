@@ -24,7 +24,7 @@ export function prepareReplayEvidence(bytes,{rulesetId,ruleset}){
     syncLevel:c.bsod.syncLevel,magnetsDrop:c.loadout.magnetsDrop,kodiaksOn:c.kodiak.enabled,
     kodiakPackMode:c.kodiak.packMode,upgradeRanks:c.loadout.upgradeRanks,boosts:c.loadout.boosts,
     inputs:b.inputs,checkpoints:b.exact.sled.map(r=>[r[0],...decodePose(r.slice(1,7)),r[7]])};
- return {ok:true,tape,causal:c,identity:{bundleDigest:v.bundleDigest,manifestDigest:v.manifestDigest,tapeDigest:c.input.tapeDigest,rulesetId:c.sim.rulesetId},expected:{startPose:c.start.pose,physicsScramble:c.rng.physicsScramble,
+ return {ok:true,tape,causal:c,identity:{bundleDigest:v.bundleDigest,causalDigest:v.causalDigest,manifestDigest:v.manifestDigest,tapeDigest:c.input.tapeDigest,rulesetId:c.sim.rulesetId},expected:{startPose:c.start.pose,physicsScramble:c.rng.physicsScramble,
     initial:[c.bsod.leftEdgeX,c.bsod.initial.wallX,c.bsod.initial.wallSpeedPxS,c.bsod.initial.accelerationPxS2],
     checkpoints:b.checkpoints,endTick:b.claims.endTick,score:b.claims.score,distanceM:b.claims.distanceM}};
 }
@@ -32,9 +32,15 @@ export function prepareReplayEvidence(bytes,{rulesetId,ruleset}){
 /** This accepts observations ONLY from a host-controlled replay worker, not a client.
  * Matching physics is not a proof of human input, ownership, or entitlement. */
 export function compareReplayObservation(e,actual){
- const match=JSON.stringify(actual.start)===JSON.stringify({pose:e.startPose,rng:e.physicsScramble,initial:e.initial})&&
-    JSON.stringify(actual.points)===JSON.stringify(e.checkpoints)&&actual.seek?.done===true&&actual.seek?.crashed===true&&
+ let match=false;
+ try{
+  // Canonical JSON (and its parser) reorder object keys. Comparing raw
+  // JSON.stringify output rejected a legitimate independently serialized
+  // observation. Compare the canonical content, not insertion order.
+  match=digestOf(actual.start)===digestOf({pose:e.startPose,rng:e.physicsScramble,initial:e.initial})&&
+    digestOf(actual.points)===digestOf(e.checkpoints)&&actual.seek?.done===true&&actual.seek?.crashed===true&&
     actual.seek.tick===e.endTick+1&&!actual.seek.desync&&actual.score===e.score&&actual.distanceM===e.distanceM&&
     actual.checked===e.checkpoints.length;
+ }catch{return {ok:false,reason:'invalid-observation'};}
  return {ok:match,reason:match?'real-replay-match':'divergence',actual};
 }
