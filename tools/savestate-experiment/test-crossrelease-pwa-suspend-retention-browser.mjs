@@ -144,6 +144,10 @@ try{
  assert(preservedA.script.includes(main(html[0]))&&preservedA.status==='ready',
   'live old tab switched code before safe worker transition');
  await p.close();
+ // Headless background tabs can stop scheduling requestAnimationFrame entirely.
+ // Bring the surviving old client forward, then poll on a bounded real timer,
+ // not a presentation frame. All strict READY/worker/bundle assertions remain.
+ await q.bringToFront();
  // Closing the first old client can induce another same-bundle navigation in
  // the remaining old client. A detached JS context is not proof the waiting
  // worker activated: re-observe the remaining page in a fresh context. Still
@@ -153,7 +157,7 @@ try{
   try{
    await q.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
     window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready'&&
-    navigator.serviceWorker.controller,null,{timeout:30000});
+    navigator.serviceWorker.controller,null,{timeout:30000,polling:250});
    held=await q.evaluate(async()=>({
     waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
     status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
