@@ -36,8 +36,14 @@ No assertion that Marvin approved an operational/public release.
   mutations must discard the candidate, never publish a half-restored scene.
 - No player Save/Resume button, scene handoff, actual PWA tab lifecycle,
   non-stock/modified configurations or independent official scoring.
-- Actual Chromium page reload/slot consume, quota/denied storage, crash
-  recovery and physical Chromebook proof remain required by #424 and #119.
+- Actual Chromium pilot fixture now passes two normal-run boundaries (481/936):
+  458306/513874 original candidate bytes passed through the real IndexedDB
+  single-use slot, were claimed and reconstructed byte-exactly with 0 restore
+  ticks, then consumed ONLY after successful native restoration. Both runs
+  retain identical suffix fingerprints and terminal tape/record. This is an
+  internal same-page harness, NOT a user Save/Resume or PWA reload flow.
+- Actual Chromium page-reload UI, quota/denied storage, crash recovery and
+  physical Chromebook proof remain required by #424 and #119.
   No network service, credential, evidence upload or Shard change.
 
 [skip netlify]

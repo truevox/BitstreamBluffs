@@ -11,6 +11,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 let vite,browser,scratch;
 const errors=[],time=Date.UTC(2026,0,5,12);
+const suspendEnvelope=process.argv.includes('--suspend-envelope');
 try{
  scratch=await mkdtemp(join(tmpdir(),'bb-candidate-file-'));
  vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true,watch:null,hmr:false}});
@@ -110,7 +111,45 @@ try{
      assert.equal(err,'native restore: reconstructed world mismatch; discard candidate');
     }finally{await c.context.close();}
    }
-   const result=await b.page.evaluate(({wire,frameTime})=>window.__candidate.restore(wire,frameTime),{wire,frameTime:cap.frameTime});
+   // Optional #424 real IndexedDB format bridge. Claim now, but consume ONLY
+   // after the same fresh native world restoration is observed successful.
+   let resumeWire=wire;
+   if(suspendEnvelope){
+    const claimed=await b.page.evaluate(async raw=>{
+     const [{candidateSuspendEnvelopeBytes,inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+      {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
+      import('/src/systems/savestate/candidateSuspendEnvelope.js'),
+      import('/src/systems/savestate/runtimeIdentity.js'),
+      import('/src/systems/savestate/localSuspendSlot.js')]);
+     const identity=await loadCurrentBuildDescriptor(),slot=new LocalSuspendSlot();
+     if(identity.buildId!==window.__candidate.g.registry.get('currentBuildId'))
+      throw Error('browser identity mismatch');
+     const bytes=candidateSuspendEnvelopeBytes(new TextEncoder().encode(raw),identity);
+     const stored=await slot.put(bytes,identity,candidateSuspendLayout);
+     if(!stored.ok)throw Error('candidate slot write failed '+stored.code);
+     const claim=await slot.claim(identity,candidateSuspendLayout);
+     if(!claim.ok)throw Error('candidate slot claim failed '+claim.code);
+     const admitted=inspectCandidateSuspendEnvelope(claim.bytes,identity);
+     if(!admitted.ok||admitted.admission!=='envelope-only')throw Error('candidate envelope admission');
+     window.__localClaim={slot,token:claim.token,identity,layout:candidateSuspendLayout};
+     return {wire:new TextDecoder().decode(admitted.candidateBytes),admission:admitted.admission};
+    },wire);
+    assert.equal(claimed.wire,wire);
+    assert.equal(claimed.admission,'envelope-only');
+    resumeWire=claimed.wire;
+   }
+   const result=await b.page.evaluate(({wire,frameTime})=>window.__candidate.restore(wire,frameTime),
+    {wire:resumeWire,frameTime:cap.frameTime});
+   if(suspendEnvelope){
+    const consumed=await b.page.evaluate(async()=>{
+     const {slot,token,identity,layout}=window.__localClaim;
+     const result=await slot.consume(token),next=await slot.claim(identity,layout);
+     return {result,next};
+    });
+    assert.deepEqual(consumed,{result:{ok:true,consumed:true},next:{ok:false,code:'empty'}});
+    console.log('PASS_IDB_CANDIDATE_ONE_USE',JSON.stringify({tick,bytes:Buffer.byteLength(wire),
+     admission:'envelope-only',consumedAfterRestore:true}));
+   }
    assert.equal(result.tick,tick);assert.equal(result.calls,0);assert.equal(result.exact,true);
    assert.deepEqual(result.fp,cap.fp);assert.equal(result.runId,cap.runId);
    await b.page.clock.setFixedTime(new Date(time));
