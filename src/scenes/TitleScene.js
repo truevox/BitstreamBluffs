@@ -54,13 +54,15 @@ import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
 import { launchTakeover } from '../ui/TakeoverLauncher.js';
-import {peekManualSuspend,resumeManualRun,discardManualSuspend,recoverInterruptedManualSuspend} from '../systems/savestate/manualSuspendController.js';
+import {peekManualSuspend,resumeManualRun,discardManualSuspend,recoverInterruptedManualSuspend,prepareIncompatibleManualBackup} from '../systems/savestate/manualSuspendController.js';
+import {requestSuspendBackupDownload} from '../systems/savestate/suspendBackupDownload.js';
 
 /** Spare narrow chip in the center column, above Museum/Postcard/Help.
  * The main six-row cabinet menu stays unchanged. Readonly peek NEVER
  * claims a save or exposes stored bytes.
  */
 const RESUME_CHIP=Object.freeze({x:226,y:186,w:80,h:14});
+const BACKUP_CHIP=Object.freeze({x:226,y:168,w:80,h:14});
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -125,6 +127,7 @@ export class TitleScene extends Phaser.Scene {
       this.jukebox = null;
       this._unbindIdleInputs();
       this._suspendPeekGeneration=(this._suspendPeekGeneration||0)+1;
+      this._suspendBackupBytes=null;
       this._closeView();
     });
     this.cameras.main.fadeIn(180, 5, 6, 15);
@@ -542,6 +545,9 @@ export class TitleScene extends Phaser.Scene {
     this.suspendButton=new Button(this,theme,{...RESUME_CHIP,label:'R RESUME SAVE',color:'lime',
       onClick:()=>this._handleSuspendChip()});
     this.suspendButton.setVisible(false);
+    this.suspendBackupButton=new Button(this,theme,{...BACKUP_CHIP,label:'BACKUP SAVE',color:'cyan',
+      onClick:()=>this._handleSuspendBackup()});
+    this.suspendBackupButton.setVisible(false);
   }
 
   /** Readonly status hint. A READY result is NEVER a reservation/authority;
@@ -554,6 +560,8 @@ export class TitleScene extends Phaser.Scene {
       !this.scene?.isActive?.(SCENES.TITLE)||!this.suspendButton?.scene)return;
     this._suspendStatus=hint.status;
     this._suspendConfirm=false;
+    this._suspendBackupBytes=null;
+    this.suspendBackupButton?.setLabel('BACKUP SAVE').setVisible(hint.status==='incompatible');
     if(hint.status==='empty'){
       this._suspendReady=false;this.suspendButton.setVisible(false);return;
     }
@@ -566,6 +574,37 @@ export class TitleScene extends Phaser.Scene {
     const canAct=this._suspendReady||this._suspendClaimCheckable||
       hint.status==='incompatible'||hint.status==='corrupt';
     this.suspendButton.setLabel(label).setDisabled(!canAct).setVisible(true);
+  }
+
+  /** Two distinct user gestures: first read old bytes, second download those
+   * unmodified bytes. Neither gesture claims or clears the old READY slot.
+   */
+  async _handleSuspendBackup(){
+    if(this.starting||this.view||this._suspendStatus!=='incompatible')return;
+    if(this.attract){this._exitAttract();return;}
+    if(this._suspendBackupBytes){
+      const result=requestSuspendBackupDownload(this._suspendBackupBytes);
+      if(result.ok){
+        this._suspendBackupBytes=null;
+        this.suspendBackupButton.setLabel('BACKUP SAVE');
+        this.hint?.setText('BACKUP DOWNLOAD REQUESTED — ORIGINAL SAVE UNCHANGED');
+      }else this.hint?.setText('DOWNLOAD BLOCKED — CLICK AGAIN TO RETRY');
+      return;
+    }
+    this.starting=true;
+    this.suspendBackupButton.setDisabled(true).setLabel('READING SAVE');
+    const copied=await prepareIncompatibleManualBackup();
+    this.starting=false;
+    if(!this.scene?.isActive?.(SCENES.TITLE))return;
+    this.suspendBackupButton.setDisabled(false);
+    if(!copied.ok){
+      this.hint?.setText('BACKUP REFUSED: '+copied.code.toUpperCase().replace(/-/g,' '));
+      void this._refreshSuspendHint();
+      return;
+    }
+    this._suspendBackupBytes=copied.bytes;
+    this.suspendBackupButton.setLabel('DOWNLOAD SAVE');
+    this.hint?.setText('SAVE COPY READY — CLICK DOWNLOAD SAVE');
   }
 
   /** Never erase silently when a build update makes a READY slot unusable.
@@ -727,6 +766,7 @@ export class TitleScene extends Phaser.Scene {
       if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
       if (e && (e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openMuseum();
       if (e && (e.key === 'r' || e.key === 'R') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) void this._resumeSavedRun();
+      if (e && (e.key === 'b' || e.key === 'B') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting && this._suspendStatus==='incompatible') void this._handleSuspendBackup();
       if (e && (e.key === 'd' || e.key === 'D') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting && ['corrupt','incompatible'].includes(this._suspendStatus)) void this._handleSuspendChip();
     };
     this._onPointer = () => { this._wakeGate(); };
@@ -759,7 +799,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.suspendButton, this.sub].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.suspendButton, this.suspendBackupButton, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {

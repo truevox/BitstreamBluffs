@@ -111,7 +111,7 @@ jobs:
       - name: Real old READY remains byte-identical across PWA upgrade until two-click erase
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
-          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31 --backup
 
   # New v2.25.34 boundary: a real valid v2.25.32 READY must never be
   # silently claimed, migrated or deleted when the UI-only patch releases.
@@ -151,7 +151,7 @@ jobs:
       - name: Real v32 READY remains intact after waiting-worker upgrade and offline two-click discard
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
-          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v32-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v32
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v32-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v32 --backup
 
   # This release is stacked on the actual v2.25.33 platform ABI build.
   # Its old READY bytes must remain intact across an installed SW update,
@@ -192,4 +192,4 @@ jobs:
       - name: Exact platform v33 READY survives v34 offline update and two-click discard
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
-          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v33-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v33
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v33-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v33 --backup

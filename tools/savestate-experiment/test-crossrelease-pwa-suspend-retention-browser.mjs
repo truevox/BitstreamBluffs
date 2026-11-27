@@ -16,6 +16,7 @@ const realV31=flags.includes('--real-v31');
 const realV32=flags.includes('--real-v32');
 const realV33=flags.includes('--real-v33');
 assert([realV31,realV32,realV33].filter(Boolean).length<=1,'choose one exact old-build fixture');
+const verifyBackup=flags.includes('--backup');
 assert(a&&b,'Usage: node script OLD_KEEP_NAMES_FIXTURE NEW_V231_DIST');
 const roots={a:resolve(a),b:resolve(b)};
 const html=await Promise.all([readFile(resolve(roots.a,'index.html'),'utf8'),
@@ -143,16 +144,16 @@ try{
  assert(preservedA.script.includes(main(html[0]))&&preservedA.status==='ready',
   'live old tab switched code before safe worker transition');
  await p.close();
- // Closing the first controlled tab can race an independent navigation in
- // the second tab. Re-observe the actual old READY Title after that context
- // settles; never replace an old-bundle/worker check with a test-only delay.
+ // Closing the first old client can induce another same-bundle navigation in
+ // the remaining old client. A detached JS context is not proof the waiting
+ // worker activated: re-observe the remaining page in a fresh context. Still
+ // require ORIGINAL JS, original READY and the B worker to remain waiting.
  let held=null;
  for(let attempt=0;attempt<4;attempt++){
   try{
    await q.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
-    navigator.serviceWorker.controller&&
-    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',
-    null,{timeout:30000});
+    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready'&&
+    navigator.serviceWorker.controller,null,{timeout:30000});
    held=await q.evaluate(async()=>({
     waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
     status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
@@ -163,8 +164,9 @@ try{
    if(!String(e?.message||e).includes('Execution context was destroyed')||attempt===3)throw e;
   }
  }
- assert(held.waiting==='installed'&&held.status==='ready'&&held.script?.includes(main(html[0])),
-  'B activated before last old tab closed or source lost its READY slot');
+ assert(held.waiting==='installed'&&held.status==='ready'&&
+  held.script?.includes(main(html[0])),
+  'B activated or remaining old tab changed before final A close '+JSON.stringify(held));
  await q.close();
  await new Promise(done=>setTimeout(done,700));
  await ctx.setOffline(true);
@@ -186,6 +188,45 @@ try{
  assert(incompatible.bundle.includes(main(html[1]))&&
   incompatible.button==='CLEAR OLD SAVE'&&incompatible.ready!==true,'old READY mistakenly admitted by new build');
  assert.deepEqual(await slot(cold),stored,'B updated or erased incompatible old save silently');
+ if(verifyBackup){
+  const downloads=[];
+  cold.on('download',item=>downloads.push(item));
+  const backup=await cold.evaluate(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),b=t.suspendBackupButton,
+    pt=b.getWorldTransformMatrix().transformPoint(b.w/2,b.h/2),
+    rect=g.canvas.getBoundingClientRect();
+   return {visible:b.visible,label:b.label.main.text,
+    pointer:{x:rect.x+pt.x*rect.width/g.scale.gameSize.width,
+     y:rect.y+pt.y*rect.height/g.scale.gameSize.height}};
+  });
+  assert(backup.visible&&backup.label==='BACKUP SAVE','incompatible backup chip missing');
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')
+   .suspendBackupButton.label.main.text==='DOWNLOAD SAVE',null,{timeout:12000});
+  assert.equal(downloads.length,0,'first click downloaded without confirmation');
+  assert.deepEqual(await slot(cold),stored,'staging old bytes changed IndexedDB');
+  const downloadEvent=cold.waitForEvent('download',{timeout:15000});
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  const downloaded=await downloadEvent;
+  const output=await readFile(await downloaded.path());
+  assert(downloaded.suggestedFilename().endsWith('.bbsave'),'incorrect backup extension');
+  const savedOriginal=await cold.evaluate(async()=>{
+   const request=indexedDB.open('bb-single-use-suspend-v1',1);
+   return new Promise((resolve,reject)=>{
+    request.onsuccess=()=>{
+     const db=request.result,tx=db.transaction('slots','readonly'),
+      get=tx.objectStore('slots').get('local-suspend');
+     get.onsuccess=()=>{const bytes=Array.from(get.result.bytes);db.close();resolve(bytes);};
+     get.onerror=()=>{db.close();reject(get.error);};
+    };
+    request.onerror=()=>reject(request.error);
+   });
+  });
+  assert.deepEqual(output,Buffer.from(savedOriginal),'downloaded bytes do not match original stored bytes');
+  assert.equal(output.length,stored.length,'backup size differs');
+  assert.equal(downloads.length,1,'unexpected extra downloads');
+  assert.deepEqual(await slot(cold),stored,'backup changed original READY slot');
+ }
  await cold.mouse.click(incompatible.pointer.x,incompatible.pointer.y);
  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')._suspendConfirm===true,null,{timeout:10000});
  const first=await cold.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').suspendButton.label.main.text);
@@ -200,7 +241,8 @@ try{
   oldBuild:old.buildId,newBundle:main(html[1]),source:{runId:source.runId,tick:source.tick},
   stored,waiting,preservedA,held,
   coldOffline:true,incompatible:{button:incompatible.button,ready:incompatible.ready},
-  preservedByteIdenticalBeforeErasure:true,firstClickOnlyConfirms:true,
+  preservedByteIdenticalBeforeErasure:true,backupDownloadByteIdentical:verifyBackup,
+  backupPreservedOriginalSlot:verifyBackup,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
   caveat:realV33?'Actual merged v2.25.33 platform contract source to current exact-build PWA; no synthetic fixture.'
    :realV32?'Actual shipped v2.25.32 to current exact-build PWA; no synthetic fixture.'

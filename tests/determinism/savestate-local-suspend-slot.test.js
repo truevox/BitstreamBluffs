@@ -182,6 +182,40 @@ describe('inert local single-use suspend slot — cannot authorize a restore',()
  });
 });
 
+describe('explicit incompatible-slot backup copy (no claim, erase or rewrite)',()=>{
+ test('only incompatible READY slots permit byte-for-byte detached copy',async()=>{
+  const idb=fakeIdb(),slot=make(idb),original=bytes(),modes=[];
+  await slot.put(original,identity(),layout);
+  idb.hooks.onTransaction=(_,mode)=>modes.push(mode);
+  idb.hooks.failPut=Object.assign(Error('write blocked'),{name:'QuotaExceededError'});
+  idb.hooks.failDelete=Object.assign(Error('erase blocked'),{name:'QuotaExceededError'});
+  const otherBuild={...identity(),buildId:H('c')};
+  expect(await slot.copyIncompatibleBytes(identity(),layout)).toEqual({ok:false,code:'save-compatible'});
+  const backup=await slot.copyIncompatibleBytes(otherBuild,layout);
+  expect(backup.ok).toBe(true);
+  expect(backup.bytes).toEqual(original);
+  expect(modes.every(mode=>mode==='readonly')).toBe(true);
+  backup.bytes.fill(88);
+  expect((await slot.copyIncompatibleBytes(otherBuild,layout)).bytes).toEqual(original);
+  expect(await slot.peek(identity(),layout)).toMatchObject({ok:true,status:'ready',tick:120});
+  idb.hooks.failPut=null;idb.hooks.failDelete=null;
+  const claimed=await slot.claim(identity(),layout);
+  expect(claimed.ok).toBe(true);
+  expect(await slot.copyIncompatibleBytes(otherBuild,layout)).toEqual({ok:false,code:'slot-claimed'});
+  expect(await slot.release(claimed.token)).toEqual({ok:true,released:true});
+  expect((await slot.copyIncompatibleBytes(otherBuild,layout)).bytes).toEqual(original);
+ });
+ test('empty, invalid and denied storage fail closed, without repair or deletion',async()=>{
+  const idb=fakeIdb(),slot=make(idb),other={...identity(),buildId:H('c')};
+  expect(await slot.copyIncompatibleBytes(other,layout)).toEqual({ok:false,code:'empty'});
+  await slot.put(bytes(),identity(),layout);
+  idb.hooks.failGet=Object.assign(Error('denied'),{name:'SecurityError'});
+  expect(await slot.copyIncompatibleBytes(other,layout)).toEqual({ok:false,code:'storage-unavailable'});
+  idb.hooks.failGet=null;
+  expect(await slot.peek(identity(),layout)).toMatchObject({status:'ready'});
+ });
+});
+
 describe('interrupted Web Lock resume ownership — #424',()=>{
  function fakeBrowserLocks(){
   let held=false;

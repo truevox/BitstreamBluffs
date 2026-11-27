@@ -180,6 +180,17 @@ export async function recoverInterruptedManualSuspend({slot=new LocalSuspendSlot
  });
 }
 
+/** No claim, deletion, migration or metadata rewrite: a user-approved
+ * exact-byte copy of the old READY save for a local browser download.
+ */
+export async function prepareIncompatibleManualBackup({slot=new LocalSuspendSlot(),
+ loadIdentity=loadCurrentBuildDescriptor}={}){
+ try{
+  const identity=await loadIdentity();
+  return await slot.copyIncompatibleBytes(identity,candidateSuspendLayout);
+ }catch{return fail('storage-unavailable');}
+}
+
 /** Explicit user-requested deletion of a READY save only. The slot's
  * atomic clearReady() refuses any existing claim, even a stale one. Only a
  * confirmed Title UI action may call this; never do it during peek or error.
