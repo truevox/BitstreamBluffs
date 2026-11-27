@@ -1,0 +1,55 @@
+name: Headless real RunScene render parity QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/headless-render-parity-qa.yml'
+      - 'tests/replay/renderless-parity-matrix.test.js'
+      - 'tests/replay/headlessRun.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/entities/**'
+      - 'src/systems/replay/**'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/ScoreManager.js'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/headless-render-parity-qa.yml'
+      - 'tests/replay/renderless-parity-matrix.test.js'
+      - 'tests/replay/headlessRun.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/entities/**'
+      - 'src/systems/replay/**'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/ScoreManager.js'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify native build identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Real RunScene/Matter render-on-off parity matrix
+        run: npm test -- --runInBand tests/replay/renderless-parity-matrix.test.js
