@@ -17,7 +17,6 @@ import {loadCurrentBuildDescriptor} from './runtimeIdentity.js';
 import {createCandidateStateCodec} from './candidateState.js';
 import {armPrivateRunSceneStage} from './privateStageOwnership.js';
 import {DailyPatch} from '../DailyPatch.js';
-import {enabledBiomeMask} from '../ProfileStore.js';
 import {SCENES,REG} from '../../constants.js';
 import {EVT} from '../../events.js';
 
@@ -31,16 +30,27 @@ function restoreRegistry(r,saved){
   else r.remove?.(key);
  }
 }
-function configureStockResume(reg,seed){
- const existingSeed=reg.get(REG.SEED),existingMask=reg.get(REG.BIOME_MASK);
- const defs=Object.values(reg.get(REG.CONTENT)?.biomes||{});
- const day=DailyPatch.dateKeyFromSeed(seed);
- const mask=existingSeed===seed&&Number.isSafeInteger(existingMask)&&existingMask>=0
-  ? existingMask
-  : day?DailyPatch.infoForDateKey(day).biomeMask
-    :enabledBiomeMask(reg.get(REG.PROFILE),defs);
+/**
+ * Rebuild the exact source biome topology, not the current profile or a
+ * same-seed registry hint. The recorder header is subsequently validated
+ * by the strict native candidate codec, whose terrain/config digest must
+ * agree with this mask before any stage is published or slot consumed.
+ * A forged or incoherent header can only fail closed, never grant authority.
+ */
+export function stockResumeBiomeMask(candidate){
+ const header=candidate?.sections?.recorder?.recorder?.header;
+ const mask=header?.biomeMask;
+ if(header?.seed!==candidate?.seed||!Number.isSafeInteger(mask)||
+  Object.is(mask,-0)||mask<0||mask>0xffffffff)
+  throw Error('suspend:invalid-recorded-biome-mask');
+ return mask>>>0;
+}
+function configureStockResume(reg,seed,sourceBiomeMask){
+ if(!Number.isSafeInteger(sourceBiomeMask)||sourceBiomeMask<0||
+  sourceBiomeMask>0xffffffff||Object.is(sourceBiomeMask,-0))
+  throw Error('suspend:invalid-source-biome-mask');
  reg.set(REG.SEED,seed);
- reg.set(REG.BIOME_MASK,mask>>>0);
+ reg.set(REG.BIOME_MASK,sourceBiomeMask>>>0);
  reg.set(REG.DAILY_OFFICIAL,false);
  reg.set(REG.DAILY_MODE,'classic');
  reg.set(REG.BSOD_GYM,false);
@@ -88,7 +98,7 @@ async function resumeManualRunLocked(title,Phaser,{slot=new LocalSuspendSlot(),
   if(source.runId!==claim.runId||source.tick!==claim.tick||!source.seed)
    throw Error('candidate-header-mismatch');
   originalRegistry=snapshotRegistry(reg);
-  configureStockResume(reg,source.seed);
+  configureStockResume(reg,source.seed,stockResumeBiomeMask(source));
   if(!title.scene.isActive(SCENES.TITLE))throw Error('title-left');
   arm=armStage(game);
   game.scene.start(SCENES.RUN);
@@ -101,6 +111,7 @@ async function resumeManualRunLocked(title,Phaser,{slot=new LocalSuspendSlot(),
   const codec=createCodec(Phaser),prepared=codec.prepare(stage,inspected.candidateBytes);
   const res=codec.restore(stage,inspected.candidateBytes);
   if(stage.simClock?.tick!==claim.tick||stage.runId!==claim.runId||
+   stage.biomeMask!==stockResumeBiomeMask(source)||
    res?.exact===false||res?.calls>0||!prepared?.world)
    throw Error('native-restore-mismatch');
   if(!title.scene.isActive(SCENES.TITLE)||!stage.sys.isPaused())
