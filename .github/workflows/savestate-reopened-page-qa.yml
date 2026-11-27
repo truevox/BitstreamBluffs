@@ -39,7 +39,7 @@ jobs:
           node tools/ruleset/build-ruleset.mjs --check
           node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Atomic local slot, candidate envelope and build identity
-        run: npm test -- --runInBand tests/determinism/savestate-candidate-suspend-bridge.test.js tests/determinism/savestate-paused-candidate.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/build-identity.test.js
+        run: npm test -- --runInBand tests/determinism/savestate-candidate-suspend-bridge.test.js tests/determinism/savestate-paused-candidate.test.js tests/determinism/savestate-private-stage.test.js tests/determinism/savestate-local-suspend-slot.test.js tests/determinism/build-identity.test.js
       - name: Install real Chromium
         run: npx playwright install --with-deps chromium
       - name: Closed page, reopened fresh game, one-use claim and exact native suffix
@@ -58,3 +58,7 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture --scene-roundtrip --owned-stage
+      - name: Real running browser loop holds private stage paused, hidden and no events, ordinary start unchanged
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-private-stage-live-browser.mjs

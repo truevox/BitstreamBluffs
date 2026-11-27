@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.28 — #424 opt-in private game-owned RunScene stage, still no player UI (2026-11-27)
+
+- Register an application-only one-shot staging capability keyed by the actual Phaser Game (private WeakMap, never serialized, exposed in scene data, stored in the registry, or available to an untrusted file). Only Title-active, Run-inactive applications may arm it; a subsequent genuine RunScene.create consumes it exactly once. Ordinary game starts remain unchanged.
+- The armed RunScene internally suppresses its early observer events and HUD, finishes real Phaser SceneManager creation, then pauses and hides itself **before the first update/render/input**. Its caller still owns validation, one-use IndexedDB consume, and the explicit observer/HUD reveal after commit; no Save/Resume button or production trusted activation has been wired.
+- Expand real Chromium exact-head acceptance to use the application-owned stage at both ticks 481/936 with full native zero-tick 537-fingerprint remainder proof, a deliberately corrupted late-restore rollback/retry, zero RUN_START before commit and exactly one after; separately run the browser's NORMAL animation frame loop for a hidden/paused stage and verify an ordinary RunScene start is unaffected. Add four unit guard tests.
+- Attest the opt-in guarded RunScene code change as normal-run-simulation invariant in the committed source tripwire; no SIM_REVISION bump. Still no player-visible Suspend/Resume, public Verified authority, or Chromebook signoff. #119 and #424 stay OPEN. [skip netlify]
+
 ## v2.25.27 — #424 actual Phaser staged native one-use restore acceptance (2026-11-26)
 
 - Add a THIRD dedicated Chromium acceptance path that actually leaves a paused RunScene, enters TitleScene, stages a NEW tick-zero RunScene behind an active title, reconstructs the full native Matter/recorder state, and consumes the exact one-use IndexedDB claimant before revealing the resumed continuation. The test checks zero simulated restore ticks and original 537-tick/terminal replay identity.

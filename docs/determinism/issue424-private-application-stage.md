@@ -33,3 +33,14 @@ run simulation or SIM_REVISION is intended.
 
 Owner/provenance: Gal Friday engineering implementation, distinct from
 Marvin's actual product requirement. Parent #119 and #424 remain OPEN.
+
+## Real ongoing frame-loop gate
+
+The independent test-private-stage-live-browser.mjs does NOT use a frozen
+headlessStep clock. It starts the actual WebGL application, arms the private
+stage, leaves Phaser's own requestAnimationFrame loop running for >200 ms,
+and proves that Title stays active, staged RunScene stays paused and
+invisible at tick zero, no HUD or RUN_START leaks. After a synthetic
+successful commit, ticks advance and RUN_START fires once. A fresh page
+starts an ordinary non-staged RunScene and emits its normal one event.
+This is now a separate step of the required reopened-page GitHub CI gate.
