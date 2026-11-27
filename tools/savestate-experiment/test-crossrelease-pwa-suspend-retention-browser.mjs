@@ -4,7 +4,7 @@
  *
  * Old release fixture uses same v2.25.30 source/identity but its test-only
  * build preserves class names, since the *shipped* v30 minifier could not
- * create a valid stock READY save. The B release is unmodified v2.25.31.
+ * create a valid stock READY save. The B release is the current compiled PWA.
  */
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -13,6 +13,9 @@ import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
 const [a,b,...flags]=process.argv.slice(2);
 const realV31=flags.includes('--real-v31');
+const realV32=flags.includes('--real-v32');
+const realV33=flags.includes('--real-v33');
+assert([realV31,realV32,realV33].filter(Boolean).length<=1,'choose one exact old-build fixture');
 assert(a&&b,'Usage: node script OLD_KEEP_NAMES_FIXTURE NEW_V231_DIST');
 const roots={a:resolve(a),b:resolve(b)};
 const html=await Promise.all([readFile(resolve(roots.a,'index.html'),'utf8'),
@@ -169,7 +172,10 @@ try{
   coldOffline:true,incompatible:{button:incompatible.button,ready:incompatible.ready},
   preservedByteIdenticalBeforeErasure:true,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
-  caveat:realV31?'Actual shipped v2.25.31 to v2.25.32 PWA bundles; no synthetic keepNames fixture.':'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
+  caveat:realV33?'Actual merged v2.25.33 platform contract source to current exact-build PWA; no synthetic fixture.'
+   :realV32?'Actual shipped v2.25.32 to current exact-build PWA; no synthetic fixture.'
+   :realV31?'Actual shipped v2.25.31 to current exact-build PWA; no synthetic fixture.'
+   :'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
  }));
  await ctx.close();
 }finally{

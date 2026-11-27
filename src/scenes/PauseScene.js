@@ -27,7 +27,7 @@ import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
 import { pauseRestartTakeover, pauseQuitTakeover } from '../ui/TakeoverLauncher.js';
-import {canCaptureManualPauseCandidate} from '../systems/savestate/pausedCandidate.js';
+import {manualSuspendUnavailableReason} from '../systems/savestate/pausedCandidate.js';
 import {suspendManualRun} from '../systems/savestate/manualSuspendController.js';
 
 export class PauseScene extends Phaser.Scene {
@@ -65,7 +65,8 @@ export class PauseScene extends Phaser.Scene {
     this._buildHeader(theme);
     const px = 30;
     const py = 36;
-    this.canSuspend=canCaptureManualPauseCandidate(this.scene.get(SCENES.RUN));
+    this.suspendUnavailableReason=manualSuspendUnavailableReason(this.scene.get(SCENES.RUN));
+    this.canSuspend=this.suspendUnavailableReason===null;
     const panelH=this.canSuspend?200:180;
     const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: panelH, color: 'magenta', title: this.takeoverRun ? 'TAKEOVER // UNRANKED' : this.guestPractice ? 'GUEST GHOST // UNRANKED' : this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
 
@@ -136,9 +137,15 @@ export class PauseScene extends Phaser.Scene {
       });
     }
     // Under the menu column, clear of the panel's inner border hairline (panel floor 180, hairline at 176).
-    panel.add(new NeonText(this, theme, 10, this.canSuspend?186:165,
-      this.gymPractice ? 'LEARN. RETRY. REPEAT.' : 'THE LEDGER NEVER FORGETS.',
-      { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+    // If a run cannot Suspend, hiding the action without a reason is
+    // indistinguishable from a broken save feature. Explain it without
+    // granting a new action, writing storage, or obstructing Quit/Resume.
+    this.suspendNotice=new NeonText(this,theme,10,this.canSuspend?186:165,
+      ellipsize(this.canSuspend?'THE LEDGER NEVER FORGETS.':
+        'SUSPEND OFF: '+this.suspendUnavailableReason,214),{
+        color:this.canSuspend?'magenta':'amber',outline:'none'
+      }).setAlpha(this.canSuspend?0.6:0.95);
+    panel.add(this.suspendNotice);
     this.suspendStatus=this.canSuspend?new NeonText(this,theme,236,169,'',{
       color:'amber',outline:'none'
     }):null;

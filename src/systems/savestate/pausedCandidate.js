@@ -8,22 +8,52 @@
  */
 import {createCandidateStateCodec} from './candidateState.js';
 
-function supported(run) {
- if(!run||run.crashed||run.unrankedPractice||run.tapePlayer||
-    run._replayTape||run.takeover||run.coachSim||run.guestPractice||
-    run.bsodGym||run.dailyOfficial||run.modded||run.upgradeRun?.enabled||
-    run.magnetsDrop||run.kodiaksOn||run.appliedBoosts?.length||
-    !Number.isSafeInteger(run.simClock?.tick)||run.simClock.tick<=0||
-    !run.ghostRecorder) return false;
- return true;
+/** A single fail-closed eligibility list powers both the actual capture guard
+ * and the read-only Pause explanation. No UI hint ever attempts a save.
+ * Reasons are conservative: the first disqualifying state wins.
+ */
+function unsupportedReason(run) {
+ if(!run)return 'NO ACTIVE RUN';
+ if(run.crashed)return 'CRASHED RUN';
+ if(run.unrankedPractice)return 'UNRANKED PRACTICE';
+ if(run.tapePlayer||run._replayTape)return 'REPLAY MODE';
+ if(run.takeover)return 'REPLAY TAKEOVER';
+ if(run.coachSim)return 'COACH SIMULATION';
+ if(run.guestPractice)return 'GUEST PRACTICE';
+ if(run.bsodGym)return 'BSOD GYM';
+ if(run.dailyOfficial)return 'OFFICIAL DAILY';
+ if(run.upgradeRun?.enabled)return 'UPGRADED RUN';
+ // Some high-level profiles enable magnets AND Kodiaks. Show the more
+ // specific combination, not an arbitrary generic magnet diagnosis.
+ if(run.kodiaksOn)return 'KODIAKS ENABLED';
+ if(run.magnetsDrop)return 'MAGNETS ENABLED';
+ if(run.appliedBoosts?.length)return 'BOOSTED RUN';
+ // `modded` is also true for some specific upgrade/hazard configurations.
+ // Report the actionable specific restriction before this broad fallback.
+ if(run.modded)return 'MODDED RUN';
+ if(!Number.isSafeInteger(run.simClock?.tick)||run.simClock.tick<=0)
+  return 'INVALID RUN TICK';
+ if(!run.ghostRecorder)return 'NO GHOST RECORDER';
+ return null;
+}
+const supported=run=>unsupportedReason(run)===null;
+
+/** Human-readable, non-authoritative reason for a hidden Suspend action.
+ * Null is allowed only for a genuinely eligible, manually paused source.
+ */
+export function manualSuspendUnavailableReason(run){
+ const unsupported=unsupportedReason(run);
+ if(unsupported!==null)return unsupported;
+ if(run._manualPausePending!==true||run.scene?.isPaused?.('RunScene')!==true)
+  return 'MANUAL PAUSE REQUIRED';
+ return null;
 }
 
-/** Conservative preflight for a menu affordance only; actual capture runs
- * this check again and serializes strictly under the paused-scene guard.
+/** Conservative preflight for the menu affordance. Actual capture repeats
+ * all guards before touching the current native causal state or storage.
  */
 export function canCaptureManualPauseCandidate(run){
- return supported(run)&&run._manualPausePending===true&&
-  run.scene?.isPaused?.('RunScene')===true;
+ return manualSuspendUnavailableReason(run)===null;
 }
 
 /** Return complete internal candidate bytes or throw before a storage write.
