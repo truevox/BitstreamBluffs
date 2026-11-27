@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.24 — #424 actual paused-run fresh-page one-use native restore acceptance (2026-11-26)
+
+- Extend the one-use browser diagnostic to close the original game page, reopen the SAME IndexedDB storage partition in a new page, fresh-boot a tick-zero RunScene, atomically claim the original candidate, reconstruct the complete live Matter world/recorder with zero simulated restore ticks and consume only after a successful, exact native proof. Competing claims fail and replay suffix, terminal score, GhostTape and RunRecord stay identical.
+- Exercise a real manual PauseScene transition at ticks 481 and 936. Capture only stock, unmodified, eligible runs; temporarily normalize the pending pause-only marker to a resumable state **during capture**, restore the original source's pause marker even if capture fails, and reject replay, takeover, daily, boosted and upgraded sources. Both source and new page continue to match the original native suffix.
+- Dedicated exact-head Chromium CI runs ordinary reopened-page and real manual PauseScene capture variants plus guards; no player-visible Suspend/Resume menu, crash-recovery policy, automated storage lease release, official verification, ranking change or network feature. #119 and #424 remain OPEN. [skip netlify]
+
 ## v2.25.23 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
 
 - Declare the reviewed eight-section native candidate layout in the exact-build layout descriptor, wrapping canonical candidate bytes in the existing bounded `bb-savestate-cache` Suspend envelope; preserve nested SHA-256 integrity, frozen complete header/section binding and strict current build, ruleset, tick and run identity. Format acceptance remains **envelope-only**, never automatic restore or Verified score admission.
