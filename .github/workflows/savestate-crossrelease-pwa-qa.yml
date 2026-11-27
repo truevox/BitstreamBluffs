@@ -114,10 +114,12 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
+
       - name: Physical old-save BACKUP then explicit ERASE, offline, exact byte-for-byte download
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-crossrelease-pwa-suspend-backup-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
+
 
   # New v2.25.34 boundary: a real valid v2.25.32 READY must never be
   # silently claimed, migrated or deleted when the UI-only patch releases.

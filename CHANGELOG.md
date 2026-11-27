@@ -1,10 +1,12 @@
 # Changelog
 
+
 ## v2.25.35 — #424 inert old-build Suspend backup before clear (2026-11-27)
 
 - For an incompatible exact-build READY local one-use Suspend, Title now offers a separate amber BACKUP SAVE chip above the unchanged CLEAR OLD SAVE control. First player click defensively copies the bounded original slot in readonly IndexedDB; second click (or E twice) requests a byte-exact inert .bbsuspend local download. No claim, consume, migration, reclassification, overwrite or storage write; original two-click erase remains intact.
 - Download is not an import/restore, tool-assisted practice, GhostTape or proof of public Verified/Shard authority; the game never claims a browser download was durably saved. Blocked downloads visibly fail and leave READY bytes intact. Safe filenames contain only bounded build digest and causal tick, not stored run IDs.
 - Permanent exact-head cross-release compiled-PWA CI verifies actual v2.25.31 paused player save survives waiting-worker upgrade to v2.25.35; fully offline Title physically exports a file SHA-256-identical to original IndexedDB, the slot stays READY, a forced blocked download preserves it, and only confirmed two-click erase clears it. Keep all v2.25.34 unsupported-mode explanations and v2.25.32/33 old-build retention gates. Physics/SIM_REVISION, save layout, public scoring and trust remain unchanged. #424/#119 stay open for physical Chromebook, OS disk pressure and separately approved legacy import/migration. [skip netlify]
+
 
 
 ## v2.25.34 — #424 explain why a paused run cannot Suspend (2026-11-27)

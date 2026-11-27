@@ -121,12 +121,25 @@ try{
  assert(waiting.waiting,'B worker never entered waiting state');
  assert.deepEqual(await slot(p),stored,'worker update silently changed old slot');
  await p.reload({waitUntil:'domcontentloaded'});
- await p.waitForFunction(()=>window.__bbGame?.scene.isActive('TitleScene')&&navigator.serviceWorker.controller&&
-  window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',null,{timeout:30000});
- const preservedA=await p.evaluate(()=>({
-  script:document.querySelector('script[type="module"][src*="main-"]')?.src,
-  status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
- }));
+ // The browser can perform a second navigation while a waiting worker is
+ // negotiating controlled clients. That invalidates a Playwright execution
+ // context between waitForFunction and evaluate. Re-observe a *fresh* old
+ // Title under a strict bound, then still assert the original bundle and
+ // READY status; never accept an early new-worker activation as success.
+ let preservedA=null;
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   await p.waitForFunction(()=>window.__bbGame?.scene.isActive('TitleScene')&&navigator.serviceWorker.controller&&
+    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',null,{timeout:30000});
+   preservedA=await p.evaluate(()=>({
+    script:document.querySelector('script[type="module"][src*="main-"]')?.src,
+    status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
+   }));
+   break;
+  }catch(e){
+   if(!String(e?.message||e).includes('Execution context was destroyed')||attempt===3)throw e;
+  }
+ }
  assert(preservedA.script.includes(main(html[0]))&&preservedA.status==='ready',
   'live old tab switched code before safe worker transition');
  await p.close();
