@@ -40,6 +40,21 @@ loss, not physical disk-pressure eviction. Real OS eviction,
 installed Chromebook test, persistence grant/denial and wider
 upgrade/biome configurations remain under #424/#119.
 
+## Synthetic IndexedDB API denial and explicit retry (v2.25.32)
+
+A third separate real compiled Pages PWA Chromium profile begins an actual
+stock RunScene, pauses at tick 181 and then deliberately replaces only
+`indexedDB.open` in the page with a function throwing `SecurityError`.
+This is a deterministic **injected API failure**, NOT evidence that Chrome
+natively revoked storage permission or that any disk-pressure eviction
+occurred. The real player Suspend UI reports `SUSPEND FAILED: STORAGE
+UNAVAILABLE`, original RunScene stays paused with the same run ID/tick,
+there is no leaving transition, and no READY slot is created. Restoring the
+original browser API and physically clicking again durably saves the SAME
+run ID/tick. No new public Verified/Shards, JS errors, or mutating outbound
+HTTP requests. The three independent test contexts (quota, Chrome-managed
+IDB clear, injected API refusal) run against the same compiled PWA.
+
 ## Local real compiled v2.25.31 evidence
 
 The actual 6.45 MB offline shell was installed (origin CDP usage

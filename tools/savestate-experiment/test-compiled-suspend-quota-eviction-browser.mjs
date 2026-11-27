@@ -154,17 +154,62 @@ try{
  await cold.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('after-idb-eviction'));
  await cold.waitForFunction(()=>window.__bbGame?.scene.isActive('RunScene')&&
   window.__bbGame.scene.getScene('RunScene').simClock?.tick>=3,null,{timeout:15000});
+ await evictContext.close();
+
+ // C: deterministic browser API denial, not a claim of native permission
+ // control. Deny only IndexedDB.open after a genuine installed PWA has booted
+ // and the same stock run is paused, then restore it for an explicit retry.
+ const deniedContext=await newContext(),dp=await install(deniedContext,origin);
+ const deniedSource=await prepare(dp,'compiled-idb-denied');
+ const deniedPoint=await pointer(dp);
+ const denial=await dp.evaluate(()=>{
+  const original=indexedDB.open.bind(indexedDB);
+  Object.defineProperty(indexedDB,'open',{configurable:true,value(){
+   throw new DOMException('Injected IndexedDB access denied for QA','SecurityError');
+  }});
+  window.__restoreIdbOpen=()=>Object.defineProperty(indexedDB,'open',
+   {configurable:true,value:original});
+  let name;
+  try{indexedDB.open('no-db-created');}catch(e){name=e.name;}
+  return name;
+ });
+ assert.equal(denial,'SecurityError','denial injection did not take effect');
+ await dp.mouse.click(deniedPoint.x,deniedPoint.y);
+ await dp.waitForFunction(()=>{
+  const g=window.__bbGame,p=g.scene.getScene('PauseScene');
+  return g.scene.isActive('PauseScene')&&
+   p.suspendStatus?.main?.text?.startsWith('SUSPEND FAILED');
+ },null,{timeout:25000});
+ const deniedRefusal=await dp.evaluate(()=>{
+  const g=window.__bbGame,p=g.scene.getScene('PauseScene'),r=g.scene.getScene('RunScene');
+  return {status:p.suspendStatus?.main?.text,leaving:p.leaving,
+   paused:g.scene.isPaused('RunScene'),runId:r.runId,tick:r.simClock.tick};
+ });
+ assert(deniedRefusal.status.includes('STORAGE')&&!deniedRefusal.leaving&&
+  deniedRefusal.paused&&deniedRefusal.runId===deniedSource.runId&&
+  deniedRefusal.tick===deniedSource.tick,
+  'IDB denial lost original paused run '+JSON.stringify(deniedRefusal));
+ await dp.evaluate(()=>window.__restoreIdbOpen());
+ assert.equal(await slot(dp),null,'IDB denied save created phantom READY');
+ await dp.mouse.click(deniedPoint.x,deniedPoint.y);
+ await dp.waitForFunction(()=>window.__bbGame.scene.isActive('TitleScene')&&
+  window.__bbGame.scene.getScene('TitleScene')._suspendReady===true,null,{timeout:30000});
+ const deniedRetry=await slot(dp);
+ assert(deniedRetry?.status==='ready'&&deniedRetry.runId===deniedSource.runId&&
+  deniedRetry.tick===deniedSource.tick,'IDB denied retry did not retain original run');
+ await deniedContext.close();
+
  assert.deepEqual(errors,[]);
  assert(!outbound.some(x=>!x.startsWith('GET:')&&!x.startsWith('HEAD:')),
   'artificial QA attempted outbound mutation');
- console.log('PASS_REAL_COMPILED_PWA_QUOTA_AND_IDB_EVICTION',JSON.stringify({
+ console.log('PASS_COMPILED_PWA_QUOTA_EVICTION_AND_INJECTED_IDB_DENIAL',JSON.stringify({
   quota:{baselineUsage:before.usage,quotaSize,original:source,refused,retry},
   eviction:{before:erun,saved,after},
+  injectedIdbDenial:{source:deniedSource,refused:deniedRefusal,retry:deniedRetry},
   separateEphemeralChromiumContexts:true,offlineAfterEviction:true,
   noPhantomSave:true,sourcePlayabilityPreserved:true,errors,outbound,
   caveat:'Chrome-managed IDB clear simulates complete browser storage partition eviction; real OS disk-pressure eviction not forced.',
  }));
- await evictContext.close();
 }finally{
  await browser?.close();
  if(server)await new Promise(done=>server.close(done));
