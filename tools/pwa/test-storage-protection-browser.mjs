@@ -31,33 +31,31 @@ try{
     act(title.menu,'SETTINGS');act(title.view.menu,'MANAGE SOUND');const sound=title.view.soundView;act(sound.menu,'OFFLINE MUSIC');const v=sound.offlineView;
     for(let i=0;i<200&&(v.pending||v.controller.replanning||v.controller.state.status==='checking');i++)await new Promise(r=>setTimeout(r,50));
     if(v.pending||v.controller.state.status==='checking')throw Error('Status never ready');
-    const i=v.menu.items.findIndex(x=>x.label==='PROTECT OFFLINE FILES');if(i<0)throw Error('Missing storage protection action');
-    // The 260 ms CRT open tween starts with a collapsed/scaled panel. Status
-    // readiness is unrelated to its animation, and calculating a pointer
-    // point before waiting for the tween gives an obsolete hit target.
-    // Observe *rendered frames* at the final scale/position instead of
-    // assuming a wall-clock delay finishes the animation on slow CI hosts.
-    let settled=0;
-    for(let frame=0;frame<240&&settled<3;frame++){
-     await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
-     const ready=v.panel.alpha>=0.999&&Math.abs(v.panel.scaleX-1)<0.0001&&
-       Math.abs(v.panel.scaleY-1)<0.0001&&v.panel.y>=0&&v.panel.y+v.h<=270;
-     settled=ready?settled+1:0;
+    // The CRT panel uses a 260 ms overshooting scale/position tween.
+    // On busy CI browsers the data check can finish before that tween; measuring
+    // the moving panel falsely flags a geometry regression. Wait for the
+    // transition to finish instead of weakening the actual bounds assertion.
+    let stable=0;
+    for(let n=0;n<150&&stable<4;n++){
+      await new Promise(resolve=>setTimeout(resolve,20));
+      const resting=v.panel.alpha===1&&v.panel.scaleX===1&&v.panel.scaleY===1&&
+        v.panel.x===16&&v.panel.y===6;
+      stable=resting?stable+1:0;
     }
-    if(settled<3)throw Error('Offline panel never settled '+JSON.stringify({
-      x:v.panel.x,y:v.panel.y,alpha:v.panel.alpha,scaleX:v.panel.scaleX,scaleY:v.panel.scaleY,h:v.h
-    }));
+    if(stable<4)throw Error('Offline Music panel never reached settled geometry');
+    const i=v.menu.items.findIndex(x=>x.label==='PROTECT OFFLINE FILES');if(i<0)throw Error('Missing storage protection action');
     const row=v.menu.rows[i],t=v.menu.getWorldTransformMatrix().transformPoint(row.zone.x+row.zone.width/2,row.zone.y+row.zone.height/2);
     const rect=document.querySelector('canvas').getBoundingClientRect(),displayWidth=g.scale.gameSize.width,displayHeight=g.scale.gameSize.height;
     const point={x:rect.left+t.x/displayWidth*rect.width,y:rect.top+t.y/displayHeight*rect.height};
-    if(v.panel.y<0||v.panel.y+v.h>270||v.menu.y+(i+1)*v.menu.rowH>v.back.y)throw Error('Storage row overlaps panel boundary or BACK '+JSON.stringify({
-      panelY:v.panel.y,height:v.h,menuY:v.menu.y,rowH:v.menu.rowH,row:i,backY:v.back.y
-    }));
+    if(v.panel.y<0||v.panel.y+v.h>270||v.menu.y+(i+1)*v.menu.rowH>v.back.y)
+      throw Error('Storage row overlaps panel boundary or BACK '+JSON.stringify({
+        panelY:v.panel.y,panelH:v.h,panelScaleY:v.panel.scaleY,
+        menuY:v.menu.y,rowH:v.menu.rowH,index:i,backY:v.back.y}));
     return {point,mode:v.controller.mode,preState:v.controller.state.storageProtection,disabled:v.menu.items[i].disabled,persistCalls:window.__persistCalls};
    });
    console.log('BEFORE_STORAGE_CLICK',cfg.label,JSON.stringify(before));
    if(before.disabled||before.persistCalls!==0||derivatives!==0)throw Error('Storage prompt activated without consent '+JSON.stringify(before));
-   // Point was computed AFTER the panel settled: click without stale delay.
+   // The panel was confirmed settled BEFORE reading geometry or hit location.
    if(cfg.hasTouch)await p.touchscreen.tap(before.point.x,before.point.y);else await p.mouse.click(before.point.x,before.point.y);
    await p.waitForFunction(()=>window.__persistCalls===1,null,{timeout:10000}).catch(async()=>{const debug=await p.evaluate(()=>{const v=window.__bbGame.scene.getScene('TitleScene').view.soundView.offlineView;return {calls:window.__persistCalls,selected:v.menu.selected,pending:v.pending,status:v.controller.state.storageProtection,last:v.localNotice,btn:v.menu.items.find(x=>x.label==='PROTECT OFFLINE FILES')};});throw Error('Storage click did not activate '+JSON.stringify({device:cfg.label,before,debug,errors}));});
    const after=await p.evaluate(()=>{const v=window.__bbGame.scene.getScene('TitleScene').view.soundView.offlineView;return {status:v.controller.state.storageProtection,notice:v.localNotice,disabled:v.menu.items.find(i=>i.label==='PROTECT OFFLINE FILES').disabled,persistCalls:window.__persistCalls,ready:v.controller.state.ready};});
