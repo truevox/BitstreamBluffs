@@ -14,6 +14,7 @@ const errors=[],time=Date.UTC(2026,0,5,12);
 const pausedCapture=process.argv.includes('--paused-capture');
 const reopenProof=process.argv.includes('--suspend-reopen');
 const sceneRoundtrip=process.argv.includes('--scene-roundtrip');
+const ownedStage=process.argv.includes('--owned-stage');
 const suspendEnvelope=process.argv.includes('--suspend-envelope')||reopenProof;
 try{
  scratch=await mkdtemp(join(tmpdir(),'bb-candidate-file-'));
@@ -165,7 +166,7 @@ try{
     },wire);
     assert.equal(titlePhase.oldTick,tick);
     assert.equal(titlePhase.saved,true);
-    const roundtrip=await a.page.evaluate(async ({frameTime,expectedTick})=>{
+    const roundtrip=await a.page.evaluate(async ({frameTime,expectedTick,ownedStage})=>{
      const p=window.__candidate,g=p.g;
      const [{inspectCandidateSuspendEnvelope,candidateSuspendLayout},
       {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
@@ -176,15 +177,27 @@ try{
      const {EVT}=await import('/src/events.js');
      let startEvents=0;
      g.events.on(EVT.RUN_START,()=>{startEvents++;});
-     const stageFresh=()=>{
-      // Synchronous zero-delta Phaser creation with observer emission muted.
-      // This diagnostic contract is NOT a production UI/service handoff.
-      const restore=p.r._muteForSeek();
-      try{g.scene.start('RunScene');g.headlessStep(p.t,0);}
-      finally{restore();}
-      g.scene.stop('UIScene');
-      g.scene.pause('RunScene');
-      p.r.sys.setVisible(false);
+     const stageFresh=async()=>{
+      if(ownedStage){
+       // The actual RunScene.create private one-shot staging capability:
+       // SceneManager invokes Systems.CREATE after create returns, and the
+       // application code pauses/hides the scene before any sim update.
+       const {armPrivateRunSceneStage}=await import('/src/systems/savestate/privateStageOwnership.js');
+       const arm=armPrivateRunSceneStage(g);
+       try{
+        g.scene.start('RunScene');g.headlessStep(p.t,0);
+        const dest=await arm.ready;
+        if(dest!==p.r)throw Error('private scene stage returned wrong RunScene');
+       }catch(e){arm.cancel();throw e;}
+      }else{
+       // Old control: a synchronous test-owned manual observer suppression.
+       const restore=p.r._muteForSeek();
+       try{g.scene.start('RunScene');g.headlessStep(p.t,0);}
+       finally{restore();}
+       g.scene.stop('UIScene');
+       g.scene.pause('RunScene');
+       p.r.sys.setVisible(false);
+      }
       if(!g.scene.isActive('TitleScene')||!g.scene.isPaused('RunScene')||
        p.r.simClock.tick!==0||startEvents!==0)
        throw Error('staging published or advanced before validation '+JSON.stringify({
@@ -200,7 +213,7 @@ try{
       if(!held.ok)throw Error('late-failure proof could not hold slot '+JSON.stringify(held));
       const admitted=inspectCandidateSuspendEnvelope(held.bytes,identity);
       if(!admitted.ok)throw Error('late-failure candidate admission');
-      stageFresh();
+      await stageFresh();
       let lateError=null;
       try{p.restore(new TextDecoder().decode(admitted.candidateBytes),frameTime,true);}
       catch(e){lateError=String(e.message);}
@@ -220,7 +233,7 @@ try{
      const prepared=inspectCandidateSuspendEnvelope(claim.bytes,identity);
      if(!prepared.ok||prepared.admission!=='envelope-only')throw Error('same-scene candidate rejected');
      const input=new TextDecoder().decode(prepared.candidateBytes);
-     stageFresh();
+     await stageFresh();
      const r=p.r,staging={title:g.scene.isActive('TitleScene'),
       paused:g.scene.isPaused('RunScene'),tick:r.simClock?.tick,startEvents};
      let exact;
@@ -252,7 +265,7 @@ try{
       await slot.release(claim.token);
       throw e;
      }
-    },{frameTime:cap.frameTime,expectedTick:tick});
+    },{frameTime:cap.frameTime,expectedTick:tick,ownedStage});
     assert.equal(roundtrip.tick,tick);assert.equal(roundtrip.calls,0);
     assert.equal(roundtrip.titleAfter,false);assert.equal(roundtrip.runAfter,true);
     assert.equal(roundtrip.consumed,true);assert.deepEqual(roundtrip.fp,cap.fp);
@@ -263,7 +276,7 @@ try{
     console.log('PASS_ACTUAL_PHASER_SCENE_LIFECYCLE_ROUNDTRIP',
      JSON.stringify({tick,abandonedOldRun:true,titleEntered:true,
       stagedAtTickZero:true,preparedBeforeTitleStopped:true,zeroSimTicks:true,
-      oneUseConsumedBeforeActivation:true,startEventsBeforeCommit:0,
+      oneUseConsumedBeforeActivation:true,privateStagingCapability:ownedStage,startEventsBeforeCommit:0,
       startEventsAfterCommit:1,lateFailureRollbackRetried:tick===481,exact:true}));
    }
    // Optional #424 real IndexedDB format bridge. Claim now, but consume ONLY

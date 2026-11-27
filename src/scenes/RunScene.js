@@ -93,6 +93,7 @@ import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, adva
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 import pmath from '../systems/pmath.js';
 import { installRenderGuard } from '../systems/replay/renderGuard.js';
+import {takePrivateRunSceneStage} from '../systems/savestate/privateStageOwnership.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -170,6 +171,32 @@ export class RunScene extends Phaser.Scene {
    * that was cancelled before the scene started, is REFUSED (fail closed).
    */
   create(data) {
+    const stage=takePrivateRunSceneStage(this.game);
+    if(stage){
+      // PRIVATE application-owned stage. SceneManager sets status RUNNING
+      // AFTER create() returns, then emits Systems.CREATE: pause THERE so
+      // no real update/render/input can run before the async IDB claim commits.
+      if(data?.coachSim){stage.fail(Error('suspend-stage:coach-descriptor'));return;}
+      this.coachSim=null;
+      this.crashInfo=null;
+      this._suspendStageActive=true;
+      const restore=this._muteForSeek();
+      try{this._create();}
+      catch(e){stage.fail(e);throw e;}
+      finally{delete this._suspendStageActive;restore();}
+      this.sys.setVisible(false);
+      this.sys.events.once(Phaser.Scenes.Events.CREATE,()=>{
+        try{
+          this.sys.setVisible(false);
+          this.sys.pause();
+          this.inputRouter?.setEnabled?.(false);
+          if(!this.sys.isPaused()||this.sys.settings.visible)
+            throw Error('suspend-stage:scene-not-hidden-and-paused');
+          stage.accept(this);
+        }catch(e){stage.fail(e);}
+      });
+      return;
+    }
     const reg = this.registry;
     const desc = data && data.coachSim;
     // Phaser preserves scene start data when a later start omits it. Consume
@@ -560,7 +587,7 @@ export class RunScene extends Phaser.Scene {
 
     // post-FX + HUD + go
     GlitchPipeline.install(this);
-    if (!this.coachSim) { // #66: a coach simulation has no HUD scene
+    if (!this.coachSim&&!this._suspendStageActive) { // no HUD in a private, pre-commit staging scene
       this.scene.stop(SCENES.UI);
       this.scene.launch(SCENES.UI);
     }
@@ -572,7 +599,7 @@ export class RunScene extends Phaser.Scene {
         this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
     } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
-    if (this.coachSim) return; // #66: not a run anyone can see or be credited for: no RUN_START
+    if (this.coachSim||this._suspendStageActive) return; // suppress all observers until stage COMMIT
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice

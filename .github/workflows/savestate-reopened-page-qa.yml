@@ -54,3 +54,7 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture --scene-roundtrip
+      - name: Actual private RunScene staging capability with no precommit events
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture --scene-roundtrip --owned-stage
