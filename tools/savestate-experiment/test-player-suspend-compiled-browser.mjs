@@ -68,6 +68,14 @@ try{
    }
   });
  });
+ // Keep a second genuine compiled Title tab with a READY hint that will
+ // become stale when the first tab consumes the one-use slot.
+ const rival=await ctx.newPage();
+ rival.on('pageerror',e=>errors.push(e.message));
+ rival.on('request',r=>{if(!['GET','HEAD','OPTIONS'].includes(r.method()))writes.push(r.method()+':'+r.url());});
+ await rival.goto(origin+'/',{waitUntil:'domcontentloaded'});
+ await rival.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+  window.__bbGame.scene.getScene('TitleScene')._suspendReady===true,null,{timeout:60000});
  // UI physical click, never source import / simulated controller.
  const point=await page.evaluate(()=>{
   const g=window.__bbGame,b=g.scene.getScene('TitleScene').suspendButton,
@@ -98,11 +106,34 @@ try{
   resumed.events.length===1&&resumed.events[0].tick===state.before.tick&&
   resumed.events[0].runId===state.before.runId&&resumed.remainingLocalSlot==='empty',
   'production restore failed exact one-use source tick '+JSON.stringify({state,resumed}));
+ // A stale real player click must NOT create a duplicate resumed RunScene.
+ // Physical pointer input is used in both tabs, not programmatic Resume.
+ await rival.bringToFront();
+ const rivalPoint=await rival.evaluate(()=>{
+  const g=window.__bbGame,b=g.scene.getScene('TitleScene').suspendButton,
+   r=g.canvas.getBoundingClientRect();
+  return {x:r.x+(b.x+b.w*.5)*r.width/g.scale.gameSize.width,
+   y:r.y+(b.y+b.h*.5)*r.height/g.scale.gameSize.height};
+ });
+ const staleBefore=await rival.evaluate(()=>window.__bbGame.scene.getScene('TitleScene')._suspendReady);
+ assert(staleBefore,'second tab was not genuinely stale');
+ await rival.mouse.click(rivalPoint.x,rivalPoint.y);
+ await rival.waitForFunction(()=>{
+  const g=window.__bbGame,t=g.scene.getScene('TitleScene');
+  return t.starting===false&&t._suspendStatus==='empty';
+ },null,{timeout:20000});
+ const staleAfter=await rival.evaluate(()=>{
+  const g=window.__bbGame,t=g.scene.getScene('TitleScene');
+  return {title:g.scene.isActive('TitleScene'),run:g.scene.isActive('RunScene'),
+   status:t._suspendStatus,ready:t._suspendReady,visible:t.suspendButton.visible};
+ });
+ assert.deepEqual(staleAfter,{title:true,run:false,status:'empty',ready:false,visible:false},
+  'stale tab resurrected consumed one-use save '+JSON.stringify(staleAfter));
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
  console.log('PASS_PRODUCTION_MINIFIED_NATIVE_SUSPEND_RESUME',JSON.stringify({
   version,before:state.before,saved,resumed,noNewRunId:true,
   sameOriginalTick:true,exactTickAtResumedRunStart:resumed.events[0].tick,
-  errors,writes,caveat:'Compiled actual Vite bundle; no external upload or physical Chromebook.'}));
+  staleAfter,secondTabRefused:true,errors,writes,caveat:'Compiled actual Vite bundle; no external upload or physical Chromebook.'}));
  await ctx.close();
 }finally{
  await browser?.close();await new Promise(ok=>server.close(ok));
