@@ -112,3 +112,84 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
+
+  # New v2.25.34 boundary: a real valid v2.25.32 READY must never be
+  # silently claimed, migrated or deleted when the UI-only patch releases.
+  real-v32-update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Compile original v2.25.32 and current production Pages PWA
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-current-v34-dist"
+          git worktree add --detach "$RUNNER_TEMP/bb-real-v32" 10137b0f5bd75c97484192fae513074b44b0b599
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/bb-real-v32/node_modules"
+          cd "$RUNNER_TEMP/bb-real-v32"
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-real-v32-dist"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real v32 READY remains intact after waiting-worker upgrade and offline two-click discard
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v32-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v32
+
+  # This release is stacked on the actual v2.25.33 platform ABI build.
+  # Its old READY bytes must remain intact across an installed SW update,
+  # despite a strictly different v2.25.34 savestate build identity.
+  real-v33-update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact triggering head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Compile real v2.25.33 ABI and proposed v2.25.34 Pages PWA
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-current-v34-dist"
+          git worktree add --detach "$RUNNER_TEMP/bb-real-v33" 6322d374fb81c69ce49d565ff3da2acdda3d749e
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/bb-real-v33/node_modules"
+          cd "$RUNNER_TEMP/bb-real-v33"
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          node tools/pwa/build-pages-site.mjs / "$RUNNER_TEMP/bb-real-v33-dist"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Exact platform v33 READY survives v34 offline update and two-click discard
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v33-dist" "$RUNNER_TEMP/bb-current-v34-dist" --real-v33
