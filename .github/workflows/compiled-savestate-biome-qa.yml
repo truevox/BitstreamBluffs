@@ -1,0 +1,74 @@
+name: Compiled PWA biome-masked Suspend and unsupported-mode QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/compiled-savestate-biome-qa.yml'
+      - 'tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs'
+      - 'src/systems/savestate/manualSuspendController.js'
+      - 'src/systems/savestate/pausedCandidate.js'
+      - 'src/scenes/**'
+      - 'src/systems/ghost/**'
+      - 'src/systems/PermanentUpgrades.js'
+      - 'src/systems/Kodiaks.js'
+      - 'src/systems/ShardMagnet.js'
+      - 'package*.json'
+      - 'tools/pwa/**'
+      - 'vite.config.*'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/compiled-savestate-biome-qa.yml'
+      - 'tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs'
+      - 'src/systems/savestate/manualSuspendController.js'
+      - 'src/systems/savestate/pausedCandidate.js'
+      - 'src/scenes/**'
+      - 'src/systems/ghost/**'
+      - 'src/systems/PermanentUpgrades.js'
+      - 'src/systems/Kodiaks.js'
+      - 'src/systems/ShardMagnet.js'
+      - 'package*.json'
+      - 'tools/pwa/**'
+      - 'vite.config.*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-biomes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact triggering SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Ruleset, savestate identity and focused field schema
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          npm test -- --runInBand tests/determinism/savestate-resume-biome-mask.test.js tests/determinism/savestate-manual-ui.test.js
+      - name: Compile actual minified offline Pages PWA
+        run: node tools/pwa/build-pages-site.mjs / dist-biome-qa
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real biome 1 and 3 offline resumed from original tick and one-use consumption
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --mask=1
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --mask=3
+      - name: Real upgraded, magnet and Kodiak run cannot silently Suspend or overwrite a slot
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=upgrade
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=magnet
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=kodiak
