@@ -143,11 +143,28 @@ try{
  assert(preservedA.script.includes(main(html[0]))&&preservedA.status==='ready',
   'live old tab switched code before safe worker transition');
  await p.close();
- const held=await q.evaluate(async()=>({
-  waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
-  status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
- }));
- assert(held.waiting==='installed','B activated before last A page closed');
+ // Closing the first controlled tab can race an independent navigation in
+ // the second tab. Re-observe the actual old READY Title after that context
+ // settles; never replace an old-bundle/worker check with a test-only delay.
+ let held=null;
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   await q.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+    navigator.serviceWorker.controller&&
+    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',
+    null,{timeout:30000});
+   held=await q.evaluate(async()=>({
+    waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
+    status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
+    script:document.querySelector('script[type="module"][src*="main-"]')?.src,
+   }));
+   break;
+  }catch(e){
+   if(!String(e?.message||e).includes('Execution context was destroyed')||attempt===3)throw e;
+  }
+ }
+ assert(held.waiting==='installed'&&held.status==='ready'&&held.script?.includes(main(html[0])),
+  'B activated before last old tab closed or source lost its READY slot');
  await q.close();
  await new Promise(done=>setTimeout(done,700));
  await ctx.setOffline(true);
