@@ -1,11 +1,15 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-26 18:29 UTC. GitHub main `64d5a14f862430c1c289c0c12c98a7af0c3043ca`, v2.25.15/SIM9; exact Pages build and deploy passed (served bytes not compared). No trusted live Save/Resume or public ranking authority.
+Last reconciled for release dependencies: 2026-11-27 03:41 UTC. GitHub main `36868faaca80309fcd8789b543de9b18675045f1`, v2.25.21/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45935234358) in progress; served release not verified. No player Save/Resume or public ranking authority.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
+
+- **Dependency reconciliation, Nov 27:** #423 merged `4ddab609` (v2.25.19) with the dormant eight-section savestate candidate; #418 closed as superseded. #119 remains open. Team B drafts #426 `595fffb1` (registered layout and one-use envelope) and stacked QA #427 `72d03c35` are not player Resume. #426's proposed v2.25.21 is occupied; recheck base, version and #427 ancestry before using old green CI. #100 still needs trusted player restoration; Morgan does not take over Team B.
+- **#135 dependency:** #419 merged `251200a0` (v2.25.20), private creator-local replay and blind-peer reference only. #135 remains open, with no live verifier service, official rank or rewards. Do not repeat the old integration work.
+- **#85:** #353 merged `36868faa` (v2.25.21). Title M/Museum opens a local static GhostTape v1 pose gallery, not a trusted archive or historical simulation. Confirm exact Pages deploy before saying it is live. Provenance and historical playback remain open; do not duplicate the preview or take over Gal's lane.
 
 - **#74/#75 prerequisite reconciliation:** shipped #392 includes #67 Postcards and #72 Replay Takeover. Postcards already offer a same-build reproducible prefix, an explicit unranked timed survival objective, and a reply code. Do not duplicate that codec or hold all #74 work on #119. Remaining #74 delta is picking/classifying a highlight and supporting explicit event-specific objectives, not a proof or leaderboard change; get design scope before adding a new objective or player flow. #75 can evaluate a developer-only recorded title/tutorial playback plus unranked interruption without inventing restore. It does not yet ship either recorded scene; #119 still gates saved-state persistence and #100. #58/#60 remain open for their distinct publishing/identity scope.
 
@@ -116,7 +120,7 @@ means resume this queue, not take over another lane or merge a draft.
    #75/#100/#74 need trusted restoration or equivalent causal replay
    prefix; #243 and #224 are narrow milestones, not full restores.
    #82: no product cohort or SaveStore migration authorization. #85:
-   no player archive verified or gallery publication. #155: preserve
+   bounded local gallery merged; no verified historical archive. #155: preserve
    delivered cue fix but do not claim full Pulp or take over Team B.
 
 ## Changes landed and published
@@ -180,9 +184,9 @@ means resume this queue, not take over another lane or merge a draft.
 
 | Phase / issues | Progress or blocker |
 |---|---|
-| 1: #132, #82, #87, #79, #126, #85 | #132 done via #167; #82 calculations shipped #169, durable provenance / screen work gated; #87 #170/#213 and #79 #174 shipped bounded slices, developer-only #318 slices shipped; #126 #171/#189/#218 shipped synthetic tools; #85 has a provenance-pinned scripted recapture candidate; original footage and gallery decision remain open. |
+| 1: #132, #82, #87, #79, #126, #85 | #132 done via #167; #82 calculations shipped #169, durable provenance / screen work gated; #87 #170/#213 and #79 #174 shipped bounded slices, developer-only #318 slices shipped; #126 #171/#189/#218 shipped synthetic tools; #85 local static preview merged #353; historical playback, original footage and provenance remain open. |
 | 2: #131, #129, #127, #84, #83, #81, #78, #77, #75, #71, #70 | Shipped slices: #131 #184/#228; #129 #205/#226; #127 #183/#202 plus #286 via #318; #81 #178 and #290 via #313; #78 #190/#237 and #281 via #318; #77 #186/#220; #71 #197; #70 #181 plus #288 via #318. #84/#83 need #60 and scoped identity; #75 needs trusted restoration/testable replay prefix, not a pose trace. Remaining rank, identity, sharing and product gates in #168 still apply. |
-| 3: #157, #155, #100, #74 | #157 #195 and draft #287 baseline only; no scoring change. #155 #196/#208 cue fix shipped; #140 Team B #160 merged and closed; full Pulp not complete. #100/#74 await trusted restoration or equivalent causal evidence; #224 is a narrow milestone. |
+| 3: #157, #155, #100, #74 | #157 #195 and draft #287 baseline only; no scoring change. #155 #196/#208 cue fix shipped; #140 Team B #160 merged and closed; full Pulp not complete. #100 awaits trusted restoration; #74 can build on the shipped bounded replay prefix, but highlight selection and event-specific goals need scope. #224 is a narrow milestone. |
 
 Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #167 and #169 shipped;
 #173 was reviewed for Gal and merged at `17993228`. #168 is the tracker, not a
@@ -202,12 +206,7 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - #82 historical native put→abort established the scope for shipped #320.
   Broader phase still needs atomic run + provenance completion and reopen
   proof for a durable cohort. Do not count memory-only scores as durable.
-- #85 / Gal's [#353](https://github.com/truevox/BitstreamBluffs/pull/353) local Museum draft `82893e93`: exact checks green; independent review incomplete.
-  Exact DOM handler reproduces a stale Remove accessible name after rename
-  or clearing. In an authorized review, synchronize title, alt and Remove
-  name. SVGs fit independently; use sourced measurements for cross-card
-  comparisons. Accepts GhostTape JSON, not MP4; matching tapes unverified.
-  No approval, publication, or lane takeover. Private scripted recapture, not player footage: SIM6
+- #85 historical review of old Museum draft `82893e93` found stale Remove accessible text after rename or clear; do not carry that finding to the merged head without checking. SVGs fit independently, not comparable across cards without a common scale. Scripted recapture, not player footage: SIM6
   `22b6ade` reached 180s cutoff under stock level 1 neutral canopyHop
   on two seeds; SIM7 `d3e80fa` actual BSOD at 84.42/80.62s.
   Do not attribute the whole difference to the wall alone.
