@@ -287,6 +287,62 @@ export class PauseScene extends Phaser.Scene {
     setTimeout(flush, 30);
   }
 
+  /**
+   * #424 real source-side storage/retirement seam. Deliberately not attached
+   * to a menu row until the matching player Resume scene host passes CI.
+   * A failed write leaves the source paused and resume-able. Once the
+   * IndexedDB slot is durably ready, no UI path can continue the old run.
+   */
+  async _suspendRun() {
+    if (this.leaving) return { ok:false, code:'busy' };
+    this.leaving = true;
+    const run = this.scene.get(SCENES.RUN);
+    let result;
+    try {
+      const [{ suspendPausedSource }, { loadCurrentBuildDescriptor }] = await Promise.all([
+        import('../systems/savestate/suspendSource.js'),
+        import('../systems/savestate/runtimeIdentity.js'),
+      ]);
+      const identity = await loadCurrentBuildDescriptor();
+      result = await suspendPausedSource({
+        run, Phaser, identity,
+        retire: () => {
+          // No async work may separate durable commit and retirement.
+          // Resume, restart and Quit cannot race: leaving remains latched.
+          // The original RunScene was PAUSED before storage.
+          run._leaving = true;
+          try {
+            this.game.events.emit(EVT.RUN_ABORT, {
+              runId:this._runId(),reason:'suspend',pauseToken:this.manualPauseToken,
+            });
+          } catch (e) { console.warn('Suspend abort observer failed',e); }
+          this.scene.stop(SCENES.RUN);
+          this.scene.stop(SCENES.UI);
+          this.scene.start(SCENES.TITLE);
+          // Scene manager may defer the stop until its next zero-delta
+          // transition; the original remains paused/marked leaving.
+          return run._leaving === true;
+        },
+      });
+    } catch (error) {
+      console.warn('Suspend failed before durable write',error);
+      result = { ok:false,code:'capture-or-storage-unavailable' };
+    }
+    if (!result.ok) {
+      if (result.saved === true || result.locked === true) {
+        // Never unlock a live source after a durable save.
+        if (this.hint?.scene) this.hint.setText(result.saved === true
+          ? 'SAVE WRITTEN. RELOAD TO RECOVER - SOURCE LOCKED'
+          : 'SAVE STATUS UNKNOWN. DO NOT RESUME - SOURCE LOCKED');
+      } else {
+        this.leaving = false;
+        if (this.hint?.scene)
+          this.hint.setText('SUSPEND FAILED: '+String(result.code).toUpperCase().slice(0,42)+' - ESC RESUME');
+      }
+    }
+    return result;
+  }
+
   /** Abort this run and start a new one with the same seed. @returns {void} */
   restart() {
     if (this.leaving) return;
