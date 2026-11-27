@@ -1,17 +1,17 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last reconciled for release dependencies: 2026-11-27 05:41 UTC. GitHub main `6efb16cc2f146988c9bb2017f5723f9a28fb886d`, v2.25.27/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45946737950) build and deploy succeeded (served bytes not checked). No player Save/Resume or public ranking authority.
+Last reconciled for release dependencies: 2026-11-27 06:40 UTC. GitHub main `dbdf0b25b21f90eb1ada04bc69d137bd0f266605`, v2.25.29/SIM9. [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45951440098) build and deploy succeeded (served bytes not independently checked). Same-build stock-only one-use player Suspend/Resume is available; no public ranking authority.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **#119/#424 dependency:** #423 merged the dormant eight-section savestate candidate (v2.25.19; #418 superseded). #426 merged the registered one-use envelope `1c276cce` (v2.25.23); #427 merged the native page-reopen proof `e0d85aa8` (v2.25.24). Main v2.25.27 staged native restore proves a research harness, not player controls. #433 `a49f231b` has [green player-controls Chromium](https://github.com/truevox/BitstreamBluffs/actions/runs/45946305029) but [red fresh-corpus real quota observation](https://github.com/truevox/BitstreamBluffs/actions/runs/45946304722); no evidence of data loss. Its .27 proposal is occupied; #434 `77512602` proposes .28 on .27 with private staging/no UI, and #430 is separate source-side QA. Team B owns consolidation and exact aligned quota retest. #100 remains blocked on trusted player restoration.
+- **#119/#424 dependency:** #435 merged stock-only Pause Suspend / Title Resume at v2.25.29, exact PR head `b000a732`. Slot is same-build, local, and single-use; consume follows native reconstruction. [Previously red quota corpus](https://github.com/truevox/BitstreamBluffs/actions/runs/45950819239) passed on that head after #436 recalibrated the test. #430/#433 are older overlapping drafts, not pending prerequisites. Physical Chromebook/PWA upgrades, claim crash recovery and wider modes remain open; Team B owns production integration. #100 still needs separate design approval and branch/state/provenance rules, not merely a same-build save.
 - **#135 dependency:** #419 merged `251200a0` (v2.25.20), private creator-local replay and blind-peer reference; v2.25.25 adds an unmounted HTTP reference. #135 remains open, with no live verifier service, official rank or rewards. Do not repeat the old integration work.
 - **#85:** #353 merged `36868faa` (v2.25.21). Title M/Museum opens a local static GhostTape v1 pose gallery, not a trusted archive or historical simulation. [Exact v2.25.21 Pages deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/45935234358) passed; served bytes not checked. Provenance and historical playback remain open; do not duplicate the preview or take over Gal's lane.
 
-- **#74/#75 prerequisite reconciliation:** shipped #392 includes #67 Postcards and #72 Replay Takeover. Postcards already offer a same-build reproducible prefix, an explicit unranked timed survival objective, and a reply code. Do not duplicate that codec or hold all #74 work on #119. Remaining #74 delta is picking/classifying a highlight and supporting explicit event-specific objectives, not a proof or leaderboard change; get design scope before adding a new objective or player flow. #75 can evaluate a developer-only recorded title/tutorial playback plus unranked interruption without inventing restore. It does not yet ship either recorded scene; #119 still gates saved-state persistence and #100. #58/#60 remain open for their distinct publishing/identity scope.
+- **#74/#75 prerequisite reconciliation:** shipped #392 includes #67 Postcards and #72 Replay Takeover. Postcards already offer a same-build reproducible prefix, an explicit unranked timed survival objective, and a reply code. Do not duplicate that codec or hold all #74 work on #119. Remaining #74 delta is picking/classifying a highlight and supporting explicit event-specific objectives, not a proof or leaderboard change; get design scope before adding a new objective or player flow. #75 can evaluate a developer-only recorded title/tutorial playback plus unranked interruption without inventing restore. Neither recorded scene ships; do not confuse v2.25.29 stock one-use Suspend with a player replay/branch or broad checkpoint API. #58/#60 remain open for their distinct publishing/identity scope.
 
 - **Shipped #391/#392 Ghost consent follow-up:** `39a83c15` requires a fresh press; consolidated #392 shipped v2.25.0 in `3e15dd98` (Pages deploy verified). #396 later hardened the mobile browser test against a moving hit zone. #395 is CI-only and remains open; no physical Chromebook/Android acceptance yet. #69 sharing shipped; #172 physical PWA QA remains open.
 
@@ -117,8 +117,8 @@ means resume this queue, not take over another lane or merge a draft.
    no merge, preview, release or issue closure.
 5. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
-   #75/#100/#74 need trusted restoration or equivalent causal replay
-   prefix; #243 and #224 are narrow milestones, not full restores.
+   #75/#74 recorded playback can use a scoped causal prefix where appropriate.
+   #100 is not approved; v2.25.29 stock-only Suspend is not repeatable rollback.
    #82: no product cohort or SaveStore migration authorization. #85:
    bounded local gallery merged; no verified historical archive. #155: preserve
    delivered cue fix but do not claim full Pulp or take over Team B.
@@ -186,7 +186,7 @@ means resume this queue, not take over another lane or merge a draft.
 |---|---|
 | 1: #132, #82, #87, #79, #126, #85 | #132 done via #167; #82 calculations shipped #169, durable provenance / screen work gated; #87 #170/#213 and #79 #174 shipped bounded slices, developer-only #318 slices shipped; #126 #171/#189/#218 shipped synthetic tools; #85 local static preview merged #353; historical playback, original footage and provenance remain open. |
 | 2: #131, #129, #127, #84, #83, #81, #78, #77, #75, #71, #70 | Shipped slices: #131 #184/#228; #129 #205/#226; #127 #183/#202 plus #286 via #318; #81 #178 and #290 via #313; #78 #190/#237 and #281 via #318; #77 #186/#220; #71 #197; #70 #181 plus #288 via #318. #84/#83 need #60 and scoped identity; #75 needs trusted restoration/testable replay prefix, not a pose trace. Remaining rank, identity, sharing and product gates in #168 still apply. |
-| 3: #157, #155, #100, #74 | #157 #195 and draft #287 baseline only; no scoring change. #155 #196/#208 cue fix shipped; #140 Team B #160 merged and closed; full Pulp not complete. #100 awaits trusted restoration; #74 can build on the shipped bounded replay prefix, but highlight selection and event-specific goals need scope. #224 is a narrow milestone. |
+| 3: #157, #155, #100, #74 | #157 #195 and draft #287 baseline only; no scoring change. #155 #196/#208 cue fix shipped; #140 Team B #160 merged and closed; full Pulp not complete. #100 awaits an approved branching design beyond stock Suspend; #74 can build on the shipped bounded replay prefix, but highlight selection and event-specific goals need scope. #224 is a narrow milestone. |
 
 Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #167 and #169 shipped;
 #173 was reviewed for Gal and merged at `17993228`. #168 is the tracker, not a
