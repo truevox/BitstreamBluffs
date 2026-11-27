@@ -81,7 +81,6 @@ export class Sled {
     this.corkscrewActive = false;
     this.heliPhase = 0; // degrees, visual only
     this.heliVel = 0;
-    this.shield = false;
     this.scrambled = false;
     this.invulnerableMs = 0;
     this.hidden = false;
@@ -667,9 +666,10 @@ export class Sled {
   /**
    * Sync graphics to body.
    * @param {number} [dtMs=16.7] frame time, drives pose smoothing (the helicopter spin is stepHeli, per tick).
+   * @param {{shield?: boolean}} [opts] per-frame draw inputs derived from sim state by the caller (never stored on the sled).
    * @returns {void}
    */
-  render(dtMs = 16.7) {
+  render(dtMs = 16.7, opts = {}) {
     if (this.destroyed || this.hidden || !this.gfx) return;
     const k = 1 - pmath.exp(-dtMs / 70);
     this.squash = Math.max(0, (this.squash || 0) - dtMs / 160);
@@ -682,7 +682,7 @@ export class Sled {
     pose.tuck = lerp(pose.tuck, tuck, k);
     pose.brake = lerp(pose.brake, airbrake, k);
     pose.chute = lerp(pose.chute, this.parachuteMs > 0 ? 1 : 0, 1 - pmath.exp(-dtMs / 90));
-    this._draw();
+    this._draw(opts);
   }
 
   /**
@@ -717,12 +717,11 @@ export class Sled {
     return parseInt(v.slice(1), 16);
   }
 
-  _draw() {
+  _draw(opts = {}) {
     const g = this.gfx;
     const pal = this.palette;
     const b = this.body;
-    g.clear();
-    this._sync();
+    g.clear(); // x/y/vx/vy are refreshed by the sim (endStep and every body mutator call _sync); render never writes them
 
     const ang = b.angle;
     const c = pmath.cos(ang);
@@ -810,7 +809,7 @@ export class Sled {
     }
 
     // shield (Hashed Backup)
-    if (this.shield) {
+    if (opts.shield) {
       const p0 = P(0, -6);
       const pulse = 0.55 + 0.25 * pmath.sin(this._time / 90);
       g.lineStyle(1.5, pal.amber, pulse);

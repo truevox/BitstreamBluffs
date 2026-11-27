@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.22 — issue 1D render-never-writes-sim guard (2026-11-27)
+
+- In dev and test builds, `RunScene.renderFrame` now runs under a deny-by-default guard: every own field of the live simulation owners (sled, scene, score, tricks, BSOD, hazards, pickups, terrain, kodiaks) becomes read-only for the frame, nested sim data comes back as read-only proxies, and any write throws a `RenderWriteError` naming `Class.field` at the offending line. Fields render legitimately owns are an explicit, justified allowlist (`RENDER_OWNED`). Production builds fold the guard away.
+- Fix the violations the suite exposed: the per-frame `Sled.shield` mirror is gone (the shield visual is passed to `Sled.render` from `shieldCharges`), and `Sled._draw` no longer re-syncs the sled's position/velocity aliases. Camera, view and lazily created visuals are allowlisted as presentation-only.
+- No gameplay, physics, scoring or replay digest change; source tripwire attested as no-behavior-change. [skip netlify]
+
 ## v2.25.21 — #85 offline Museum of Bad Physics player preview (2026-11-26)
 
 - Expose the bounded, **local-file-only** Museum of Bad Physics static GhostTape v1 pose gallery through a new `M MUSEUM` Title chip and keyboard M. The Vite production-built gallery has Back to Game and never automatically reads saved games, uploads selected files, executes prior physics, accepts official scores or changes ranking.

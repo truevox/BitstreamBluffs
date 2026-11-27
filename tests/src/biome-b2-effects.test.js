@@ -147,11 +147,10 @@ describe('B2 Crystal Clear Goggles (ward vs blind and scramble, 6 s)', () => {
 });
 
 describe('B2 Heat Shield (the existing shield, 1 charge, its own HUD chip)', () => {
-  test('a pickup adds 1 charge and raises the sled shield; a hazard crash is negated and the Heat Shield chip expires', () => {
+  test('a pickup adds 1 charge (the shield visual derives from shieldCharges); a hazard crash is negated and the Heat Shield chip expires', () => {
     const s = makeRun();
     s.onPowerUp(take('heatShield'));
     expect(s.shieldCharges).toBe(1);
-    expect(s.sled.shield).toBe(true);
     expect(events(s, EVT.POWERUP_COLLECTED)).toEqual([{ id: 'heatShield', durationMs: 0, charges: 1 }]);
     s.onHazard(hit('packetSpike'));
     expect(s.pendingCrash).toEqual({ cause: 'hazard', hazardId: 'packetSpike' });
