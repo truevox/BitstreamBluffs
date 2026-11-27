@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.25 — #424 read-only, non-reserving local Suspend slot preview foundation (2026-11-26)
+
+- Add a read-only IndexedDB status hint for the existing one-use local Suspend slot: empty / ready / claimed or incompatible / corrupt / unavailable. It validates a detached envelope snapshot outside the IDB read transaction, so merely opening a future Title/Resume view cannot reserve a token, mutate a slot or hold the cross-tab claim lock through large-file parsing.
+- Share strict envelope/header/identity bindings with the actual atomic claim path to avoid divergent acceptance. The preview returns only display metadata from a verified envelope and NEVER candidate bytes, ownership token, restorable scene, Verified authority or ranking eligibility. A READY hint may immediately become stale; the future player action must always claim atomically again.
+- Fake IndexedDB tests for invalid status, old build, corrupt saved binding, unavailable storage, cross-tab ownership, and read-only mode; real Chromium two-tab close/reload tests verify the entire empty -> ready -> claimed -> released -> consumed lifecycle and no HTTP writes.
+- This does NOT add a player-facing Suspend/Resume button, production isolated world handoff, automatic stale-claim recovery, or new DB. Parent #119 and child #424 remain OPEN. [skip netlify]
+
 ## v2.25.24 — #424 actual paused-run fresh-page one-use native restore acceptance (2026-11-26)
 
 - Extend the one-use browser diagnostic to close the original game page, reopen the SAME IndexedDB storage partition in a new page, fresh-boot a tick-zero RunScene, atomically claim the original candidate, reconstruct the complete live Matter world/recorder with zero simulated restore ticks and consume only after a successful, exact native proof. Competing claims fail and replay suffix, terminal score, GhostTape and RunRecord stay identical.
