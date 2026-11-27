@@ -56,7 +56,7 @@ try{
   return state();
  });
  assert(commit.events===1&&!commit.title&&!commit.paused&&commit.visible,JSON.stringify(commit));
- await page.waitForTimeout(220);
+ await page.waitForFunction(()=>window.__privateStageTest.state().tick>0,null,{timeout:10000});
  const running=await page.evaluate(()=>window.__privateStageTest.state());
  assert(running.events===1&&running.tick>0&&running.visible&&!running.paused,JSON.stringify(running));
  await page.close();
