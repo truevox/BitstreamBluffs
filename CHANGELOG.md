@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.25.18 — project scope and roadmap documentation (2026-11-26)
+
+- Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
+
+## v2.25.17 — coarse pre-alpha geography (2026-11-26)
+
+- On the playtest host only, optionally resolve country/region through ipapi.co once per browser per day, with a 2.5-second timeout, no referrer or credentials, and no raw IP retained. Failure does not block telemetry. Opt-out aborts lookup and deletes the cache. Inform testers that the external lookup provider sees their IP; revisit before launch.
+
+## v2.25.16 — returning playtest browsers (2026-11-26)
+
+- Attach a random persistent browser UUID to new telemetry batches while retaining a separate page-session UUID. Opt-out erases the browser UUID and unsent local data. No IP addresses, fingerprints or account identifiers are collected by game code. Storage-denied browsers remain session-only. Earlier batches cannot be linked retroactively.
+
+## v2.25.15 — cooperative PWA updates (2026-11-26)
+
+- Check for updates every minute and on foreground/online events. An idle title offers Update Now and automatically requests a verified waiting update after five safe seconds. All controlled tabs must confirm safe title state and settled durable storage before activation; active/paused runs and open menus block the handoff. No cache or save deletion. Legacy workers require a final close/reopen.
+
+## v2.25.14 — temporary default-on playtest telemetry (2026-11-26)
+
+- Enable the existing bounded gameplay telemetry on the normal simulate.sledhead.ing URL for the current adult pre-alpha test. Persist URL opt-out across visits and stop other open recording tabs. No overlay or change to gameplay. Other hosts remain opt-in. Remove default-on collection before public launch.
+
+## v2.25.13 — automatic playtest uploads (2026-11-26)
+
+- Dedicated playtest link sends bounded, pseudonymous gameplay event batches directly to the owner’s private Google Drive via a write-only Apps Script collector. No prompts, overlays, credentials, or network requests on ordinary game URLs. Pending uploads retry with stable IDs; opt-out erases unsent tab data.
+
+## v2.25.12 — local playtest telemetry (2026-11-26)
+
+- Dedicated playtest URL automatically records bounded, anonymous gameplay events and 1 Hz performance samples, without overlays or network transmission. Same-tab export and opt-out erase are available by URL. Normal game URLs do not record. No physics or replay authority changes.
+
 ## v2.25.11 — #413 one-ledger UNVERIFIED provisional submission reference (2026-11-26)
 
 - Add a **server-only**, opt-in provisional submission adapter that reuses the *same* #411 signed challenge, account and frozen equipment tables, rather than inventing a competing public Shard balance. Require canonical `provisional-public` request bytes, authenticated account, independently trusted consent/audience, exact pinned course/equipment, server clock and one-use SQLite publication. No live HTTP endpoint or upload is enabled.

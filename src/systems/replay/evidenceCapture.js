@@ -138,6 +138,10 @@ export function scheduleRunEvidence(tape, recorder, opts) {
   // Set the active run synchronously at scheduling time, but do NOT set the
   // legacy result key until the deferred validation/write has completed.
   try { opts?.registry?.set?.(EVIDENCE_ACTIVE_RUN_KEY,tape?.runId||null); } catch { /* optional */ }
-  const run = () => { saveRunEvidence(tape, recorder, opts); };
+  const reg = opts?.registry;
+  try { reg?.set?.('pwaEvidencePending',(reg.get?.('pwaEvidencePending') || 0)+1); } catch {}
+  const run = () => { saveRunEvidence(tape, recorder, opts).finally(() => {
+    try { reg?.set?.('pwaEvidencePending',Math.max(0,(reg.get?.('pwaEvidencePending') || 1)-1)); } catch {}
+  }); };
   if (typeof setTimeout === 'function') setTimeout(run, 0); else Promise.resolve().then(run);
 }

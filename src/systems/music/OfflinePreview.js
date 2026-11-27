@@ -6,6 +6,7 @@ import {earnedBiomeIds} from '../ProfileStore.js';
 import {levelForXp} from '../Progression.js';
 import {upcomingBiomePrefetch} from './NextBiomePrefetch.js';
 import {EVT} from '../../events.js';
+import {installPwaUpdater} from '../PwaUpdater.js';
 const expected=typeof __BB_OFFLINE_INDEX_SHA256__==='string'?__BB_OFFLINE_INDEX_SHA256__:null;
 /** Current authoritative settings and awarded profile, with one bounded
  * next-unlock lookahead. This does not transfer data or mutate the profile. */
@@ -24,7 +25,8 @@ export function offlinePreviewContext(game){
 export async function installOfflinePreview(game){
  if(!expected||!globalThis.isSecureContext||!navigator.serviceWorker||!globalThis.caches||!globalThis.DecompressionStream)return false;
  const base=new URL(import.meta.env.BASE_URL,location.origin).pathname;
- await navigator.serviceWorker.register(base+'sw.js',{scope:base,updateViaCache:'none'});
+ const registration=await navigator.serviceWorker.register(base+'sw.js',{scope:base,updateViaCache:'none'});
+ try { installPwaUpdater(game,registration); } catch {}
  const worker=navigator.serviceWorker.controller;
  if(!worker){game.registry.set('offlineMusicNeedsReopen',true);return false;} // never force claim/reload
  game.registry.set('offlineMusicNeedsReopen',false);

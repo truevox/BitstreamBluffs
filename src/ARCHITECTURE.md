@@ -2717,3 +2717,36 @@ site were not merged/deployed.
 A non-null frozen result contains `trusted:false`, `timingKind:'synthetic-unverified'`, `use:'cosmetic-only'`, `canAuthorizeGameplay:false`, `trackId` and `transportRevision` as stale-callback guards, `sourceTimeSeconds`, `beatSeconds:.5`, `beatsPerMeasure:4`, `measureSeconds:2`, zero-based `beatIndex` and `measureIndex`, one-based `beatInMeasure`, `beatStartSeconds`, `measureStartSeconds`, `nextBeatSeconds`, `nextMeasureStartSeconds`, `isMeasureStartBeat`, `atMeasureStart` (approx. 50ms boundary window), and corresponding WebAudio `*AudioTime` fields. Time fields use the same real source-transport clock as the original OGG music; no extra player, timers, or derived 160 BPM claim. Visual consumers (e.g. a future optional World Dance rhythm mode) should react to **changes of `(transportRevision, beatIndex)` or `(transportRevision, measureIndex)`** once per boundary, never retrigger continuously while `isMeasureStartBeat` remains true. Never gate gameplay, Gym starts, collision, scoring or release pacing on this value. The existing `getBeatTiming()` verified-only fail-closed interface is unchanged.
 
 The existing `planFatalCountIn()` additionally reports `beatInMeasure:[1,2,3,4]`, one `measureStartOnsets` timestamp at the first drum accent, `beatsPerMeasure:4`, `measureSeconds`, and `syntheticMeterOrigin:'count-in-first-drum'`, without changing scheduling. This is an **independent artificial count-in** and should not be assumed aligned with the song-wide fake meter, much less an actual source downbeat. Actual source measure verification remains separate research; release beat catalogs stay unverified.
+
+### Temporary pre-alpha playtest telemetry
+The normal simulate.sledhead.ing host automatically enables a bounded event observer with no game UI during the owner-authorized pre-alpha test. Other hosts require `?playtest=1`.
+It uploads batches to the owner's write-only Google Apps Script collector every
+30 seconds and on page hide; confirmed batches are removed, failed batches retry
+with identical session/batch IDs. Since v2.25.16, each batch also includes a
+random pseudonymous browser UUID (player) persisted in localStorage, when
+available. The session UUID still changes per page load. Browser storage denial
+falls back to session-only; no IP collection or fingerprinting. Older queued
+batches remain unchanged and cannot be linked retroactively.
+`?playtest=0` persists a browser opt-out and erases the tab's pending
+data and the persistent browser UUID (already uploaded files remain in Drive).
+Same-tab manual JSON export
+remains a fallback. No raw keys, seeds, device IDs, error messages, or account
+data. Network and local buffers are bounded; tab closure/offline can lose data.
+Inform adult testers before playing, including the persistent pseudonymous browser ID.
+Since v2.25.17 the production test host also attempts a best-effort ipapi.co
+country/region lookup once per browser per day (including failed attempts). Only
+validated country and region codes persist or upload; the external provider sees
+the IP but BsB does not retain it. No coordinates, city, raw IP or fingerprint.
+Opt-out cancels lookup and clears the cache. Inform testers of this provider.
+Remove the production-host default before public launch.
+
+### Cooperative PWA updates (v2.25.15)
+A checked waiting worker is offered via Update Now on the idle main title and
+automatically requested after five safe seconds. No active, paused, game-over,
+takeover, or menu-view reloads. The active worker polls every controlled
+in-scope window, freezes only consenting idle titles, checks pending
+run/ghost/attempt/evidence writes and memory-only storage, gates new navigations,
+and requests activation of the verified waiting worker only after all consent.
+No cache or user-storage deletion. Legacy clients must close/reopen once;
+unresponsive windows and unsafe storage refuse activation. Existing version
+caches are retained. Failed preparations unlock all participating titles.
