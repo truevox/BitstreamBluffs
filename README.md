@@ -119,7 +119,7 @@ Replay takeovers, postcards, guest practice and training simulations do not earn
 - `public/` — static assets, manifest and bundled music/fallback content; additional soundtrack delivery is versioned separately.
 - `tools/` — simulation, replay and other development/QA tooling.
 - `server/` — experimental server-reference work; not a live public competition backend.
-- `tests/src/` — current-game tests; other maintained `tests/` folders cover replay, simulation, tooling, and integration.
+- `tests/src/` — current-game tests; other maintained `tests/` folders cover replay, simulation, tooling, and integration. The shared `tests/__mocks__/phaser.js` remains necessary for maintained replay tests.
 - The retired pre-`src/` engine, its engine-only tests, and obsolete root test-repair scripts are recoverable at [the pre-retirement Git tag](https://github.com/truevox/BitstreamBluffs/tree/archive/pre-legacy-js-retirement-20261127) (commit `10137b0f`), but are not active code. The historical `/docs/` playground now links to the current game. The old `todo.txt` is retained as a historical planning note, not a current sprint tracker.
 - `docs/` — design, engineering and experiment records. [CHANGELOG.md](CHANGELOG.md) records release slices and limitations.
 

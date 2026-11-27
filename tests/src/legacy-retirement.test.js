@@ -18,6 +18,10 @@ describe('retired engine cannot reappear in the active app', () => {
     }
   });
 
+  test('the shared Phaser Jest mock stays available to maintained replay tests', () => {
+    expect(existsSync(rootFile('tests/__mocks__/phaser.js'))).toBe(true);
+  });
+
   test('production entry and former playground point at the current game', () => {
     const game = readFileSync(rootFile('index.html'), 'utf8');
     const retiredPage = readFileSync(rootFile('public/docs/index.html'), 'utf8');
