@@ -202,8 +202,24 @@ try{
    }
    assert.equal(result.tick,tick);assert.equal(result.calls,0);assert.equal(result.exact,true);
    if(pausedCapture){
-    const hasPending=await b.page.evaluate(()=>window.__candidate.r._manualPausePending);
-    assert.equal(hasPending,false,'resumed gameplay must accept future Pause inputs');
+    const rePaused=await b.page.evaluate(()=>{
+     const p=window.__candidate,r=p.r,beforeTick=r.simClock.tick;
+     if(r._manualPausePending||r.scene.isPaused('RunScene'))throw Error('fresh resume remained paused');
+     r.pauseRun();
+     p.g.headlessStep(p.t,0);
+     if(!r._manualPausePending||!r.scene.isPaused('RunScene')||!p.g.scene.isActive('PauseScene'))
+      throw Error('freshly resumed run refused a new manual PauseScene');
+     r.scene.get('PauseScene')._doResume();
+     p.g.headlessStep(p.t,0);
+     return {beforeTick,afterTick:r.simClock.tick,pending:r._manualPausePending,
+      paused:r.scene.isPaused('RunScene')};
+    });
+    assert.equal(rePaused.beforeTick,tick);
+    assert.equal(rePaused.afterTick,tick,'re-pause must not simulate a single causal tick');
+    assert.equal(rePaused.pending,false,'re-pause must clear transient guard');
+    assert.equal(rePaused.paused,false,'re-pause must return to active simulation');
+    console.log('PASS_REPAUSE_AFTER_FRESH_REOPEN',JSON.stringify({tick,zeroSimTicks:true,
+     resumedCanPauseAgain:true}));
    }
    assert.deepEqual(result.fp,cap.fp);assert.equal(result.runId,cap.runId);
    await b.page.clock.setFixedTime(new Date(time));
