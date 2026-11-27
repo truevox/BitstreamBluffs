@@ -16,6 +16,9 @@ const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies } = Matter;
 
 export class PowerUp {
+  // Stable native save class identity across production JS minification.
+  // Static constructor metadata, never a serialized instance field.
+  static NATIVE_SNAPSHOT_CLASS = 'PowerUp';
   /**
    * @param {Phaser.Scene} scene
    * @param {import('../data/schemas.js').PowerUpDef} def

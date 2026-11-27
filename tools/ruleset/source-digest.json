@@ -3,16 +3,19 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: One-use restore lifecycle gate only; no modification to deterministic simulation update or physics",
+  "attestation": "no-behavior-change: constructor static native snapshot class names only, no physics, damage, or scoring changes",
   "changedFiles": [
-    "src/scenes/RunScene.js"
+    "src/entities/Hazard.js",
+    "src/entities/PowerUp.js",
+    "src/entities/Shard.js",
+    "src/entities/Sled.js"
   ],
   "files": {
     "src/constants.js": "sha256:3abae229bb25b4b2d78b6c8439bd9e6758f91091617e0d5cb16893b9a7680adb",
-    "src/entities/Hazard.js": "sha256:95ec763127d49b4dcbdd260695f8cd6136ca70b1e1204bda48d0a008a31fa5a8",
-    "src/entities/PowerUp.js": "sha256:9c3965f9c7fe074bfe4fba4abaf80139c637755487fa885195b6ded208a61752",
-    "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
-    "src/entities/Sled.js": "sha256:1281d12b3f132efc7dc3ab240a3c2d3e77b3449d4922b088f0f654f575098b9c",
+    "src/entities/Hazard.js": "sha256:4a0cf946f3de481e8dc68cce329017d359e367e342d2356d4f2381c4dbbe4bad",
+    "src/entities/PowerUp.js": "sha256:75d6bbfca813595d87842f009006b71c02ab77a4f1356f9f8e8d77f74066aafb",
+    "src/entities/Shard.js": "sha256:883852c2e52467a2e96bb49d0e8d28bf42900b905d2551d504eaba523d021a5e",
+    "src/entities/Sled.js": "sha256:78bfe01104c99cb127a693748bbfd0ca7a800e73af1423623258fff147f3fb5a",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
     "src/scenes/RunScene.js": "sha256:dfffe4f04b205472947af8287c65210f052530925a7c64c37f8ec183940db683",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",

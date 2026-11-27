@@ -33,6 +33,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export class Sled {
+  // Stable native save class identity across production JS minification.
+  // Static constructor metadata, never a serialized instance field.
+  static NATIVE_SNAPSHOT_CLASS = 'Sled';
   /**
    * @param {Phaser.Scene} scene
    * @param {number} x world px spawn.

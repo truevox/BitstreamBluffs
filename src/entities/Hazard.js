@@ -23,6 +23,9 @@ function hash01(n) {
 }
 
 export class Hazard {
+  // Stable native save class identity across production JS minification.
+  // Static constructor metadata, never a serialized instance field.
+  static NATIVE_SNAPSHOT_CLASS = 'Hazard';
   /**
    * @param {Phaser.Scene} scene
    * @param {import('../data/schemas.js').HazardDef} def
