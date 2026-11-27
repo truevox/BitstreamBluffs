@@ -890,21 +890,13 @@ export class AudioSynth {
           if (d.transportPlay()) {
             this._musicWanted = true;
             session.shouldResume = false;
-            // Loading stems have no playback clock yet. If the player flips
-            // ON→OFF before decode completes, don't reset this saved position
-            // to zero merely because transportPause() cannot measure it.
-            session.pendingOffset = session.offset;
           }
         }
       }
     } else if (!session.shouldResume && this._musicWanted) {
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx);
-      const pendingOffset = live && (!d.pack || d.clockStart == null) &&
-        d.trackIndex === session.trackIndex && Number.isFinite(session.pendingOffset)
-        ? session.pendingOffset : null;
       const frozen = live && d.transportPause();
-      if (frozen && pendingOffset !== null) d._resumeOffset = pendingOffset;
       const procedural = !frozen && this._musicTimer !== null;
       if (frozen || procedural) {
         this._musicWanted = false;
@@ -913,7 +905,6 @@ export class AudioSynth {
         Object.assign(session, {
           shouldResume: true, procedural,
           token: d?._token, trackIndex: d?.trackIndex, offset: d?._resumeOffset,
-          pendingOffset: null,
         });
       }
     }
@@ -1167,7 +1158,8 @@ export class AudioSynth {
   _activateStemMusic() {
     if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
     if (this._paused && this._vinylPauseSession &&
-        !this._vinylPauseSession.manualOverride) return false;
+        !this._vinylPauseSession.manualOverride &&
+        !(this.settings?.musicDuringPause === true && this._musicWanted)) return false;
     const player = this._stemMusic;
     if (!player || !player.ready || !this.ctx || !this.nodes) return false;
     player.attach(this.ctx, this.nodes.musicFilter);

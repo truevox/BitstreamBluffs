@@ -57,6 +57,10 @@ try{
   assert.equal(original.audioPaused,true);
   assert.equal(original.sessionActive,true);
   assert.equal(await openSound(),false);
+  // Phaser's PauseScene intentionally suppresses menu input until its intro
+  // finishes. On busy CI hosts 450ms wall time need not mean 340ms scene time.
+  await page.waitForFunction(()=>!window.__bbGame.scene.getScene('PauseScene')._menuOpening,
+    null,{timeout:10000});
   await page.keyboard.press('ArrowRight',{delay:50}); // Physical UI key, not direct settings injection
   const enabled=await view();
   assert.equal(enabled.settingsOption,true);
@@ -73,6 +77,8 @@ try{
   assert.equal(reloaded.runPaused,true);
   assert.equal(reloaded.audioPaused,true);
   assert.equal(await openSound(),true);
+  await page.waitForFunction(()=>!window.__bbGame.scene.getScene('PauseScene')._menuOpening,
+    null,{timeout:10000});
   await page.keyboard.press('ArrowLeft',{delay:50});
   const disabled=await view();
   assert.equal(disabled.settingsOption,false);

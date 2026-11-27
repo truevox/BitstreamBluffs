@@ -163,6 +163,30 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('opted-in Pause starts an original song when its catalog finishes loading late',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.ready=false;d.started=false;d.pack=null;
+    a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._paused).toBe(true);
+    expect(a._musicWanted).toBe(true);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    d.ready=true;
+    d.start=jest.fn(function(){this.started=true;return true;});
+    a._activateStemMusic=AudioSynth.prototype._activateStemMusic.bind(a);
+    // The real catalog callback must be permitted to start music while the
+    // authoritative RunScene remains paused, without a second sound player.
+    a._onStemCatalogReady();
+    expect(d.start).toHaveBeenCalledTimes(1);
+    expect(d.started).toBe(true);
+    expect(a._paused).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._paused).toBe(false);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
   test('pause preference enables the same frozen song immediately without a vinyl scratch',()=>{
     const {a,d,events}=setup();
     events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
@@ -205,11 +229,20 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     const saved=d._resumeOffset;
     a.applySettings({...a.settings,musicDuringPause:true});
     expect(d.transportPlay).toHaveBeenCalledTimes(1);
-    expect(a._vinylPauseSession.pendingOffset).toBe(saved);
+    // The actual StemMusicDirector owns the in-flight offset independently
+    // of a single PauseScene token (tested below against its real method).
     // Director consumed its resume offset while loading, before it owns a
     // pack/clockStart. Another OFF must not silently seek back to song zero.
     d.pack=null;d.clockStart=null;d.activeNodes.clear();
-    d._resumeOffset=0;d._loading=Promise.resolve('loading');
+    d._resumeOffset=0;d._pendingResumeOffset=saved;
+    d._loading=Promise.resolve('loading');
+    // Match the real director's in-flight behavior, tested independently.
+    d.transportPause.mockImplementationOnce(function(){
+      this._resumeOffset=this._pendingResumeOffset;
+      this._pendingResumeOffset=null;
+      this.started=false;this.transportPaused=true;this._token++;
+      return true;
+    });
     a.applySettings({...a.settings,musicDuringPause:false});
     expect(d.transportPause).toHaveBeenCalledTimes(2);
     expect(d._resumeOffset).toBe(saved);

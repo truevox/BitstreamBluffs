@@ -120,3 +120,37 @@ describe('vinyl musical resume must start from precisely the saved frame',()=>{
     expect(player.transportPaused).toBe(false);
   });
 });
+
+
+describe('source offset is not lost while an original stem decodes',()=>{
+  test('a second Pause during async load retains the saved source offset, not zero',()=>{
+    const d=Object.create(StemMusicDirector.prototype);
+    d.started=true;d.disposed=false;d.ready=true;
+    d.ctx={state:'running',currentTime:42};
+    d.pack=null;d.clockStart=null;
+    d.trackIndex=0;d.catalog=[{id:'original'}];d.songEnabled={original:true};
+    d.shuffleEnabled=false;d._transportHistory=[];d._shuffleRemaining=[];
+    d._resumeOffset=22.375;d._pendingResumeOffset=null;
+    d._token=5;d._loading=null;d._timer=null;
+    d._nextEnabledIndex=()=>0;
+    d._holdPlaybackBoundary=()=>false;
+    // A deliberately pending network decode. No pack/clock available yet.
+    d._beginTrack=jest.fn(()=>new Promise(()=>{}));
+    d.stop=jest.fn(function(){
+      this.started=false;this.transportPaused=false;
+      this._resumeOffset=0;this._pendingResumeOffset=null;
+      this._token++;
+    });
+    try{
+      d._ensureRunning();
+      expect(d._beginTrack).toHaveBeenCalledWith(0,null,22.375);
+      expect(d._resumeOffset).toBe(0);
+      expect(d._pendingResumeOffset).toBe(22.375);
+      expect(d.transportSnapshot().position).toBeCloseTo(22.375,6);
+      expect(d.transportPause()).toBe(true);
+      expect(d._resumeOffset).toBeCloseTo(22.375,6);
+      expect(d.transportPaused).toBe(true);
+      expect(d.stop).toHaveBeenCalledTimes(1);
+    } finally {if(d._timer)clearInterval(d._timer);}
+  });
+});
