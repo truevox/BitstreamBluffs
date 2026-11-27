@@ -115,26 +115,24 @@ describe('S1: digests do not depend on the display cadence (real renderFrame)', 
   function runAtCadence(k, shieldOffAt) {
     const s = mk({ pad });
     s.shieldCharges = 1;
-    s.sled.shield = true;
     while (s.simClock.tick < 240) {
       if (s.simClock.tick === shieldOffAt) s.shieldCharges = 0; // a Hashed Backup consumed at a frame boundary
       tick(s, k);
     }
     return s.ghostRecorder.fingerprints.map((f) => f.combined);
   }
-  /** Value of the render-time mirror Sled.shield at the first checkpoint, per cadence (proves the scenario exercises the old leak). */
-  function mirrorAtCheckpoint(k, shieldOffAt) {
+  test('the shield visual is derived per frame from shieldCharges; Sled keeps no mirror field', () => {
     const s = mk({ pad });
     s.shieldCharges = 1;
-    s.sled.shield = true;
-    let seen = null;
-    const orig = s.ghostRecorder._fingerprint.bind(s.ghostRecorder);
-    s.ghostRecorder._fingerprint = (t, sc) => { if (t === 120) seen = sc.sled.shield; orig(t, sc); };
-    while (s.simClock.tick < 120) { if (s.simClock.tick === shieldOffAt) s.shieldCharges = 0; tick(s, k); }
-    return seen;
-  }
-  test('the scenario is real: the Sled.shield mirror differs between cadences at the checkpoint', () => {
-    expect([mirrorAtCheckpoint(1, 116), mirrorAtCheckpoint(4, 116)]).toEqual([false, true]);
+    const seen = [];
+    const orig = s.sled.render.bind(s.sled);
+    s.sled.render = (dt, opts) => { seen.push(opts && opts.shield); return orig(dt, opts); };
+    tick(s, 1);
+    s.shieldCharges = 0;
+    tick(s, 1);
+    expect(seen.slice(0, 1)).toEqual([true]);
+    expect(seen[seen.length - 1]).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(s.sled, 'shield')).toBe(false);
   });
   test.each([116, 52])('shield consumed at tick %i: 1, 2 and 4 ticks per frame give identical fingerprints', (at) => {
     const one = runAtCadence(1, at);

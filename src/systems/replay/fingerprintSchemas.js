@@ -331,7 +331,6 @@ export const NON_CAUSAL = Object.freeze({
     x: 'alias of body.position.x refreshed by _sync(); derived (spec 6.3)', y: 'alias of body.position.y; derived',
     vx: 'px/s alias of body velocity refreshed by _sync(); derived', vy: 'px/s alias of body velocity; derived',
     palette: PRESENTATION, look: PRESENTATION, gfx: PRESENTATION, pose: PRESENTATION + ' (rider drawing pose lerp)',
-    shield: 'render-time mirror of effects.shieldCharges, written in RunScene.renderFrame once per display frame and read only by Sled._draw (hashing it would make digests display-cadence dependent)',
     squash: PRESENTATION + ' (landing squash)', hidden: PRESENTATION + ' (set with inWorld=false by vanish())',
     hopPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
     pushPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',

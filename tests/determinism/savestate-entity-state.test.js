@@ -17,6 +17,12 @@ test('real stock source projection roundtrip, frozen descriptor and fixed constr
  expect(Object.keys(parseCanonical(wire).state)).toHaveLength(ENTITY_STATE_FIELDS.length);
  expect(parseCanonical(wire).state.sled).not.toHaveProperty('__c');
 });
+test('render-only shield mirror may be absent from real sled since render guard',()=>{
+ const g=fresh();delete g.sled.__obj.shield;
+ const bytes=encodeEntityState(g,ctx);
+ expect(decodeEntityState(bytes,ctx)).toEqual(g);
+ expect(decodeEntityState(bytes,ctx).sled.__obj).not.toHaveProperty('shield');
+});
 test('explicit nonempty pickup, pulled shard, moving hazard and held airbrake states',()=>{
  const g=fresh(),h=g.hazards.__map[0][1].__arr[0].__obj,s=g.sled.__obj;
  // Synthetic variants of native captured projections; not claims that this

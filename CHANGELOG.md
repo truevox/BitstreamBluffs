@@ -1,11 +1,29 @@
 # Changelog
 
-## v2.25.20 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
+## v2.25.23 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
 
 - Declare the reviewed eight-section native candidate layout in the exact-build layout descriptor, wrapping canonical candidate bytes in the existing bounded `bb-savestate-cache` Suspend envelope; preserve nested SHA-256 integrity, frozen complete header/section binding and strict current build, ruleset, tick and run identity. Format acceptance remains **envelope-only**, never automatic restore or Verified score admission.
 - Reuse the existing atomic `LocalSuspendSlot` rather than creating a second save database. New negative tests refuse forged, re-sealed inner file and inconsistent outer header before persistent mutation. A native Chromium diagnostic at ticks 481 and 936 stores actual 458,306/513,874-byte candidates into IndexedDB, claims each, restores a fresh scene with no simulated ticks, verifies original full replay suffix/tape and consumes the single-use token only **after successful restoration**.
 - Preserve the separately merged #425 PWA browser-test stabilization as the canonical timing fix (with exact settled-panel detection); the earlier local #424 test-only variant is superseded. Desktop and touch mobile storage-protection interactions passed against a genuine Pages PWA build. No in-game UI changes.
 - **Not yet a player-facing Suspend/Resume feature**: real scene handoff, fresh page/PWA reload flow, explicit UI, non-stock configurations, storage crash recovery and physical Chromebook validation remain in #424. Keep parent #119 OPEN. No gameplay, scoring, Shard, telemetry, account, network or official leaderboard behavior changes. [skip netlify]
+
+## v2.25.22 — issue 1D render-never-writes-sim guard (2026-11-27)
+
+- In dev and test builds, `RunScene.renderFrame` now runs under a deny-by-default guard: every own field of the live simulation owners (sled, scene, score, tricks, BSOD, hazards, pickups, terrain, kodiaks) becomes read-only for the frame, nested sim data comes back as read-only proxies, and any write throws a `RenderWriteError` naming `Class.field` at the offending line. Fields render legitimately owns are an explicit, justified allowlist (`RENDER_OWNED`). Production builds fold the guard away.
+- Fix the violations the suite exposed: the per-frame `Sled.shield` mirror is gone (the shield visual is passed to `Sled.render` from `shieldCharges`), and `Sled._draw` no longer re-syncs the sled's position/velocity aliases. Camera, view and lazily created visuals are allowlisted as presentation-only.
+- No gameplay, physics, scoring or replay digest change; source tripwire attested as no-behavior-change. [skip netlify]
+
+## v2.25.21 — #85 offline Museum of Bad Physics player preview (2026-11-26)
+
+- Expose the bounded, **local-file-only** Museum of Bad Physics static GhostTape v1 pose gallery through a new `M MUSEUM` Title chip and keyboard M. The Vite production-built gallery has Back to Game and never automatically reads saved games, uploads selected files, executes prior physics, accepts official scores or changes ranking.
+- An installed PWA explicitly precaches **only the Museum HTML** and existing first-party hashed JS, never user files or optional audio. Under the 8 MiB verified offline-shell budget, the title-to-gallery and return path work **with network disabled** at both `/` and `/BitstreamBluffs/` bases. Browser tests verify safe filenames/notes, malformed JSON rejection, Blob URL cleanup, pointer/keyboard/touch entry and no file-selection HTTP requests.
+- Preserve source from current v2.25.20 #135 creator-clear/private peer queue, v2.25.19 #119 dormant eight-section save foundation, and #425 test-only storage consent animation correction. This is a **preview of static unverified recorded poses**; #85 remains OPEN for genuine historical playback/provenance. [skip netlify]
+
+## v2.25.20 — local creator qualification and blind peer verification reference (2026-11-26)
+
+- #135: Add a **server-only private** player-requested local creator-clear and blind peer queue. A run may enter visible Unverified publication only after a reported local replay observation matches its pinned canonical evidence; 2–4 other server-selected peers can be assigned concurrently but never issue a Verified grant. Separate private Human/TAS challenge categories are guarded; the existing Human public trust policy is unchanged.
+- Work allocation samples the complete eligible set using cryptographic randomness by default, with server-private HMAC verifier tags, bounded assignments, restart-safe leases and per-device concurrency limits. Reject repeated causal replays by the same account even when challenge IDs or cosmetic manifest data change. No arbitrary client match votes are accepted.
+- Tests include 38 native server crypto/peer/provisional checks, a simultaneous cross-connection assignment test, and a **real three-Chromium-context** creator-plus-two-peers replay proof. The code does not enable any live public service, user account authentication, real trusted remote issuer, extra-track model verification, paid route or Shard payout. #135 remains OPEN. [skip netlify]
 
 ## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
 
