@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.23 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
+
+- Declare the reviewed eight-section native candidate layout in the exact-build layout descriptor, wrapping canonical candidate bytes in the existing bounded `bb-savestate-cache` Suspend envelope; preserve nested SHA-256 integrity, frozen complete header/section binding and strict current build, ruleset, tick and run identity. Format acceptance remains **envelope-only**, never automatic restore or Verified score admission.
+- Reuse the existing atomic `LocalSuspendSlot` rather than creating a second save database. New negative tests refuse forged, re-sealed inner file and inconsistent outer header before persistent mutation. A native Chromium diagnostic at ticks 481 and 936 stores actual 458,306/513,874-byte candidates into IndexedDB, claims each, restores a fresh scene with no simulated ticks, verifies original full replay suffix/tape and consumes the single-use token only **after successful restoration**.
+- Preserve the separately merged #425 PWA browser-test stabilization as the canonical timing fix (with exact settled-panel detection); the earlier local #424 test-only variant is superseded. Desktop and touch mobile storage-protection interactions passed against a genuine Pages PWA build. No in-game UI changes.
+- **Not yet a player-facing Suspend/Resume feature**: real scene handoff, fresh page/PWA reload flow, explicit UI, non-stock configurations, storage crash recovery and physical Chromebook validation remain in #424. Keep parent #119 OPEN. No gameplay, scoring, Shard, telemetry, account, network or official leaderboard behavior changes. [skip netlify]
+
 ## v2.25.22 — issue 1D render-never-writes-sim guard (2026-11-27)
 
 - In dev and test builds, `RunScene.renderFrame` now runs under a deny-by-default guard: every own field of the live simulation owners (sled, scene, score, tricks, BSOD, hazards, pickups, terrain, kodiaks) becomes read-only for the frame, nested sim data comes back as read-only proxies, and any write throws a `RenderWriteError` naming `Class.field` at the offending line. Fields render legitimately owns are an explicit, justified allowlist (`RENDER_OWNED`). Production builds fold the guard away.
@@ -17,6 +24,7 @@
 - #135: Add a **server-only private** player-requested local creator-clear and blind peer queue. A run may enter visible Unverified publication only after a reported local replay observation matches its pinned canonical evidence; 2–4 other server-selected peers can be assigned concurrently but never issue a Verified grant. Separate private Human/TAS challenge categories are guarded; the existing Human public trust policy is unchanged.
 - Work allocation samples the complete eligible set using cryptographic randomness by default, with server-private HMAC verifier tags, bounded assignments, restart-safe leases and per-device concurrency limits. Reject repeated causal replays by the same account even when challenge IDs or cosmetic manifest data change. No arbitrary client match votes are accepted.
 - Tests include 38 native server crypto/peer/provisional checks, a simultaneous cross-connection assignment test, and a **real three-Chromium-context** creator-plus-two-peers replay proof. The code does not enable any live public service, user account authentication, real trusted remote issuer, extra-track model verification, paid route or Shard payout. #135 remains OPEN. [skip netlify]
+
 ## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
 
 - Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
