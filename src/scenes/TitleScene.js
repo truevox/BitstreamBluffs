@@ -54,7 +54,7 @@ import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
 import { launchTakeover } from '../ui/TakeoverLauncher.js';
-import {peekManualSuspend,resumeManualRun,discardManualSuspend} from '../systems/savestate/manualSuspendController.js';
+import {peekManualSuspend,resumeManualRun,discardManualSuspend,recoverInterruptedManualSuspend} from '../systems/savestate/manualSuspendController.js';
 
 /** Spare narrow chip in the center column, above Museum/Postcard/Help.
  * The main six-row cabinet menu stays unchanged. Readonly peek NEVER
@@ -558,11 +558,13 @@ export class TitleScene extends Phaser.Scene {
       this._suspendReady=false;this.suspendButton.setVisible(false);return;
     }
     const label={
-      ready:'R RESUME SAVE',claimed:'SAVE IN USE',incompatible:'CLEAR OLD SAVE',
+      ready:'R RESUME SAVE',claimed:hint.canCheckOwner?'CHECK HELD SAVE':'SAVE IN USE',incompatible:'CLEAR OLD SAVE',
       corrupt:'CLEAR BAD SAVE',unavailable:'SAVE OFFLINE',
     }[hint.status]||'SAVE UNAVAILABLE';
     this._suspendReady=hint.status==='ready';
-    const canAct=this._suspendReady||hint.status==='incompatible'||hint.status==='corrupt';
+    this._suspendClaimCheckable=hint.status==='claimed'&&hint.canCheckOwner===true;
+    const canAct=this._suspendReady||this._suspendClaimCheckable||
+      hint.status==='incompatible'||hint.status==='corrupt';
     this.suspendButton.setLabel(label).setDisabled(!canAct).setVisible(true);
   }
 
@@ -572,6 +574,20 @@ export class TitleScene extends Phaser.Scene {
   async _handleSuspendChip(){
     if(this.starting||this.view)return;
     if(this._suspendReady)return this._resumeSavedRun(true);
+    if(this._suspendClaimCheckable){
+      if(this.attract){this._exitAttract();return;}
+      this.starting=true;this.suspendButton.setDisabled(true).setLabel('CHECKING...');
+      const checked=await recoverInterruptedManualSuspend();
+      this.starting=false;
+      if(!this.scene?.isActive?.(SCENES.TITLE))return;
+      this.hint?.setText(checked.recovered
+       ?'INTERRUPTED SAVE RELEASED — SELECT RESUME'
+       :checked.code==='resume-active-other-tab'
+        ?'SAVE ACTIVE IN ANOTHER TAB — NO CHANGE MADE'
+        :'SAVE HELD — RECOVERY NOT AVAILABLE');
+      void this._refreshSuspendHint();
+      return;
+    }
     if(!['corrupt','incompatible'].includes(this._suspendStatus))return;
     if(this.attract){this._exitAttract();return;}
     if(!this._suspendConfirm){

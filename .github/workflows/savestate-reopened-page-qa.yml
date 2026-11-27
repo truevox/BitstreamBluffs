@@ -74,6 +74,10 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-player-suspend-live-browser.mjs --physical-click --late-failure --hostile-observer
+      - name: Genuine renderer crash-held claim refuses live tab and recovers only after exclusive lock released
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-player-suspend-live-browser.mjs --interrupted-claim
       - name: Corrupt save demands two separate physical player clicks to erase
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
