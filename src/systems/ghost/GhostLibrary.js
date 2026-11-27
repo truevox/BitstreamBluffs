@@ -93,6 +93,7 @@ export class GhostLibrary {
     // This avoids losing existing ghost tapes on storage-denied devices.
     this.archiveLimit = null;
     this.lastArchiveFailure = null;
+    this.pendingWrites = 0;
   }
 
   /** Open IndexedDB and load course entries. Never rejects. */
@@ -158,6 +159,7 @@ export class GhostLibrary {
       this.lastArchiveFailure=null;
       return true;
     }
+    this.pendingWrites++;
     return new Promise(resolve=>{
       let tx;
       try {tx=this._db.transaction(['courses','tapes'],'readwrite');}
@@ -195,7 +197,7 @@ export class GhostLibrary {
           };
         }catch{reject();}
       };
-    });
+    }).finally(() => { this.pendingWrites--; });
   }
 
   /** One atomic IndexedDB transaction for the whole role mutation.
@@ -207,6 +209,7 @@ export class GhostLibrary {
    */
   async _idbChange(kind, { tape, seed, biomeMask, slot, runId, role, on } = {}) {
     const key = kind === 'save' ? courseKey(tape.seed, tape.biomeMask) : courseKey(seed, biomeMask);
+    this.pendingWrites++;
     return new Promise((resolve) => {
       let tx;
       try { tx = this._db.transaction(['courses', 'tapes'], 'readwrite'); }
@@ -311,7 +314,7 @@ export class GhostLibrary {
           updated = next;
         } else reject();
       });
-    });
+    }).finally(() => { this.pendingWrites--; });
   }
 
   /** Refresh course metadata from disk before displaying roles from other tabs. */

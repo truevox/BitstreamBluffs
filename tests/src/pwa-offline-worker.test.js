@@ -41,7 +41,9 @@ test('inventory and worker bytes are repeatable, and any included change rotates
   const after = await createOfflineInventory(tmp);
   expect(after.version).not.toBe(before.version);
   expect(renderOfflineWorker(after)).not.toBe(renderOfflineWorker(before));
-  expect(renderOfflineWorker(after)).not.toMatch(/self\.(?:skipWaiting|clients\.claim)\s*\(/);
+  expect(renderOfflineWorker(after)).not.toMatch(/self\.clients\.claim\s*\(/);
+  expect(renderOfflineWorker(after)).toContain('event.source instanceof ServiceWorker');
+  expect(renderOfflineWorker(after)).toContain('ready.every(Boolean)');
   expect(renderOfflineWorker(after)).not.toMatch(/caches\.delete\(name\)/);
 });
 test('rejects mismatched HTML bundle and absent essential assets', async () => {

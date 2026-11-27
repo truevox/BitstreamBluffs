@@ -7,6 +7,7 @@ import { renderMusicRouteWorker } from './music-route-worker.mjs';
 import { renderR2RouteWorker } from './r2-cache.mjs';
 import { renderMonoDevRouter } from './r2-mono-dev-cache.mjs';
 import { renderMelodyTierRouter } from './melody-tier-cache.mjs';
+import { renderCooperativeUpdateWorker } from './cooperative-update-worker.mjs';
 
 export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
@@ -88,6 +89,7 @@ export function renderOfflineWorker(inventory, {monoDev=false,melodyDev=false} =
 renderR2RouteWorker() +
 (monoDev ? renderMonoDevRouter() : '') +
 (melodyDev ? renderMelodyTierRouter() : '') +
+renderCooperativeUpdateWorker() +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
@@ -106,7 +108,7 @@ renderR2RouteWorker() +
 `  })());\n` +
 `});\n` +
 `self.addEventListener('activate', event => {\n` +
-`  // No skipWaiting(), clients.claim(), or eager deletion of older caches.\n` +
+`  // No unconditional activation, client claiming, or eager cache deletion.\n` +
 `  // A prior-version client may still need its own assets during an active run.\n` +
 `  // Version cache garbage collection requires a separate safe-boundary policy.\n` +
 `  event.waitUntil(Promise.resolve());\n` +
@@ -115,6 +117,9 @@ renderR2RouteWorker() +
 `  const request = event.request;\n` +
 `  if (request.method !== 'GET') return;\n` +
 `  const url = new URL(request.url);\n` +
+`  if (updateGate && request.mode === 'navigate' && url.origin === self.location.origin && url.pathname.startsWith(BASE)) {\n` +
+`    event.respondWith(new Response('<!doctype html><meta http-equiv="refresh" content="2"><title>Updating Bitstream Bluffs</title><p>Updating Bitstream Bluffs…</p>', {headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}}));return;\n` +
+`  }\n` +
 `  if (request.mode === 'cors' && releaseUrl(url.href) && !request.headers.has('Range')) {\n` +
 `    event.respondWith((async()=>{` +
 (melodyDev ? `const melody=await melodyTierResponse(url.href,event.clientId);if(melody!==undefined)return melody;` : '') +

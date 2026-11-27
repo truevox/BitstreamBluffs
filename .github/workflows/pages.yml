@@ -55,7 +55,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'
-      - run: npm test -- --runInBand tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js tests/src/ghost-link-preview.test.js tests/src/ghost-guest-practice.test.js tests/src/ghost-portable-file.test.js
+      - run: npm test -- --runInBand tests/src/playtest-telemetry.test.js tests/src/playtest-upload.test.js tests/src/playtest-geo.test.js tests/src/pwa-*.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/title-howtoplay.test.js tests/src/control-layouts.test.js tests/src/ghost-link.test.js tests/src/ghost-link-preview.test.js tests/src/ghost-guest-practice.test.js tests/src/ghost-portable-file.test.js
       - name: Build for Pages base path
         env:
           BASE: ${{ steps.base.outputs.path }}
@@ -94,6 +94,7 @@ jobs:
           BASE: ${{ steps.base.outputs.path }}
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/pwa/test-cooperative-worker-update.mjs
           node tools/pwa/test-first-install-reopen-browser.mjs dist "$BASE"
           node tools/pwa/test-storage-protection-browser.mjs dist "$BASE"
       - uses: actions/upload-pages-artifact@v3
