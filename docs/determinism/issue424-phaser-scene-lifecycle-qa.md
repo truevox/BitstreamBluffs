@@ -1,0 +1,13 @@
+# #424 actual Phaser scene handoff and transactional rollback diagnostic
+
+This is an **internal acceptance harness**, not player Save/Resume. Run it with:
+
+    CHROMIUM_EXECUTABLE=/usr/bin/chromium node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture --scene-roundtrip
+
+In a real Chromium page at both ticks 481 and 936, it first creates an actual PauseScene and captures the canonical paused source. It uses the SAME IndexedDB one-use slot to hold the complete native candidate, stops the old RunScene/UI, enters a real TitleScene, claims the slot, and starts an entirely new tick-zero Phaser RunScene while Title remains active. That staged RunScene stays hidden and paused. Zero-delta scene manager steps and temporary synchronous observer suppression prevent any RUN_START event from leaking during preparation; this matters because the normal RunScene.create would otherwise publish events that affect input, missions, music and telemetry before any commit.
+
+The strict native candidate restores the entire Matter world, RunScene state, original GhostTape recorder and run ID with ZERO re-simulated causal ticks. Only after an exact fingerprint check and successful one-use consume does the diagnostic stop Title, reveal/resume gameplay and publish exactly ONE RUN_START observer event. The original tape/record, 537 later fingerprints and terminal score are compared against an independent control. At tick 481 an intentionally corrupted *late* reconstruction is attempted first: the mutated staging RunScene is stopped, Title stays active, the holder exclusively releases its claimed slot, and a new tick-zero stage claims and resumes the same candidate correctly. No automatic stale claim recovery is introduced.
+
+**Not production-safe yet.** The test synchronously controls a sleeping Chromium game and masks events using RunScene's internal seek helper; it does not offer a production-owned private capability, user-facing Suspend/Resume buttons, a real overlay protecting against a one-frame flash, general upgrade-state and meta-service recovery, a crash-safe claim/consume handoff, physical Chromebook signoff or server Verified issuance. Game code and simulation revision are UNCHANGED by this diagnostic. A real UI/service integration must preserve the zero-observer/staged-paused boundary in a supported lifecycle and only release input/observers after commit. Parent #119 and child #424 remain OPEN.
+
+Provenance: Gal Friday-owned development and Playwright proof, distinct from Marvin's established single-use/resumable-run product decision. Canonical GBrain relation: [[projects/truevox-bitstreambluffs/determinism-opportunities/op-052-heavy-mode-trusted-savestates]].

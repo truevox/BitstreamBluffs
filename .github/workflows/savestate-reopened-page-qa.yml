@@ -50,3 +50,7 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture
+      - name: Actual Phaser Title-to-new-RunScene stage with late-failure rollback and one-use commit
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture --scene-roundtrip

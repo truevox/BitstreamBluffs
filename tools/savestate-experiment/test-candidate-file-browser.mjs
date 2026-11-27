@@ -13,6 +13,7 @@ let vite,browser,scratch;
 const errors=[],time=Date.UTC(2026,0,5,12);
 const pausedCapture=process.argv.includes('--paused-capture');
 const reopenProof=process.argv.includes('--suspend-reopen');
+const sceneRoundtrip=process.argv.includes('--scene-roundtrip');
 const suspendEnvelope=process.argv.includes('--suspend-envelope')||reopenProof;
 try{
  scratch=await mkdtemp(join(tmpdir(),'bb-candidate-file-'));
@@ -137,6 +138,133 @@ try{
      },{wire,frameTime:cap.frameTime});
      assert.equal(err,'native restore: reconstructed world mismatch; discard candidate');
     }finally{await c.context.close();}
+   }
+   if(sceneRoundtrip){
+    // A separately tested, research-only Phaser SceneManager roundtrip:
+    // leave the original active RunScene, make Title active, then stage a NEW
+    // tick-zero RunScene while Title remains active, restore and consume before
+    // publishing the continuation. No player menu is connected.
+    const titlePhase=await a.page.evaluate(async raw=>{
+     const p=window.__candidate,g=p.g;
+     const [{candidateSuspendEnvelopeBytes,candidateSuspendLayout},
+      {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
+      import('/src/systems/savestate/candidateSuspendEnvelope.js'),
+      import('/src/systems/savestate/runtimeIdentity.js'),
+      import('/src/systems/savestate/localSuspendSlot.js')]);
+     const identity=await loadCurrentBuildDescriptor(),slot=new LocalSuspendSlot();
+     const saved=await slot.put(candidateSuspendEnvelopeBytes(new TextEncoder().encode(raw),identity),
+      identity,candidateSuspendLayout);
+     if(!saved.ok)throw Error('same-scene suspend failed '+JSON.stringify(saved));
+     const oldTick=p.r.simClock.tick;
+     g.scene.stop('PauseScene');g.scene.stop('UIScene');g.scene.stop('RunScene');
+     g.scene.start('TitleScene');g.headlessStep(p.t,0);
+     const active={title:g.scene.isActive('TitleScene'),run:g.scene.isActive('RunScene'),
+      ui:g.scene.isActive('UIScene')};
+     if(!active.title||active.run)throw Error('source scene failed to reach title '+JSON.stringify(active));
+     return {oldTick,active,saved:saved.saved};
+    },wire);
+    assert.equal(titlePhase.oldTick,tick);
+    assert.equal(titlePhase.saved,true);
+    const roundtrip=await a.page.evaluate(async ({frameTime,expectedTick})=>{
+     const p=window.__candidate,g=p.g;
+     const [{inspectCandidateSuspendEnvelope,candidateSuspendLayout},
+      {loadCurrentBuildDescriptor},{LocalSuspendSlot}]=await Promise.all([
+      import('/src/systems/savestate/candidateSuspendEnvelope.js'),
+      import('/src/systems/savestate/runtimeIdentity.js'),
+      import('/src/systems/savestate/localSuspendSlot.js')]);
+     const identity=await loadCurrentBuildDescriptor(),slot=new LocalSuspendSlot();
+     const {EVT}=await import('/src/events.js');
+     let startEvents=0;
+     g.events.on(EVT.RUN_START,()=>{startEvents++;});
+     const stageFresh=()=>{
+      // Synchronous zero-delta Phaser creation with observer emission muted.
+      // This diagnostic contract is NOT a production UI/service handoff.
+      const restore=p.r._muteForSeek();
+      try{g.scene.start('RunScene');g.headlessStep(p.t,0);}
+      finally{restore();}
+      g.scene.stop('UIScene');
+      g.scene.pause('RunScene');
+      p.r.sys.setVisible(false);
+      if(!g.scene.isActive('TitleScene')||!g.scene.isPaused('RunScene')||
+       p.r.simClock.tick!==0||startEvents!==0)
+       throw Error('staging published or advanced before validation '+JSON.stringify({
+        tick:p.r.simClock.tick,startEvents,title:g.scene.isActive('TitleScene'),
+        paused:g.scene.isPaused('RunScene')}));
+     };
+     let failedStagingDiscarded=false;
+     if(expectedTick===481){
+      // Deliberately fail AFTER the native restore mutates a disposable stage.
+      // Title remains active; the partially restored Run/UIScene must be
+      // destroyed BEFORE the exact holder releases its original one-use slot.
+      const held=await slot.claim(identity,candidateSuspendLayout);
+      if(!held.ok)throw Error('late-failure proof could not hold slot '+JSON.stringify(held));
+      const admitted=inspectCandidateSuspendEnvelope(held.bytes,identity);
+      if(!admitted.ok)throw Error('late-failure candidate admission');
+      stageFresh();
+      let lateError=null;
+      try{p.restore(new TextDecoder().decode(admitted.candidateBytes),frameTime,true);}
+      catch(e){lateError=String(e.message);}
+      if(lateError!=='native restore: reconstructed world mismatch; discard candidate')
+       throw Error('late restore was not reliably refused '+lateError);
+      g.scene.stop('UIScene');g.scene.stop('RunScene');
+      if(!g.scene.isActive('TitleScene')||g.scene.isActive('RunScene'))
+       throw Error('discarded scene remained player-visible');
+      const released=await slot.release(held.token);
+      if(!released.ok)throw Error('discarded scene could not release held slot '+released.code);
+      const hint=await slot.peek(identity,candidateSuspendLayout);
+      if(!hint.ok||hint.status!=='ready')throw Error('discard/retry lost ready slot');
+      failedStagingDiscarded=true;
+     }
+     const claim=await slot.claim(identity,candidateSuspendLayout);
+     if(!claim.ok)throw Error('same-scene claim failed '+JSON.stringify(claim));
+     const prepared=inspectCandidateSuspendEnvelope(claim.bytes,identity);
+     if(!prepared.ok||prepared.admission!=='envelope-only')throw Error('same-scene candidate rejected');
+     const input=new TextDecoder().decode(prepared.candidateBytes);
+     stageFresh();
+     const r=p.r,staging={title:g.scene.isActive('TitleScene'),
+      paused:g.scene.isPaused('RunScene'),tick:r.simClock?.tick,startEvents};
+     let exact;
+     try{
+      exact=p.restore(input,frameTime);
+      if(!exact.exact||exact.calls!==0||exact.tick!==expectedTick)
+       throw Error('staging native reconstruction diverged');
+      const consumed=await slot.consume(claim.token);
+      if(!consumed.ok)throw Error('staging cannot commit until single-use consume '+consumed.code);
+      if(startEvents!==0||!g.scene.isActive('TitleScene')||!g.scene.isPaused('RunScene'))
+       throw Error('precommit side effects escaped staging');
+      // Commit only AFTER the immutable one-use slot was successfully
+      // consumed: publish input/HUD/music observers once, not on staging.
+      g.scene.stop('TitleScene');
+      r.sys.setVisible(true);
+      r.scene.launch('UIScene');
+      g.scene.resume('RunScene');
+      g.events.emit(EVT.RUN_START,{runId:r.runId,seed:r.seed,startedAt:r.startedAt,
+       dailyOfficial:r.dailyOfficial,dailyMode:r.dailyMode,gym:r.bsodGym===true,
+       practice:r.unrankedPractice===true,resumed:true});
+      if(startEvents!==1)throw Error('commit did not publish exactly one run start');
+      return {staging,tick:exact.tick,calls:exact.calls,visible:r.sys.settings.visible,
+       titleAfter:g.scene.isActive('TitleScene'),runAfter:g.scene.isActive('RunScene'),
+       startEvents,consumed:consumed.consumed,exact:exact.exact,fp:exact.fp,failedStagingDiscarded};
+     }catch(e){
+      g.scene.stop('UIScene');g.scene.stop('RunScene');
+      // A late validation failure never publishes the partially restored Run.
+      // Only the verified holder can release after the staging scene is gone.
+      await slot.release(claim.token);
+      throw e;
+     }
+    },{frameTime:cap.frameTime,expectedTick:tick});
+    assert.equal(roundtrip.tick,tick);assert.equal(roundtrip.calls,0);
+    assert.equal(roundtrip.titleAfter,false);assert.equal(roundtrip.runAfter,true);
+    assert.equal(roundtrip.consumed,true);assert.deepEqual(roundtrip.fp,cap.fp);
+    assert.equal(roundtrip.startEvents,1);
+    assert.equal(roundtrip.staging.startEvents,0);
+    assert.equal(roundtrip.staging.paused,true);
+    assert.equal(roundtrip.failedStagingDiscarded,tick===481);
+    console.log('PASS_ACTUAL_PHASER_SCENE_LIFECYCLE_ROUNDTRIP',
+     JSON.stringify({tick,abandonedOldRun:true,titleEntered:true,
+      stagedAtTickZero:true,preparedBeforeTitleStopped:true,zeroSimTicks:true,
+      oneUseConsumedBeforeActivation:true,startEventsBeforeCommit:0,
+      startEventsAfterCommit:1,lateFailureRollbackRetried:tick===481,exact:true}));
    }
    // Optional #424 real IndexedDB format bridge. Claim now, but consume ONLY
    // after the same fresh native world restoration is observed successful.
