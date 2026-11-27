@@ -1,4 +1,4 @@
-name: Compiled Suspend genuine quota and IndexedDB eviction QA
+name: Compiled Suspend quota, IDB loss and denied-access QA
 on:
   pull_request:
     paths:
@@ -51,7 +51,7 @@ jobs:
         run: node tools/pwa/build-pages-site.mjs / dist-quota-eviction
       - name: Install actual Chromium
         run: npx playwright install --with-deps chromium
-      - name: Genuine quota-pressure abort/retry and offline browser-IDB eviction
+      - name: Native quota, browser-IDB loss and injected denied-access retry
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs dist-quota-eviction
