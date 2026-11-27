@@ -15,6 +15,7 @@ function prepare() {
   put('manifest.webmanifest', '{}'); put('favicon.ico', 'ICO'); put('music/catalog.json', '{"tracks":[]}'); put('music/transition-grids.json','{"tracks":{}}');
   put('assets/index-ABC.js', 'hello'); put('assets/menu/mountains.svg', 'vector');
   put('icons/bitstream-192.png', 'fake-png');
+  put('tools/museum-of-bad-physics.html', '<!doctype html><title>Museum</title>');
   put('music/packs/huge/performance.json', 'not offline');
   put('assets/index-ABC.js.map', 'sourcemap');
   put('docs/index.html', 'not offline');
@@ -25,11 +26,14 @@ test('includes coherent app assets but excludes huge/optional/third party conten
   expect(inv.entries.map(x => x.path)).toEqual([
     '/assets/index-ABC.js', '/assets/menu/mountains.svg', '/favicon.ico', '/icons/bitstream-192.png',
     '/index.html', '/manifest.webmanifest', '/music/catalog.json', '/music/transition-grids.json',
+    '/tools/museum-of-bad-physics.html',
   ]);
   expect(inv.entries.every(x => /^[0-9a-f]{64}$/.test(x.sha256))).toBe(true);
   expect(shouldPrecache('music/packs/foo/performance.json')).toBe(false);
   expect(shouldPrecache('assets/index.js.map')).toBe(false);
   expect(shouldPrecache('docs/index.html')).toBe(false);
+  expect(shouldPrecache('tools/museum-of-bad-physics.html')).toBe(true);
+  expect(shouldPrecache('tools/unknown.html')).toBe(false);
 });
 test('inventory and worker bytes are repeatable, and any included change rotates cache', async () => {
   prepare();

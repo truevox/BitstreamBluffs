@@ -58,3 +58,7 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-paused-source-retirement-browser.mjs
+      - name: Original native manual Pause candidate, closed page and exact resume
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-candidate-file-browser.mjs --suspend-reopen --paused-capture

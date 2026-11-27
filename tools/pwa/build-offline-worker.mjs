@@ -13,7 +13,7 @@ export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
 // Transition grids are tiny real soundtrack metadata requested during gameplay.
 // They must be available to an offline run, not silently fetched from network.
-const EXPLICIT = new Set(['index.html', 'manifest.webmanifest', 'favicon.ico', 'music/catalog.json', 'music/transition-grids.json']);
+const EXPLICIT = new Set(['index.html', 'manifest.webmanifest', 'favicon.ico', 'music/catalog.json', 'music/transition-grids.json', 'tools/museum-of-bad-physics.html']);
 const EXTENSIONS = /\.(?:js|css|svg|png|jpe?g|webp|gif|ico|woff2?)$/i;
 
 export function shouldPrecache(relativePath) {

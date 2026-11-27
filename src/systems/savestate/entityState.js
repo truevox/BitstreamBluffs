@@ -66,11 +66,11 @@ const drone=plain({rotors:arr(plain({ring:arr(point,10,10),blade:arr(F,4,4)}),2,
 const sled=obj('Sled',{
  scene,world,palette:visual,look:visual,random:A,
  ...fields('x y vx vy msSinceContact groundAngleDeg airtimeMs hopBufferMs _playerHopElapsedMs pushCooldownMs parachuteMs parachuteFuelMs _protectedHopExtraVyPxS heliPhase heliVel invulnerableMs _time _lastTilt boostMs squash dropAheadDeg _groundRunMs _sinceLaunchMs _landSettleMs canopyFuelFullMs geyserCooldownMs _crawlMs _preVx _preVy',F),
- ...fields('_contactFlag _playerHopActive chuteUsed tucked airBrakeActive airBrakePressPending airBrakeKickUsed airBrakeLiftProtected corkscrewActive shield scrambled _nudging',B),
+ ...fields('_contactFlag _playerHopActive chuteUsed tucked airBrakeActive airBrakePressPending airBrakeKickUsed airBrakeLiftProtected corkscrewActive scrambled _nudging',B),
  destroyed:lit(false),inWorld:lit(true),hidden:lit(false),airBrakeKickPulse:one(0,1),heliInput:one(-1,0,1),_lastPad:nullable(pad),
  pose:plain(fields('phi chute brake tuck',F)),airEtaMs:P,airSlopeDeg:nullable(F),body:body('^sled$'),off:point,gfx:visual,
  touchdownVx:maybe(F),touchdownVy:maybe(F),hopPulse:one(0,1),pushPulse:one(0,1),
-},{lastRiderShape:one('default','drone'),drone:nullable(drone),windPomAnchor:nullable(point),snapSteps:U});
+},{shield:B,lastRiderShape:one('default','drone'),drone:nullable(drone),windPomAnchor:nullable(point),snapSteps:U});
 const roots={collectedPowerups:set(pickupKey),hazards:map(arr(hazard)),powerups:map(arr(powerup)),shardField,sled};
 function freeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
 export const ENTITY_STATE_DESCRIPTOR=freeze({kind:KIND,version:VERSION,fields:roots,

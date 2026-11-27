@@ -39,3 +39,7 @@ public ranking. Parent #119 / #424 remain OPEN. The tests are
 engineering provenance, not an inferred Marvin product decision.
 
 [skip netlify]
+
+## Resume can pause again
+
+The real Chromium reopened-page gate explicitly invokes a **second** manual PauseScene transition after the freshly reconstructed run resumes, then resumes that new pause, proves zero simulated ticks were added by either pause transition, and compares the original terminal replay suffix. A lingering `_manualPausePending` would fail this test.

@@ -92,6 +92,7 @@ import { bsodWindVisualStrength } from '../systems/BsodWindVisual.js';
 import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs, gymBeatSuggestion } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 import pmath from '../systems/pmath.js';
+import { installRenderGuard } from '../systems/replay/renderGuard.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -197,6 +198,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   _create() {
+    installRenderGuard(this); // dev/test only: renderFrame must never write sim state (issue 1D)
     const reg = this.registry;
     this.content = reg.get(REG.CONTENT) || { chunks: [], hazards: {}, powerups: {}, terrainMods: {}, palettes: {} };
     this.inputRouter = reg.get(REG.INPUT) || null;
@@ -474,7 +476,6 @@ export class RunScene extends Phaser.Scene {
     this.opening = headStartOpening(this.loadout, boostOpts);
     if (this.boostFx.shieldCharges > 0) {
       this.shieldCharges = (this.shieldCharges || 0) + this.boostFx.shieldCharges;
-      this.sled.shield = true;
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     // An actual Gym attempt starts at a prepared launch pose. After that,
@@ -1289,7 +1290,6 @@ export class RunScene extends Phaser.Scene {
       // B2: a biome shield (Heat Shield) shares the pool but keeps its own HUD chip and charge count
       this.shieldSources = addShieldSource(this.shieldSources, def.id, eff.charges || 1);
       charges = shieldChargesFor(this.shieldSources, def.id, this.shieldCharges);
-      this.sled.shield = true;
     } else if (eff.kind === 'ward') {
       // B0: switches off its listed mods / hazards / effects for 4-6 s (Wards.js; PhysicsTuner and onHazard consult it)
       this.wards = addWard(this.wards, def.id, eff);
@@ -1813,9 +1813,8 @@ export class RunScene extends Phaser.Scene {
   renderFrame(dt) {
     const sled = this.sled;
     if (!sled || !this.cameras.main) return;
-    sled.shield = this.shieldCharges > 0;
     if (!this.crashed) {
-      sled.render(dt);
+      sled.render(dt, { shield: this.shieldCharges > 0 }); // shield visual derives from sim state per frame; no mirror field
       // trail anchored at the rear runner
       const a = sled.body.angle;
       const c = pmath.cos(a);
@@ -2727,7 +2726,6 @@ export class RunScene extends Phaser.Scene {
     // normal timed boosts and their duration restarting for the new attempt.
     this.shieldCharges = this.boostFx?.shieldCharges || 0;
     this.shieldSources = [];
-    sled.shield = this.shieldCharges > 0;
     this.openingGraces = 0;
     this.gymAttemptStartTimeMs = this.runTimeMs;
     this.gymAttemptStartX = x;
