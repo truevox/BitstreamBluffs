@@ -389,6 +389,10 @@ export class AudioSynth {
     if (!this.ctx || this.ctx.state !== 'running') return;
     // AudioContext suspension cannot unpause the recording by accident.
     if (this._vinylResume?.awaitingContext) this._finishVinylResume(this._vinylResume);
+    // A paused run can opt into music while the tab's AudioContext is still
+    // suspended. Keep its frozen source/intent until unlock actually succeeds.
+    if (this._paused && this.settings?.musicDuringPause === true)
+      this._reconcileManualPauseMusic(true);
     if (!this._unlocked) {
       this._unlocked = true;
       try { // iOS: play a silent buffer inside the gesture to fully unlock
@@ -822,9 +826,14 @@ export class AudioSynth {
       // WebAudio transport. This also preserves historic menu continuity.
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
+      // Freeze any started transport bound to this AudioContext, including
+      // gaps between scheduled stem nodes and async decode/boundary waits.
+      // Only sources with active nodes count as AUDIBLE for the vinyl scratch.
+      const activeTransport = !!(d?.started && !d.transportPaused &&
+        d.ctx === this.ctx);
       const audible = this._vinylAudible() && originallyWanted && live;
       const keepPlaying = this.settings?.musicDuringPause === true;
-      const frozen = !keepPlaying && (live ? d.transportPause() :
+      const frozen = !keepPlaying && (activeTransport ? d.transportPause() :
         !!(old?.shouldResume && d?.transportPaused));
       const procedural = !keepPlaying && originallyWanted && !live && !frozen &&
         this._musicTimer !== null;
@@ -856,11 +865,17 @@ export class AudioSynth {
     if (keepPlaying) {
       if (session.shouldResume) {
         if (session.procedural) {
-          this._musicWanted = true;
-          if (this.ctx?.state === 'running' &&
-              !this._activateStemMusic() && !this._musicTimer) this._startScheduler();
-          session.shouldResume = false;
-          session.procedural = false;
+          // Do not consume the restore intent while the AudioContext is
+          // suspended. On unlock, _afterResume() retries this same session.
+          if (this.ctx?.state === 'running') {
+            this._musicWanted = true;
+            if (!this._activateStemMusic() && !this._musicTimer)
+              this._startScheduler();
+            if (d?.started || this._musicTimer) {
+              session.shouldResume = false;
+              session.procedural = false;
+            } else this._musicWanted = false;
+          }
         } else if (d?.transportPaused && !d.started &&
             d._token === session.token && d.trackIndex === session.trackIndex &&
             d._resumeOffset === session.offset &&
@@ -873,7 +888,7 @@ export class AudioSynth {
       }
     } else if (!session.shouldResume && this._musicWanted) {
       const live = !!(d?.started && !d.transportPaused &&
-        d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
+        d.ctx === this.ctx);
       const frozen = live && d.transportPause();
       const procedural = !frozen && this._musicTimer !== null;
       if (frozen || procedural) {

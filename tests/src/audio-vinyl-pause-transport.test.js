@@ -104,6 +104,65 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('default OFF freezes a still-loading original stem before async playback can escape',()=>{
+    const {a,d,events}=setup();
+    d.pack=null;
+    d.activeNodes.clear();
+    d._loading=Promise.resolve('decoding');
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(d.transportPause).toHaveBeenCalledTimes(1);
+    expect(d.started).toBe(false);
+    expect(d.transportPaused).toBe(true);
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    expect(a._vinylScratch.play).not.toHaveBeenCalled(); // no audible source yet
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(205);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('switching continuous playback OFF mid-pause freezes a still-loading stem',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.pack=null;
+    d.activeNodes.clear();
+    d._loading=Promise.resolve('decoding');
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(d.transportPause).not.toHaveBeenCalled();
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(d.transportPause).toHaveBeenCalledTimes(1);
+    expect(d.started).toBe(false);
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(205);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('suspended AudioContext preserves procedural restore until a real unlock',()=>{
+    const {a,d,ctx,events}=setup();
+    // The original song has fallen back to procedural audio.
+    d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=12345;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,procedural:true});
+    ctx.state='suspended';
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,procedural:true});
+    expect(a._musicWanted).toBe(false);
+    a._activateStemMusic=jest.fn(()=>false); // real guard refuses stems during a manual pause
+    a._startScheduler=jest.fn(()=>{a._musicTimer=23456;});
+    ctx.state='running';
+    a._afterResume();
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,procedural:false});
+    expect(a._musicWanted).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    a._musicTimer=null; // test scheduler sentinel, not a real interval
+    a.destroy();
+  });
+
   test('pause preference enables the same frozen song immediately without a vinyl scratch',()=>{
     const {a,d,events}=setup();
     events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
