@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.20 — #424 source-only one-use candidate envelope and IndexedDB bridge (2026-11-26)
+
+- Declare the reviewed eight-section native candidate layout in the exact-build layout descriptor, wrapping canonical candidate bytes in the existing bounded `bb-savestate-cache` Suspend envelope; preserve nested SHA-256 integrity, frozen complete header/section binding and strict current build, ruleset, tick and run identity. Format acceptance remains **envelope-only**, never automatic restore or Verified score admission.
+- Reuse the existing atomic `LocalSuspendSlot` rather than creating a second save database. New negative tests refuse forged, re-sealed inner file and inconsistent outer header before persistent mutation. A native Chromium diagnostic at ticks 481 and 936 stores actual 458,306/513,874-byte candidates into IndexedDB, claims each, restores a fresh scene with no simulated ticks, verifies original full replay suffix/tape and consumes the single-use token only **after successful restoration**.
+- Harden the Offline Music storage-protection browser test so the animated panel has finished entering before the geometry and click position are measured; both desktop and touch mobile passed against the real Pages PWA build. This changes the test harness, not the in-game UI.
+- **Not yet a player-facing Suspend/Resume feature**: real scene handoff, fresh page/PWA reload flow, explicit UI, non-stock configurations, storage crash recovery and physical Chromebook validation remain in #424. Keep parent #119 OPEN. No gameplay, scoring, Shard, telemetry, account, network or official leaderboard behavior changes. [skip netlify]
+
 ## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
 
 - Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
