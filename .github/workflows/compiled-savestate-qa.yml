@@ -9,6 +9,7 @@ on:
       - 'src/systems/savestate/**'
       - 'src/entities/**'
       - 'tools/savestate-experiment/test-player-suspend-compiled-browser.mjs'
+      - 'tools/savestate-experiment/test-player-suspend-eviction-browser.mjs'
   push:
     branches: [main]
     paths:
@@ -19,6 +20,7 @@ on:
       - 'src/systems/savestate/**'
       - 'src/entities/**'
       - 'tools/savestate-experiment/test-player-suspend-compiled-browser.mjs'
+      - 'tools/savestate-experiment/test-player-suspend-eviction-browser.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,3 +57,4 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-player-suspend-compiled-browser.mjs dist
+          node tools/savestate-experiment/test-player-suspend-eviction-browser.mjs dist
