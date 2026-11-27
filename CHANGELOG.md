@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.19 — #85 Museum of Bad Physics player-preview route (2026-11-26)
+
+- Expose the local-file-only **Museum of Bad Physics** static pose gallery to players through an `M MUSEUM` Title chip and keyboard **M**, with a Back to Game link. The gallery is a bundled production HTML entry, not an additional game menu row or an automatic import of prior local data.
+- Preserve the original DSH Servo/Gal Friday-bounded GhostTape v1 validator and SVG gallery with eight-file/2 MiB per-file/8 MiB total limits, no selected-file upload/storage, strict UTF-8, inert user filenames and `LOCAL FILES / UNVERIFIED` labeling. No historic physics playback or official score/ranking claims.
+- Add exact-build Chromium regression coverage for keyboard and pointer navigation, Back to Game, local GhostTape import, image URL cleanup, malicious filename/invalid JSON handling and zero selected-file HTTP requests. The public preview remains subject to explicit source and security review before release.
+
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
 - Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]

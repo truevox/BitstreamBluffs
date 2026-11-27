@@ -1,0 +1,46 @@
+name: Museum local-file player-preview QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/museum-public-preview-qa.yml'
+      - 'src/systems/museum-of-bad-physics.js'
+      - 'src/systems/downhill-run-strip.js'
+      - 'src/ui/PostcardOpenView.js'
+      - 'src/scenes/TitleScene.js'
+      - 'tools/museum-of-bad-physics.html'
+      - 'tools/museum-of-bad-physics.js'
+      - 'tools/test-museum-public-browser.mjs'
+      - 'tests/src/museum-of-bad-physics.test.js'
+      - 'vite.config.js'
+      - 'docs/museum-of-bad-physics.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  museum-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Exact source identity
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Gallery validator, GhostTape, trace and Title regressions
+        run: npm test -- --runInBand tests/src/museum-of-bad-physics.test.js tests/src/downhill-run-strip.test.js tests/src/ghost-tapes.test.js tests/src/title-howtoplay.test.js
+      - name: Compile actual production game and Museum HTML
+        run: |
+          npm run build
+          test -s dist/tools/museum-of-bad-physics.html
+      - name: Install real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real browser Title keyboard, pointer, local-only gallery and back navigation
+        run: node tools/test-museum-public-browser.mjs

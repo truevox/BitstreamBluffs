@@ -69,6 +69,9 @@ const versionShown = new WeakSet();
 const VERSION_LABEL_ALPHA = 0.65;
 
 const HINT_TEXT = '↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY';
+// #85 limited Museum preview: no saved-data reads or physics execution.
+export const MUSEUM_CHIP = Object.freeze({x:226,y:204,w:80,h:14});
+export const MUSEUM_GALLERY_PATH = '/tools/museum-of-bad-physics.html';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -523,6 +526,18 @@ export class TitleScene extends Phaser.Scene {
     // #67: open a postcard (keyboard: O). The title menu is full, so it is a chip above HOW TO PLAY.
     const pc = POSTCARD_CHIP;
     this.postcardButton = new Button(this, theme, { x: pc.x, y: pc.y, w: pc.w, h: pc.h, label: 'O POSTCARD', color: 'magenta', onClick: () => this._openPostcard(true) });
+    // A public, local-file-only static pose gallery, NOT a real old-physics runner.
+    // A separate route avoids adding a seventh main-menu row or loading tapes automatically.
+    const m = MUSEUM_CHIP;
+    this.museumButton = new Button(this, theme, { x:m.x, y:m.y, w:m.w, h:m.h, label:'M MUSEUM', color:'amber', onClick: () => this._openMuseum(true) });
+  }
+
+  /** #85: leave Title for the local-file-only Museum page, never mid-run. */
+  _openMuseum(fromButton = false) {
+    if (this.starting || this.view) return;
+    if (!fromButton) uiSfx(this, 'uiSelect');
+    if (fromButton && this.attract) { this._exitAttract(); return; }
+    window.location.assign(MUSEUM_GALLERY_PATH);
   }
 
   /** #67: the open-postcard view. Nothing is read or started until the player presses OPEN. */
@@ -624,6 +639,7 @@ export class TitleScene extends Phaser.Scene {
       if (this._wakeGate()) return;
       if (e && (e.key === 'h' || e.key === 'H') && !e.repeat && !this.view && !this.starting) this._openHelp();
       if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
+      if (e && (e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openMuseum();
     };
     this._onPointer = () => { this._wakeGate(); };
     this._onRouter = (p) => { if (p && p.pressed) this._wakeGate(); };
@@ -655,7 +671,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.sub].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {
@@ -853,5 +869,5 @@ function launchFx(scene, ms) {
   };
   slide(scene.menuPanel, -240);
   slide(scene.cardPanel, 180);
-  for (const o of [scene.hint, scene.helpButton, scene.postcardButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
+  for (const o of [scene.hint, scene.helpButton, scene.postcardButton, scene.museumButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
 }
