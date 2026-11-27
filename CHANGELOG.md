@@ -1,10 +1,15 @@
 # Changelog
 
-## v2.25.19 — local creator qualification and blind peer verification reference (2026-11-26)
+## v2.25.20 — local creator qualification and blind peer verification reference (2026-11-26)
 
 - #135: Add a **server-only private** player-requested local creator-clear and blind peer queue. A run may enter visible Unverified publication only after a reported local replay observation matches its pinned canonical evidence; 2–4 other server-selected peers can be assigned concurrently but never issue a Verified grant. Separate private Human/TAS challenge categories are guarded; the existing Human public trust policy is unchanged.
 - Work allocation samples the complete eligible set using cryptographic randomness by default, with server-private HMAC verifier tags, bounded assignments, restart-safe leases and per-device concurrency limits. Reject repeated causal replays by the same account even when challenge IDs or cosmetic manifest data change. No arbitrary client match votes are accepted.
 - Tests include 38 native server crypto/peer/provisional checks, a simultaneous cross-connection assignment test, and a **real three-Chromium-context** creator-plus-two-peers replay proof. The code does not enable any live public service, user account authentication, real trusted remote issuer, extra-track model verification, paid route or Shard payout. #135 remains OPEN. [skip netlify]
+## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
+
+- Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
+- Native real Chromium candidate transport at ticks 481 and 936: 458,306 and 513,874 bytes; zero replay ticks, identical fatal tick 977, scores, full run records and tapes, and 537 exact subsequent fingerprints. Twenty-four early malformed/forged refusal controls pass; detached terrain reconstructs 40/40 future streaming/query batches. Source identity and 439 focused regression tests passed locally before this version bump.
+- **Internal dormant source only**: not a registered final production save layout, not an actual player Save/Resume button, cross-browser stored-slot lifecycle, atomic scene publish, general modified-configuration acceptance or public Verified run. Keep parent #119 OPEN. No new gameplay scoring, telemetry, account, Shard, service or network upload behavior. [skip netlify]
 
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
