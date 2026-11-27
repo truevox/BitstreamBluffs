@@ -57,7 +57,7 @@ failure and irreversible post-commit result status.
 
 Real native Chromium from exact source:
 - Source PauseScene at completed stock ticks **481** and **936**.
-- Durable single-use outer envelopes **458892** and **514460** bytes
+- Durable single-use outer envelopes **458877** and **514445** bytes
   respectively; no overwrite of another READY or CLAIMED slot.
 - Source RunScene and PauseScene actually stopped, TitleScene active,
   source page physically closed.
@@ -95,3 +95,13 @@ continue after an explicit pre-write refusal or known transaction
 abort. This intentionally favors one-use correctness over a
 speculative recovery; a visible recovery flow still needs to report
 and resolve that exceptional case.
+
+
+The non-force reconciliation with the current #427 parent
+(4a3ce174, v2.25.24 source) was then retested in real Chromium.
+At ticks 481/936 the exact accepted local envelope sizes were
+458877/514445 bytes; both cases again passed zero-step restoration,
+537/537 suffix fingerprints and identical terminal tape and record.
+The occupied-slot fail-then-retry also passed at tick 481.
+The earlier 458892/514460 figures were from the prior stacked
+build identity; they are not interchangeable with this new build.
