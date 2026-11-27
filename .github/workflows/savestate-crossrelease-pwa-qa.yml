@@ -111,4 +111,4 @@ jobs:
       - name: Real old READY remains byte-identical across PWA upgrade until two-click erase
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
-          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31
+          node tools/savestate-experiment/test-crossrelease-pwa-suspend-retention-browser.mjs "$RUNNER_TEMP/bb-real-v31-dist" "$RUNNER_TEMP/bb-current-dist" --real-v31 --backup

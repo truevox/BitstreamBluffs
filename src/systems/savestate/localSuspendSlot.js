@@ -138,6 +138,35 @@ export class LocalSuspendSlot{
   }catch(e){return {ok:false,status:'unavailable',code:failure(e)};}
   finally{db?.close?.();}
  }
+ /** Read the exact original bytes of an incompatible READY slot without claiming,
+  * rewriting, or interpreting them as a current-build restore capability.
+  * This is an explicit user-requested backup, never a migration.
+  */
+ async copyIncompatibleBytes(expectedIdentity,layout){
+  let db;
+  try{
+   db=await this._open();
+   const tx=db.transaction(SUSPEND_SLOT_STORE,'readonly');
+   let row=null;
+   const done=new Promise((resolve,reject)=>{
+    tx.oncomplete=resolve;
+    tx.onabort=()=>reject(tx.error||Error('transaction aborted'));
+    tx.onerror=()=>reject(tx.error||Error('transaction error'));
+   });
+   const req=tx.objectStore(SUSPEND_SLOT_STORE).get(SUSPEND_SLOT_KEY);
+   req.onsuccess=()=>{row=req.result||null;};
+   await done;
+   if(!row)return {ok:false,code:'empty'};
+   if(row.status!=='ready')return {ok:false,code:'slot-claimed'};
+   if(!(row.bytes instanceof Uint8Array)||!row.bytes.length||
+      row.bytes.length>MAX_OUTPUT_BYTES)return {ok:false,code:'invalid-bytes'};
+   const checked=inspectStoredReady(row,expectedIdentity,layout);
+   if(checked.ok)return {ok:false,code:'save-compatible'};
+   if(!incompatibleCodes.has(checked.code))return {ok:false,code:'save-not-incompatible'};
+   return {ok:true,bytes:Uint8Array.from(row.bytes)};
+  }catch(e){return {ok:false,code:failure(e)};}
+  finally{db?.close?.();}
+ }
  /** Explicitly keep a *pure-format-admitted* suspended envelope. The caller
   * must supply the expected exact-build identity and trusted shipped schema;
   * no default production registration is provided by the current game.

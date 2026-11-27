@@ -13,6 +13,7 @@ import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
 const [a,b,...flags]=process.argv.slice(2);
 const realV31=flags.includes('--real-v31');
+const verifyBackup=flags.includes('--backup');
 assert(a&&b,'Usage: node script OLD_KEEP_NAMES_FIXTURE NEW_V231_DIST');
 const roots={a:resolve(a),b:resolve(b)};
 const html=await Promise.all([readFile(resolve(roots.a,'index.html'),'utf8'),
@@ -153,6 +154,45 @@ try{
  assert(incompatible.bundle.includes(main(html[1]))&&
   incompatible.button==='CLEAR OLD SAVE'&&incompatible.ready!==true,'old READY mistakenly admitted by new build');
  assert.deepEqual(await slot(cold),stored,'B updated or erased incompatible old save silently');
+ if(verifyBackup){
+  const downloads=[];
+  cold.on('download',item=>downloads.push(item));
+  const backup=await cold.evaluate(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene'),b=t.suspendBackupButton,
+    pt=b.getWorldTransformMatrix().transformPoint(b.w/2,b.h/2),
+    rect=g.canvas.getBoundingClientRect();
+   return {visible:b.visible,label:b.label.main.text,
+    pointer:{x:rect.x+pt.x*rect.width/g.scale.gameSize.width,
+     y:rect.y+pt.y*rect.height/g.scale.gameSize.height}};
+  });
+  assert(backup.visible&&backup.label==='BACKUP SAVE','incompatible backup chip missing');
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')
+   .suspendBackupButton.label.main.text==='DOWNLOAD SAVE',null,{timeout:12000});
+  assert.equal(downloads.length,0,'first click downloaded without confirmation');
+  assert.deepEqual(await slot(cold),stored,'staging old bytes changed IndexedDB');
+  const downloadEvent=cold.waitForEvent('download',{timeout:15000});
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  const downloaded=await downloadEvent;
+  const output=await readFile(await downloaded.path());
+  assert(downloaded.suggestedFilename().endsWith('.bbsave'),'incorrect backup extension');
+  const savedOriginal=await cold.evaluate(async()=>{
+   const request=indexedDB.open('bb-single-use-suspend-v1',1);
+   return new Promise((resolve,reject)=>{
+    request.onsuccess=()=>{
+     const db=request.result,tx=db.transaction('slots','readonly'),
+      get=tx.objectStore('slots').get('local-suspend');
+     get.onsuccess=()=>{const bytes=Array.from(get.result.bytes);db.close();resolve(bytes);};
+     get.onerror=()=>{db.close();reject(get.error);};
+    };
+    request.onerror=()=>reject(request.error);
+   });
+  });
+  assert.deepEqual(output,Buffer.from(savedOriginal),'downloaded bytes do not match original stored bytes');
+  assert.equal(output.length,stored.length,'backup size differs');
+  assert.equal(downloads.length,1,'unexpected extra downloads');
+  assert.deepEqual(await slot(cold),stored,'backup changed original READY slot');
+ }
  await cold.mouse.click(incompatible.pointer.x,incompatible.pointer.y);
  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')._suspendConfirm===true,null,{timeout:10000});
  const first=await cold.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').suspendButton.label.main.text);
@@ -167,9 +207,10 @@ try{
   oldBuild:old.buildId,newBundle:main(html[1]),source:{runId:source.runId,tick:source.tick},
   stored,waiting,preservedA,held,
   coldOffline:true,incompatible:{button:incompatible.button,ready:incompatible.ready},
-  preservedByteIdenticalBeforeErasure:true,firstClickOnlyConfirms:true,
+  preservedByteIdenticalBeforeErasure:true,backupDownloadByteIdentical:verifyBackup,
+  backupPreservedOriginalSlot:verifyBackup,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
-  caveat:realV31?'Actual shipped v2.25.31 to v2.25.32 PWA bundles; no synthetic keepNames fixture.':'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
+  caveat:realV31?'Actual shipped v2.25.31 to newer production PWA bundles; no synthetic keepNames fixture.':'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
  }));
  await ctx.close();
 }finally{

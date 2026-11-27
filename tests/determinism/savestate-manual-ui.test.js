@@ -1,5 +1,5 @@
 import {canCaptureManualPauseCandidate} from '../../src/systems/savestate/pausedCandidate.js';
-import {suspendManualRun,resumeManualRun,peekManualSuspend,discardManualSuspend} from '../../src/systems/savestate/manualSuspendController.js';
+import {suspendManualRun,resumeManualRun,peekManualSuspend,discardManualSuspend,prepareIncompatibleManualBackup} from '../../src/systems/savestate/manualSuspendController.js';
 
 const eligible=()=>({
  crashed:false,unrankedPractice:false,tapePlayer:null,_replayTape:null,
@@ -33,6 +33,17 @@ test('READONLY peek preserves incompatible and unavailable statuses',async()=>{
  expect(await peekManualSuspend({slot:{peek:async()=>{throw Error('privacy denied');}},loadIdentity:async()=>({})}))
   .toEqual({ok:false,status:'unavailable',code:'storage-unavailable'});
 });
+test('old-save backup only delegates read-only copy with current identity',async()=>{
+ const sample=new Uint8Array([1,4,9]),identity={buildId:'new'};
+ expect(await prepareIncompatibleManualBackup({slot:{copyIncompatibleBytes:async(id,layout)=>{
+  expect(id).toBe(identity);expect(layout).toBeTruthy();
+  return {ok:true,bytes:sample};
+ }},loadIdentity:async()=>identity})).toEqual({ok:true,bytes:sample});
+ expect(await prepareIncompatibleManualBackup({slot:{copyIncompatibleBytes:async()=>{
+  throw Error('blocked');
+ }},loadIdentity:async()=>identity})).toEqual({ok:false,code:'storage-unavailable'});
+});
+
 test('explicit discard delegates to atomic READY-only clear and propagates claim failure',async()=>{
  const claimed={ok:false,code:'slot-claimed'};
  expect(await discardManualSuspend({slot:{clearReady:async()=>claimed}})).toEqual(claimed);
