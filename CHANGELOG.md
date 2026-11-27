@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.19 — #119 integrated typed native savestate candidate source (2026-11-26)
+
+- Preserve the independently authored #412 scene subsystem, #415 deterministic terrain, #416 sled/hazard/pickup/shard entity state and #418 integrated candidate-file implementation in one non-force source merge onto v2.25.18. Add strict typed scene remainder, frozen configuration, exact cross-section bindings, canonical checksummed eight-section candidate and regenerated terrain; refuse malformed/foreign identity and alias collisions.
+- Native real Chromium candidate transport at ticks 481 and 936: 458,306 and 513,874 bytes; zero replay ticks, identical fatal tick 977, scores, full run records and tapes, and 537 exact subsequent fingerprints. Twenty-four early malformed/forged refusal controls pass; detached terrain reconstructs 40/40 future streaming/query batches. Source identity and 439 focused regression tests passed locally before this version bump.
+- **Internal dormant source only**: not a registered final production save layout, not an actual player Save/Resume button, cross-browser stored-slot lifecycle, atomic scene publish, general modified-configuration acceptance or public Verified run. Keep parent #119 OPEN. No new gameplay scoring, telemetry, account, Shard, service or network upload behavior. [skip netlify]
+
 ## v2.25.18 — project scope and roadmap documentation (2026-11-26)
 
 - Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
