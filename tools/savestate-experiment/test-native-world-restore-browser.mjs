@@ -9,11 +9,17 @@ import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const matterWire=process.argv.includes('--matter-section');
+const entityWire=process.argv.includes('--entity-section');
+const sceneWire=process.argv.includes('--scene-subsystems');
+const terrainWire=process.argv.includes('--terrain-section');
+const remainderWire=process.argv.includes('--scene-remainder');
+if(remainderWire&&!terrainWire)throw Error('remainder requires integrated terrain transport');
+if(terrainWire&&(!matterWire||!entityWire||!sceneWire))throw Error('terrain integration requires other typed sections');
 let scratch;
 let vite,browser;
 const errors=[];
 try {
-  if(matterWire)scratch=await mkdtemp(join(tmpdir(),'bb-matter-section-'));
+  if(matterWire||entityWire||sceneWire)scratch=await mkdtemp(join(tmpdir(),'bb-matter-section-'));
   vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true}});
   await vite.listen();
   const url='http://127.0.0.1:'+vite.httpServer.address().port+'/';
@@ -31,6 +37,11 @@ try {
     await page.evaluate(async()=>{
       const {createNativeRunSceneRestoreKit}=await import('/src/systems/savestate/RunSceneRestoreKit.js');
       const {encodeMatterState,decodeMatterState}=await import('/src/systems/savestate/matterState.js');
+      const {encodeEntityState,decodeEntityState,ENTITY_STATE_FIELDS}=await import('/src/systems/savestate/entityState.js');
+      const {encodeSceneSubsystemState,decodeSceneSubsystemState,SCENE_SUBSYSTEM_FIELDS}=await import('/src/systems/savestate/sceneSubsystemState.js');
+      const {captureTerrainState,restoreTerrainState}=await import('/src/systems/savestate/terrainState.js');
+      const {validateSectionBindings}=await import('/src/systems/savestate/sectionBindings.js');
+      const {encodeSceneRemainderState,decodeSceneRemainderState}=await import('/src/systems/savestate/sceneRemainderState.js');
       const {captureCausalState}=await import('/src/systems/replay/fingerprintCapture.js');
       const {fingerprintState}=await import('/src/systems/replay/fingerprint.js');
       const g=window.__bbGame,r=g.scene.getScene('RunScene');
@@ -44,7 +55,81 @@ try {
       const fp=()=>fingerprintState(captureCausalState(r));
       const matterContext=snapshot=>({runId:snapshot.ctx.runId,tick:snapshot.ctx.tick,buildId:snapshot.ctx.buildId});
       const Matter=window.Phaser.Physics.Matter.Matter;
+      const entityContext=snapshot=>({...matterContext(snapshot),randomId:snapshot.world.game.runRandom.__id});
+      const sceneContext=snapshot=>({...matterContext(snapshot),seed:r.seed});
+      const earlyKeys=['simClock','runRandom','terrain','_chunkQueue'];
       window.__nativeWorld={g,r,kit,fp,t:0,
+        encodeRemainder(snapshot){
+          const {game,camera,telegraph,ghost,config}=snapshot.world;
+          return new TextDecoder().decode(encodeSceneRemainderState(game,{camera,telegraph,ghost,config,fingerprint:snapshot.fingerprint},sceneContext(snapshot)));
+        },
+        stripRemainder(snapshot){
+          for(const k of ['game','camera','telegraph','ghost','config','classes','audit','skipped','pool'])delete snapshot.world[k];
+          delete snapshot.fingerprint;
+          snapshot.world.game={};
+        },
+        decodeRemainder(snapshot,wire){
+          if(wire===undefined)return;
+          if(['camera','telegraph','ghost','config','classes','audit','skipped','pool'].some(k=>Object.hasOwn(snapshot.world,k))||Object.hasOwn(snapshot,'fingerprint'))
+            throw Error('raw remainder bypassed byte transport');
+          const config=kit.projectConfig(r);
+          const value=decodeSceneRemainderState(new TextEncoder().encode(wire),sceneContext(snapshot),config);
+          if(Object.keys(value.game).some(k=>Object.hasOwn(snapshot.world.game,k)))throw Error('remainder field overlap');
+          Object.assign(snapshot.world.game,value.game);
+          Object.assign(snapshot.world,{camera:value.camera,telegraph:value.telegraph,ghost:value.ghost,config,
+            classes:{SIM:Object.keys(snapshot.world.game),unclassified:[]},audit:[],skipped:0,pool:[]});
+          snapshot.fingerprint=value.fingerprint;
+        },
+        encodeTerrain(snapshot){
+          return new TextDecoder().decode(captureTerrainState(r.terrain,r._chunkQueue,[...r.mesh.chunks.keys()],matterContext(snapshot)));
+        },
+        stripTerrain(snapshot){
+          // Confirm native regeneration's graph order on the source too.
+          const early=kit.projectEarly(r,snapshot.clock,snapshot.rng,r.terrain,r._chunkQueue,[...r.collectedPowerups]);
+          for(const k of [...earlyKeys,'collectedPowerups'])
+            if(JSON.stringify(early[k])!==JSON.stringify(snapshot.world.game[k]))
+              throw Error('source early projection differs: '+k);
+          for(const k of earlyKeys)delete snapshot.world.game[k];
+        },
+        decodeTerrain(snapshot,wire){
+          if(wire===undefined)return;
+          if(earlyKeys.some(k=>Object.hasOwn(snapshot.world.game,k)))throw Error('raw terrain bypassed byte transport');
+          const prepared=restoreTerrainState(new TextEncoder().encode(wire),r.createTerrainGenerator().options,matterContext(snapshot));
+          if(JSON.stringify(prepared.meshOrder)!==JSON.stringify(snapshot.world.meshOrder))throw Error('terrain mesh order mismatch');
+          const early=kit.projectEarly(r,snapshot.clock,snapshot.rng,prepared.terrain,prepared.queue,[]);
+          // The entity section provides the actual collected set. Its node ID
+          // must coincide with the deterministic placeholder's position.
+          this.collectedNodeId=early.collectedPowerups.__id;
+          for(const k of earlyKeys)snapshot.world.game[k]=early[k];
+        },
+        verifyBindings(snapshot){
+          if(snapshot.world.game.collectedPowerups.__id!==this.collectedNodeId)throw Error('collected set node mismatch');
+          validateSectionBindings(snapshot.world.game,snapshot.world.matter,snapshot.world.meshOrder);
+        },
+        encodeScene(snapshot){
+          return new TextDecoder().decode(encodeSceneSubsystemState(snapshot.world.game,sceneContext(snapshot)));
+        },
+        stripScene(snapshot){
+          for(const k of SCENE_SUBSYSTEM_FIELDS)delete snapshot.world.game[k];
+        },
+        decodeScene(snapshot,wire){
+          if(wire===undefined)return;
+          if(SCENE_SUBSYSTEM_FIELDS.some(k=>Object.hasOwn(snapshot.world.game,k)))throw Error('raw subsystems bypassed byte transport');
+          Object.assign(snapshot.world.game,decodeSceneSubsystemState(new TextEncoder().encode(wire),sceneContext(snapshot)));
+          if(this.encodeScene(snapshot)!==wire)throw Error('subsystem wire mismatch');
+        },
+        encodeEntities(snapshot){
+          return new TextDecoder().decode(encodeEntityState(snapshot.world.game,entityContext(snapshot)));
+        },
+        stripEntities(snapshot){
+          for(const k of ENTITY_STATE_FIELDS)delete snapshot.world.game[k];
+        },
+        decodeEntities(snapshot,wire){
+          if(wire===undefined)return;
+          if(ENTITY_STATE_FIELDS.some(k=>Object.hasOwn(snapshot.world.game,k)))throw Error('raw entities bypassed byte transport');
+          Object.assign(snapshot.world.game,decodeEntityState(new TextEncoder().encode(wire),entityContext(snapshot)));
+          if(this.encodeEntities(snapshot)!==wire)throw Error('entity wire mismatch');
+        },
         encodeMatter(snapshot){
           return new TextDecoder().decode(encodeMatterState(snapshot.world.matter,matterContext(snapshot),Matter));
         },
@@ -58,8 +143,14 @@ try {
           this.t+=1000/120;g.headlessStep(this.t,1000/120);
           frames.push([r.simClock.tick,fp().combined]);
         }return frames;},
-        reconstruct(snapshot,frameTime,wire){
+        reconstruct(snapshot,frameTime,wire,entities,subWire,terrain,remainder,late=false){
           this.decodeMatter(snapshot,wire);
+          this.decodeTerrain(snapshot,terrain);
+          this.decodeEntities(snapshot,entities);
+          this.decodeScene(snapshot,subWire);
+          this.decodeRemainder(snapshot,remainder);
+          if(late)snapshot.fingerprint.combined='xxh32x2:0000000000000000';
+          if(terrain!==undefined)this.verifyBindings(snapshot);
           if(r.simClock.tick!==0)throw Error('candidate advanced before restore');
           const proto=Object.getPrototypeOf(r),sim=proto.simTick;
           let calls=0;
@@ -70,7 +161,13 @@ try {
           this.t=frameTime;
           const exactMatter=wire===undefined?null:this.encodeMatter(kit.capture(r))===wire;
           if(wire!==undefined&&!exactMatter)throw Error('restored Matter bytes differ');
-          return {tick:r.simClock.tick,calls,runId:r.runId,fingerprint:fp(),exactMatter};
+          if(r.sled.random!==r.runRandom)throw Error('sled RNG alias lost');
+          const exactScene=subWire===undefined?null:this.encodeScene(kit.capture(r))===subWire;
+          if(subWire!==undefined&&!exactScene)throw Error('restored scene subsystem bytes differ');
+          if(r.hints.done!==r.tutDone)throw Error('tutorial alias lost');
+          const exactTerrain=terrain===undefined?null:this.encodeTerrain(kit.capture(r))===terrain;
+          if(terrain!==undefined&&!exactTerrain)throw Error('restored terrain bytes differ');
+          return {tick:r.simClock.tick,calls,runId:r.runId,fingerprint:fp(),exactMatter,exactScene,exactTerrain};
         },
       };
     });
@@ -79,7 +176,7 @@ try {
   for(const captureTick of [481,936]) {
     const a=await boot(time),b=await boot(time+1000);
     try {
-      const captured=await a.page.evaluate(({tick,matterWire})=>{
+      const captured=await a.page.evaluate(({tick,matterWire,entityWire,sceneWire,terrainWire,remainderWire})=>{
         const p=window.__nativeWorld;p.stepTo(tick);
         if(p.r.simClock.tick!==tick||p.r.crashed)throw Error('source did not reach capture boundary');
         const snapshot=p.kit.capture(p.r);
@@ -87,8 +184,17 @@ try {
         const bodies=Object.keys(snapshot.world.matter.bodies).length;
         const wire=matterWire?p.encodeMatter(snapshot):undefined;
         if(matterWire)delete snapshot.world.matter;
-        return {snapshot,frameTime:p.t,wire,retired,bodies};
-      },{tick:captureTick,matterWire});
+        const entities=entityWire?p.encodeEntities(snapshot):undefined;
+        const terrain=terrainWire?p.encodeTerrain(snapshot):undefined;
+        if(terrainWire)p.stripTerrain(snapshot);
+        if(entityWire)p.stripEntities(snapshot);
+        const subWire=sceneWire?p.encodeScene(snapshot):undefined;
+        if(sceneWire)p.stripScene(snapshot);
+        const remainder=remainderWire?p.encodeRemainder(snapshot):undefined;
+        const expectedFingerprint=snapshot.fingerprint;
+        if(remainderWire)p.stripRemainder(snapshot);
+        return {snapshot,frameTime:p.t,wire,entities,subWire,terrain,remainder,expectedFingerprint,retired,bodies};
+      },{tick:captureTick,matterWire,entityWire,sceneWire,terrainWire,remainderWire});
       if(matterWire){
         const path=join(scratch,'matter-'+captureTick+'.bbmatter');
         // Real byte transport through a file; B receives no raw Matter data.
@@ -97,12 +203,36 @@ try {
         assert.equal(Object.hasOwn(captured.snapshot.world,'matter'),false);
         if(captureTick===936)assert.ok(captured.retired>0,'retired detector witness missing');
       }
+      if(entityWire){
+        const path=join(scratch,'entities-'+captureTick+'.bbentities');
+        await writeFile(path,captured.entities,{flag:'wx'});
+        captured.entities=await readFile(path,'utf8');
+      }
+      if(sceneWire){
+        const path=join(scratch,'scene-'+captureTick+'.bbsubsystems');
+        await writeFile(path,captured.subWire,{flag:'wx'});
+        captured.subWire=await readFile(path,'utf8');
+      }
+      if(terrainWire){
+        const path=join(scratch,'terrain-'+captureTick+'.bbterrain');
+        await writeFile(path,captured.terrain,{flag:'wx'});
+        captured.terrain=await readFile(path,'utf8');
+        assert.equal(Object.hasOwn(captured.snapshot.world.game,'terrain'),false);
+      }
+      if(remainderWire){
+        const path=join(scratch,'remainder-'+captureTick+'.bbremainder');
+        await writeFile(path,captured.remainder,{flag:'wx'});
+        captured.remainder=await readFile(path,'utf8');
+        assert.deepEqual(captured.snapshot.world.game,{});
+        assert.equal(Object.hasOwn(captured.snapshot.world,'camera'),false);
+        assert.equal(Object.hasOwn(captured.snapshot,'fingerprint'),false);
+      }
       const before=await b.page.evaluate(()=>({tick:window.__nativeWorld.r.simClock.tick,
         fp:window.__nativeWorld.fp(),runId:window.__nativeWorld.r.runId}));
       assert.equal(before.tick,0);
       assert.notEqual(before.runId,captured.snapshot.ctx.runId);
-      const negatives=await b.page.evaluate(({snapshot,wire})=>{
-        const p=window.__nativeWorld; p.decodeMatter(snapshot,wire);
+      const negatives=await b.page.evaluate(({snapshot,wire,entities,subWire,terrain,remainder})=>{
+        const p=window.__nativeWorld; p.decodeMatter(snapshot,wire);p.decodeTerrain(snapshot,terrain);p.decodeEntities(snapshot,entities);p.decodeScene(snapshot,subWire);p.decodeRemainder(snapshot,remainder);if(terrain!==undefined)p.verifyBindings(snapshot);
         const before=JSON.stringify({fp:p.fp(),runId:p.r.runId,
           tick:p.r.simClock.tick,rec:p.r.ghostRecorder.lastTick});
         const controls={
@@ -130,9 +260,8 @@ try {
         const before=await Promise.all([a.page,b.page].map(measured));
         const c=await boot(time+2000);
         try{
-          const refusal=await c.page.evaluate(({snapshot,frameTime,wire})=>{
-            snapshot.fingerprint.combined='xxh32x2:0000000000000000';
-            try{window.__nativeWorld.reconstruct(snapshot,frameTime,wire);return null;}
+          const refusal=await c.page.evaluate(({snapshot,frameTime,wire,entities,subWire,terrain,remainder})=>{
+            try{window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities,subWire,terrain,remainder,true);return null;}
             catch(e){return {error:String(e.message),tick:window.__nativeWorld.r.simClock.tick};}
           },captured);
           assert.equal(refusal?.error,'native restore: reconstructed world mismatch; discard candidate');
@@ -141,12 +270,14 @@ try {
         assert.deepEqual(await Promise.all([a.page,b.page].map(measured)),before);
         console.log('PASS_NATIVE_WORLD_LATE_DISCARD');
       }
-      const restored=await b.page.evaluate(({snapshot,frameTime,wire})=>window.__nativeWorld.reconstruct(snapshot,frameTime,wire),captured);
+      const restored=await b.page.evaluate(({snapshot,frameTime,wire,entities,subWire,terrain,remainder})=>window.__nativeWorld.reconstruct(snapshot,frameTime,wire,entities,subWire,terrain,remainder),captured);
       assert.equal(restored.tick,captureTick);
       assert.equal(restored.calls,0);
       if(matterWire)assert.equal(restored.exactMatter,true);
+      if(sceneWire)assert.equal(restored.exactScene,true);
+      if(terrainWire)assert.equal(restored.exactTerrain,true);
       assert.equal(restored.runId,captured.snapshot.ctx.runId);
-      assert.deepEqual(restored.fingerprint,captured.snapshot.fingerprint);
+      assert.deepEqual(restored.fingerprint,captured.expectedFingerprint);
       // Metadata for the original native run is restored; align the test
       // clocks for end timestamps without changing simulation state.
       await b.page.clock.setFixedTime(new Date(time));
@@ -168,7 +299,7 @@ try {
         score:left.record.score,restoreSimTicks:restored.calls,negativeControls:negatives,
         exactNativeTape:true,exactNativeRecord:true,exactEverySuffixFingerprint:true,errors,
         matterWireBytes:matterWire?Buffer.byteLength(captured.wire):null,exactMatterRecapture:restored.exactMatter,
-        bodies:captured.bodies,retiredDetector:captured.retired}));
+        bodies:captured.bodies,retiredDetector:captured.retired,entityWireBytes:entityWire?Buffer.byteLength(captured.entities):null,sceneWireBytes:sceneWire?Buffer.byteLength(captured.subWire):null,exactSceneRecapture:restored.exactScene,terrainWireBytes:terrainWire?Buffer.byteLength(captured.terrain):null,exactTerrainRecapture:restored.exactTerrain,remainderWireBytes:remainderWire?Buffer.byteLength(captured.remainder):null}));
     }finally{await a.context.close();await b.context.close();}
   }
 }finally{await browser?.close();await vite?.close();if(scratch)await rm(scratch,{recursive:true,force:true});}
