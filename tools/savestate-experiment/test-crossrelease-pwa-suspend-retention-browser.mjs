@@ -4,7 +4,7 @@
  *
  * Old release fixture uses same v2.25.30 source/identity but its test-only
  * build preserves class names, since the *shipped* v30 minifier could not
- * create a valid stock READY save. The B release is unmodified v2.25.31.
+ * create a valid stock READY save. The B release is the current compiled PWA.
  */
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -13,6 +13,9 @@ import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
 const [a,b,...flags]=process.argv.slice(2);
 const realV31=flags.includes('--real-v31');
+const realV32=flags.includes('--real-v32');
+const realV33=flags.includes('--real-v33');
+assert([realV31,realV32,realV33].filter(Boolean).length<=1,'choose one exact old-build fixture');
 const verifyBackup=flags.includes('--backup');
 assert(a&&b,'Usage: node script OLD_KEEP_NAMES_FIXTURE NEW_V231_DIST');
 const roots={a:resolve(a),b:resolve(b)};
@@ -119,20 +122,55 @@ try{
  assert(waiting.waiting,'B worker never entered waiting state');
  assert.deepEqual(await slot(p),stored,'worker update silently changed old slot');
  await p.reload({waitUntil:'domcontentloaded'});
- await p.waitForFunction(()=>window.__bbGame?.scene.isActive('TitleScene')&&navigator.serviceWorker.controller&&
-  window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',null,{timeout:30000});
- const preservedA=await p.evaluate(()=>({
-  script:document.querySelector('script[type="module"][src*="main-"]')?.src,
-  status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
- }));
+ // The browser can perform a second navigation while a waiting worker is
+ // negotiating controlled clients. That invalidates a Playwright execution
+ // context between waitForFunction and evaluate. Re-observe a *fresh* old
+ // Title under a strict bound, then still assert the original bundle and
+ // READY status; never accept an early new-worker activation as success.
+ let preservedA=null;
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   await p.waitForFunction(()=>window.__bbGame?.scene.isActive('TitleScene')&&navigator.serviceWorker.controller&&
+    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',null,{timeout:30000});
+   preservedA=await p.evaluate(()=>({
+    script:document.querySelector('script[type="module"][src*="main-"]')?.src,
+    status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
+   }));
+   break;
+  }catch(e){
+   if(!String(e?.message||e).includes('Execution context was destroyed')||attempt===3)throw e;
+  }
+ }
  assert(preservedA.script.includes(main(html[0]))&&preservedA.status==='ready',
   'live old tab switched code before safe worker transition');
  await p.close();
- const held=await q.evaluate(async()=>({
-  waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
-  status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
- }));
- assert(held.waiting==='installed','B activated before last A page closed');
+ // Headless background tabs can stop scheduling requestAnimationFrame entirely.
+ // Bring the surviving old client forward, then poll on a bounded real timer,
+ // not a presentation frame. All strict READY/worker/bundle assertions remain.
+ await q.bringToFront();
+ // Closing the first old client can induce another same-bundle navigation in
+ // the remaining old client. A detached JS context is not proof the waiting
+ // worker activated: re-observe the remaining page in a fresh context. Still
+ // require ORIGINAL JS, original READY and the B worker to remain waiting.
+ let held=null;
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   await q.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+    window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready'&&
+    navigator.serviceWorker.controller,null,{timeout:30000,polling:250});
+   held=await q.evaluate(async()=>({
+    waiting:(await navigator.serviceWorker.getRegistration())?.waiting?.state,
+    status:window.__bbGame.scene.getScene('TitleScene')._suspendStatus,
+    script:document.querySelector('script[type="module"][src*="main-"]')?.src,
+   }));
+   break;
+  }catch(e){
+   if(!String(e?.message||e).includes('Execution context was destroyed')||attempt===3)throw e;
+  }
+ }
+ assert(held.waiting==='installed'&&held.status==='ready'&&
+  held.script?.includes(main(html[0])),
+  'B activated or remaining old tab changed before final A close '+JSON.stringify(held));
  await q.close();
  await new Promise(done=>setTimeout(done,700));
  await ctx.setOffline(true);
@@ -210,7 +248,10 @@ try{
   preservedByteIdenticalBeforeErasure:true,backupDownloadByteIdentical:verifyBackup,
   backupPreservedOriginalSlot:verifyBackup,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
-  caveat:realV31?'Actual shipped v2.25.31 to newer production PWA bundles; no synthetic keepNames fixture.':'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
+  caveat:realV33?'Actual merged v2.25.33 platform contract source to current exact-build PWA; no synthetic fixture.'
+   :realV32?'Actual shipped v2.25.32 to current exact-build PWA; no synthetic fixture.'
+   :realV31?'Actual shipped v2.25.31 to current exact-build PWA; no synthetic fixture.'
+   :'V30 fixture uses test-only keepNames to create a valid pre-hotfix READY blob',
  }));
  await ctx.close();
 }finally{

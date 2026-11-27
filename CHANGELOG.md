@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.25.34 — #424 explain why a paused run cannot Suspend (2026-11-27)
+
+- When a player pauses an unsupported run, show a short, specific **SUSPEND OFF: ...** explanation in Pascal's Ledger instead of silently omitting the Suspend button. Purchased upgrades, magnet/Kodiak effects, active boosts, official Daily, BSOD Gym, replay/practice, mods, and invalid captures remain ineligible; the original paused run and other menu actions stay intact.
+- Derive the explanation from the SAME conservative predicate that controls native capture. A broad `modded` flag no longer obscures a more informative upgrade/magnet/Kodiak reason. No new IndexedDB writes, replay authority, eligibility, physics or SIM_REVISION changes.
+- Add 18 explanation/guard tests and compiled Pages PWA real-browser checks for upgrade/magnet/Kodiak denial plus stock nonzero-biome offline one-use Resume. Add the actual shipped v2.25.33 → v2.25.34 Chromium offline waiting-worker retention gate. **Cross-build policy remains exact:** a v2.25.33 READY slot becomes incompatible in v2.25.34, is preserved without automatic deletion and requires explicit two-step discard; no migration is claimed. Keep #424/#119 OPEN for supported nonstock runs, physical Chromebook, OS-pressure eviction and older save migration/export policy. [skip netlify]
+
+## v2.25.33 — #441 additive platform capability ABI-v1 foundation (2026-11-27)
+
+- Establish a versioned ad-free web adapter and deterministic test fake for namespaced local storage, ownership status, and rewarded-request status. The own-site web build explicitly returns UNAVAILABLE for rewarded ads; CrazyGames and Steam are honest unavailable stubs pending their own SDK integration and QA.
+- The platform adapter does not mint ownership, in-game currency, public Verified eligibility, or make network requests. Exact source identity and simulation ruleset acceptance preserved; platform integration remains a separate feature track. [skip netlify]
+
+## v2.25.32 — #424 source biome-mask one-use Resume repair (2026-11-27)
+
+- Restore legitimate unmodified stock runs using the ORIGINAL seed-bound recorder header biome mask (including nonzero unlocked masks), not the new page's profile mask. Strict native terrain/config digest still gates private staging and one-use consumption.
+- Actual compiled Pages PWA cold-offline player Resume for masks 1 and 3 passed; upgraded, magnet and Kodiak modes remain denied. Exact-head CI and Pages publication passed; no public Verified or entitlement authority granted. [skip netlify]
+
 ## v2.25.31 — #424 production-only savestate constructor identity hotfix (2026-11-27)
 
 - Fix a **production-only real player Suspend failure** that was invisible to all prior development-browser and native-source tests: Vite/esbuild minification renamed semantic classes (e.g. `PowerUp` to `Gm`), while the typed native entity-state validator required canonical `PowerUp`/Hazard/Sled class IDs. A genuine stock RunScene with a power-up failed SUSPEND as `entity-state:powerups/0/0/class`. The game correctly stayed paused, but no usable save was produced.

@@ -1,4 +1,4 @@
-import {captureManualPauseCandidate} from '../../src/systems/savestate/pausedCandidate.js';
+import {captureManualPauseCandidate,canCaptureManualPauseCandidate,manualSuspendUnavailableReason} from '../../src/systems/savestate/pausedCandidate.js';
 
 const eligible=()=>({
  crashed:false,unrankedPractice:false,tapePlayer:null,_replayTape:null,
@@ -50,4 +50,42 @@ test('malformed caller or absent scene fails before attempting a capture',()=>{
  expect(()=>captureManualPauseCandidate(null,{})).toThrow('suspend:unsupported-active-run');
  const r=eligible();r.scene=null;
  expect(()=>captureManualPauseCandidate(r,{})).toThrow('suspend:manual-pause-required');
+});
+
+// Player-facing reason and the authoritative guard MUST stay coupled: no
+// unsupported state can be accidentally represented as an eligible save.
+test.each([
+ ['CRASHED RUN',r=>r.crashed=true],
+ ['UNRANKED PRACTICE',r=>r.unrankedPractice=true],
+ ['REPLAY MODE',r=>r.tapePlayer={}],
+ ['REPLAY TAKEOVER',r=>r.takeover={}],
+ ['COACH SIMULATION',r=>r.coachSim={}],
+ ['GUEST PRACTICE',r=>r.guestPractice=true],
+ ['BSOD GYM',r=>r.bsodGym=true],
+ ['OFFICIAL DAILY',r=>r.dailyOfficial=true],
+ ['MODDED RUN',r=>r.modded=true],
+ ['UPGRADED RUN',r=>r.upgradeRun.enabled=true],
+ ['MAGNETS ENABLED',r=>r.magnetsDrop=true],
+ ['KODIAKS ENABLED',r=>{r.magnetsDrop=true;r.kodiaksOn=true;}],
+ ['BOOSTED RUN',r=>r.appliedBoosts=['headStart']],
+ ['INVALID RUN TICK',r=>r.simClock.tick=0],
+ ['NO GHOST RECORDER',r=>r.ghostRecorder=null],
+ ['MANUAL PAUSE REQUIRED',r=>r._manualPausePending=false],
+ ['MANUAL PAUSE REQUIRED',r=>r.scene.isPaused=()=>false],
+])('reason %s matches actual Suspend refusal without mutating the source',(_,change)=>{
+ const r=eligible();change(r);
+ const before={guard:r._manualPausePending,tick:r.simClock.tick,recorder:r.ghostRecorder};
+ expect(manualSuspendUnavailableReason(r)).toBe(_);
+ expect(canCaptureManualPauseCandidate(r)).toBe(false);
+ expect(r._manualPausePending).toBe(before.guard);
+ expect(r.simClock.tick).toBe(before.tick);
+ expect(r.ghostRecorder).toBe(before.recorder);
+});
+
+test('eligible manual pause has no restriction, and missing run is explained',()=>{
+ const r=eligible();
+ expect(manualSuspendUnavailableReason(r)).toBeNull();
+ expect(canCaptureManualPauseCandidate(r)).toBe(true);
+ expect(manualSuspendUnavailableReason(null)).toBe('NO ACTIVE RUN');
+ expect(canCaptureManualPauseCandidate(null)).toBe(false);
 });

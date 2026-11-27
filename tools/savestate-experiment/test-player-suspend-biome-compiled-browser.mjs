@@ -95,11 +95,15 @@ try{
     upgrade:r.upgradeRun.enabled,magnet:r.magnetsDrop,kodiak:r.kodiaksOn,
     paused:g.scene.isPaused('RunScene'),canSuspend:pause.canSuspend,
     suspendRows:pause.menu.items.filter(x=>x.label==='SUSPEND RUN').length,
-    resumeRows:pause.menu.items.filter(x=>x.label==='RESUME').length};
+    resumeRows:pause.menu.items.filter(x=>x.label==='RESUME').length,
+    suspendNotice:pause.suspendNotice?.main?.text};
   });
   assert(evidence[deny=== 'upgrade'?'upgrade':deny]===true,'nonstock scenario failed '+JSON.stringify(evidence));
   assert(evidence.paused&&!evidence.canSuspend&&evidence.suspendRows===0&&evidence.resumeRows===1,
    'unsafe nonstock suspend affordance '+JSON.stringify(evidence));
+  const reason={upgrade:'UPGRADED RUN',magnet:'MAGNETS ENABLED',kodiak:'KODIAKS ENABLED'}[deny];
+  assert(evidence.suspendNotice===`SUSPEND OFF: ${reason}`,
+   'Pause did not explain unavailable save '+JSON.stringify(evidence));
   assert.equal(await slotRead(p),null,'unsupported run created a READY save');
   assert.deepEqual(errors,[]);
   console.log('PASS_COMPILED_PWA_SUSPEND_DENIAL',JSON.stringify({deny,evidence,noPhantomSlot:true,errors,outbound}));
