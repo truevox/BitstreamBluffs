@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.25.27 — #424 actual Phaser staged native one-use restore acceptance (2026-11-26)
+
+- Add a THIRD dedicated Chromium acceptance path that actually leaves a paused RunScene, enters TitleScene, stages a NEW tick-zero RunScene behind an active title, reconstructs the full native Matter/recorder state, and consumes the exact one-use IndexedDB claimant before revealing the resumed continuation. The test checks zero simulated restore ticks and original 537-tick/terminal replay identity.
+- The research harness explicitly suppresses premature run-start events during the synchronous zero-delta stage and asserts **zero RUN_START before commit**, **one RUN_START after commit**. At tick 481 it deliberately fails AFTER mutating the fresh stage, destroys the partially restored scene, releases the token only from the authentic holder, and successfully retries the same saved run from an entirely new stage.
+- Add the exact-head Chromium acceptance to existing reopened-page QA, retaining all older reopen/pause tests. **No production UI or new runtime activation capability is exposed:** Phaser lifecycle is manually driven under a sleeping game in this diagnostic. #119/#424 stay OPEN pending production scene transaction, player menus, crash/PWA recovery and physical Chromebook proof. [skip netlify]
+
 ## v2.25.26 — #424 read-only, non-reserving local Suspend slot preview foundation (2026-11-26)
 
 - Add a read-only IndexedDB status hint for the existing one-use local Suspend slot: empty / ready / claimed or incompatible / corrupt / unavailable. It validates a detached envelope snapshot outside the IDB read transaction, so merely opening a future Title/Resume view cannot reserve a token, mutate a slot or hold the cross-tab claim lock through large-file parsing.
