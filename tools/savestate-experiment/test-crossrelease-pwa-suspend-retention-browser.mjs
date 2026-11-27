@@ -230,6 +230,38 @@ try{
   assert.equal(output.length,stored.length,'backup size differs');
   assert.equal(downloads.length,1,'unexpected extra downloads');
   assert.deepEqual(await slot(cold),stored,'backup changed original READY slot');
+  // A browser/CSP download denial must NOT silently drop the prepared copy,
+  // consume the original, invent a success, or require another IndexedDB
+  // claim. A second physical click must then retry the SAME exact bytes.
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')
+   .suspendBackupButton.label.main.text==='DOWNLOAD SAVE',null,{timeout:12000});
+  assert.deepEqual(await slot(cold),stored,'second backup preparation changed original READY slot');
+  await cold.evaluate(()=>{
+   window.__bbOriginalCreateObjectURL=URL.createObjectURL;
+   URL.createObjectURL=()=>{throw Error('QA deliberately blocked local download');};
+  });
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  const blocked=await cold.evaluate(()=>{
+   const t=window.__bbGame.scene.getScene('TitleScene');
+   return {button:t.suspendBackupButton.label.main.text,
+    hint:t.hint?.main?.text,hasPreparedBytes:t._suspendBackupBytes instanceof Uint8Array};
+  });
+  assert(blocked.button==='DOWNLOAD SAVE'&&blocked.hint?.includes('DOWNLOAD BLOCKED')&&
+   blocked.hasPreparedBytes===true,'blocked download was misreported or lost retry '+JSON.stringify(blocked));
+  assert.equal(downloads.length,1,'blocked download still emitted a file');
+  assert.deepEqual(await slot(cold),stored,'download denial consumed or erased original READY slot');
+  await cold.evaluate(()=>{
+   URL.createObjectURL=window.__bbOriginalCreateObjectURL;
+   delete window.__bbOriginalCreateObjectURL;
+  });
+  const retryDownloadEvent=cold.waitForEvent('download',{timeout:15000});
+  await cold.mouse.click(backup.pointer.x,backup.pointer.y);
+  const retryDownload=await retryDownloadEvent;
+  const retryBytes=await readFile(await retryDownload.path());
+  assert.deepEqual(retryBytes,output,'browser retry produced different old saved bytes');
+  assert.equal(downloads.length,2,'download retry did not produce exactly one additional file');
+  assert.deepEqual(await slot(cold),stored,'successful retry changed original READY slot');
  }
  await cold.mouse.click(incompatible.pointer.x,incompatible.pointer.y);
  await cold.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')._suspendConfirm===true,null,{timeout:10000});
@@ -246,7 +278,7 @@ try{
   stored,waiting,preservedA,held,
   coldOffline:true,incompatible:{button:incompatible.button,ready:incompatible.ready},
   preservedByteIdenticalBeforeErasure:true,backupDownloadByteIdentical:verifyBackup,
-  backupPreservedOriginalSlot:verifyBackup,firstClickOnlyConfirms:true,
+  backupPreservedOriginalSlot:verifyBackup,blockedDownloadRetryVerified:verifyBackup,firstClickOnlyConfirms:true,
   secondClickExplicitlyErases:true,errors,external,
   caveat:realV33?'Actual merged v2.25.33 platform contract source to current exact-build PWA; no synthetic fixture.'
    :realV32?'Actual shipped v2.25.32 to current exact-build PWA; no synthetic fixture.'
