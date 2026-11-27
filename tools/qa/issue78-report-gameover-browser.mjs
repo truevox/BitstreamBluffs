@@ -137,24 +137,27 @@ try{
     // consumed instead of launching a destructive Retry.
     const z=s.reportBtn.zone;
     const center=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
-    const oldRetry=s.retry;
-    let retries=0;
+    const oldRetry=s.retry,oldCancel=s._cancelShopAutoprompt;
+    let retries=0,cancelled=0;
     s.retry=()=>{retries++;};
+    s._cancelShopAutoprompt=()=>{cancelled++;};
     s.left.setAlpha(0.45);
     s._onPointer({x:center.x,y:center.y},[]);
     const partialConsumed=retries===0&&!s.ghostView;
+    const partialCancelledPrompt=cancelled===1;
     // A completely invisible REPORT location is still blank background.
     s.left.setAlpha(0);
     s._onPointer({x:center.x,y:center.y},[]);
     const hiddenStillRetries=retries===1&&!s.ghostView;
     s.retry=oldRetry;
+    s._cancelShopAutoprompt=oldCancel;
     s.left.setAlpha(savedAlpha);
     return {blocked,noModal,restored,hiddenRejected,noHiddenModal,
-      pendingRejected,noPendingModal,partialConsumed,hiddenStillRetries};
+      pendingRejected,noPendingModal,partialConsumed,partialCancelledPrompt,hiddenStillRetries};
   });
   assert.deepEqual(guarded,{blocked:true,noModal:true,restored:true,
     hiddenRejected:true,noHiddenModal:true,pendingRejected:true,noPendingModal:true,
-    partialConsumed:true,hiddenStillRetries:true});
+    partialConsumed:true,partialCancelledPrompt:true,hiddenStillRetries:true});
   assert.deepEqual(errors,[]);
   console.log('REAL_GAME_OVER_LOCAL_REPORT_EXPORT_PASS',before,opened,afterExport);
 }finally{

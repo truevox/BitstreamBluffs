@@ -201,6 +201,9 @@ export class GameOverScene extends Phaser.Scene {
       // while its panel is still unfolding; the player can select it once
       // fully ready. No click should silently switch to Retry.
       if(hitReport && reportWasRendered){
+        // Even if the panel cannot be activated yet, a deliberate visible
+        // tap cancels the shop autoprompt just like every other user input.
+        this._cancelShopAutoprompt();
         if(reportWasReady)this._openLocalReport();
         return;
       }
