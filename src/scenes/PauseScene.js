@@ -187,6 +187,17 @@ export class PauseScene extends Phaser.Scene {
 
   /** Open: shade fades in, header glitches in, the panel CRT-zips open. Reduced motion: short fades only. */
   _playIntro() {
+    // The CRT panel's geometry is animated during the opening transition.
+    // Interactive rows can physically move under a mouse click and select a
+    // NEIGHBORING destructive command (notably Quit instead of Suspend).
+    // Disable all action zones AND keyboard confirmation until layout settles.
+    this._menuOpening=true;
+    this.menu?.rows?.forEach(({zone})=>zone.disableInteractive());
+    this.time.delayedCall(motionMs(340,this.reduced),()=>{
+      if(!this.sys?.isActive?.())return;
+      this.menu?.rows?.forEach(({zone})=>{if(zone?.scene)zone.setInteractive();});
+      this._menuOpening=false;
+    });
     const panel = this.panel;
     const parts = [...this.hdrParts, this.hdrBar, this.hint];
     const targetA = parts.map((o) => o.alpha);
@@ -222,7 +233,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   _onAction(action) {
-    if (this.leaving) return;
+    if (this.leaving||this._menuOpening) return;
     if (this.view) {
       this.view.handleAction(action);
       return;

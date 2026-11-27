@@ -33,6 +33,13 @@ physical Chromebook signoff, installed PWA reload/eviction experiments,
 crash-held claim recovery and expanded config matrix. Public independent
 verification service is separately tracked by #135.
 
+The Pause panel opens with an animated CRT transition. All MenuList zones
+and keyboard confirmation remain inactive until geometry settles. This
+prevents a pointer targeted at SUSPEND from landing on the adjacent QUIT
+action while the panel is moving. The browser QA intentionally clicks
+before this transition ends, confirms the original run is still paused,
+then performs the normal post-transition Suspend action.
+
 Required Chromium gates: a real mouse-click Suspend / page-reload / click
 Resume at exactly the original tick; a deliberately failed late reconstruction
 with registry rollback and retry; a hostile postcommit observer; an actually

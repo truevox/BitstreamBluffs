@@ -69,7 +69,7 @@ jobs:
       - name: Player UI physically clicks Pause > Suspend, reloads and clicks Title > Resume
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
-          node tools/savestate-experiment/test-player-suspend-live-browser.mjs --physical-click
+          node tools/savestate-experiment/test-player-suspend-live-browser.mjs --physical-click --early-click
       - name: Late restore rejection retains slot and settings; hostile observer cannot discard consumed run
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"

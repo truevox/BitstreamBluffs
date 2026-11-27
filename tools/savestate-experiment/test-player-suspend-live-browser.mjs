@@ -9,6 +9,7 @@ const physical=process.argv.includes('--physical-click');
 const lateFailure=process.argv.includes('--late-failure');
 const corruptClear=process.argv.includes('--corrupt-clear');
 const hostileObserver=process.argv.includes('--hostile-observer');
+const earlyClick=process.argv.includes('--early-click');
 try{
  vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true,watch:null,hmr:false}});
  await vite.listen();
@@ -35,6 +36,27 @@ try{
   return {tick,runId:r.runId};
  });
  await page.waitForFunction(()=>window.__bbGame.scene.isActive('PauseScene'),null,{timeout:15000});
+ if(earlyClick){
+  const transient=await page.evaluate(()=>{
+   const g=window.__bbGame,p=g.scene.getScene('PauseScene'),rect=g.canvas.getBoundingClientRect();
+   const zone=p.menu.rows[p.menu.items.findIndex(x=>x.label==='SUSPEND RUN')].zone,
+    pos=p.menu.getWorldTransformMatrix().transformPoint(zone.x+zone.width*.15,zone.y+zone.height*.5);
+   return {x:rect.x+pos.x*rect.width/g.scale.gameSize.width,y:rect.y+pos.y*rect.height/g.scale.gameSize.height,
+    opening:p._menuOpening};
+  });
+  assert(transient.opening,'early-click regression did not sample animated panel');
+  await page.mouse.click(transient.x,transient.y);
+  const safe=await page.evaluate(()=>{
+   const g=window.__bbGame,p=g.scene.getScene('PauseScene');
+   return {pause:g.scene.isActive('PauseScene'),runPaused:g.scene.isPaused('RunScene'),
+    leaving:p.leaving||false,saving:p.suspendStatus?.main?.text};
+  });
+  assert(safe.pause&&safe.runPaused&&!safe.leaving,JSON.stringify(safe));
+  console.log('PASS_EARLY_CLICK_CANNOT_QUIT_MOVING_PAUSE_MENU',JSON.stringify(safe));
+ }
+ // User can't click a moving destructive menu; wait for its own interactable
+ // state, not an arbitrary test sleep or a stale transforming hit target.
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('PauseScene')._menuOpening===false,null,{timeout:10000});
  const menu=await page.evaluate(()=>{
   const g=window.__bbGame,p=g.scene.getScene('PauseScene');
   return {hasSuspend:!!p.canSuspend,labels:p.menu.items.map(x=>x.label),
