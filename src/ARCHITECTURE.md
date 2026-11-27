@@ -313,6 +313,7 @@ Authoritative typedefs: `src/data/schemas.js` (terrain/content), `src/events.js`
 | Registry key (`REG.*`) | Created by | When | Lifetime |
 |---|---|---|---|
 | `SAVE_STORE`, `SETTINGS`, `CONTENT`, `INPUT`, `AUDIO` | `createServices(game)` (`services.js`), called by `PreloadScene.create()` | once, at boot | whole session |
+| `PLATFORM` | `createServices(game)` as an ABI-v1 own-site web adapter (`platform/adapter.js`) | once, at boot | whole session |
 | `SEED` | `createServices` (random default); overwritten by `TitleScene` | boot / title | until changed |
 | `LAST_RECORD` | `RunScene` | on run end | until next run end |
 | `DAILY_OFFICIAL` | `TitleScene.startRun` (true only from DAILY RUN), `GameOverScene.retry` / `newSeed` | run start | until the next start (decision 2) |
