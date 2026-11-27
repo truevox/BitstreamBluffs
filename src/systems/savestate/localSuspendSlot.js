@@ -138,6 +138,41 @@ export class LocalSuspendSlot{
   }catch(e){return {ok:false,status:'unavailable',code:failure(e)};}
   finally{db?.close?.();}
  }
+ /** User-initiated, read-only backup of a READY local envelope, including
+  * from a retired exact build. Never claims, migrates, consumes, replaces,
+  * validates as current-build gameplay, or writes to IndexedDB.
+  *
+  * This deliberate recovery exception does NOT inspect the old layout:
+  * malformed but bounded bytes may still be useful to future repair tools.
+  * A claimed/unknown-state slot cannot be copied as if READY. The caller
+  * must require a separate explicit player download gesture and must NEVER
+  * treat these bytes as a replay, ranked proof or resumable current save.
+  */
+ async backupReady(){
+  let db;
+  try{
+   db=await this._open();
+   const tx=db.transaction(SUSPEND_SLOT_STORE,'readonly');
+   let row=null;
+   const done=new Promise((resolve,reject)=>{
+    tx.oncomplete=resolve;
+    tx.onabort=()=>reject(tx.error||Error('transaction aborted'));
+    tx.onerror=()=>reject(tx.error||Error('transaction error'));
+   });
+   tx.objectStore(SUSPEND_SLOT_STORE).get(SUSPEND_SLOT_KEY).onsuccess=e=>{row=e.target.result||null;};
+   await done;
+   if(!row)return {ok:false,code:'empty'};
+   if(row.status!=='ready')return {ok:false,code:'slot-not-ready'};
+   if(!(row.bytes instanceof Uint8Array)||row.bytes.length===0||row.bytes.length>MAX_OUTPUT_BYTES)
+    return {ok:false,code:'invalid-bytes'};
+   if(!Number.isSafeInteger(row.tick)||row.tick<=0||
+      typeof row.buildId!=='string'||!/^sha256:[0-9a-f]{64}$/.test(row.buildId))
+    return {ok:false,code:'invalid-metadata'};
+   return {ok:true,admission:'inert-local-backup-only',bytes:Uint8Array.from(row.bytes),
+    tick:row.tick,buildId:row.buildId};
+  }catch(e){return {ok:false,code:failure(e)};}
+  finally{db?.close?.();}
+ }
  /** Explicitly keep a *pure-format-admitted* suspended envelope. The caller
   * must supply the expected exact-build identity and trusted shipped schema;
   * no default production registration is provided by the current game.

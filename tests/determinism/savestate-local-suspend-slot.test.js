@@ -182,6 +182,68 @@ describe('inert local single-use suspend slot — cannot authorize a restore',()
  });
 });
 
+describe('inert player-requested old-build backup — #424',()=>{
+ test('read-only backup of incompatible exact-build READY copies original bytes without token or mutation',async()=>{
+  const idb=fakeIdb(),modes=[],writer=make(idb),viewer=make(idb,{uuid:()=>{throw Error('never claim');}});
+  idb.hooks.onTransaction=(_names,mode)=>modes.push(mode);
+  const original=bytes();
+  expect((await writer.put(original,identity(),layout)).ok).toBe(true);
+  const badIdentity={...identity(),buildId:H('c')};
+  expect(await viewer.peek(badIdentity,layout)).toMatchObject({status:'incompatible'});
+  idb.hooks.failPut=Object.assign(Error('backup must not put'),{name:'QuotaExceededError'});
+  idb.hooks.failDelete=Object.assign(Error('backup must not delete'),{name:'QuotaExceededError'});
+  const backup=await viewer.backupReady();
+  expect(backup).toEqual({ok:true,admission:'inert-local-backup-only',bytes:original,
+   tick:120,buildId:identity().buildId});
+  expect(modes.at(-1)).toBe('readonly');
+  expect(backup).not.toHaveProperty('token');
+  backup.bytes.fill(0);
+  idb.hooks.failPut=null;idb.hooks.failDelete=null;
+  expect(await writer.peek(identity(),layout)).toMatchObject({status:'ready',runId:'synthetic-run-1'});
+  const claimed=await writer.claim(identity(),layout);
+  expect(claimed.ok).toBe(true);
+  expect(claimed.bytes).toEqual(original);
+  expect(await writer.release(claimed.token)).toEqual({ok:true,released:true});
+ });
+ test('backup refuses empty, claimed, unknown status and storage denial without altering them',async()=>{
+  const idb=fakeIdb(),a=make(idb),b=make(idb);
+  expect(await a.backupReady()).toEqual({ok:false,code:'empty'});
+  await a.put(bytes(),identity(),layout);
+  const c=await a.claim(identity(),layout);
+  expect((await b.backupReady())).toEqual({ok:false,code:'slot-not-ready'});
+  expect(await a.release(c.token)).toEqual({ok:true,released:true});
+  idb.hooks.failGet=Object.assign(Error('denied'),{name:'SecurityError'});
+  expect(await b.backupReady()).toEqual({ok:false,code:'storage-unavailable'});
+  idb.hooks.failGet=null;
+  const db=await a._open();
+  const tx=db.transaction(SUSPEND_SLOT_STORE,'readwrite'),store=tx.objectStore(SUSPEND_SLOT_STORE);
+  store.get(SUSPEND_SLOT_KEY).onsuccess=e=>{store.put({...e.target.result,status:'unknown'});};
+  await new Promise((yes,no)=>{tx.oncomplete=yes;tx.onabort=()=>no(tx.error);});
+  db.close();
+  expect(await b.backupReady()).toEqual({ok:false,code:'slot-not-ready'});
+  expect(await b.clearReady()).toEqual({ok:false,code:'slot-claimed'});
+ });
+ test('malformed or oversized READY contents cannot be materialized as a download',async()=>{
+  const idb=fakeIdb(),slot=make(idb);
+  await slot.put(bytes(),identity(),layout);
+  const mutate=async fn=>{
+   const db=await slot._open(),tx=db.transaction(SUSPEND_SLOT_STORE,'readwrite'),
+    store=tx.objectStore(SUSPEND_SLOT_STORE);
+   store.get(SUSPEND_SLOT_KEY).onsuccess=e=>{store.put(fn(e.target.result));};
+   await new Promise((yes,no)=>{tx.oncomplete=yes;tx.onabort=()=>no(tx.error);});
+   db.close();
+  };
+  await mutate(r=>({...r,bytes:new Uint8Array(0)}));
+  expect(await slot.backupReady()).toEqual({ok:false,code:'invalid-bytes'});
+  await mutate(r=>({...r,bytes:new Uint8Array(16*1024*1024+1)}));
+  expect(await slot.backupReady()).toEqual({ok:false,code:'invalid-bytes'});
+  await mutate(r=>({...r,bytes:bytes(),buildId:'../../bad'}));
+  expect(await slot.backupReady()).toEqual({ok:false,code:'invalid-metadata'});
+  await mutate(r=>({...r,buildId:H('a'),tick:-10}));
+  expect(await slot.backupReady()).toEqual({ok:false,code:'invalid-metadata'});
+ });
+});
+
 describe('interrupted Web Lock resume ownership — #424',()=>{
  function fakeBrowserLocks(){
   let held=false;

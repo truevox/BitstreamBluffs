@@ -1,5 +1,5 @@
 import {canCaptureManualPauseCandidate} from '../../src/systems/savestate/pausedCandidate.js';
-import {suspendManualRun,resumeManualRun,peekManualSuspend,discardManualSuspend} from '../../src/systems/savestate/manualSuspendController.js';
+import {suspendManualRun,resumeManualRun,peekManualSuspend,discardManualSuspend,backupManualSuspend} from '../../src/systems/savestate/manualSuspendController.js';
 
 const eligible=()=>({
  crashed:false,unrankedPractice:false,tapePlayer:null,_replayTape:null,
@@ -84,4 +84,12 @@ test.each([
  expect(run.ghostRecorder).toBe(initialRun);
  expect(run.scene.isPaused('RunScene')).toBe(_==='unpaused run'?false:true);
  expect(scene.isActive('PauseScene')).toBe(true);
+});
+
+test('manual backup delegates only to nonclaiming READY reader; errors keep original save',async()=>{
+ const bytes=Uint8Array.of(1,2,3);
+ expect(await backupManualSuspend({slot:{backupReady:async()=>({ok:true,bytes,admission:'inert-local-backup-only'})}}))
+  .toEqual({ok:true,bytes,admission:'inert-local-backup-only'});
+ expect(await backupManualSuspend({slot:{backupReady:async()=>{throw Error('denied');}}}))
+  .toEqual({ok:false,code:'storage-unavailable'});
 });

@@ -184,6 +184,14 @@ export async function recoverInterruptedManualSuspend({slot=new LocalSuspendSlot
  * atomic clearReady() refuses any existing claim, even a stale one. Only a
  * confirmed Title UI action may call this; never do it during peek or error.
  */
+/** Inert copy of the original READY bytes for a player-requested local
+ * download. Deliberately bypasses current-build identity validation, never
+ * bypasses one-use restore admission, and never mutates the slot.
+ */
+export async function backupManualSuspend({slot=new LocalSuspendSlot()}={}){
+ try{return await slot.backupReady();}
+ catch{return fail('storage-unavailable');}
+}
 export async function discardManualSuspend({slot=new LocalSuspendSlot()}={}){
  try{return await slot.clearReady();}
  catch{return fail('storage-unavailable');}
