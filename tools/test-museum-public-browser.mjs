@@ -24,6 +24,16 @@ try {
     window.__bbGame.scene.getScene('TitleScene').museumButton?.scene,null,{timeout:60000});
  };
  await boot();
+ const offline=process.env.MUSEUM_REQUIRE_OFFLINE==='1';
+ if(offline){
+  const scope=await page.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return reg.scope;});
+  assert.equal(new URL(scope).pathname,base,'service worker scope matches game base');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&
+    !!navigator.serviceWorker.controller,null,{timeout:30000});
+  await context.setOffline(true);
+  pass('offline service worker controls game before entering Museum',{base});
+ }
  const layout=await page.evaluate(()=>{
   const s=window.__bbGame.scene.getScene('TitleScene');
   const rects=[s.museumButton,s.postcardButton,s.helpButton].map(b=>({x:b.x,y:b.y,w:b.w,h:b.h}));
@@ -71,6 +81,6 @@ try {
  await page.mouse.click(target.x,target.y);
  await page.waitForURL('**/tools/museum-of-bad-physics.html',{timeout:12000});
  pass('pointer click on Museum chip opens public route');
- assert.deepEqual(errors,[],'browser runtime errors');pass('compiled game acceptance',{pageErrors:0});
+ assert.deepEqual(errors,[],'browser runtime errors');pass('compiled game acceptance',{pageErrors:0,offline,base});
  await context.close();
 }finally{await browser?.close();await server?.httpServer?.close();}
