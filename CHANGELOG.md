@@ -1,12 +1,18 @@
 # Changelog
 
-## v2.25.25 — #424 read-only, non-reserving local Suspend slot preview foundation (2026-11-26)
+## v2.25.26 — #424 read-only, non-reserving local Suspend slot preview foundation (2026-11-26)
 
 - Add a read-only IndexedDB status hint for the existing one-use local Suspend slot: empty / ready / claimed or incompatible / corrupt / unavailable. It validates a detached envelope snapshot outside the IDB read transaction, so merely opening a future Title/Resume view cannot reserve a token, mutate a slot or hold the cross-tab claim lock through large-file parsing.
 - Share strict envelope/header/identity bindings with the actual atomic claim path to avoid divergent acceptance. The preview returns only display metadata from a verified envelope and NEVER candidate bytes, ownership token, restorable scene, Verified authority or ranking eligibility. A READY hint may immediately become stale; the future player action must always claim atomically again.
 - Fake IndexedDB tests for invalid status, old build, corrupt saved binding, unavailable storage, cross-tab ownership, and read-only mode; real Chromium two-tab close/reload tests verify the entire empty -> ready -> claimed -> released -> consumed lifecycle and no HTTP writes.
 - This does NOT add a player-facing Suspend/Resume button, production isolated world handoff, automatic stale-claim recovery, or new DB. Parent #119 and child #424 remain OPEN. Also pin twelve affected Playwright CI jobs to Ubuntu 24.04 (not a disabled gate): GitHub runner Ubuntu 26.04 cannot install this locked Playwright version because fonts-freefont-ttf, fonts-unifont, and related distro dependencies are missing. Maintain all browser acceptance steps and retain the Pages deploy job runner unchanged. [skip netlify]
 
+
+## v2.25.25 — #135 authenticated private-verifier HTTP adapter reference (2026-11-26)
+
+- Add a **source-only, opt-in Node HTTP handler** for an externally authenticated account to request server-issued challenges, submit a pinned replay, receive random blinded peer work, provide observed local/peer results, privately check its own status, and request visibly UNVERIFIED publication after the local creator-clear gate. No listener or actual identity service is configured.
+- Exact canonical JSON/strict base64url wire contract; bearer identity comes exclusively from a trusted injected verifier, and both legal challenge issuance and publication consent/audience must be supplied by separate trusted callbacks. Default CORS deny, body bounds, origin allowlisting, per-account in-process abuse budget, no wallet/Verified/reward endpoint or client-visible peer identities.
+- Six real loopback HTTP tests plus 38 existing signed-admission/peer/provisional tests pass; 243 trust/replay regressions, current ruleset/build identity and production build isolation pass locally. This is NOT a deployable public Verified/Shard authority: no real account provider, externally signed run-origin witness, hosted evaluator, persistent abuse controls, privacy/consent rollout or independent security review. Keep #135 OPEN. [skip netlify]
 ## v2.25.24 — #424 actual paused-run fresh-page one-use native restore acceptance (2026-11-26)
 
 - Extend the one-use browser diagnostic to close the original game page, reopen the SAME IndexedDB storage partition in a new page, fresh-boot a tick-zero RunScene, atomically claim the original candidate, reconstruct the complete live Matter world/recorder with zero simulated restore ticks and consume only after a successful, exact native proof. Competing claims fail and replay suffix, terminal score, GhostTape and RunRecord stay identical.
