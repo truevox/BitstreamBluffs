@@ -3,7 +3,7 @@ import {fakeIdb} from '../replay/fakeIdb.js';
 import {f64Encode} from '../../src/systems/replay/canonicalJson.js';
 import {savestateLayoutIdOf} from '../../src/systems/savestate/layout.js';
 import {snapshotEnvelopeBytes} from '../../src/systems/savestate/envelope.js';
-import {LocalSuspendSlot,SUSPEND_SLOT_DB,SUSPEND_SLOT_STORE,SUSPEND_SLOT_KEY} from '../../src/systems/savestate/localSuspendSlot.js';
+import {LocalSuspendSlot,SUSPEND_SLOT_DB,SUSPEND_SLOT_STORE,SUSPEND_SLOT_KEY,SUSPEND_RESUME_WEB_LOCK,withSuspendResumeLock} from '../../src/systems/savestate/localSuspendSlot.js';
 const H=c=>'sha256:'+String(c).repeat(64);
 const descriptor=Object.freeze({version:1,sections:{sim:{fields:['tick:uint32','velocity:f64']}}});
 const layout=Object.freeze({descriptor,validateSections:s=>
@@ -179,5 +179,62 @@ describe('inert local single-use suspend slot — cannot authorize a restore',()
   const noEntropy=make(idb,{uuid:()=>null});
   expect(await noEntropy.claim(identity(),layout)).toEqual({ok:false,code:'secure-token-unavailable'});
   expect((await writer.claim(identity(),layout)).ok).toBe(true);
+ });
+});
+
+describe('interrupted Web Lock resume ownership — #424',()=>{
+ function fakeBrowserLocks(){
+  let held=false;
+  return {request:async(name,options,callback)=>{
+   if(name!==SUSPEND_RESUME_WEB_LOCK||options.mode!=='exclusive'||options.ifAvailable!==true)
+    throw Error('wrong lock mode');
+   if(held)return callback(null);
+   held=true;
+   try{return await callback({name,mode:'exclusive'});}
+   finally{held=false;}
+  }};
+ }
+ test('only exclusive origin lock owner can recover a crash-held marked claim, never a live owner',async()=>{
+  const idb=fakeIdb(),a=make(idb),b=make(idb),locks=fakeBrowserLocks();
+  await a.put(bytes(),identity(),layout);
+  const held=await withSuspendResumeLock(async proof=>{
+   const claimed=await a.claim(identity(),layout,{leaseProof:proof});
+   expect(claimed.ok).toBe(true);
+   expect(await b.peek(identity(),layout)).toEqual({ok:true,status:'claimed',canCheckOwner:true});
+   expect(await b.clearReady()).toEqual({ok:false,code:'slot-claimed'});
+   expect(await b.recoverInterrupted()).toEqual({ok:false,code:'recovery-lock-required'});
+   expect(await withSuspendResumeLock(p=>b.recoverInterrupted({leaseProof:p}),{locks}))
+    .toEqual({ok:false,code:'resume-active-other-tab'});
+   expect(await withSuspendResumeLock(p=>b.claim(identity(),layout,{leaseProof:p}),{locks}))
+    .toEqual({ok:false,code:'resume-active-other-tab'});
+   return claimed;
+  },{locks});
+  expect(held.ok).toBe(true);
+  expect(await b.peek(identity(),layout)).toEqual({ok:true,status:'claimed',canCheckOwner:true});
+  expect(await withSuspendResumeLock(p=>b.recoverInterrupted({leaseProof:p}),{locks}))
+   .toEqual({ok:true,recovered:true});
+  expect(await a.consume(held.token)).toEqual({ok:false,code:'claim-mismatch'});
+  expect(await a.release(held.token)).toEqual({ok:false,code:'claim-mismatch'});
+  expect(await b.peek(identity(),layout)).toMatchObject({ok:true,status:'ready',tick:120});
+  const next=await withSuspendResumeLock(p=>b.claim(identity(),layout,{leaseProof:p}),{locks});
+  expect(next.ok).toBe(true);
+  expect(await b.consume(next.token)).toEqual({ok:true,consumed:true});
+  expect(await b.peek(identity(),layout)).toEqual({ok:true,status:'empty'});
+ });
+ test('old claims and browser without Web Locks never become recoverable via guessed proofs',async()=>{
+  const idb=fakeIdb(),a=make(idb),b=make(idb),locks=fakeBrowserLocks();
+  await a.put(bytes(),identity(),layout);
+  const legacy=await withSuspendResumeLock(p=>a.claim(identity(),layout,{leaseProof:p}),{locks:null});
+  expect(legacy.ok).toBe(true);
+  expect(await b.peek(identity(),layout)).toEqual({ok:true,status:'claimed'});
+  expect(await withSuspendResumeLock(p=>b.recoverInterrupted({leaseProof:p}),{locks}))
+   .toEqual({ok:false,code:'unrecoverable-old-claim'});
+  expect(await withSuspendResumeLock(p=>b.recoverInterrupted({leaseProof:p}),{locks:null}))
+   .toEqual({ok:false,code:'recovery-lock-required'});
+  expect(await b.clearReady()).toEqual({ok:false,code:'slot-claimed'});
+  expect(await b.claim(identity(),layout)).toEqual({ok:false,code:'slot-claimed'});
+  // The original owner token remains the only legal legacy release method.
+  expect(await a.release(legacy.token)).toEqual({ok:true,released:true});
+  expect(await b.peek(identity(),layout)).toMatchObject({ok:true,status:'ready'});
  });
 });

@@ -10,7 +10,7 @@
  * gameplay start is published before the successful consume transaction.
  */
 import {parseCanonical} from '../replay/canonicalJson.js';
-import {LocalSuspendSlot} from './localSuspendSlot.js';
+import {LocalSuspendSlot,withSuspendResumeLock} from './localSuspendSlot.js';
 import {captureManualPauseCandidate} from './pausedCandidate.js';
 import {candidateSuspendEnvelopeBytes,candidateSuspendLayout,inspectCandidateSuspendEnvelope} from './candidateSuspendEnvelope.js';
 import {loadCurrentBuildDescriptor} from './runtimeIdentity.js';
@@ -69,9 +69,9 @@ export async function suspendManualRun(pause,Phaser,{slot=new LocalSuspendSlot()
 }
 
 /** Restore into a PRIVATE fresh scene. Failure never publishes the stage. */
-export async function resumeManualRun(title,Phaser,{slot=new LocalSuspendSlot(),
+async function resumeManualRunLocked(title,Phaser,{slot=new LocalSuspendSlot(),
  loadIdentity=loadCurrentBuildDescriptor,createCodec=createCandidateStateCodec,
- armStage=armPrivateRunSceneStage}={}){
+ armStage=armPrivateRunSceneStage,leaseProof=null}={}){
  if(!title?.scene?.isActive?.(SCENES.TITLE)||title.game?.scene?.isActive?.(SCENES.RUN))
   return fail('title-required');
  let token=null,stage=null,arm=null,consumed=false,originalRegistry=null;
@@ -79,7 +79,7 @@ export async function resumeManualRun(title,Phaser,{slot=new LocalSuspendSlot(),
  try{
   const identity=await loadIdentity();
   if(!title.scene.isActive(SCENES.TITLE))return fail('title-left');
-  const claim=await slot.claim(identity,candidateSuspendLayout);
+  const claim=await slot.claim(identity,candidateSuspendLayout,{leaseProof});
   if(!claim.ok)return fail(claim.code);
   token=claim.token;
   const inspected=inspectCandidateSuspendEnvelope(claim.bytes,identity);
@@ -147,6 +147,26 @@ export async function resumeManualRun(title,Phaser,{slot=new LocalSuspendSlot(),
   }
   return fail(!released?'claim-held-after-failure':'native-restore-refused');
  }
+}
+
+/** An exclusive browser lock covers the WHOLE native restore transaction.
+ * No lock support = old fail-closed protocol (no crash recovery). A second
+ * active tab gets a non-mutating rejection, never a second resume.
+ */
+export async function resumeManualRun(title,Phaser,options={}){
+ return withSuspendResumeLock(leaseProof=>
+  resumeManualRunLocked(title,Phaser,{...options,leaseProof}));
+}
+
+/** Deliberately requested by the player from a claimed Title slot.
+ * Reclaim only claims that were created under a Web Lock AND when no other
+ * tab still holds that same lock. Never auto-run after claim recovery.
+ */
+export async function recoverInterruptedManualSuspend({slot=new LocalSuspendSlot()}={}){
+ return withSuspendResumeLock(async leaseProof=>{
+  if(!leaseProof)return fail('recovery-lock-unavailable');
+  return slot.recoverInterrupted({leaseProof});
+ });
 }
 
 /** Explicit user-requested deletion of a READY save only. The slot's

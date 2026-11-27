@@ -49,3 +49,32 @@ corrupted IndexedDB save requiring two physical clicks to erase. The native
 Provenance: Gal Friday implementation of Marvin's pre-existing single-use
 product decision, not a newly inferred user request. Canonical GBrain:
 [[projects/truevox-bitstreambluffs/determinism-opportunities/op-052-heavy-mode-trusted-savestates]].
+
+
+## 2026-11-27 crash-held claim recovery (next candidate, NOT v2.25.29)
+
+A normal PWA's suspended state is **single-use**, never a repeatable human-run
+checkpoint. From this candidate onward the original Title Resume operation
+holds the origin-wide exclusive Web Lock
+`bb:single-use-suspend-resume-v1` throughout claim, native reconstruction,
+unique consume, and scene activation. The IDB row records a *lease-backed*
+claim only if the operation genuinely holds that lock. No lock support falls
+back to the existing safe, non-reclaimable owner token protocol.
+
+If a tab crashes after claiming but before the one-use consume, the IDB claim
+survives while the browser releases its Web Lock. Another Title tab can
+**explicitly select CHECK HELD SAVE**. It never silently clears anything.
+If another tab still holds the lock, recovery refuses with a visible message
+and leaves the claim untouched. If the lock has been released, the check may
+atomically release ONLY a marked lease-backed claim; the user must then choose
+the normal R RESUME SAVE command separately. An old pre-lease claim remains
+locked even after a crash because the app cannot prove that owner is gone.
+There is **no clock-based expiry**, automatic deletion, second claimant, or
+score/Verified reward entitlement in this recovery path.
+
+Browser acceptance must deliberately hold a real private native restore
+between claim and consume, demonstrate another tab refusing the still-active
+claim, close the owner browser renderer before consume, and prove the fresh
+Title tab can explicitly reclaim and successfully resume the exact original
+tick exactly once. This is local Chromium proof, not physical Chromebook or
+installed-PWA cross-release proof.

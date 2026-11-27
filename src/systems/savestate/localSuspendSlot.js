@@ -1,9 +1,8 @@
 /** #119: LOCAL-ONLY single-use suspend-slot transaction boundary.
  *
- * Inert until a trusted production snapshot *layout*, strict Matter fresh-world
- * restore and complete GhostRecorder tick-zero continuation are shipped.
- * This module NEVER accepts an envelope as a trusted, restorable run: the
- * existing inspector only returns `admission: envelope-only`.
+ * Stock-only native Suspend/Resume is live from v2.25.29. This store accepts
+ * canonical local envelopes ONLY, never public rank/Shard/Verified authority;
+ * the envelope inspector intentionally returns `admission: envelope-only`.
  *
  * One slot per browser database. Claimed slots stay held across tab crashes
  * (no unsafe TTL/retry); the trusted caller must explicitly release after an
@@ -20,6 +19,24 @@ export const SUSPEND_SLOT_DB_VERSION=1;
 export const SUSPEND_SLOT_KEY='local-suspend';
 
 const failure=e=>e?.name==='QuotaExceededError'?'quota-exceeded':'storage-unavailable';
+
+// Only cooperating same-origin browser contexts may recover an interrupted
+// resume. The Web Lock is held across claim, native reconstruction and consume;
+// a crash releases it but does NOT release the IDB claim by itself. Old claims
+// that predate this protocol deliberately remain non-recoverable.
+export const SUSPEND_RESUME_WEB_LOCK='bb:single-use-suspend-resume-v1';
+const LOCK_PROOF=Symbol('held-browser-resume-lock');
+export async function withSuspendResumeLock(operation,{locks=globalThis.navigator?.locks}={}){
+ if(typeof operation!=='function')throw new TypeError('Expected operation');
+ if(!locks||typeof locks.request!=='function')return operation(null);
+ try{
+  return await locks.request(SUSPEND_RESUME_WEB_LOCK,
+   {mode:'exclusive',ifAvailable:true},
+   held=>held?operation(LOCK_PROOF):{ok:false,code:'resume-active-other-tab'});
+ }catch{
+  return {ok:false,code:'resume-lock-unavailable'};
+ }
+}
 
 /** Format-only admission shared by non-claiming UI previews and atomic claims.
  * No digest, layout or build identity can authenticate a stored run.
@@ -108,7 +125,9 @@ export class LocalSuspendSlot{
    // closes; a large candidate must not hold up another tab's atomic claim.
    try{
     if(!row)return {ok:true,status:'empty'};
-    if(row.status==='claimed')return {ok:true,status:'claimed'};
+    if(row.status==='claimed')return row.holderKind==='web-lock-v1'
+     ?{ok:true,status:'claimed',canCheckOwner:true}
+     :{ok:true,status:'claimed'};
     if(row.status!=='ready')return {ok:false,status:'corrupt',code:'invalid-slot-state'};
     const checked=inspectStoredReady(row,expectedIdentity,layout);
     return checked.ok?{ok:true,status:'ready',admission:'envelope-only',
@@ -150,7 +169,7 @@ export class LocalSuspendSlot{
   * transaction, before any mutation. A stale/invalid/incomplete envelope is
   * LEFT untouched and never returned as a live-world restore capability.
   */
- async claim(expectedIdentity,layout){
+ async claim(expectedIdentity,layout,{leaseProof=null}={}){
   let claimToken;
   try{claimToken=this.uuid();}catch{return {ok:false,code:'secure-token-unavailable'};}
   if(typeof claimToken!=='string'||!/^[a-f0-9-]{36}$/i.test(claimToken))
@@ -160,7 +179,13 @@ export class LocalSuspendSlot{
    if(current.status!=='ready')return {ok:false,code:'slot-claimed'};
    const checked=inspectStoredReady(current,expectedIdentity,layout);
    if(!checked.ok)return checked;
-   store.put({...current,status:'claimed',claimedBy:claimToken});
+   // An old/unlocked claim can NEVER be recovered by a new tab, even after
+   // a browser crash. Only a claim made while holding the origin Web Lock
+   // is eligible for guarded recovery.
+   const next={...current,status:'claimed',claimedBy:claimToken};
+   if(leaseProof===LOCK_PROOF)next.holderKind='web-lock-v1';
+   else delete next.holderKind;
+   store.put(next);
    return {ok:true,admission:'envelope-only',claimed:true,token:claimToken,
     bytes:Uint8Array.from(current.bytes),runId:current.runId,tick:current.tick};
   });
@@ -191,8 +216,27 @@ export class LocalSuspendSlot{
     return {ok:false,code:'claim-mismatch'};
    const next={...current,status:'ready'};
    delete next.claimedBy;
+   delete next.holderKind;
    store.put(next);
    return {ok:true,released:true};
+  });
+ }
+ /** Caller must hold the exclusive cross-tab Web Lock BEFORE this transaction.
+  * It will NOT run on old/unmarked claims, wrong lock proof, or READY records.
+  * The browser lock is acquired non-blockingly; any still-live owner prevents
+  * recovery. No timer, page timestamp, second-owner token or auto deletion.
+  */
+ async recoverInterrupted({leaseProof=null}={}){
+  if(leaseProof!==LOCK_PROOF)return {ok:false,code:'recovery-lock-required'};
+  return this._modify((store,current)=>{
+   if(!current)return {ok:false,code:'empty'};
+   if(current.status!=='claimed')return {ok:false,code:'not-claimed'};
+   if(current.holderKind!=='web-lock-v1')return {ok:false,code:'unrecoverable-old-claim'};
+   const next={...current,status:'ready'};
+   delete next.claimedBy;
+   delete next.holderKind;
+   store.put(next);
+   return {ok:true,recovered:true};
   });
  }
  /** Explicit cleanup for an unused ready slot; never steals another tab's

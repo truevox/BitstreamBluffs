@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.25.30 — #424 explicit crash-held one-use Suspend recovery via exclusive browser lock (2026-11-27)
+
+- Preserve the exact single-use, local-only Suspend/Resume transaction. A resume attempt on browsers supporting the standard origin-scoped Web Locks API now holds one **exclusive lock across claim, native Matter/recorder reconstruction, atomic consume and scene release**. Two tabs cannot actively resume the same save; existing token/IDB ownership remains authoritative.
+- If the owner tab crashes after claiming but before consuming, its lease-backed IDB record stays held. Title offers **CHECK HELD SAVE**, which first verifies the cross-tab lock is actually free. A still-active owner is never preempted, and a genuine abandoned claim is released to READY **only on an explicit player click**, never automatically. A separate **R RESUME SAVE** action must then restore and consume it exactly once.
+- Old claims without this lock protocol, or browsers without Web Locks, remain nonrecoverable rather than using an unsafe TTL, stale token, double-resume or silent erase. No new leaderboard/rank/Shard trust is issued and no automatic upload occurs. Still stock-only; #119/#424 remain OPEN for physical Chromebook and installed-PWA cross-release/eviction/upgrade and broader upgraded/biome/hazard coverage.
+- Add two deterministic lock/legacy ownership tests and a real two-tab Chromium crash test that hangs the *real private stage* after claim, verifies the second tab cannot claim/clear while the owner lives, closes the owner without release, physically checks and recovers the abandoned slot, and physically resumes exactly once at the source tick. The existing normal click, late-restore rollback and corrupt-save confirmation gates remain intact. [skip netlify]
+
 ## v2.25.29 — #119 actual local one-use player Suspend and Resume controls (2026-11-27)
 
 - Add real **SUSPEND RUN** to the Pause menu for eligible unmodified stock runs only, retaining their exact original GhostTape, run ID, live Matter state and causal tick. Write an existing exact-build one-use IndexedDB slot BEFORE stopping the original run; if unavailable or occupied, the game stays paused and reports an error.

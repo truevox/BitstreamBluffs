@@ -10,6 +10,7 @@ const lateFailure=process.argv.includes('--late-failure');
 const corruptClear=process.argv.includes('--corrupt-clear');
 const hostileObserver=process.argv.includes('--hostile-observer');
 const earlyClick=process.argv.includes('--early-click');
+const interruptedClaim=process.argv.includes('--interrupted-claim');
 try{
  vite=await createServer({server:{host:'127.0.0.1',port:0,strictPort:true,watch:null,hmr:false}});
  await vite.listen();
@@ -105,7 +106,160 @@ try{
  });
  console.log('SAVED',JSON.stringify(saved));
  assert(saved.slot.status==='ready'&&saved.slot.tick===paused.tick&&saved.chip);
- if(corruptClear){
+ if(interruptedClaim){
+  // Separate browser tab with its own actual TitleScene, shared origin IDB.
+  const rival=await context.newPage();
+  rival.on('pageerror',e=>errors.push(e.message));
+  await rival.goto(url,{waitUntil:'domcontentloaded'});
+  await rival.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:60000});
+  // Start a real production private-stage transaction, then deliberately
+  // suspend before its consume. Closing this page simulates a hard renderer
+  // death: JS releases the browser Web Lock, but IDB keeps the claim.
+  await page.evaluate(()=>{
+   const g=window.__bbGame,t=g.scene.getScene('TitleScene');
+   window.__interruptedResume='started';
+   void Promise.all([
+    import('/src/systems/savestate/manualSuspendController.js'),
+    import('/src/systems/savestate/privateStageOwnership.js'),
+   ]).then(([{resumeManualRun},{armPrivateRunSceneStage}])=>
+    resumeManualRun(t,null,{armStage:game=>{
+     const stage=armPrivateRunSceneStage(game);
+     return {...stage,ready:stage.ready.then(()=>new Promise(()=>{}))};
+    }})).then(result=>{window.__interruptedResume=result;})
+     .catch(e=>{window.__interruptedResume={unexpectedError:String(e)};});
+  });
+  await page.waitForFunction(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   const status=await peekManualSuspend();
+   return status.status==='claimed'&&status.canCheckOwner===true;
+  },null,{timeout:20000});
+  await rival.evaluate(()=>window.__bbGame.scene.getScene('TitleScene')._refreshSuspendHint());
+  await rival.waitForFunction(()=>{
+   const t=window.__bbGame?.scene?.getScene('TitleScene');
+   return t?._suspendStatus==='claimed'&&t._suspendClaimCheckable===true&&
+    t.suspendButton?.label?.main?.text==='CHECK HELD SAVE';
+  },null,{timeout:15000});
+  await rival.evaluate(()=>{
+   window.__recoverPointerTrace={zone:0,scene:0};
+   const t=window.__bbGame.scene.getScene('TitleScene');
+   t.suspendButton.zone.on('pointerdown',()=>window.__recoverPointerTrace.zone++);
+   t.input.on('pointerdown',()=>window.__recoverPointerTrace.scene++);
+  });
+  const click=async()=>rival.evaluate(()=>{
+   const g=window.__bbGame,b=g.scene.getScene('TitleScene').suspendButton,
+    rect=g.canvas.getBoundingClientRect();
+   return {x:rect.x+(b.x+b.w*.5)*rect.width/g.scale.gameSize.width,
+    y:rect.y+(b.y+b.h*.5)*rect.height/g.scale.gameSize.height};
+  });
+  const before=await rival.evaluate(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   const {LocalSuspendSlot}=await import('/src/systems/savestate/localSuspendSlot.js');
+   return {peek:await peekManualSuspend(),clear:await new LocalSuspendSlot().clearReady()};
+  });
+  assert(before.peek.status==='claimed'&&before.peek.canCheckOwner===true&&
+   before.clear.code==='slot-claimed',JSON.stringify(before));
+  let point=await click();
+  await rival.mouse.click(point.x,point.y);
+  await rival.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').starting===false,null,{timeout:10000});
+  const whileActive=await rival.evaluate(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   const t=window.__bbGame.scene.getScene('TitleScene');
+   return {slot:await peekManualSuspend(),text:t.hint?.main?.text};
+  });
+  assert(whileActive.slot.status==='claimed'&&
+   whileActive.text?.includes('ACTIVE IN ANOTHER TAB'),JSON.stringify(whileActive));
+  await page.close(); // harsh renderer close, no release/consume callback!
+  await rival.bringToFront(); // the player switches back to the surviving tab
+  await rival.waitForFunction(()=>!document.hidden&&
+   window.__bbGame?.input?.enabled&&window.__bbGame.scene.getScene('TitleScene').input?.enabled,
+   null,{timeout:10000});
+  // A valid lease-backed claim is still held in IDB, but its Web Lock is gone.
+  const afterCrash=await rival.evaluate(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   return peekManualSuspend();
+  });
+  assert(afterCrash.status==='claimed'&&afterCrash.canCheckOwner===true,JSON.stringify(afterCrash));
+  // Explicit player action now reclaims the abandoned claim; never auto-resume.
+  // Renderer page closure can release browser Web Locks asynchronously.
+  // Wait for the actual owner lock to vanish, never assume a timeout/TTL.
+  await rival.waitForFunction(async()=>{
+   const {SUSPEND_RESUME_WEB_LOCK}=await import('/src/systems/savestate/localSuspendSlot.js');
+   const state=await navigator.locks.query();
+   return !state.held.some(lock=>lock.name===SUSPEND_RESUME_WEB_LOCK);
+  },null,{timeout:15000});
+  await rival.waitForFunction(()=>{
+   const t=window.__bbGame?.scene?.getScene('TitleScene');
+   return t?._suspendStatus==='claimed'&&t._suspendClaimCheckable===true&&
+    !t.starting&&t.suspendButton?.visible&&!t.suspendButton?.disabled;
+  },null,{timeout:15000});
+  point=await click();
+  // The Title attract timer may have elapsed while a Chromium renderer
+  // closes. One *physical* click then only wakes the screen, never mutates
+  // the held slot; perform the separate explicit recovery click afterward.
+  const asleep=await rival.evaluate(()=>!!window.__bbGame.scene.getScene('TitleScene').attract);
+  if(asleep){
+   await rival.mouse.click(point.x,point.y);
+   await rival.waitForFunction(()=>!window.__bbGame.scene.getScene('TitleScene').attract,null,{timeout:10000});
+   assert((await rival.evaluate(async()=>{
+    const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+    return peekManualSuspend();
+   })).status==='claimed','attract wake changed claimed IDB without player recovery');
+  }
+  await rival.waitForFunction(()=>{
+   const t=window.__bbGame?.scene?.getScene('TitleScene');
+   return t?._suspendStatus==='claimed'&&!t.starting&&
+    t.suspendButton?.visible&&!t.suspendButton?.disabled;
+  },null,{timeout:15000});
+  await rival.mouse.move(point.x+60,point.y+35);
+  await rival.mouse.move(point.x,point.y);
+  await rival.mouse.click(point.x,point.y);
+  try{
+   await rival.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')._suspendStatus==='ready',null,{timeout:15000});
+  }catch(e){
+   const diagnostic=await rival.evaluate(async()=>{
+    const t=window.__bbGame.scene.getScene('TitleScene');
+    const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+    return {attract:t.attract,starting:t.starting,status:t._suspendStatus,
+     checkable:t._suspendClaimCheckable,buttonDisabled:t.suspendButton?.disabled,
+     label:t.suspendButton?.label?.main?.text,hint:t.hint?.main?.text,
+     persisted:await peekManualSuspend(),lock:await navigator.locks.query(),
+     hidden:document.hidden,focus:document.hasFocus(),sceneInput:t.input?.enabled,
+     menuInput:t.input_?.enabled,gameInput:window.__bbGame?.input?.enabled,
+     zoneInput:t.suspendButton?.zone?.input?.enabled,view:!!t.view,
+     pointerTrace:window.__recoverPointerTrace,attractExitAt:t.attractExitAt,gameTime:t.time.now};
+   });
+   throw Error('clicked recovery did not finish: '+JSON.stringify(diagnostic),{cause:e});
+  }
+  const recovered=await rival.evaluate(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   const t=window.__bbGame.scene.getScene('TitleScene');
+   return {slot:await peekManualSuspend(),label:t.suspendButton.label.main.text,stillTitle:window.__bbGame.scene.isActive('TitleScene')};
+  });
+  assert(recovered.slot.status==='ready'&&recovered.label==='R RESUME SAVE'&&recovered.stillTitle,
+   JSON.stringify(recovered));
+  await rival.evaluate(async()=>{
+   const g=window.__bbGame,{EVT}=await import('/src/events.js');
+   window.__recoveredStart={count:0,tick:null};
+   g.events.on(EVT.RUN_START,e=>{
+    if(e.resumed){window.__recoveredStart.count++;window.__recoveredStart.tick=g.scene.getScene('RunScene').simClock.tick;}
+   });
+  });
+  point=await click();await rival.mouse.click(point.x,point.y);
+  await rival.waitForFunction(()=>window.__bbGame.scene.isActive('RunScene')&&
+   window.__recoveredStart?.count===1,null,{timeout:25000});
+  const final=await rival.evaluate(async()=>{
+   const {peekManualSuspend}=await import('/src/systems/savestate/manualSuspendController.js');
+   return {slot:await peekManualSuspend(),start:window.__recoveredStart,
+    title:window.__bbGame.scene.isActive('TitleScene'),run:window.__bbGame.scene.isActive('RunScene')};
+  });
+  assert(final.slot.status==='empty'&&final.start.count===1&&
+   final.start.tick===paused.tick&&final.run&&!final.title,JSON.stringify(final));
+  assert.deepEqual(errors,[]);
+  console.log('PASS_PLAYER_CRASH_HELD_CLAIM_WEBLOCK_RECOVERY',JSON.stringify({
+   savedTick:paused.tick,before,whileActive,afterCrash,recovered,final,errors,
+   noLeaseTimeout:true,noAutomaticMutation:true,noSecondActiveResume:true}));
+  await rival.close();
+ }else if(corruptClear){
   await page.evaluate(async()=>{
    const {SUSPEND_SLOT_DB,SUSPEND_SLOT_STORE,SUSPEND_SLOT_KEY}=await import('/src/systems/savestate/localSuspendSlot.js');
    const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(SUSPEND_SLOT_DB,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
