@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.25.18 — project scope and roadmap documentation (2026-11-26)
+
+- Refresh README to distinguish playable features, active foundations, and future AlphaBluffs, creator and Frequency scope. No gameplay, physics, audio, economy, telemetry or server behavior changes. [skip netlify]
+
 ## v2.25.17 — coarse pre-alpha geography (2026-11-26)
 
 - On the playtest host only, optionally resolve country/region through ipapi.co once per browser per day, with a 2.5-second timeout, no referrer or credentials, and no raw IP retained. Failure does not block telemetry. Opt-out aborts lookup and deletes the cache. Inform testers that the external lookup provider sees their IP; revisit before launch.
