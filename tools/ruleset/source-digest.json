@@ -3,9 +3,8 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "no-behavior-change: issue 1D dev/test-only render guard install and removal of the non-causal Sled.shield render mirror plus render-time _sync; replay corpus and fingerprint suites unchanged",
+  "attestation": "no-behavior-change: One-use restore lifecycle gate only; no modification to deterministic simulation update or physics",
   "changedFiles": [
-    "src/entities/Sled.js",
     "src/scenes/RunScene.js"
   ],
   "files": {
@@ -15,7 +14,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:1281d12b3f132efc7dc3ab240a3c2d3e77b3449d4922b088f0f654f575098b9c",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
-    "src/scenes/RunScene.js": "sha256:84d72f86079c2844055eea11220368098b043b9dbb20201a7167935d4e9245e5",
+    "src/scenes/RunScene.js": "sha256:dfffe4f04b205472947af8287c65210f052530925a7c64c37f8ec183940db683",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:5f24e720a35b949b68d8e14062d4abab397c2e094598542f9ecebfcbf3cf27c3",

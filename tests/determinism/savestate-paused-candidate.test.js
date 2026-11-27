@@ -4,7 +4,7 @@ const eligible=()=>({
  crashed:false,unrankedPractice:false,tapePlayer:null,_replayTape:null,
  takeover:null,coachSim:null,guestPractice:false,bsodGym:false,
  dailyOfficial:false,modded:false,upgradeRun:{enabled:false},
- magnetsDrop:false,kodiaksOn:false,appliedBoosts:[],
+ biomeMask:0,magnetsDrop:false,kodiaksOn:false,appliedBoosts:[],
  simClock:{tick:481},ghostRecorder:{lastTick:481},
  _manualPausePending:true,scene:{isPaused:key=>key==='RunScene'},
 });
@@ -28,6 +28,7 @@ test.each([
  ['modified',r=>r.modded=true],
  ['upgrade',r=>r.upgradeRun.enabled=true],
  ['boost',r=>r.appliedBoosts=['headStart']],
+ ['nonbase biome',r=>r.biomeMask=1],
  ['magnet',r=>r.magnetsDrop=true],
  ['Kodiak',r=>r.kodiaksOn=true],
  ['tick zero',r=>r.simClock.tick=0],

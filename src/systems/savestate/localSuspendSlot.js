@@ -96,6 +96,26 @@ export class LocalSuspendSlot{
    return {ok:true,admission:'envelope-only',saved:true,runId,tick,bytes:stable.length};
   });
  }
+ /** Read-only availability for player UI. Never claims, consumes or removes
+  * a slot; claim() must still revalidate atomically on explicit Resume.
+  * A crashed/claimed slot stays claimed, not silently retried or erased.
+  */
+ async peek(expectedIdentity,layout){
+  return this._modify((_store,current)=>{
+   if(!current)return {ok:true,status:'empty'};
+   if(current.status!=='ready')return {ok:true,status:'claimed'};
+   if(!(current.bytes instanceof Uint8Array))return {ok:false,code:'invalid-bytes'};
+   const inspected=inspectSnapshotEnvelope(current.bytes,expectedIdentity,layout);
+   if(!inspected.ok)return {ok:false,code:inspected.code,pointer:inspected.pointer};
+   if(inspected.admission!=='envelope-only'||inspected.envelope.purpose!=='suspend'||
+    current.integrity!==inspected.envelope.integrity||
+    current.runId!==inspected.envelope.runId||current.tick!==inspected.envelope.tick||
+    current.buildId!==inspected.envelope.build.buildId)
+    return {ok:false,code:'binding-mismatch'};
+   return {ok:true,status:'ready',runId:current.runId,tick:current.tick};
+  });
+ }
+
  /** Exact-build/layout validation happens inside the same atomic claim
   * transaction, before any mutation. A stale/invalid/incomplete envelope is
   * LEFT untouched and never returned as a live-world restore capability.

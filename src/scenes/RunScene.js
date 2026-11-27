@@ -93,6 +93,9 @@ import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, adva
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 import pmath from '../systems/pmath.js';
 import { installRenderGuard } from '../systems/replay/renderGuard.js';
+import {restorePlayerSuspend,suspendMessage} from '../systems/savestate/playerSuspendFlow.js';
+// Control-only staging bit lives OUTSIDE RunScene's strict simulation snapshot inventory.
+const suspendRestorePending=new WeakSet();
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -176,6 +179,22 @@ export class RunScene extends Phaser.Scene {
     // this private one-shot descriptor so a normal retry cannot reuse it.
     if (desc && this.sys?.settings) this.sys.settings.data = {};
 
+    // The suspended claim is passed in private one-shot Phaser scene data,
+    // NEVER through the registry. Replayed/invalid descriptors cannot become
+    // a normal scoring run. No sim frame or HUD is published until the native
+    // eight-section world and original recorder are restored AND slot consumed.
+    if(data&&Object.hasOwn(data,'suspendResume')){
+      const claim=data.suspendResume;
+      if(this.sys?.settings)this.sys.settings.data={};
+      suspendRestorePending.add(this);
+      this.coachSim=null;
+      this.crashInfo=null;
+      this.sys?.setVisible?.(false);
+      try{this._create();}
+      catch(e){void this._abortSuspendedResume(claim,'resume:scene-failed');return;}
+      void this._completeSuspendedResume(claim);
+      return;
+    }
     this.coachSim = null;
     this.crashInfo = null;
     if (!desc) { this.sys?.setVisible?.(true); return this._create(); }
@@ -195,6 +214,46 @@ export class RunScene extends Phaser.Scene {
       restore();
       if (this.coachSim) this.coachSim.created = true;
     }
+  }
+
+  /** Resume commits only after full native restore and atomic one-use slot
+   * consumption; the scene stays invisible, unticked and without HUD while
+   * being prepared. Failure disposes it before any safe token release.
+   */
+  async _completeSuspendedResume(claim){
+    const result=await restorePlayerSuspend(this,Phaser,claim);
+    if(!result.ok){await this._abortSuspendedResume(claim,result.code);return;}
+    if(!this.sys?.isActive?.())return; // no resurrection after external shutdown
+    try{
+      this.scene.launch(SCENES.UI);
+      this.sys.setVisible(true);
+      suspendRestorePending.delete(this);
+      this._emitRunStart();
+    }catch(e){
+      // The token has already been consumed, never put it back after a
+      // partially published scene/hud. Abort; a one-use restore is spent.
+      await this._abortSuspendedResume(claim,'resume:consume-failed');
+    }
+  }
+
+  async _abortSuspendedResume(claim,code){
+    // A failed/stale native candidate must NEVER continue as a normal run.
+    // Stop the disposable scene and HUD before releasing a still-held token.
+    let disposed=false;
+    try{
+      this.game.scene.stop(SCENES.UI);
+      this.game.scene.stop(SCENES.RUN);
+      disposed=!this.game.scene.isActive(SCENES.RUN);
+    }catch{disposed=false;}
+    suspendRestorePending.delete(this);
+    let message=suspendMessage(code||'resume:scene-failed');
+    if(disposed&&code!=='resume:consume-failed'&&claim?.slot&&claim?.token){
+      const released=await claim.slot.release(claim.token);
+      if(!released.ok)message='SAVE LOCKED - DO NOT CLEAR';
+    }else if(!disposed||code==='resume:consume-failed')
+      message='RESTORE ABORTED - SAVE LOCKED';
+    this.registry?.set?.('bb.localSuspendNotice',message);
+    try{this.game.scene.start(SCENES.TITLE);}catch{}
   }
 
   _create() {
@@ -562,7 +621,7 @@ export class RunScene extends Phaser.Scene {
     GlitchPipeline.install(this);
     if (!this.coachSim) { // #66: a coach simulation has no HUD scene
       this.scene.stop(SCENES.UI);
-      this.scene.launch(SCENES.UI);
+      if(!suspendRestorePending.has(this))this.scene.launch(SCENES.UI);
     }
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
@@ -572,7 +631,13 @@ export class RunScene extends Phaser.Scene {
         this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
     } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
-    if (this.coachSim) return; // #66: not a run anyone can see or be credited for: no RUN_START
+    if (this.coachSim||suspendRestorePending.has(this))return;
+    this._emitRunStart();
+  }
+
+  /** Emitted exactly once after ordinary start OR a fully committed one-use
+   * native restore. Never emitted during detached restore preparation. */
+  _emitRunStart(){
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
@@ -1377,6 +1442,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    if(suspendRestorePending.has(this))return; // no sim ticks while claim is pending
     if (!this.sled) return;
     if (this.coachSim) return; // #66: driven only by seekTo()
     const dt = clamp(Number.isFinite(delta) ? delta : 16.7, 0, 50);

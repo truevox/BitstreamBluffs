@@ -25,6 +25,7 @@ import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import {savePlayerSuspend,suspendMessage} from '../systems/savestate/playerSuspendFlow.js';
 import { guestPracticeEligible } from '../systems/ghost/GuestPractice.js';
 import { pauseRestartTakeover, pauseQuitTakeover } from '../ui/TakeoverLauncher.js';
 
@@ -45,6 +46,7 @@ export class PauseScene extends Phaser.Scene {
 
   create() {
     this.leaving = false;
+    this.suspendConfirm = false;
     this.guestPractice = this.manualPauseGuest || this.scene?.get?.(SCENES.RUN)?.guestPractice === true;
     // #72: a takeover is UNRANKED PRACTICE / TAS: no ranked items, RESTART = retry from the same tick, QUIT = the takeover end screen.
     this.takeoverRun = this.manualPauseTakeover || !!this.scene?.get?.(SCENES.RUN)?.takeover;
@@ -67,6 +69,7 @@ export class PauseScene extends Phaser.Scene {
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
+      ...(!this.gymPractice ? [{kind:'action',label:'SUSPEND RUN',color:'amber',onSelect:()=>this.suspend()}] : []),
       { kind: 'action', label: 'RESTART', color: 'amber', onSelect: () => this.restart() },
       ...(!this.gymPractice ? [{ kind: 'action', label: 'LEADERBOARD', color: 'cyan', onSelect: () => this._open(new LeaderboardView(this, theme, { onClose: () => this._close() })) }] : []),
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._open(new SettingsView(this, theme, { onClose: () => this._close() })) },
@@ -76,7 +79,9 @@ export class PauseScene extends Phaser.Scene {
       ] : []),
       { kind: 'action', label: 'QUIT TO TITLE', color: 'magenta', onSelect: () => this.quit() },
     ];
-    this.menu = new MenuList(this, theme, { x: 6, y: 22, w: 214, rowH: 20, items, scale: 2, parent: panel });
+    // Eight 2x rows in the 180px pause panel: 8*17+22 ends at 158,
+    // before the ledger footer at y165. A ninth would need a layout review.
+    this.menu = new MenuList(this, theme, { x: 6, y: 22, w: 214, rowH: this.gymPractice?20:17, items, scale: 2, parent: panel });
 
     // run info column
     const info = DailyPatch.getDailyInfo();
@@ -131,9 +136,10 @@ export class PauseScene extends Phaser.Scene {
       });
     }
     // Under the menu column, clear of the panel's inner border hairline (panel floor 180, hairline at 176).
-    panel.add(new NeonText(this, theme, 10, 165,
+    this.ledgerFooter=new NeonText(this, theme, 10, 165,
       this.gymPractice ? 'LEARN. RETRY. REPEAT.' : 'THE LEDGER NEVER FORGETS.',
-      { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+      { color: 'magenta', outline: 'none' }).setAlpha(0.6);
+    panel.add(this.ledgerFooter);
 
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + 172 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
@@ -245,6 +251,35 @@ export class PauseScene extends Phaser.Scene {
     if (this.runIdFromData) return this.runIdFromData;
     const ui = this.scene.get(SCENES.UI);
     return (ui && ui.runId) || '';
+  }
+
+  /** Manual one-use local Suspend. No auto-save, overwrite, public proof or
+   * editor/dev shortcuts. A second explicit selection confirms the version-
+   * bound save; a refused write leaves the original RunScene paused and intact.
+   */
+  async suspend() {
+    if(this.leaving||this.gymPractice)return;
+    if(!this.suspendConfirm){
+      this.suspendConfirm=true;
+      this.ledgerFooter?.setText('SELECT AGAIN TO SAVE AND QUIT');
+      return;
+    }
+    this.leaving=true; // Blocks Resume/Restart/Quit while the IDB write is open.
+    this.ledgerFooter?.setText('WRITING LOCAL SUSPEND...');
+    const run=this.scene.get(SCENES.RUN);
+    let result;
+    try{result=await savePlayerSuspend(run,Phaser);}
+    catch(e){result={ok:false,code:'storage-unavailable'};}
+    if(!result?.ok){
+      this.leaving=false;
+      this.suspendConfirm=false;
+      this.ledgerFooter?.setText(ellipsize(suspendMessage(result?.code),196));
+      return;
+    }
+    // The original was saved transactionally; quitting MUST not emit RUN_END,
+    // award points or delete the original GhostTape prefix within the slot.
+    this.leaving=false;
+    this.quit();
   }
 
   /** Resume the run exactly as the contract describes. @returns {void} */

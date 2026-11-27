@@ -1,3 +1,21 @@
+describe('read-only player Resume availability',()=>{
+ test('peek is non-mutating, distinguishes empty/ready/claimed/foreign/corrupt',async()=>{
+  const idb=fakeIdb(),slot=make(idb),own=identity(),other={...identity(),buildId:H('c')};
+  expect(await slot.peek(own,layout)).toEqual({ok:true,status:'empty'});
+  expect((await slot.put(bytes(),own,layout)).ok).toBe(true);
+  expect(await slot.peek(own,layout)).toMatchObject({ok:true,status:'ready',tick:120,runId:'synthetic-run-1'});
+  expect(await slot.peek(other,layout)).toMatchObject({ok:false,code:'build-mismatch'});
+  expect(await slot.peek(own,null)).toMatchObject({ok:false,code:'unsupported-layout'});
+  const claim=await slot.claim(own,layout);
+  expect(claim.ok).toBe(true);
+  expect(await slot.peek(own,layout)).toEqual({ok:true,status:'claimed'});
+  expect(await slot.peek(other,layout)).toEqual({ok:true,status:'claimed'});
+  expect(await slot.release(claim.token)).toEqual({ok:true,released:true});
+  expect(await slot.peek(own,layout)).toMatchObject({ok:true,status:'ready'});
+  expect((await slot.claim(own,layout)).ok).toBe(true);
+ });
+});
+
 /** #119: storage/ownership only; no live Matter restore or scoreboard status. */
 import {fakeIdb} from '../replay/fakeIdb.js';
 import {f64Encode} from '../../src/systems/replay/canonicalJson.js';

@@ -54,6 +54,7 @@ import { guestPracticeLaunch } from '../systems/ghost/GuestPractice.js';
 import { showTakeoverNotice } from '../ui/TakeoverNotice.js';
 import { PostcardOpenView, POSTCARD_CHIP } from '../ui/PostcardOpenView.js';
 import { launchTakeover } from '../ui/TakeoverLauncher.js';
+import {peekPlayerSuspend,claimPlayerSuspend,suspendMessage} from '../systems/savestate/playerSuspendFlow.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -72,6 +73,8 @@ const HINT_TEXT = '↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY';
 // #85 limited Museum preview: no saved-data reads or physics execution.
 export const MUSEUM_CHIP = Object.freeze({x:226,y:204,w:80,h:14});
 export const MUSEUM_GALLERY_PATH = 'tools/museum-of-bad-physics.html';
+// #424: fourth compact chip above Museum, outside both menu and missions panel.
+export const RESUME_CHIP = Object.freeze({x:226,y:186,w:80,h:14});
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -530,6 +533,69 @@ export class TitleScene extends Phaser.Scene {
     // A separate route avoids adding a seventh main-menu row or loading tapes automatically.
     const m = MUSEUM_CHIP;
     this.museumButton = new Button(this, theme, { x:m.x, y:m.y, w:m.w, h:m.h, label:'M MUSEUM', color:'amber', onClick: () => this._openMuseum(true) });
+    const r=RESUME_CHIP;
+    this.resumeState={ok:false,status:'checking'};
+    this.resumeButton=new Button(this,theme,{x:r.x,y:r.y,w:r.w,h:r.h,
+      label:'R RESUME',color:'lime',onClick:()=>void this._resumeSavedRun(true)}).setDisabled(true);
+    this.resumeNote=new NeonText(this,theme,266,177,'CHECKING SAVE',{
+      color:'text',anchor:'center',outline:'dark',
+    }).setAlpha(0.75);
+    this.lastSuspendNotice=this.registry.get('bb.localSuspendNotice')||null;
+    this.registry.remove?.('bb.localSuspendNotice');
+    void this._refreshSuspendSlot();
+  }
+
+  /** Local-only single-use availability; this observation NEVER claims or
+   * clears storage. A true atomic claim runs only after explicit R/tap. */
+  async _refreshSuspendSlot(){
+    let result;
+    try{result=await peekPlayerSuspend();}
+    catch{result={ok:false,code:'storage-unavailable'};}
+    if(!this.sys?.isActive?.()||!this.resumeButton?.scene)return;
+    this.resumeState=result;
+    const ready=result?.ok&&result.status==='ready';
+    this.resumeButton.setDisabled(!ready);
+    const message=this.lastSuspendNotice||
+      (ready?'ONE USE - THIS VERSION':suspendMessage(result.ok?result.status:result.code));
+    this.resumeNote.setText(ellipsize(message,79));
+    this.lastSuspendNotice=null;
+  }
+
+  /** #424 single-use resume. A claimed token cannot be reused in another tab.
+   * No automatic storage read becomes trusted gameplay, scoring or Verified.
+   */
+  async _resumeSavedRun(fromButton=false){
+    if(this.view||this.starting||this.attract||this.resumeState?.status!=='ready')return;
+    this.starting=true;
+    this.resumeButton?.setDisabled(true);
+    this.resumeNote?.setText('CLAIMING SAVE');
+    let claim;
+    try{claim=await claimPlayerSuspend();}
+    catch{claim={ok:false,code:'storage-unavailable'};}
+    if(!claim?.ok){
+      this.starting=false;
+      this.lastSuspendNotice=suspendMessage(claim?.code);
+      await this._refreshSuspendSlot();
+      return;
+    }
+    // Recreate only a proven base-biome, unmodified stock RunScene. The native
+    // eight-section codec must independently reject changed profile/config.
+    // No stale replay, Takeover, Gym or daily handoff is allowed to leak in.
+    this.registry.set(REG.SEED,claim.seed);
+    this.registry.set(REG.BIOME_MASK,0);
+    this.registry.set(REG.DAILY_OFFICIAL,false);
+    this.registry.set(REG.DAILY_MODE,'classic');
+    this.registry.set(REG.BSOD_GYM,false);
+    for(const key of [REG.GHOST_REPLAY,REG.TAKEOVER,REG.GUEST_PRACTICE])
+      this.registry.remove?.(key);
+    this._closeView();
+    try{this.scene.start(SCENES.RUN,{suspendResume:claim});}
+    catch(e){
+      const released=await claim.slot.release(claim.token);
+      this.starting=false;
+      this.lastSuspendNotice=released.ok?'RESTORE NOT STARTED':'SAVE LOCKED - DO NOT CLEAR';
+      await this._refreshSuspendSlot();
+    }
   }
 
   /** #85: leave Title for the local-file-only Museum page, never mid-run. */
@@ -640,6 +706,7 @@ export class TitleScene extends Phaser.Scene {
       if (e && (e.key === 'h' || e.key === 'H') && !e.repeat && !this.view && !this.starting) this._openHelp();
       if (e && (e.key === 'o' || e.key === 'O') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openPostcard();
       if (e && (e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) this._openMuseum();
+      if (e && (e.key === 'r' || e.key === 'R') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this.view && !this.starting) void this._resumeSavedRun();
     };
     this._onPointer = () => { this._wakeGate(); };
     this._onRouter = (p) => { if (p && p.pressed) this._wakeGate(); };
@@ -671,7 +738,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.sub].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.postcardButton, this.museumButton, this.resumeButton, this.resumeNote, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {
@@ -869,5 +936,5 @@ function launchFx(scene, ms) {
   };
   slide(scene.menuPanel, -240);
   slide(scene.cardPanel, 180);
-  for (const o of [scene.hint, scene.helpButton, scene.postcardButton, scene.museumButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
+  for (const o of [scene.hint, scene.helpButton, scene.postcardButton, scene.museumButton, scene.resumeButton, scene.resumeNote, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
 }

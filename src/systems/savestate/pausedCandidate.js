@@ -12,7 +12,7 @@ function supported(run) {
  if(!run||run.crashed||run.unrankedPractice||run.tapePlayer||
     run._replayTape||run.takeover||run.coachSim||run.guestPractice||
     run.bsodGym||run.dailyOfficial||run.modded||run.upgradeRun?.enabled||
-    run.magnetsDrop||run.kodiaksOn||run.appliedBoosts?.length||
+    run.biomeMask!==0||run.magnetsDrop||run.kodiaksOn||run.appliedBoosts?.length||
     !Number.isSafeInteger(run.simClock?.tick)||run.simClock.tick<=0||
     !run.ghostRecorder) return false;
  return true;
