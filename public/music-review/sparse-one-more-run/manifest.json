@@ -1,0 +1,138 @@
+{
+  "song": "local-one-more-run-bitstream-bluffs",
+  "title": "One More Run (The Ballad of Bitstream Bluffs)",
+  "sourceScoreHash": "de3cb9b095e183c9996b1edec22bc870f3d2bdbf3502c67615f9a687aa32529c",
+  "quality": "EXPERIMENTAL_UNREVIEWED",
+  "beatGrid": "UNVERIFIED_SOURCE_BEAT_TRACK_RESEARCH_NO_PRODUCTION_APPROVAL",
+  "start": 36.0,
+  "duration": 48.0,
+  "sampleRate": 48000,
+  "counts": {
+    "dense": {
+      "bass": {
+        "from": 112,
+        "retained": 112
+      },
+      "guitar": {
+        "from": 542,
+        "retained": 542
+      },
+      "piano": {
+        "from": 864,
+        "retained": 864
+      },
+      "other": {
+        "from": 1080,
+        "retained": 1080
+      },
+      "drums": {
+        "from": 551,
+        "retained": 551
+      }
+    },
+    "beats": {
+      "bass": {
+        "from": 112,
+        "retained": 44
+      },
+      "guitar": {
+        "from": 542,
+        "retained": 164
+      },
+      "piano": {
+        "from": 864,
+        "retained": 178
+      },
+      "other": {
+        "from": 1080,
+        "retained": 234
+      },
+      "drums": {
+        "from": 551,
+        "retained": 128
+      }
+    },
+    "eighths": {
+      "bass": {
+        "from": 112,
+        "retained": 98
+      },
+      "guitar": {
+        "from": 542,
+        "retained": 458
+      },
+      "piano": {
+        "from": 864,
+        "retained": 624
+      },
+      "other": {
+        "from": 1080,
+        "retained": 784
+      },
+      "drums": {
+        "from": 551,
+        "retained": 430
+      }
+    },
+    "selective": {
+      "bass": {
+        "from": 112,
+        "retained": 76
+      },
+      "guitar": {
+        "from": 542,
+        "retained": 350
+      },
+      "piano": {
+        "from": 864,
+        "retained": 390
+      },
+      "other": {
+        "from": 1080,
+        "retained": 242
+      },
+      "drums": {
+        "from": 551,
+        "retained": 255
+      }
+    }
+  },
+  "files": {
+    "recorded": {
+      "file": "recorded.ogg",
+      "rmsBefore": 0.155239,
+      "peakBefore": 1.013604,
+      "gain": 0.773
+    },
+    "dense": {
+      "file": "dense.ogg",
+      "rmsBefore": 0.100517,
+      "peakBefore": 0.848233,
+      "gain": 1.08461
+    },
+    "beats": {
+      "file": "beats.ogg",
+      "rmsBefore": 0.091506,
+      "peakBefore": 0.822317,
+      "gain": 1.11879
+    },
+    "eighths": {
+      "file": "eighths.ogg",
+      "rmsBefore": 0.098444,
+      "peakBefore": 0.853079,
+      "gain": 1.07845
+    },
+    "selective": {
+      "file": "selective.ogg",
+      "rmsBefore": 0.097707,
+      "peakBefore": 0.834542,
+      "gain": 1.1024
+    },
+    "hybrid": {
+      "file": "hybrid.ogg",
+      "rmsBefore": 0.097857,
+      "peakBefore": 0.887839,
+      "gain": 1.03622
+    }
+  }
+}
