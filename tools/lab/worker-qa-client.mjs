@@ -1,2 +1,3 @@
 import {runBrowserWorkerBatch} from './worker-episode-batch.mjs';
-window.__labWorkerQa={runBrowserWorkerBatch};
+import {runGovernedBrowserWorkerBatch} from './governed-worker-batch.mjs';
+window.__labWorkerQa={runBrowserWorkerBatch,runGovernedBrowserWorkerBatch};
