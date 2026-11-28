@@ -35,7 +35,7 @@ try{
  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
  await page.goto(`http://127.0.0.1:${server.address().port}/tools/lab/qa-real-physics.html`,
   {waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>!!window.__realPhysicsQa,{timeout:15000});
+ await page.waitForFunction(()=>!!window.__realPhysicsQa&&!!window.__physicsThroughputQa,{timeout:15000});
  const cases=PHYSICS_QA_CASES;
  const golden=JSON.parse(await readFile(resolve(root,'tools/lab/qa-real-physics-golden.json'),'utf8'));
  const reports=await page.evaluate(async cases=>{
@@ -79,7 +79,7 @@ try{
  // the exact same previously golden-validated RunScene/Matter physics.
  const measured=await page.evaluate(async({cases,expected})=>{
   const qa=window.__realPhysicsQa;
-  return qa.measureRealPhysicsWorkerThroughput({
+  return window.__physicsThroughputQa({
    spawn:qa.spawn,cases,expected,workerCountLevels:[1,2,4]});
  },{cases,expected:reports.map(x=>x.main)});
  assert.deepEqual(measured.results.map(x=>x.lanes),[1,2,4]);

@@ -1,6 +1,6 @@
 # P0 #134 — measured real RunScene/Matter Worker throughput (QA-only)
 
-**2026-11-28: four independent local headless Chromium trials PASS.**
+**2026-11-28: five independent local headless Chromium trials PASS.**
 This is the first measurement using the **actual authoritative** RunScene,
 TerrainGenerator, GhostRecorder and Phaser Matter 0.20 physics in compiled
 Chromium module Workers, rather than the earlier fast synthetic RNG probe.
@@ -28,10 +28,11 @@ benchmark scores, shipping guarantees, or Chromebook forecasts**.
 | 2 | 8,554 | 8,976 | 7,378 |
 | 3 | 5,907 | 5,162 | 5,017 |
 | 4 (final cleanup assertion) | 10,207 | 7,444 | 6,614 |
+| 5 (isolated QA entrypoint) | 10,411 | 13,729 | 9,868 |
 
 The multiple trials matter: extra Workers did **not** scale linearly and
-sometimes made the same workload slower. In all four trials, four Workers
-failed to beat two. Two beat one in only two of four. Therefore the
+sometimes made the same workload slower. In all five trials, four Workers
+failed to beat two. Two beat one in only three of five. Therefore the
 conservative single-slot web default remains warranted; do **not** infer a
 universal optimal worker count from this host's noisy measurements. The CI
 job captures measured values on each runner but deliberately does not gate
