@@ -3300,7 +3300,9 @@ export class RunScene extends Phaser.Scene {
       // mutation or new RNG draw can be triggered by this camera query.
       if(this.hazards?.values)for(const list of this.hazards.values()){
         for(const h of list){
-          const dx=h.x-s.x;
+          // Hazard instances expose current world centre as cx (not x).
+          // Read-only: do not update warning thresholds or hazard generation.
+          const dx=h.cx-s.x;
           if(Number.isFinite(dx)&&dx>=0&&dx<hazardAheadPx)hazardAheadPx=dx;
         }
       }

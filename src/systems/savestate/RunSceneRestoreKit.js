@@ -602,8 +602,11 @@ function installRunSceneStateKit(global) {
     const preparedRecorder = global.__ssCanonical
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
     if (global.__ssCanonical) {
-      const configKeys=CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner');
-      if(!exactKeys(snap.config,configKeys)||configKeys.some(k=>JSON.stringify(run[k])!==snap.config[k]))
+      // Capture and both restore preflights MUST use the same projection:
+      // Pulp is camera-only, not a causal configuration constraint.
+      const freshConfig=projectConfig(run);
+      if(!exactKeys(snap.config,Object.keys(freshConfig))||
+          Object.entries(freshConfig).some(([k,v])=>snap.config[k]!==v))
         throw Error('restore: CONFIG differs from fresh scene');
       if(!Array.isArray(snap.classes?.SIM)||new Set(snap.classes.SIM).size!==snap.classes.SIM.length||
          !snap.classes.SIM.every(k=>SIM.includes(k))||!exactKeys(snap.game,snap.classes.SIM))
@@ -653,7 +656,9 @@ function installRunSceneStateKit(global) {
       if (k in run && !(k in snap.game)) { dcd.log.push(`deleted SIM field absent from snapshot: ${k}`); delete run[k]; }
     }
     if (snap.config) {
-      for (const [k, v] of Object.entries(snap.config)) if (JSON.stringify(run[k]) !== v) throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
+      const freshConfig=projectConfig(run);
+      for (const [k, v] of Object.entries(snap.config)) if(freshConfig[k]!==v)
+        throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
     }
     for (const k of order) if (!early.includes(k)) run[k] = dcd.dec(snap.game[k], run[k], k);
     // The marker palette key is derived, not a serialized color. A

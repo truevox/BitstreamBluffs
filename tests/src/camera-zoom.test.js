@@ -217,14 +217,20 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
     expect(s.cameras.main.rotation).toBe(0);
   });
 
-  test('drone camera leaves view/collision/telegraph planner untouched',()=>{
+  test('drone reads actual Hazard.cx without writing collision/telegraph or generation state',()=>{
     const s=makeScene();
-    const hazard={x:s.sled.x+22};
+    s.updateCamera(16.6);
+    const calm=s._cameraIntent;
+    const hazard={cx:s.sled.x+22,cy:s.sled.y,def:{id:'spike'}};
     s.hazards.set(1,[hazard]);
     const before=JSON.stringify(hazard);
     s.updateCamera(16.6);
+    const danger=s._cameraIntent;
     expect(JSON.stringify(hazard)).toBe(before);
-    expect(s._cameraIntent.lookAhead).toBeGreaterThanOrEqual(250);
-    expect(typeof s._cameraIntent.focusX).toBe('number');
+    expect(s.hazards.get(1)[0]).toBe(hazard);
+    expect(Math.abs(danger.roll)).toBeLessThan(Math.abs(calm.roll));
+    expect(danger.riderScreenX).toBeLessThanOrEqual(calm.riderScreenX);
+    expect(danger.lookAhead).toBeGreaterThanOrEqual(250);
+    expect(typeof danger.focusX).toBe('number');
   });
 });
