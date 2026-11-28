@@ -29,7 +29,12 @@ export class Panel extends Phaser.GameObjects.Container {
   constructor(scene, theme, o) {
     super(scene, o.x, o.y);
     this.theme = theme;
-    this.w = o.w;
+    // #241: Phaser Container.setPosition(x,y,z,w) sets the transform's `w`
+    // coordinate to 0 whenever the open animation moves this Panel. Do NOT
+    // store our layout width in that inherited `w` property: doing so erased
+    // the width (432 -> 0) after every modal transition and could collapse
+    // palette repaints, frame borders and geometry audits.
+    this.frameWidth = o.w;
     this.h = o.h;
     this.colorKey = o.color || 'cyan';
     this.fillAlpha = o.fillAlpha === undefined ? 0.92 : o.fillAlpha;
@@ -55,7 +60,7 @@ export class Panel extends Phaser.GameObjects.Container {
 
   _paint(pal) {
     const g = this.g;
-    const { w, h } = this;
+    const { frameWidth: w, h } = this;
     g.clear();
     const c = pal[this.colorKey];
     const fa = this.fillAlpha;
@@ -83,7 +88,7 @@ export class Panel extends Phaser.GameObjects.Container {
 
   /** Angled title tab: slanted right edge, filled faintly, with a rule across the panel under it. */
   _paintTab(g, pal, c) {
-    const tw = Math.min(this.w - TAB_SLANT - 4, (this.titleText ? measureText(this.titleText.main.text) : 0) + 16);
+    const tw = Math.min(this.frameWidth - TAB_SLANT - 4, (this.titleText ? measureText(this.titleText.main.text) : 0) + 16);
     for (let r = 0; r < TAB_H - 1; r++) {
       // per-row runs give a crisp pixel stair on the slant (a filled triangle would anti-alias)
       const rw = tw + Math.round(TAB_SLANT * (1 - r / (TAB_H - 2)));
@@ -96,7 +101,7 @@ export class Panel extends Phaser.GameObjects.Container {
     g.fillStyle(c, 0.9);
     g.fillRect(1, TAB_H, tw + 1, 1);
     g.fillStyle(c, 0.4);
-    g.fillRect(tw + 2, TAB_H, this.w - tw - 3, 1);
+    g.fillRect(tw + 2, TAB_H, this.frameWidth - tw - 3, 1);
     // three data ticks after the slant: a cabinet-label detail
     for (let i = 0; i < 3; i++) {
       g.fillStyle(c, 0.55 - i * 0.15);
@@ -114,9 +119,9 @@ export class Panel extends Phaser.GameObjects.Container {
     const f = this.fx;
     f.clear();
     const o = 1 + out;
-    cornerTicks(f, -o, -o, this.w + o * 2, this.h + o * 2, c, 8, 0.95);
+    cornerTicks(f, -o, -o, this.frameWidth + o * 2, this.h + o * 2, c, 8, 0.95);
     f.fillStyle(pal.text, 0.9);
-    for (const [x, y] of [[-o, -o], [this.w - 1 + o, -o], [-o, this.h - 1 + o], [this.w - 1 + o, this.h - 1 + o]]) f.fillRect(x, y, 1, 1);
+    for (const [x, y] of [[-o, -o], [this.frameWidth - 1 + o, -o], [-o, this.h - 1 + o], [this.frameWidth - 1 + o, this.h - 1 + o]]) f.fillRect(x, y, 1, 1);
   }
 
   _tick(time) {
