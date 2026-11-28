@@ -42,7 +42,7 @@ jobs:
           node tools/ruleset/build-ruleset.mjs --check
           node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Complete snapshot, denial, export and quarantine unit gates
-        run: npm test -- --runInBand tests/brain/brain-file-preflight.test.js tests/brain/lab-checkpoint-storage.test.js
+        run: npm test -- --runInBand tests/brain/brain-file-preflight.test.js tests/brain/lab-checkpoint-storage.test.js tests/brain/brain-revision-policy.test.js
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Actual browser atomic IDB, reload, corrupt bytes, quota report and partition-loss warning

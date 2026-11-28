@@ -28,3 +28,22 @@ head GitHub workflow runs them alongside #450 preflight tests and checks game
 build identity. #452 remains P0 OPEN for real validated brain storage,
 re-evaluation queue/worker, Idle fallback binding, and actual vN to vN+1
 browser acceptance.
+
+## #451 integration correction (2026-11-28)
+
+The original pure policy incorrectly demanded a positive **numeric** model ABI,
+while the already merged #451 checkpoint envelope stores a bounded **string**
+(e.g. `draft-test-1`). Thus genuine storage metadata always failed closed as
+`invalid-brain-identity`. The policy now accepts exactly the existing
+`^[a-zA-Z0-9._-]{1,128}$` checkpoint versioned string schema, without
+inventing or approving a new model ABI. The read-only
+`LocalBrainCheckpoints.inspectCompatibility` first verifies actual IndexedDB
+checkpoint bytes/checksum with `read()`, then compares trusted installed
+revision/ABI inputs to the stored metadata, always forces
+`hasTrustedEvaluation:false`, returns no brain bytes, never writes or
+mutates the checkpoint, and always reports baseline Idle. The caller remains
+responsible for supplying *trusted* installed identity, not values from the
+checkpoint itself. The existing native Chromium checkpoint test now asserts
+same-revision, stale-revision and mismatched-ABI behavior against real stored
+IDB bytes across page reload, and confirms non-authoritative outcomes. This
+bridges two storage/policy foundations, not runnable model admission.

@@ -31,19 +31,38 @@ try{
  const original=await p.evaluate(async json=>{
   const {LocalBrainCheckpoints}=await import('/src/systems/brain/localBrainCheckpoints.js');
   const db=new LocalBrainCheckpoints({storage:{persisted:async()=>false,persist:async()=>false}});
-  return {saved:await db.save(json),loaded:await db.read(),exported:await db.export()};
+  const saved=await db.save(json);
+  return {saved,loaded:await db.read(),exported:await db.export(),
+   compatible:await db.inspectCompatibility({currentSimRevision:9,currentModelAbi:'test-draft-abi'}),
+   stale:await db.inspectCompatibility({currentSimRevision:10,currentModelAbi:'test-draft-abi'}),
+   wrongAbi:await db.inspectCompatibility({currentSimRevision:9,currentModelAbi:'different-model'})};
  },payload());
  assert(original.saved.ok&&original.saved.durability==='best-effort',JSON.stringify(original.saved));
  assert(original.loaded.ok&&original.loaded.generation===2);
  assert.deepEqual(new TextDecoder().decode(original.exported.bytes),payload());
+ // The real checksum-validated IndexedDB checkpoint must feed the version gate.
+ // The guard never leaks weights or claims a runnable trained brain.
+ assert.equal(original.compatible.compatibility.reason,'evaluation-missing');
+ assert.equal(original.stale.compatibility.reason,'sim-revision-changed');
+ assert.equal(original.stale.compatibility.reevaluation,'required-before-use');
+ assert.equal(original.wrongAbi.compatibility.reason,'model-abi-incompatible');
+ for(const check of [original.compatible,original.stale,original.wrongAbi]){
+  assert(check.ok&&check.idle==='baseline'&&check.stats==='stale');
+  assert(!Object.hasOwn(check,'bytes')&&!Object.hasOwn(check,'brain'));
+ }
+
  // Reload new page/context and verify actual browser durable transaction.
  await p.reload({waitUntil:'domcontentloaded'});
  const reloaded=await p.evaluate(async()=>{
   const {LocalBrainCheckpoints}=await import('/src/systems/brain/localBrainCheckpoints.js');
   const s=new LocalBrainCheckpoints();const r=await s.read();
-  return {ok:r.ok,generation:r.generation,rng:r.ok?JSON.parse(new TextDecoder().decode(r.bytes)).rng:null};
+  const status=await s.inspectCompatibility({currentSimRevision:10,currentModelAbi:'test-draft-abi'});
+  return {ok:r.ok,generation:r.generation,rng:r.ok?JSON.parse(new TextDecoder().decode(r.bytes)).rng:null,
+   revisionStatus:status.compatibility?.reason,idle:status.idle};
  });
  assert(reloaded.ok&&reloaded.generation===2&&reloaded.rng.state[2]===3,'reload lost atomic checkpoint');
+ assert.equal(reloaded.revisionStatus,'sim-revision-changed');
+ assert.equal(reloaded.idle,'baseline');
  const protections=await p.evaluate(async ([next,wrong])=>{
   const {LocalBrainCheckpoints}=await import('/src/systems/brain/localBrainCheckpoints.js');
   const s=new LocalBrainCheckpoints();
