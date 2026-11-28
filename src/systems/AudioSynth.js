@@ -164,13 +164,11 @@ export class AudioSynth {
       this.jukeboxPlay();
       return;
     }
-    // Keep already-audible procedural music continuous during the opted-in
-    // Pause. Director.start() only accepts an asynchronous decode request;
-    // it is NOT proof original stems have started producing sound. Defer the
-    // handoff to gameplay Resume rather than cutting the live fallback here.
-    if (this._paused && this.settings?.musicDuringPause === true &&
-        this._musicTimer !== null && !this._vinylPauseSession?.manualOverride)
-      return;
+    // The procedural fallback is already an audible source. Director.start()
+    // merely accepts asynchronous stem decode, not an audible handoff. Keep
+    // the fallback until an explicit user action or the next Title transition
+    // can select the original without interrupting the current song.
+    if (this._musicTimer !== null && (this._paused || this._musicMode === 'run')) return;
     if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
       const started=this._activateStemMusic();
       const session=this._vinylPauseSession;
@@ -1144,13 +1142,9 @@ export class AudioSynth {
       this._onBsodState(null);
       this._setPaused(false);
       if (!session?.shouldResume || session.manualOverride) {
-        // Pending original handoff was deferred while procedural music was
-        // audible during Pause; gameplay Resume is the first allowed moment
-        // to attempt it. No speculative decode may break PAUSED music.
-        if (!session?.manualOverride && this._musicTimer !== null &&
-            this._stemMusic?.ready && this._musicWanted &&
-            this._hasEnabledSongs(this.settings?.musicEnabledSongs))
-          this._activateStemMusic();
+        // Preserve the already-audible procedural track across Resume too:
+        // merely READY catalog is not proof stems have decoded. The next
+        // explicit Jukebox action or Title original-only handoff owns it.
         return;
       }
       const d = this._stemMusic;

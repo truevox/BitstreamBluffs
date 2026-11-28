@@ -1129,7 +1129,8 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     expect(attempted).not.toHaveBeenCalled();
     expect(a._musicTimer).toBe(82731); // no gap during a manual pause
     events.emit(EVT.GAME_RESUME,{reason:'manual'});
-    expect(attempted).toHaveBeenCalledTimes(1); // handoff only after gameplay Resume
+    expect(attempted).not.toHaveBeenCalled(); // not until ACTUAL source is available
+    expect(a._musicTimer).toBe(82731); // uninterrupted original-compatible fallback
     expect(a._paused).toBe(false);
     a.destroy();
   });
