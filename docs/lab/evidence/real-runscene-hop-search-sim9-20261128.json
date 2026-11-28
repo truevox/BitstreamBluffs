@@ -1,0 +1,167 @@
+{
+  "kind": "DEVELOPER-ONLY-real-RunScene-hop-policy-search",
+  "abi": 1,
+  "simRevision": 9,
+  "gitHead": "21097e8aacbd2d73dd15f6e7befdf190791e11c0",
+  "sourceClean": true,
+  "simulation": "Real Phaser/Matter tools/sim/run.mjs; NOT worker parity-certified training SimWorld",
+  "plan": {
+    "candidates": [
+      280,
+      380,
+      480
+    ],
+    "trainingSeeds": [
+      "pilot-train-01",
+      "pilot-train-02"
+    ],
+    "holdoutSeeds": [
+      "pilot-held-01",
+      "pilot-held-02"
+    ],
+    "maxDistanceM": 900,
+    "maxSeconds": 35
+  },
+  "selection": {
+    "baselineLeadMs": 380,
+    "winnerLeadMs": 280,
+    "trainingMeanM": 536.3,
+    "baselineTrainingMeanM": 493.85,
+    "selectedUsing": "training-seeds-only",
+    "candidateMeans": [
+      {
+        "leadMs": 280,
+        "meanDistanceM": 536.3
+      },
+      {
+        "leadMs": 380,
+        "meanDistanceM": 493.85
+      },
+      {
+        "leadMs": 480,
+        "meanDistanceM": 493
+      }
+    ]
+  },
+  "evaluation": {
+    "verdict": "inconclusive-small-gain",
+    "meanChangeM": 0.55,
+    "minVisibleGainM": 8.894,
+    "baselineMeanM": 889.4,
+    "championMeanM": 889.95,
+    "perSeed": [
+      {
+        "seed": "pilot-held-01",
+        "baselineDistanceM": 878.8,
+        "championDistanceM": 879.9,
+        "changeM": 1.1
+      },
+      {
+        "seed": "pilot-held-02",
+        "baselineDistanceM": 900,
+        "championDistanceM": 900,
+        "changeM": 0
+      }
+    ],
+    "confidence": "exploratory-only; no statistical or low-end-device claim",
+    "progressionCredit": false,
+    "verified": false,
+    "modelAdmission": false
+  },
+  "training": [
+    {
+      "leadMs": 280,
+      "rows": [
+        {
+          "seed": "pilot-train-01",
+          "distanceM": 900.4,
+          "endReason": "maxM"
+        },
+        {
+          "seed": "pilot-train-02",
+          "distanceM": 172.2,
+          "endReason": "crash:hazard"
+        }
+      ],
+      "meanDistanceM": 536.3
+    },
+    {
+      "leadMs": 380,
+      "rows": [
+        {
+          "seed": "pilot-train-01",
+          "distanceM": 817.1,
+          "endReason": "crash:hazard"
+        },
+        {
+          "seed": "pilot-train-02",
+          "distanceM": 170.6,
+          "endReason": "crash:hazard"
+        }
+      ],
+      "meanDistanceM": 493.85
+    },
+    {
+      "leadMs": 480,
+      "rows": [
+        {
+          "seed": "pilot-train-01",
+          "distanceM": 815.5,
+          "endReason": "crash:hazard"
+        },
+        {
+          "seed": "pilot-train-02",
+          "distanceM": 170.5,
+          "endReason": "crash:hazard"
+        }
+      ],
+      "meanDistanceM": 493
+    }
+  ],
+  "heldout": [
+    {
+      "leadMs": 380,
+      "rows": [
+        {
+          "seed": "pilot-held-01",
+          "distanceM": 878.8,
+          "endReason": "timeout"
+        },
+        {
+          "seed": "pilot-held-02",
+          "distanceM": 900,
+          "endReason": "maxM"
+        }
+      ],
+      "meanDistanceM": 889.4
+    },
+    {
+      "leadMs": 280,
+      "rows": [
+        {
+          "seed": "pilot-held-01",
+          "distanceM": 879.9,
+          "endReason": "timeout"
+        },
+        {
+          "seed": "pilot-held-02",
+          "distanceM": 900,
+          "endReason": "maxM"
+        }
+      ],
+      "meanDistanceM": 889.95
+    }
+  ],
+  "observedWallMs": 52132,
+  "simulatedEpisodes": 10,
+  "safety": {
+    "frozenWinnerBeforeHoldout": true,
+    "trainingSeedsSeparate": true,
+    "rewardsGranted": false,
+    "verified": false,
+    "publicTraining": false,
+    "noClaimOfChromebookPerformance": true,
+    "noClaimOfTwoMinuteLearning": true,
+    "noStatisticalSignificanceClaim": true
+  }
+}
