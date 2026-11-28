@@ -866,6 +866,28 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('Quit mutes procedural fallback but late original catalog still resumes in Title',()=>{
+    const {a,d,events,ctx}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;d.ready=false;
+    a._musicTimer=5623;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    events.emit(EVT.RUN_ABORT,{reason:'quit',runId:'R',pauseToken:'R:1'});
+    expect(a._musicMode).toBe('menu');
+    expect(a._musicTimer).toBeNull(); // NO run-only synthetic sound in Title
+    expect(a._musicWanted).toBe(true); // selected ORIGINAL still requested
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([0,ctx.currentTime,.03]);
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    d.ready=true;
+    a._onStemCatalogReady();
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(d.started).toBe(true);
+    expect(a._musicTimer).toBeNull();
+    expect(a._musicMode).toBe('menu');
+    a.destroy();
+  });
+
   test('Pause Jukebox SKIP retires procedural fallback before switching originals',()=>{
     const {a,d,events,ctx}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

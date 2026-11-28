@@ -845,7 +845,12 @@ export class AudioSynth {
       clearInterval(this._musicTimer);
       this._musicTimer=null;
       if (!this._stemMusic?.started) {
-        this._musicWanted=false;
+        // Muting RUN-only synth does not cancel the user's ORIGINAL source
+        // request. A catalog may still finish loading after we enter Title;
+        // onReady should be allowed to start the original, without starting
+        // another procedural scheduler or overriding an explicit Jukebox PAUSE.
+        this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
+          !session?.manualOverride;
         this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
       }
     }
