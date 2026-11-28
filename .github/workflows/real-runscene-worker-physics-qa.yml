@@ -5,6 +5,7 @@ on:
       - '.github/workflows/real-runscene-worker-physics-qa.yml'
       - 'tools/lab/qa-real-physics-*'
       - 'tools/lab/test-physics-worker-browser.mjs'
+      - 'docs/determinism/issue134-real-physics-worker-throughput.md'
       - 'tests/replay/real-runscene-worker-golden.test.js'
       - 'tests/replay/headlessRun.js'
       - 'src/scenes/RunScene.js'
@@ -20,6 +21,7 @@ on:
       - '.github/workflows/real-runscene-worker-physics-qa.yml'
       - 'tools/lab/qa-real-physics-*'
       - 'tools/lab/test-physics-worker-browser.mjs'
+      - 'docs/determinism/issue134-real-physics-worker-throughput.md'
       - 'tests/replay/real-runscene-worker-golden.test.js'
       - 'tests/replay/headlessRun.js'
       - 'src/scenes/RunScene.js'
@@ -61,7 +63,7 @@ jobs:
         run: npm test -- --runInBand tests/replay/real-runscene-worker-golden.test.js
       - name: Install Chromium browser and OS dependencies
         run: npx playwright install --with-deps chromium
-      - name: Compare compiled Chromium main-thread and real Worker RunScene/Matter with golden
+      - name: Compare compiled Chromium native physics golden and measure real 1/2/4 Worker throughput
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/lab/test-physics-worker-browser.mjs
