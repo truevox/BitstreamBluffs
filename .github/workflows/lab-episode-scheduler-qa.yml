@@ -6,6 +6,7 @@ on:
       - 'tools/lab/**'
       - 'tests/lab/**'
       - 'src/systems/Rng.js'
+      - 'src/systems/lab/**'
       - 'package*.json'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'tools/lab/**'
       - 'tests/lab/**'
       - 'src/systems/Rng.js'
+      - 'src/systems/lab/**'
       - 'package*.json'
   workflow_dispatch:
 permissions:
@@ -44,4 +46,4 @@ jobs:
           node tools/ruleset/build-ruleset.mjs --check
           node tools/ruleset/build-ruleset.mjs --check-identity
       - name: Deterministic schedule, bounded concurrency and cancellation
-        run: npm test -- --runInBand tests/lab/episode-batch.test.js
+        run: npm test -- --runInBand tests/lab/episode-batch.test.js tests/lab/resource-governor.test.js
