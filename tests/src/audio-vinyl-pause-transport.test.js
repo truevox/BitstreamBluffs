@@ -1114,6 +1114,48 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('disabling final installed public song keeps selected unknown private original through quiet Pause',()=>{
+    const {a,d,events}=setup();
+    const privateId=GAME_SONGS[4].id;
+    a.settings.musicEnabledSongs=Object.fromEntries(GAME_SONGS.map(song=>[
+      song.id,song.id===FIRST_SONG_ID||song.id===privateId]));
+    d.ready=false;d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=9872;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'}); // default quiet Pause
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    a.applySettings({...a.settings,
+      musicEnabledSongs:{...a.settings.musicEnabledSongs,[FIRST_SONG_ID]:false}});
+    expect(a._hasEnabledSongs()).toBe(false);
+    expect(a._hasPendingCatalogSelection()).toBe(true);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,
+      restartOnResume:true,procedural:false});
+    expect(a._musicWanted).toBe(false);
+    expect(a._musicTimer).toBeNull();
+    const original=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=original;
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._musicWanted).toBe(true);
+    expect(original).not.toHaveBeenCalled(); // pending catalog: no synth
+    d.ready=true;d.catalog=[{id:privateId}];
+    a._onStemCatalogReady();
+    expect(original).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
+  test('unrelated settings update cannot replace audible procedural music with pending stem decode',()=>{
+    const {a,d}=setup();
+    d.started=false;d.transportPaused=false;d.ready=true;d.pack=null;
+    a._musicMode='run';a._musicTimer=9973;a._musicWanted=true;
+    const activate=jest.fn(()=>{d.started=true;a._musicTimer=null;return true;});
+    a._activateStemMusic=activate;
+    a.applySettings({...a.settings,musicVolume:.41});
+    expect(a.settings.musicVolume).toBe(.41);
+    expect(activate).not.toHaveBeenCalled();
+    expect(a._musicTimer).toBe(9973);
+    expect(a._musicWanted).toBe(true);
+    a._musicTimer=null;a.destroy();
+  });
+
   test('catalog-ready cannot interrupt audible procedural opt-in Pause before gameplay Resume',()=>{
     const {a,d,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

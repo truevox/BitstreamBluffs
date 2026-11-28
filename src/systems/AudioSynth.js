@@ -759,12 +759,27 @@ export class AudioSynth {
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
         if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+          // The player may have disabled the last *installed public* song
+          // while leaving an undiscovered PRIVATE original selected. Carry
+          // that pending original through gameplay Resume, but make Pause
+          // quiet and never synthesize for an unconfirmed catalog entry.
+          if (hadMusic && this._hasPendingCatalogSelection() && this._paused &&
+              this._vinylPauseSession && !this._vinylPauseSession.manualOverride &&
+              !this._jukeboxUserPaused) {
+            this._vinylPauseSession.shouldResume=true;
+            this._vinylPauseSession.restartOnResume=true;
+            this._vinylPauseSession.procedural=false;
+            this._musicWanted=false;
+          }
           if (this._musicTimer) clearInterval(this._musicTimer);
           this._musicTimer = null;
           this._stemMusic?.stop();
           if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
         } else if (this._musicWanted && this.ctx && !this._paused &&
-                   !this._stemMusic?.started) {
+                   this._musicTimer === null && !this._stemMusic?.started) {
+          // A volume/FX setting cannot replace an audible fallback with
+          // a speculative original decode. Only a real playback source
+          // action or Title transition may retire the running scheduler.
           if (!this._activateStemMusic() && !this._musicTimer &&
               this.ctx.state === 'running' && !this._jukeboxMode &&
               !this._paused && !this._stemMusic?.started) {
