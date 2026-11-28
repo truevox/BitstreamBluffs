@@ -74,7 +74,31 @@ try{
    score:r.main.score,checkpoints:r.main.checkpoints.map(x=>[x.tick,x.combined])},
    golden.find(g=>g.seed===r.spec.seed),'compiled Chromium deviated from pinned golden');
  }
+ // Real-world throughput diagnostics, NOT a device entitlement grant or
+ // physical low-end Chromebook QA. Each lane starts an actual Worker running
+ // the exact same previously golden-validated RunScene/Matter physics.
+ const measured=await page.evaluate(async({cases,expected})=>{
+  const qa=window.__realPhysicsQa;
+  return qa.measureRealPhysicsWorkerThroughput({
+   spawn:qa.spawn,cases,expected,workerCountLevels:[1,2,4]});
+ },{cases,expected:reports.map(x=>x.main)});
+ assert.deepEqual(measured.results.map(x=>x.lanes),[1,2,4]);
+ assert.equal(measured.baseWebAuthorizedSimSlots,1);
+ for(const metric of measured.results){
+  assert.equal(metric.jobs,cases.length*4);
+  assert.equal(metric.workersStarted,metric.lanes);
+  assert.equal(metric.workerTerminationRequests,metric.lanes);
+  assert.equal(metric.peakActiveTasks,metric.lanes);
+  assert.equal(metric.actualTicks,4*reports.reduce((s,r)=>s+r.main.tick,0));
+  assert(metric.throughputTicksPerWallSec>0&&metric.elapsedMs>0);
+  assert.equal(metric.memoryMiB,null);
+  assert.equal(metric.thermalC,null);
+ }
  assert.deepEqual(errors,[],'browser errors');
+ console.log('PASS_REAL_RUNSCENE_WORKER_THROUGHPUT_QA',JSON.stringify({
+  browserHints:await page.evaluate(()=>({hardwareConcurrency:navigator.hardwareConcurrency??null,
+   deviceMemoryGiB:navigator.deviceMemory??null,visibility:document.visibilityState})),
+  ...measured}));
  console.log('PASS_REAL_RUNSCENE_MATTER_MAIN_VS_WORKER',JSON.stringify(reports.map(r=>({
   seed:r.spec.seed,tick:r.main.tick,crashed:r.main.crashed,score:r.main.score,
   checkpoints:r.main.checkpoints.map(x=>[x.tick,x.combined])}))));
