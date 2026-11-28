@@ -888,15 +888,21 @@ export class AudioSynth {
         !!(old?.shouldResume && d?.transportPaused));
       const procedural = !keepPlaying && originallyWanted && !live && !frozen &&
         this._musicTimer !== null;
-      if (frozen || procedural) {
+      // A selected song may still be waiting on catalog discovery. Default
+      // OFF Pause has no source node to freeze, but must retain that start
+      // request for the next gameplay Resume (and forbid late auto-play).
+      const pendingStart = !keepPlaying && originallyWanted && !frozen &&
+        !procedural && !d?.started && !d?.transportPaused &&
+        this._musicTimer === null;
+      if (frozen || procedural || pendingStart) {
         this._musicWanted = false; // tab unlock cannot restart a paused song
         if (this._musicTimer !== null) clearInterval(this._musicTimer);
         this._musicTimer = null;
       }
       this._vinylPauseSession = {
-        shouldResume:!!(originallyWanted && (frozen || procedural || carried)),
+        shouldResume:!!(originallyWanted && (frozen || procedural || carried || pendingStart)),
         procedural:procedural || !!(carried && prior.procedural),manualOverride:false,
-        restartOnResume:!!(carried && prior.restartOnResume),
+        restartOnResume:!!(pendingStart || (carried && prior.restartOnResume)),
         runId:payload?.runId??null,pauseToken:payload?.pauseToken??null,
         token:carried?prior.token:d?._token,
         trackIndex:carried?prior.trackIndex:d?.trackIndex,
@@ -974,12 +980,14 @@ export class AudioSynth {
         d.ctx === this.ctx);
       const frozen = live && d.transportPause();
       const procedural = !frozen && this._musicTimer !== null;
-      if (frozen || procedural) {
+      const pendingStart = !frozen && !procedural && !d?.started &&
+        !d?.transportPaused && this._hasEnabledSongs(this.settings?.musicEnabledSongs);
+      if (frozen || procedural || pendingStart) {
         this._musicWanted = false;
         if (this._musicTimer !== null) clearInterval(this._musicTimer);
         this._musicTimer = null;
         Object.assign(session, {
-          shouldResume: true, procedural,
+          shouldResume: true, procedural, restartOnResume:!!pendingStart,
           token: d?._token, trackIndex: d?.trackIndex, offset: d?._resumeOffset,
         });
       }

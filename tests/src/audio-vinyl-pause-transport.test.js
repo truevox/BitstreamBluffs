@@ -775,6 +775,44 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('quiet default-OFF Pause retains not-yet-loaded catalog start for gameplay Resume',()=>{
+    const {a,d,events}=setup();
+    d.started=false;d.transportPaused=false;d.ready=false;
+    a._musicTimer=null;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    d.ready=true;
+    a._activateStemMusic=jest.fn(()=>true);
+    a._onStemCatalogReady();
+    expect(a._activateStemMusic).not.toHaveBeenCalled(); // no background play
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._activateStemMusic).toHaveBeenCalledTimes(1);
+    expect(a._musicWanted).toBe(true);
+    expect(a._paused).toBe(false);
+    a.destroy();
+  });
+
+  test('ON→OFF Pause while original catalog is loading defers start until Resume',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=false;
+    a._musicTimer=null;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    d.ready=true;
+    a._activateStemMusic=jest.fn(()=>true);
+    a._onStemCatalogReady();
+    expect(a._activateStemMusic).not.toHaveBeenCalled(); // quiet pause wins
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._activateStemMusic).toHaveBeenCalledTimes(1);
+    expect(a._musicWanted).toBe(true);
+    a.destroy();
+  });
+
   test('second ON pause while first restore awaits AudioContext unlock retains exact stem frame',()=>{
     const {a,d,events,ctx}=setup();
     events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
