@@ -1035,6 +1035,26 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a._musicTimer=null;a.destroy();
   });
 
+  test('SKIP after explicit procedural PAUSE retargets original but stays silent until PLAY',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=true;d.pack=null;
+    a._musicWanted=true;a._musicTimer=7523;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a.jukeboxPause()).toBe(true);
+    expect(a._jukeboxUserPaused).toBe(true);
+    expect(d.transportPaused).toBe(false); // no stem existed to freeze
+    expect(a.jukeboxStep(1)).toBe(true);
+    expect(d.transportStep).toHaveBeenCalledTimes(1);
+    expect(a._jukeboxUserPaused).toBe(true);
+    expect(a._musicWanted).toBe(false);
+    expect(a._musicTimer).toBeNull();
+    expect(d.transportPaused).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._musicWanted).toBe(false);
+    a.destroy();
+  });
+
   test('SKIP while catalog unavailable preserves audible fallback and leaves session unclaimed',()=>{
     const {a,d,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

@@ -1521,7 +1521,12 @@ export class AudioSynth {
       }
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
-      const wasPaused=this._stemMusic.transportPaused;
+      const wasPaused=this._stemMusic.transportPaused || this._jukeboxUserPaused;
+      // Explicit human PAUSE may have silenced only a procedural fallback,
+      // leaving no original source node to freeze. Carry that paused intent
+      // into the director's selection-only Step: it must not auto-PLAY.
+      if(this._jukeboxUserPaused && !this._stemMusic.transportPaused)
+        this._stemMusic.transportPaused=true;
       this._jukeboxMode=true;
       this._musicWanted=!wasPaused;
       if (this._paused) this._setPaused(true);
@@ -1529,7 +1534,7 @@ export class AudioSynth {
       // Choose and invalidate the previous async generation BEFORE
       // AudioContext unlock can call _afterResume() and load another song.
       const moved=this._stemMusic.transportStep(direction<0?-1:1);
-      if(moved)this._jukeboxUserPaused=false;
+      if(moved)this._jukeboxUserPaused=wasPaused;
       this.unlock(); // browser user-gesture policy
       return moved;
     } catch {return false;}
