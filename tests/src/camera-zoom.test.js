@@ -131,3 +131,163 @@ describe('RunScene.updateCamera uses the curve', () => {
     expect(sx).toBeLessThan(GAME_WIDTH * 0.6);
   });
 });
+
+describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
+  function makeScene(mode='drone',reduced=false){
+    const s=Object.create(RunScene.prototype);
+    const cam={zoom:1,rotation:0,scrollX:0,scrollY:0,
+      setZoom(z){this.zoom=z;},setRotation(r){this.rotation=r;}};
+    Object.assign(s,{
+      sled:{x:50000,y:3000,vx:825,vy:-130,speed:870,grounded:false},
+      seed:'pulp-canary',simClock:{tick:936,tickMs:1000/120},
+      bsodState:{proximity01:.2},hazards:new Map(),
+      cameras:{main:cam},settings:{pulp:mode,reduceMotion:reduced?'on':'off'},
+      registry:{get:()=>({reduceMotion:reduced?'on':'off'})},
+      _camX:49800,_camY:2910,_zoom:1,_zoomKick:0,shakeAmp:0,
+      bg:null,flashRect:null,blindRect:null,
+    });
+    return s;
+  }
+  test('100% Pulp camera path repeats exactly at the same authoritative tick across display FPS',()=>{
+    const a=makeScene(),b=makeScene();
+    const initial=JSON.stringify(a.sled);
+    a.updateCamera(16.6);
+    b.updateCamera(5.5);
+    expect(a._cameraIntent).toEqual(b._cameraIntent);
+    for(const key of ['zoom','rotation','scrollX','scrollY'])
+      expect(a.cameras.main[key]).toBe(b.cameras.main[key]);
+    expect(a.cameras.main.rotation).not.toBe(0);
+    expect(JSON.stringify(a.sled)).toBe(initial);
+    expect(a.simClock.tick).toBe(936);
+    expect(a.shakeAmp).toBe(0);
+  });
+  test('reduce-motion overrides saved 100% mode and locks zoom and roll',()=>{
+    const s=makeScene('drone',true);
+    s.updateCamera(16.6);
+    expect(s._cameraIntent).toBeNull();
+    expect(s.cameras.main.zoom).toBe(1);
+    expect(s.cameras.main.rotation).toBe(0);
+    expect(s.cameras.main.scrollX).toBe(Math.round(s.sled.x-480*.38));
+    s.settings.reduceMotion='off';
+    s.registry.get=()=>({reduceMotion:'off'});
+    s.updateCamera(16.6);
+    expect(s._cameraIntent.mode).toBe('drone');
+    s.settings.pulp='original';
+    s.updateCamera(16.6);
+    expect(s._cameraIntent).toBeNull();
+    expect(s.cameras.main.rotation).toBe(0);
+  });
+  test('Drone keeps actual spawn rider at least 94px from left edge',()=>{
+    const s=makeScene('drone');
+    s.sled.x=44;s.sled.y=180;s.simClock.tick=1;
+    s.updateCamera(8.33);
+    const c=s.cameras.main;
+    const viewLeft=c.scrollX+480/2-480/(2*c.zoom);
+    const actualX=(s.sled.x-viewLeft)*c.zoom;
+    expect(actualX).toBeGreaterThanOrEqual(94);
+    expect(actualX).toBeLessThanOrEqual(202);
+    expect(s._cameraIntent.mode).toBe('drone');
+  });
+
+  test('both new modes retain world-start clamp and full-screen effects overscan on roll',()=>{
+    for(const mode of ['less','drone']){
+      const s=makeScene(mode);
+      s.sled.x=44;s.sled.y=180;
+      s.simClock.tick=1;
+      const updates=[];
+      const makeRect=()=>({
+        setScale(x){updates.push(['scale',x]);return this;},
+        setPosition(x,y){updates.push(['pos',x,y]);return this;},
+      });
+      s.flashRect=makeRect();s.blindRect=makeRect();
+      s.updateCamera(16);
+      const z=s.cameras.main.zoom;
+      const visibleLeft=s.cameras.main.scrollX+480/2-480/(2*z);
+      if(mode==='less'){
+        expect(visibleLeft).toBeGreaterThanOrEqual(-31);
+        expect(s.cameras.main.rotation).toBe(0);
+        expect(s.cameras.main.zoom).toBe(1);
+      }else{
+        expect(s._cameraIntent.mode).toBe('drone');
+        expect((s.sled.x-visibleLeft)*z).toBeGreaterThanOrEqual(94);
+        expect(updates.filter(x=>x[0]==='scale').length).toBeGreaterThanOrEqual(2);
+        // Uniform rectangle expands beyond the zoom compensated viewport.
+        expect(updates.at(-2)[1]).toBeGreaterThan(1/z);
+      }
+    }
+  });
+
+  test('Drone consumes pending cosmetic impact shake and zoom kick before Original can resume',()=>{
+    const s=makeScene('drone');
+    s.shakeAmp=23;s._zoomKick=.25;
+    s.updateCamera(16);
+    expect(s.shakeAmp).toBe(0);
+    expect(s._zoomKick).toBe(0);
+    s.settings.pulp='original';
+    s.updateCamera(16);
+    expect(s.shakeAmp).toBe(0);
+    expect(s._zoomKick).toBe(0);
+    expect(s.cameras.main.rotation).toBe(0);
+  });
+
+  test('hazard passage eases camera framing instead of snapping on center crossing',()=>{
+    const s=makeScene('drone');
+    s.sled.x=50000;s.sled.speed=1100;s.sled.vx=1100;
+    s.bsodState.proximity01=0;
+    s.hazards.set(1,[{cx:50000+1,cy:s.sled.y}]);
+    s.simClock.tick=986;
+    s.updateCamera(8.33);
+    const before=s._cameraIntent;
+    s.sled.x+=9.17;
+    s.simClock.tick++;
+    s.updateCamera(8.33);
+    const after=s._cameraIntent;
+    expect(Math.abs(after.riderScreenX-before.riderScreenX)).toBeLessThan(12);
+    // The fading influence should eventually disappear with no sim writes.
+    s.sled.x+=80;s.simClock.tick+=10;
+    s.updateCamera(8.33);
+    expect(s._cameraIntent.mode).toBe('drone');
+  });
+
+  test('rotated Pulp telegraph cue-fit view stays inscribed in actual viewport',()=>{
+    const s=makeScene('drone');
+    s.updateCamera(8);
+    const c=s.cameras.main;
+    const zoom=c.zoom;
+    const full={left:100,right:100+480/zoom,top:200,bottom:200+270/zoom};
+    const safe=s.pulpCueSafeView(full,c.rotation,zoom);
+    expect(safe.left).toBeGreaterThan(full.left);
+    expect(safe.right).toBeLessThan(full.right);
+    expect(safe.top).toBeGreaterThan(full.top);
+    expect(safe.bottom).toBeLessThan(full.bottom);
+    // Any corner within the reduced cue-fit rectangle must still project
+    // within the real unrotated screen; no clipped cue misjudged as fitting.
+    const cx=(full.left+full.right)/2,cy=(full.top+full.bottom)/2;
+    for(const x of [safe.left,safe.right])for(const y of [safe.top,safe.bottom]){
+      const dx=x-cx,dy=y-cy,a=c.rotation;
+      const px=dx*Math.cos(a)-dy*Math.sin(a);
+      const py=dx*Math.sin(a)+dy*Math.cos(a);
+      expect(Math.abs(px)).toBeLessThanOrEqual(240/zoom+1e-7);
+      expect(Math.abs(py)).toBeLessThanOrEqual(135/zoom+1e-7);
+    }
+    s._cameraIntent=null;
+    expect(s.pulpCueSafeView(full,c.rotation,zoom)).toBe(full);
+  });
+
+  test('drone reads actual Hazard.cx without writing collision/telegraph or generation state',()=>{
+    const s=makeScene();
+    s.updateCamera(16.6);
+    const calm=s._cameraIntent;
+    const hazard={cx:s.sled.x+22,cy:s.sled.y,def:{id:'spike'}};
+    s.hazards.set(1,[hazard]);
+    const before=JSON.stringify(hazard);
+    s.updateCamera(16.6);
+    const danger=s._cameraIntent;
+    expect(JSON.stringify(hazard)).toBe(before);
+    expect(s.hazards.get(1)[0]).toBe(hazard);
+    expect(Math.abs(danger.roll)).toBeLessThan(Math.abs(calm.roll));
+    expect(danger.riderScreenX).toBeLessThanOrEqual(calm.riderScreenX);
+    expect(danger.lookAhead).toBeGreaterThanOrEqual(250);
+    expect(typeof danger.focusX).toBe('number');
+  });
+});

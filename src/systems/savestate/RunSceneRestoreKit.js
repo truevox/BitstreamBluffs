@@ -284,6 +284,8 @@ function installRunSceneStateKit(global) {
   const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',
     'streaks', 'flashRect', 'blindRect', 'bsodEdge', 'windPom', 'startGate', 'bestMarker', 'deathMarker', 'ghostRiders',
     'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake',
+    '_cameraIntent', // #155 regenerated immutable render-only intent; never serialize as causal state
+    '_suspendStageActive', // #424 ephemeral staging presentation/observer mute; never stored as a normal run field
     // SIM9: bridge look/veil and cached span are visual; marker height reads joined mesh,
     // not speculative terrain. Matches the shipped RunScene fingerprint exclusions.
     '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn',
@@ -600,8 +602,11 @@ function installRunSceneStateKit(global) {
     const preparedRecorder = global.__ssCanonical
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
     if (global.__ssCanonical) {
-      const configKeys=CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner');
-      if(!exactKeys(snap.config,configKeys)||configKeys.some(k=>JSON.stringify(run[k])!==snap.config[k]))
+      // Capture and both restore preflights MUST use the same projection:
+      // Pulp is camera-only, not a causal configuration constraint.
+      const freshConfig=projectConfig(run);
+      if(!exactKeys(snap.config,Object.keys(freshConfig))||
+          Object.entries(freshConfig).some(([k,v])=>snap.config[k]!==v))
         throw Error('restore: CONFIG differs from fresh scene');
       if(!Array.isArray(snap.classes?.SIM)||new Set(snap.classes.SIM).size!==snap.classes.SIM.length||
          !snap.classes.SIM.every(k=>SIM.includes(k))||!exactKeys(snap.game,snap.classes.SIM))
@@ -651,7 +656,9 @@ function installRunSceneStateKit(global) {
       if (k in run && !(k in snap.game)) { dcd.log.push(`deleted SIM field absent from snapshot: ${k}`); delete run[k]; }
     }
     if (snap.config) {
-      for (const [k, v] of Object.entries(snap.config)) if (JSON.stringify(run[k]) !== v) throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
+      const freshConfig=projectConfig(run);
+      for (const [k, v] of Object.entries(snap.config)) if(freshConfig[k]!==v)
+        throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
     }
     for (const k of order) if (!early.includes(k)) run[k] = dcd.dec(snap.game[k], run[k], k);
     // The marker palette key is derived, not a serialized color. A
@@ -766,7 +773,15 @@ function installRunSceneStateKit(global) {
   }
 
   function projectConfig(run){
-    return Object.fromEntries(CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner').map(k=>[k,JSON.stringify(run[k])]));
+    return Object.fromEntries(CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner').map(k=>{
+      if(k!=='settings')return [k,JSON.stringify(run[k])];
+      // #155 Pulp affects ONLY camera presentation. Toggling it from Title
+      // must never invalidate an otherwise byte-exact suspended run. Omit
+      // this camera choice from the saved configuration equality contract.
+      const settings={...run.settings};
+      delete settings.pulp;
+      return [k,JSON.stringify(settings)];
+    }));
   }
   function projectEarly(run,clock,rng,terrain,queue,collected){
     const {enc,audit}=makeEncoder(run,bodyIndex(run).keyOf);

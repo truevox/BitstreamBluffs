@@ -295,3 +295,21 @@ Loading, empty, error, success and partial are all designed. Highlights:
 - **Automated UI checks** (glyph set, integer scales, overlapping tap zones) are decided but not built.
 - **Autopilot needs a real design** centered on watching and managing riders (live race, recent
   accomplishments, racing against them), not just collecting Bits.
+
+## Pulp camera (P1 #155)
+
+Settings > **PULP** offers **99% LESS**, **ORIGINAL** (default), and **100% PULP**.
+The existing Original camera remains byte-for-byte on its old presentation path.
+99% Less is a steady, readable rider-centred 1x view without shake, zoom
+kicks, sway, or roll. Reduce Motion (including an OS request under AUTO)
+forces 99% Less and shows **LOCKED: LESS**, while preserving the user's saved
+Pulp choice to restore when reduced motion is disabled.
+
+100% Pulp uses a deterministic 2D drone-camera *intent*: signed focus,
+look-ahead, zoom, and small roll, based only on the authoritative run seed,
+simulation tick and sled/hazard/BSOD snapshots. It never reads rendered view
+bounds into simulation decisions, never advances simulation RNG, and never
+changes ground-hazard warn/hop cues. The same intent can be projected by a
+future 3D renderer, but this phase does **not** install a 3D engine. Camera
+bounds and look-ahead have conservative playability floors; subtitles, HUD,
+menu and pause panels retain their native 480x270 screen-space alignment.

@@ -28,6 +28,7 @@ export const PRESENTATION_FILES = [
   'src/entities/GroundTelegraph.js', 'src/entities/KodiakRider.js', 'src/entities/LastDeathMarker.js', 'src/entities/PowerUp.js', 'src/entities/Shard.js',
   'src/entities/SongBillboard.js', 'src/scenes/GameOverScene.js', 'src/scenes/TitleScene.js', 'src/scenes/UIScene.js',
   'src/shaders/GlitchPipeline.js', 'src/systems/AudioSynth.js', 'src/systems/MicroBees.js', 'src/systems/WorldDance.js',
+  'src/systems/PulpCameraIntent.js', // #155 presentation-only visual phase; no sim input/readback, native sin is allowed
   'src/systems/music/AdaptiveBiomeRouter.js', 'src/systems/music/BsodThreatProcessor.js', 'src/systems/music/ImpulseBank.js', 'src/systems/music/MusicFXGraph.js',
   // Original-stem notes, pressure ambience and event-gated cowbell are
   // ONLY Web Audio presentation. They never feed physics or recorded pads.

@@ -84,6 +84,7 @@ import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
+import {droneCameraIntent,effectivePulpLevel,PULP_SAFE} from '../systems/PulpCameraIntent.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { installPortableMatter } from '../systems/MatterPortable.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
@@ -1877,7 +1878,11 @@ export class RunScene extends Phaser.Scene {
       this.deathMarker.setPlacement(L.death);
     }
     this.drawStreaks(t);
-    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.terrain?.activeList);
+    // The hazard cue fallback classifier must use a viewport guaranteed
+    // visible AFTER the cosmetic drone roll. Other culling still receives
+    // the ordinary (wider) rect; physics/hazard cue TIMES stay untouched.
+    const cueView=this.pulpCueSafeView(this._view,cam.rotation||0,cam.zoom);
+    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, cueView, cam.zoom, this.terrain?.activeList);
     // Visual-only world dance: no music player/beat-grid mutation, and no
     // hidden synthetic tempo. With a muted/paused song or reduced motion the
     // backdrop returns immediately to its original neutral geometry.
@@ -1911,6 +1916,18 @@ export class RunScene extends Phaser.Scene {
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
+  }
+
+  /** Conservative inscribed viewport for HUD hazard-warning cue fit checks. */
+  pulpCueSafeView(view,roll,zoom){
+    if(!view||!this._cameraIntent||!Number.isFinite(roll)||Math.abs(roll)<1e-7)
+      return view;
+    const r=Math.min(Math.abs(roll),0.04),z=Math.max(.4,zoom||1);
+    const halfW=GAME_WIDTH/(2*z),halfH=GAME_HEIGHT/(2*z);
+    const insetX=pmath.sin(r)*halfH+(1-pmath.cos(r))*halfW;
+    const insetY=pmath.sin(r)*halfW+(1-pmath.cos(r))*halfH;
+    return {left:view.left+insetX,right:view.right-insetX,
+      top:view.top+insetY,bottom:view.bottom-insetY};
   }
 
   /** The visible world rectangle from the camera (`_view`). Shared by renderFrame and the takeover seek (#72). */
@@ -3246,6 +3263,8 @@ export class RunScene extends Phaser.Scene {
   snapCamera() {
     const cam = this.cameras.main;
     const s = this.sled;
+    if(cam.setRotation)cam.setRotation(0);
+    this._cameraIntent=null;
     this._camX = s.x - GAME_WIDTH * 0.38;
     this._camY = s.y - GAME_HEIGHT / 3;
     this._zoom = 1;
@@ -3266,9 +3285,99 @@ export class RunScene extends Phaser.Scene {
     if (this.blindRect) this.blindRect.setScale(k).setPosition(px, py);
   }
 
+  /** #155: uniform screen effects must never expose rotated viewport corners. */
+  applyPulpOverlayCoverage(zoom,roll){
+    if(!this.flashRect&&!this.blindRect)return;
+    const k=1/zoom,extra=Math.abs(roll)*2+0.02; // conservative bound on |sin(roll)|
+    const px=(GAME_WIDTH*(zoom-1))/(2*zoom);
+    const py=(GAME_HEIGHT*(zoom-1))/(2*zoom);
+    for(const rect of [this.flashRect,this.blindRect]){
+      if(!rect)continue;
+      rect.setScale(k*(1+extra));
+      rect.setPosition(px-GAME_WIDTH*k*extra/2,py-GAME_HEIGHT*k*extra/2);
+    }
+  }
+
   updateCamera(dt) {
     const cam = this.cameras.main;
     const s = this.sled;
+    // #155 Pulp: consume ONLY immutable pose/seed/clock snapshots, never
+    // mutate physics or RNG or feed rendered camera bounds to telegraph
+    // timing. The 2D drone is a pure camera-intent projection that is
+    // identical when a replay is rendered at a different display FPS.
+    const pulp=effectivePulpLevel(this.settings?.pulp,isReducedMotion(this));
+    if(pulp==='drone'){
+      // A landing, boost or explosion can still set these presentation
+      // impulses. Drain them NOW: returning to Original later must not
+      // replay stale shake or a long-obsolete zoom kick.
+      this.shakeAmp=0;this._zoomKick=0;
+      let hazardAheadPx=Infinity;
+      // Read existing generated hazards. No terrain generation, collision
+      // mutation or new RNG draw can be triggered by this camera query.
+      if(this.hazards?.values)for(const list of this.hazards.values()){
+        for(const h of list){
+          // Hazard instances expose current world centre as cx (not x).
+          // Read-only: do not update warning thresholds or hazard generation.
+          const dx=h.cx-s.x;
+          // A hazard's influence cannot disappear in a single 120 Hz tick
+          // when its center crosses the sled. Fade its framing pressure over
+          // the following 70 world pixels, not a one-frame snap to calm.
+          const effectiveDx=dx>=0?dx:dx>=-70?(-dx*3):Infinity;
+          if(Number.isFinite(effectiveDx)&&effectiveDx<hazardAheadPx)
+            hazardAheadPx=effectiveDx;
+        }
+      }
+      const intent=droneCameraIntent({
+        seed:this.seed,tick:this.simClock?.tick??0,
+        tickMs:this.simClock?.tickMs??1000/120,
+        x:s.x,y:s.y,vx:s.vx,vy:s.vy,speed:s.speed,
+        grounded:s.grounded,bsodProximity:this.bsodState?.proximity01??0,
+        hazardAheadPx,
+      });
+      this._cameraIntent=intent;
+      this._camX=s.x-intent.riderScreenX/intent.zoom;
+      this._camY=s.y-intent.riderScreenY/intent.zoom;
+      this._zoom=intent.zoom;
+      if(cam.zoom!==intent.zoom){
+        cam.setZoom(intent.zoom);
+        this.applyZoomCompensation(intent.zoom);
+      }
+      if(cam.setRotation)cam.setRotation(intent.roll);
+      let scrollX=intent.focusX-GAME_WIDTH/2;
+      const visibleLeft=scrollX+GAME_WIDTH/2-GAME_WIDTH/(2*intent.zoom);
+      // The spawn is x≈44: a hard -30 world-edge clamp would push the
+      // rider below the promised 94px safe margin. Allow a little extra
+      // empty world at spawn instead of making the rider unreadable.
+      const minLeft=Math.min(-30,s.x-(PULP_SAFE.minScreenX+6)/intent.zoom);
+      if(visibleLeft<minLeft)scrollX+=minLeft-visibleLeft;
+      cam.scrollX=Math.round(scrollX);
+      cam.scrollY=Math.round(intent.focusY-GAME_HEIGHT/2);
+      // Full-screen flash / blindness are uniform, screen-space effects,
+      // NOT a tilted painting attached to the terrain. Overscan their
+      // untextured quads enough to cover the viewport corners under roll.
+      // At max .025rad roll a 7% overscan exceeds both rotated corner gaps.
+      this.applyPulpOverlayCoverage(intent.zoom,intent.roll);
+      return;
+    }
+    // No residual camera roll or zoom from a prior 100% Pulp frame.
+    if(cam.rotation&&cam.setRotation){
+      cam.setRotation(0);
+      this.applyZoomCompensation(cam.zoom); // remove drone overlay overscan
+    }
+    this._cameraIntent=null;
+    if(pulp==='less'){
+      // 99% Less Pulp: no cosmetic shake, sway, speed-zoom or roll. Keep
+      // predictable rider framing without reusing or touching game RNG.
+      this.shakeAmp=0;
+      this._zoom=1;this._zoomKick=0;
+      if(cam.zoom!==1){cam.setZoom(1);this.applyZoomCompensation(1);}
+      this._camX=Math.max(-30,s.x-GAME_WIDTH*.38);
+      this._camY=s.y-GAME_HEIGHT/3;
+      cam.scrollX=Math.round(this._camX);
+      cam.scrollY=Math.round(this._camY);
+      return;
+    }
+    // Original Pulp: intentionally retain every existing calculation.
     // Look ahead in the direction of travel; Y keeps ~1/3 of the screen above the rider and peeks lower when falling.
     const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx)
       + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400) + LOOK_ULTRA_EXTRA_PX * smooth01((s.vx - 850) / 450)

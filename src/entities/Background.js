@@ -804,10 +804,15 @@ export class Background {
     // sky gradient (banded)
     const pixel = this.skin === 'pixel';
     const bands = pixel ? 0 : 8;
+    // Screen-space graphics inherit camera rotation despite scrollFactor 0.
+    // Only the Pulp Drone needs horizontal sky overscan; original rendering
+    // remains pixel-identical with no extra draw area.
+    const skyPad=Math.abs(this.scene?.cameras?.main?.rotation||0)>1e-7?16:0;
     for (let i = 0; i < bands; i++) {
       const t = i / bands;
       g.fillStyle(p.magenta, 0.015 + 0.075 * t * t);
-      g.fillRect(0, GAME_HEIGHT * (0.1 + 0.6 * t), GAME_WIDTH, (GAME_HEIGHT * 0.6) / bands + 1);
+      g.fillRect(-skyPad, GAME_HEIGHT * (0.1 + 0.6 * t),
+        GAME_WIDTH+2*skyPad, (GAME_HEIGHT * 0.6) / bands + 1);
     }
     // stars
     for (const s of this.stars) {
