@@ -72,3 +72,15 @@ jobs:
           node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=upgrade
           node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=magnet
           node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --deny=kodiak
+      - name: Existing READY is byte-exact through nonstock denial and occupied-slot conflict
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          # Begin with a REAL player-created READY slot. Subsequent unsupported
+          # run restrictions must not erase its exact original saved bytes.
+          for mode in upgrade magnet kodiak; do
+            node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --mask=3 --preexisting-ready "--deny=$mode"
+          done
+          # A second otherwise-valid stock pause is a stronger collision:
+          # it must visibly refuse overwrite, preserve the paused source,
+          # and allow the ORIGINAL slot to resume once at its exact tick.
+          node tools/savestate-experiment/test-player-suspend-biome-compiled-browser.mjs dist-biome-qa --mask=3 --preexisting-ready --occupied-stock
