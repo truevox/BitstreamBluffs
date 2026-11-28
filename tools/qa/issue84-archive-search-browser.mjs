@@ -36,9 +36,32 @@ try {
     return {length:v.archives.length,label:v._layout.rows.find(r=>r.key==='archiveHeader')?.label,
       pager:v._layout.rows.find(r=>r.key==='archivePager')?.label};
   });
+  const clickRow=async(kind, labelPart='')=>{
+    await page.waitForFunction(()=>{
+      const v=window.__bbGame.scene.getScene('TitleScene')?.view;
+      return v?.alive&&v.panel?.alpha>=0.995&&v.panel?.scaleX>=0.995 &&
+        Math.abs(v.panel?.x-32)<0.01&&Math.abs(v.panel?.y-22)<0.01;
+    },null,{timeout:8000});
+    // Shop rebuilds replace interactive row objects. Let the input hit list
+    // settle for two rendered frames before a distinct human click.
+    await page.waitForTimeout(100);
+    const coords=await page.evaluate(({kind,labelPart})=>{
+      const g=window.__bbGame,v=g.scene.getScene('TitleScene').view;
+      const i=v._layout.rows.findIndex(r=>r.kind===kind||r.key===kind);
+      if(i<0)throw new Error('No row '+kind);
+      if(labelPart&&!v._layout.rows[i].label?.includes(labelPart))throw new Error('Wrong row');
+      const z=v.menu.rows[i].zone;
+      if(!z)throw new Error('Row not interactive: '+kind);
+      const pt=z.getWorldTransformMatrix().transformPoint(z.width/2,z.height/2);
+      const rect=g.canvas.getBoundingClientRect();
+      return {x:rect.left+pt.x/g.scale.gameSize.width*rect.width,
+        y:rect.top+pt.y/g.scale.gameSize.height*rect.height};
+    },{kind,labelPart});
+    await page.mouse.click(coords.x,coords.y);
+  };
   assert.equal(starting.length,3);
   assert.match(starting.pager,/FIND SEED/);
-  await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view._openArchiveSearch());
+  await clickRow('archivePager');
   await page.waitForSelector('input[aria-label="SEED / @MASK / #FAV"]',{timeout:5000});
   await page.locator('input[aria-label="SEED / @MASK / #FAV"]').fill('gap');
   await page.locator('input[aria-label="SEED / @MASK / #FAV"]').press('Enter');
@@ -55,10 +78,7 @@ try {
   assert.ok(filtered.rows.some(r=>r.includes('ALPHA-GAP')));
   assert.ok(filtered.rows.some(r=>r.includes('GAMMA-GAP')));
   assert.match(filtered.header,/2\/3/);
-  await page.evaluate(()=>{
-    const v=window.__bbGame.scene.getScene('TitleScene').view;
-    v._selectArchive(v.archives[0].key);
-  });
+  await clickRow('archiveEntry','ALPHA-GAP');
   await page.waitForFunction(()=>{
     const v=window.__bbGame.scene.getScene('TitleScene').view;
     return !!v._layout.rows.find(r=>r.kind==='archiveShare');
@@ -70,10 +90,10 @@ try {
   });
   assert.equal(selected.share,'COPY SELECTED SEED + MASK');
   assert.match(selected.confirm,/CONFIRM DELETE/);
-  await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view._copySelectedArchive());
+  await clickRow('archiveShare');
   await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene').view.archiveNotice.includes('COPIED'),null,{timeout:5000});
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'ALPHA-GAP@7');
-  await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').view._openArchiveSearch());
+  await clickRow('archivePager');
   await page.locator('input[aria-label="SEED / @MASK / #FAV"]').fill('#fav');
   await page.locator('input[aria-label="SEED / @MASK / #FAV"]').press('Enter');
   const fav=await page.evaluate(()=>{
