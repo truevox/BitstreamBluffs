@@ -43,7 +43,15 @@ export function inspectRunSceneTrial(raw,{leadMs,seeds,maxDistanceM,maxSeconds}=
   seeds.every(validSeed),'invalid trial descriptor');
  check(raw?.args?.policy==='hop'&&raw?.params?.hopLeadMs===leadMs&&
   raw.args.maxM===maxDistanceM&&raw.args.maxSec===maxSeconds&&
-  raw.args.seeds===seeds.length&&Array.isArray(raw.results)&&
+  raw.args.seeds===seeds.length&&
+  (raw.args.rule===undefined||raw.args.rule==='none')&&
+  (raw.args.biomeMask===undefined||raw.args.biomeMask===0)&&
+  raw.args.noHop!==true&&raw.args.keepUi!==true&&
+  raw.args.noReload!==true&&raw.args.fatigue!==true&&
+  raw.args.noiseProfiles===undefined&&
+  (raw.params.releaseLateMs===undefined||raw.params.releaseLateMs===0)&&
+  Object.keys(raw.params).every(key=>key==='hopLeadMs'||key==='releaseLateMs')&&
+  Array.isArray(raw.results)&&
   raw.results.length===seeds.length,'trial source/settings mismatch');
  const bySeed=new Map();
  for(const r of raw.results){

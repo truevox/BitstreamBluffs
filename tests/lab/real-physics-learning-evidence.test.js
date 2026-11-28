@@ -22,6 +22,12 @@ test('trial fingerprint binds real source policy, episode horizon, seed identity
   {args:{policy:'handsOff',seeds:2,maxM:900,maxSec:35}},
   {args:{policy:'hop',seeds:2,maxM:900,maxSec:25}},
   {params:{hopLeadMs:280}},
+  {args:{policy:'hop',seeds:2,maxM:900,maxSec:35,rule:'bonus-simulator'}},
+  {args:{policy:'hop',seeds:2,maxM:900,maxSec:35,biomeMask:3}},
+  {args:{policy:'hop',seeds:2,maxM:900,maxSec:35,noHop:true}},
+  {args:{policy:'hop',seeds:2,maxM:900,maxSec:35,fatigue:true}},
+  {params:{hopLeadMs:380,noHop:true}},
+  {params:{hopLeadMs:380,releaseLateMs:250}},
   {results:[{seed:'train-A',distM:10,endReason:'crash'},{seed:'train-A',distM:20,endReason:'crash'}]},
   {results:[{seed:'train-A',distM:-1,endReason:'crash'},{seed:'train-B',distM:20,endReason:'crash'}]},
  ]){
