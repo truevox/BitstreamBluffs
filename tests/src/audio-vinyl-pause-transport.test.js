@@ -227,6 +227,68 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('first song enabled in a default-OFF Pause starts on Resume even with no frozen source',()=>{
+    const {a,d,events}=setup();
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.settings.musicEnabledSongs=off;
+    a._musicWanted=false;d.started=false;d.transportPaused=false;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    expect(activate).not.toHaveBeenCalled(); // default OFF until actual Resume
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._paused).toBe(false);
+    expect(a._musicWanted).toBe(true);
+    a.destroy();
+  });
+
+  test('restartOnResume branch supplies procedural fallback when opted-in and original unavailable',()=>{
+    const {a,d,events,ctx}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    d.started=false;d.transportPaused=false;d.ready=false;
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    const activate=jest.fn(()=>false);
+    a._activateStemMusic=activate;
+    a._startScheduler=jest.fn(()=>{a._musicTimer=12347;});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([1,ctx.currentTime,.04]);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    expect(a._paused).toBe(true);
+    a._musicTimer=null;
+    a.destroy();
+  });
+
+  test('late catalog while opted-in clears deferred intent so subsequently OFF freezes actual stem',()=>{
+    const {a,d,events,ctx}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    d.started=false;d.transportPaused=false;d.ready=false;
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    ctx.state='suspended';
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(true);
+    ctx.state='running';d.ready=true;
+    a._activateStemMusic=jest.fn(()=>{d.started=true;return true;});
+    a._onStemCatalogReady();
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    const previousFreezes=d.transportPause.mock.calls.length;
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(d.transportPause).toHaveBeenCalledTimes(previousFreezes+1);
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    expect(a._musicWanted).toBe(false);
+    a.destroy();
+  });
+
   test('procedural source resumes AUDIBLY after toggling continuous Pause OFF',()=>{
     const {a,d,events,ctx}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

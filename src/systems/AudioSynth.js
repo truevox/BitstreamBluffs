@@ -151,8 +151,19 @@ export class AudioSynth {
       this.jukeboxPlay();
       return;
     }
-    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs))
-      this._activateStemMusic();
+    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+      const started=this._activateStemMusic();
+      const session=this._vinylPauseSession;
+      // Deferred catalog completion can satisfy a pause-menu ON restart.
+      // Its real started transport is no longer waiting to be resumed; a
+      // subsequent OFF must freeze it rather than leave a filtered song live.
+      if (started && this._paused && this.settings?.musicDuringPause===true &&
+          session && !session.manualOverride) {
+        session.shouldResume=false;
+        session.restartOnResume=false;
+        session.procedural=false;
+      }
+    }
   }
 
   // -------------------------------------------------------------------------------------------------------- wiring
@@ -680,10 +691,15 @@ export class AudioSynth {
         // Enabling a song while gameplay is paused is a preference change,
         // not an explicit Jukebox PLAY. If all-off invalidated the frozen
         // transport, restart the selected music only after gameplay resumes.
-        if (newlyEnabled && this._paused &&
-            this._vinylPauseSession?.shouldResume &&
-            !this._vinylPauseSession.manualOverride)
-          this._vinylPauseSession.restartOnResume = true;
+        if (newlyEnabled && this._paused && this._vinylPauseSession &&
+            !this._vinylPauseSession.manualOverride) {
+          // A pause entered while ALL songs were disabled has no frozen
+          // transport, so shouldResume was false. Enabling a song is still
+          // an explicit playback preference for Resume (or immediately if
+          // the user opted into music during this Pause).
+          this._vinylPauseSession.restartOnResume=true;
+          this._vinylPauseSession.shouldResume=true;
+        }
         if (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
             (newlyEnabled && this._paused && this.settings.musicDuringPause))
           this._reconcileManualPauseMusic(this.settings.musicDuringPause);
@@ -699,7 +715,8 @@ export class AudioSynth {
           this._musicTimer = null;
           this._stemMusic?.stop();
           if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
-        } else if (this._musicWanted && this.ctx && !this._stemMusic?.started) {
+        } else if (this._musicWanted && this.ctx && !this._paused &&
+                   !this._stemMusic?.started) {
           if (!this._activateStemMusic() && !this._musicTimer &&
               this.ctx.state === 'running' && !this._jukeboxMode &&
               !this._paused && !this._stemMusic?.started) {
@@ -894,9 +911,14 @@ export class AudioSynth {
         // Turning continuous Pause music ON explicitly permits starting the
         // newly selected source before gameplay resumes.
         this._musicWanted = true;
-        if (this.ctx?.state === 'running' && this._activateStemMusic()) {
-          session.restartOnResume = false;
-          session.shouldResume = false;
+        if (this.ctx?.state === 'running') {
+          const started=this._activateStemMusic();
+          if (!started && !this._musicTimer) this.musicProviderFailed();
+          if (started || this._musicTimer !== null) {
+            session.restartOnResume = false;
+            session.shouldResume = false;
+            session.procedural = false;
+          }
         }
       } else if (!session.shouldResume && this._musicWanted &&
           !d?.started && this._musicTimer === null &&
