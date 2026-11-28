@@ -35,6 +35,8 @@ const KEY_MAP = {
   g: 'ghost', G: 'ghost',
   // Issue #68: Game Over Cemetery Montage. Other menus ignore the action.
   m: 'montage', M: 'montage',
+  // #82: read-only personal run comparison (Game Over only).
+  l: 'localranks', L: 'localranks',
   // #78: direct local evidence report (Game Over only; other scenes ignore it).
   r: 'report', R: 'report',
 };
@@ -174,6 +176,9 @@ export class MenuInput {
     if (this.retryAction && edge(5)) this._fire('retry', 'gamepad');
     // RT is otherwise unused on Game Over; mirror keyboard R.
     if (this.retryAction && edge(7)) this._fire('report', 'gamepad');
+    // Pad View/Select is otherwise unused here: inspect personal ranks without
+    // using A (retry) or the shoulder buttons reserved for shop/report.
+    if (this.retryAction && edge(8)) this._fire('localranks', 'gamepad');
     const dirs = {
       up: cur.btn[12] || cur.ay < -0.6,
       down: cur.btn[13] || cur.ay > 0.6,

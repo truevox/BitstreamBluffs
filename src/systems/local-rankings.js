@@ -59,11 +59,12 @@ function ratio(a, b, scale = 1) {
   return Number.isFinite(value) ? canonicalZero(value) : null;
 }
 
-function candidateOf(record) {
+function candidateOf(record, { includeUnenteredLocalRuns = false } = {}) {
   if (!isObject(record) || !ledgerVersions.includes(record.hashV) ||
       !nonempty(record.id) || !nonempty(record.seed) || !nonempty(record.dailyRuleId) ||
       !isMask(record.biomeMask ?? 0) || record.imported === true ||
-      normalizeInitials(record.initials).length < INITIALS_MIN || record.cause !== 'crash' ||
+      (!includeUnenteredLocalRuns && normalizeInitials(record.initials).length < INITIALS_MIN) ||
+      record.cause !== 'crash' ||
       ![record.distanceM, record.score, record.durationMs, record.maxAirtimeMs].every(nonnegative) ||
       !isObject(record.tricks) || !Object.values(record.tricks).every(nonnegative)) return null;
   if (record.biomeMask === null ||
@@ -101,11 +102,21 @@ function candidateOf(record) {
   };
 }
 
-function localCohort(history, scopeKey) {
+/** Exact stored-run cohort, using the same canonical validation as the
+ * calculator. The default requires initials (the existing local board
+ * contract); `includeUnenteredLocalRuns` is for private read-only history
+ * presentation ONLY, and does not grant official leaderboard eligibility.
+ * A local ledger hash is not proof of human play. */
+export function localRankingSelectionForRecord(record, options = {}) {
+  const candidate = candidateOf(record, options);
+  return candidate ? JSON.parse(candidate.scopeKey) : null;
+}
+
+function localCohort(history, scopeKey, options = {}) {
   const byRun = new Map();
   const conflicts = new Set();
   for (const record of history) {
-    const candidate = candidateOf(record);
+    const candidate = candidateOf(record, options);
     if (!candidate) continue;
     const prior = byRun.get(candidate.id);
     if (!prior) byRun.set(candidate.id, candidate);
@@ -146,8 +157,9 @@ function dominates(a, b) {
  * @param {Array<object>} history current SaveStore history snapshot
  * @param {{board:string, seed:string, biomeMask:number, dailyRuleId:string,
  *   boosts?:string[], upgradeRanks?:Object<string,number>}} selection exact cohort
+ * @param {{includeUnenteredLocalRuns?:boolean}} [options] private local history only; default preserves initials-gated board
  */
-export function calculateLocalRankings(history, selection) {
+export function calculateLocalRankings(history, selection, options = {}) {
   if (!Array.isArray(history)) throw new TypeError('Local ranking history must be an array');
   if (history.length > MAX_LOCAL_RANKING_RECORDS) {
     throw new RangeError(`Local ranking history is limited to ${MAX_LOCAL_RANKING_RECORDS} records`);
@@ -159,7 +171,7 @@ export function calculateLocalRankings(history, selection) {
   const loadout = loadoutOf(selection);
   if (!loadout) throw new TypeError('Invalid local ranking loadout');
   const cohort = scopeOf(selection.board, selection.seed, selection.biomeMask, selection.dailyRuleId, loadout);
-  const rows = localCohort(history, JSON.stringify(cohort)).map(({ id, values }) => ({
+  const rows = localCohort(history, JSON.stringify(cohort), options).map(({ id, values }) => ({
     id, values,
     percentiles: Object.fromEntries(metricKeys.map((key) => [key, null])),
     pareto: null,

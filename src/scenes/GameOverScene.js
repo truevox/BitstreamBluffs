@@ -45,6 +45,7 @@ import { ShopView } from '../ui/Views.js';
 import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
 import { installTakeoverHook } from '../ui/TakeoverHook.js';
 import { ReplayEvidenceView } from '../ui/ReplayEvidenceView.js';
+import { LocalRankingsView } from '../ui/LocalRankingsView.js';
 import { CemeteryMontageView } from '../ui/CemeteryMontageView.js';
 import { sanitizeMontageStyle } from '../systems/ghost/montageSettings.js';
 import { ATTEMPT_HISTORY_KEY } from '../systems/ghost/attemptHistoryService.js';
@@ -163,6 +164,7 @@ export class GameOverScene extends Phaser.Scene {
     this._buildMissions();
     this._buildButtons();
     this._buildMontageButton();
+    this._buildLocalRankingsButton();
     this._buildProgression();
     this._buildAchievementToast();
     this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 5, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
@@ -1127,6 +1129,32 @@ export class GameOverScene extends Phaser.Scene {
     });
   }
 
+  /** #82: the local-only readout reuses the existing modal slot/teardown. */
+  _buildLocalRankingsButton() {
+    this.localRanksBtn = new Button(this,this.theme,{
+      x:378,y:36,w:89,h:14,label:'RANKS L/VIEW',color:'cyan',
+      onClick:()=>this._openLocalRankings(),
+    });
+  }
+
+  _openLocalRankings() {
+    if (this.ghostView || this.takeoverPicker || this.coachView || this.shopOpen || this.entry || !this.alive || this.leaving) return;
+    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
+    this.ghostDim=this.add.rectangle(0,0,GAME_WIDTH,GAME_HEIGHT,0x000000,0.7)
+      .setOrigin(0,0).setDepth(400).setInteractive();
+    const view=new LocalRankingsView(this,this.theme,{record:this.rec,onClose:()=>this._closeGhosts()});
+    this.ghostView=view;
+    const store=this.registry.get(REG.SAVE_STORE);
+    const live=()=>this.alive && !this.leaving && this.ghostView===view && view.alive;
+    // A failure or late completion after Retry must never affect another scene.
+    Promise.resolve().then(()=>{
+      if(!live()||!store||typeof store.getRecentRuns!=='function')throw new Error('History unavailable');
+      return store.getRecentRuns(1000);
+    }).then(history=>{if(live())view.showHistory(history);})
+      .catch(()=>{if(live())view.showFailure();});
+  }
+
   _closeGhosts() {
     try { this.ghostView?.destroy(); } catch (e) { /* a failed teardown must not wedge the screen */ }
     this.ghostView = null;
@@ -1480,6 +1508,7 @@ export class GameOverScene extends Phaser.Scene {
     if (action === 'report' && !this.shopOpen && !this.entry) { this._openLocalReport(); return; }
     if (action === 'ghost' && !this.shopOpen && !this.entry) { this._openGhosts(); return; }
     if (action === 'montage' && !this.shopOpen && !this.entry) { this._openMontage(); return; }
+    if (action === 'localranks' && !this.shopOpen && !this.entry) { this._openLocalRankings(); return; }
     if (this.shopOpen) {
       // Decision 7: in an ARMED shop Enter / pad A buy, equip, unequip or turn the page on the highlighted
       // row (ShopView's own rules, the same as Title -> Profile -> Shop). In an unarmed autoprompt shop
