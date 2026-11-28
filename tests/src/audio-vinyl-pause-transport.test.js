@@ -1017,6 +1017,47 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('late unlock restores procedural source gain after an opted-in paused run resumes',()=>{
+    const {a,d,ctx,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=false;d.pack=null;
+    a._musicTimer=null;a._musicWanted=true;
+    ctx.state='suspended';
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    ctx.state='running';
+    a._activateStemMusic=jest.fn(()=>false);
+    a._startScheduler=jest.fn(()=>{a._musicTimer=2347;});
+    a._afterResume();
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([1,ctx.currentTime,.04]);
+    expect(a._musicWanted).toBe(true);
+    a._musicTimer=null;a.destroy();
+  });
+
+  test('explicit PAUSE of procedural Jukebox survives Restart without spawning music',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=true;d.pack=null;
+    d.setBiome=jest.fn();
+    a._musicTimer=6352;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a.jukeboxPause()).toBe(true);
+    expect(a._jukeboxUserPaused).toBe(true);
+    expect(a._musicWanted).toBe(false);
+    const start=jest.spyOn(a,'startMusic');
+    events.emit(EVT.RUN_ABORT,{reason:'restart',runId:'R',pauseToken:'R:1'});
+    events.emit(EVT.RUN_START,{seed:'again'});
+    expect(start).not.toHaveBeenCalled();
+    expect(a._musicWanted).toBe(false);
+    expect(a._musicTimer).toBeNull();
+    // A real explicit Play clears the persistent pause intention.
+    a._activateStemMusic=jest.fn(()=>true);
+    expect(a.jukeboxPlay()).toBe(true);
+    expect(a._jukeboxUserPaused).toBe(false);
+    a.destroy();
+  });
+
   test('visibility unlock never replaces a running procedural Pause fallback with an unverified stem',()=>{
     const {a,d,ctx,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

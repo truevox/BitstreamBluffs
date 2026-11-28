@@ -84,6 +84,9 @@ export class AudioSynth {
     this._musicTimer = null;
     this._musicSeed = null;
     this._musicWanted = false;
+    // Explicit human PAUSE is not equivalent to an absent transport. It
+    // survives run restart even when only procedural fallback was audible.
+    this._jukeboxUserPaused = false;
     this._jukeboxMode = false;
     this._musicMode = 'run';
     this._autoStartAttempted = false;
@@ -439,7 +442,7 @@ export class AudioSynth {
         this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
       if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode &&
           !this._paused && !this._stemMusic?.started)
-        this._startScheduler();
+        this.musicProviderFailed(); // restores muted bus before starting fallback
     }
   }
 
@@ -1347,7 +1350,8 @@ export class AudioSynth {
     // Respect an explicit manual pause in the jukebox.
     // An existing song is already advancing: don't call even a nominal
     // start routine, and do not reset the clock at the next run.
-    if (!this._stemMusic?.transportPaused && !this._stemMusic?.started)
+    if (!this._jukeboxUserPaused && !this._stemMusic?.transportPaused &&
+        !this._stemMusic?.started)
       this.startMusic(seed);
   }
 
@@ -1473,6 +1477,7 @@ export class AudioSynth {
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       this._jukeboxMode = true;
+      this._jukeboxUserPaused = false;
       this._musicWanted = true;
       if (this._paused) this._setPaused(true);
       this.unlock();  // called from actual user interaction
@@ -1487,7 +1492,8 @@ export class AudioSynth {
     this._vinylJukeboxIntent();
     const ok=(this._stemMusic?.transportPause()||false)||proceduralPlaying;
     if(ok){
-      this._musicWanted=false; // don't auto-resume after tab suspension
+      this._jukeboxUserPaused=true;
+      this._musicWanted=false; // don't auto-resume after tab suspension OR Restart
       if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
       if (this._paused) this._setPaused(true);
     }
@@ -1516,6 +1522,7 @@ export class AudioSynth {
       // Choose and invalidate the previous async generation BEFORE
       // AudioContext unlock can call _afterResume() and load another song.
       const moved=this._stemMusic.transportStep(direction<0?-1:1);
+      if(moved)this._jukeboxUserPaused=false;
       this.unlock(); // browser user-gesture policy
       return moved;
     } catch {return false;}
