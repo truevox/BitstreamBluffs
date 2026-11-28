@@ -684,6 +684,15 @@ export class AudioSynth {
         const hadMusic = this._hasEnabledSongs(this.settings?.musicEnabledSongs);
         const previouslyPlayingDuringPause = this.settings?.musicDuringPause === true;
         const newlyEnabled = !hadMusic && this._hasEnabledSongs(settings.musicEnabledSongs);
+        // Installation is unknown before the private catalog arrives. A
+        // deliberate ALL OFF → private-only selection still creates a
+        // playback request, even though no installed song can be confirmed.
+        // This intent is never used to authorize procedural fallback.
+        const hadAnySelection=Object.values(this.settings?.musicEnabledSongs||{})
+          .some(value=>value===true);
+        const requestedAnySelection=Object.values(sanitizeSongSelection(settings.musicEnabledSongs))
+          .some(value=>value===true);
+        const newlyRequested=newlyEnabled || (!hadAnySelection && requestedAnySelection);
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -720,7 +729,7 @@ export class AudioSynth {
         // Enabling a song while gameplay is paused is a preference change,
         // not an explicit Jukebox PLAY. If all-off invalidated the frozen
         // transport, restart the selected music only after gameplay resumes.
-        if (newlyEnabled && this._paused && this._vinylPauseSession &&
+        if (newlyRequested && this._paused && this._vinylPauseSession &&
             !this._vinylPauseSession.manualOverride) {
           // A pause entered while ALL songs were disabled has no frozen
           // transport, so shouldResume was false. Enabling a song is still
@@ -730,7 +739,7 @@ export class AudioSynth {
           this._vinylPauseSession.shouldResume=true;
         }
         if (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
-            (newlyEnabled && this._paused && this.settings.musicDuringPause))
+            (newlyRequested && this._paused && this.settings.musicDuringPause))
           this._reconcileManualPauseMusic(this.settings.musicDuringPause);
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.

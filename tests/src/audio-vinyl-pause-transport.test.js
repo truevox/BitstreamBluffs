@@ -910,6 +910,41 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('enabling a private-only song during an already opted-in ALL-OFF Pause plays on catalog-ready',()=>{
+    const {a,d,events}=setup();
+    const privateId=GAME_SONGS[4].id;
+    const allOff=Object.fromEntries(GAME_SONGS.map(song=>[song.id,false]));
+    a.settings.musicEnabledSongs=allOff;
+    a._musicWanted=false;
+    d.started=false;d.transportPaused=false;d.ready=false;d.pack=null;
+    a._musicTimer=null;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._musicWanted).toBe(false); // user still explicitly selected nothing
+    const startScheduler=jest.spyOn(a,'_startScheduler');
+    a.applySettings({...a.settings,
+      musicEnabledSongs:{...allOff,[privateId]:true}});
+    expect(a._hasEnabledSongs()).toBe(false); // no invented private installation
+    expect(a._hasPendingCatalogSelection()).toBe(true);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(true);
+    expect(startScheduler).not.toHaveBeenCalled();
+    expect(a._musicTimer).toBeNull();
+    expect(d.started).toBe(false);
+    d.ready=true;d.catalog=[{id:privateId,title:'Private Original'}];
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    a._onStemCatalogReady();
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    expect(a._paused).toBe(true);
+    expect(a._musicTimer).toBeNull();
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(activate).toHaveBeenCalledTimes(1); // no doubled song on resume
+    a.destroy();
+  });
+
   test('turning continuous Pause ON queues an undiscovered private original without synth',()=>{
     const {a,d,events}=setup();
     const id=GAME_SONGS[4].id;
