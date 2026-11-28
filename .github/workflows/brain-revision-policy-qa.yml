@@ -1,0 +1,45 @@
+name: Brain SIM revision stale-stat fallback QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/brain-revision-policy-qa.yml'
+      - 'src/systems/brain/brainRevisionPolicy.js'
+      - 'tests/brain/brain-revision-policy.test.js'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/brain-revision-policy-qa.yml'
+      - 'src/systems/brain/brainRevisionPolicy.js'
+      - 'tests/brain/brain-revision-policy.test.js'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  revision-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact triggering commit
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify released game source identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: No stale fitness or stale brain Idle admission
+        run: npm test -- --runInBand tests/brain/brain-revision-policy.test.js tests/brain/brain-file-preflight.test.js
