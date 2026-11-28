@@ -838,6 +838,17 @@ export class AudioSynth {
     const pending = session ? this._cancelVinylTransition() : null;
     this._vinylPauseSession = null;
     this._paused = false;
+    // The procedural fallback is RUN-only. A real original stem continues
+    // into Title; synthesized substitute notes must not outlive the run or
+    // masquerade as a stopped original in the Title jukebox.
+    if (this._musicTimer !== null) {
+      clearInterval(this._musicTimer);
+      this._musicTimer=null;
+      if (!this._stemMusic?.started) {
+        this._musicWanted=false;
+        this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
+      }
+    }
     const snap = session || pending?.snapshot;
     if (!snap?.shouldResume || snap.manualOverride) return;
     // Turning every song off during a default-OFF Pause invalidates the old
@@ -852,10 +863,10 @@ export class AudioSynth {
     }
     const d = this._stemMusic;
     if (snap.procedural) {
-      this._musicWanted = true;
-      if (this.ctx?.state === 'running') {
-        if (!this._activateStemMusic() && !this._musicTimer) this._startScheduler();
-      }
+      // Restore only an original catalog source on Title. This is a menu,
+      // never an alternative run-scoring procedural soundtrack session.
+      this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs);
+      if (this._musicWanted && this.ctx?.state === 'running') this._activateStemMusic();
       return;
     }
     if (!d?.transportPaused || d.started || d._token !== snap.token ||
@@ -1417,6 +1428,14 @@ export class AudioSynth {
     this._menuAutoplayPending = false; // next/previous is explicit manual intent
     try {
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      // A skip hands sound ownership to an explicitly selected ORIGINAL.
+      // Retire any pause-only procedural substitute before the generation
+      // changes, even when the next original is not yet decodable.
+      if (this._paused && this._musicTimer !== null) {
+        clearInterval(this._musicTimer);
+        this._musicTimer=null;
+        this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
+      }
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       const wasPaused=this._stemMusic.transportPaused;

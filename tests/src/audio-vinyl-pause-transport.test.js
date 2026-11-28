@@ -822,6 +822,43 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('Quit from opted-in Pause stops run-only procedural fallback without disturbing Title sound policy',()=>{
+    const {a,d,events,ctx}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;
+    d.transportSnapshot=jest.fn(()=>({state:'stopped',current:null,upcoming:[],position:0}));
+    a._musicTimer=8787;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a.jukeboxSnapshot().state).toBe('playing');
+    events.emit(EVT.RUN_ABORT,{reason:'quit',runId:'R',pauseToken:'R:1'});
+    expect(a._musicMode).toBe('menu');
+    expect(a._paused).toBe(false);
+    expect(a._musicTimer).toBeNull();
+    expect(a.jukeboxSnapshot().state).toBe('stopped');
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([0,ctx.currentTime,.03]);
+    expect(a._vinylPauseSession).toBeNull();
+    a.destroy();
+  });
+
+  test('Pause Jukebox SKIP retires procedural fallback before switching originals',()=>{
+    const {a,d,events,ctx}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;
+    d.transportSnapshot=jest.fn(()=>({state:'stopped',current:null,upcoming:[],position:0}));
+    a._musicTimer=9898;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a.jukeboxSnapshot().state).toBe('playing');
+    expect(a.jukeboxStep(1)).toBe(true);
+    expect(d.transportStep).toHaveBeenCalledTimes(1);
+    expect(a._musicTimer).toBeNull();
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([0,ctx.currentTime,.03]);
+    expect(a._vinylPauseSession.manualOverride).toBe(true);
+    expect(a.jukeboxSnapshot().state).toBe('stopped');
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._musicTimer).toBeNull();
+    a.destroy();
+  });
+
   test('quiet default-OFF Pause retains not-yet-loaded catalog start for gameplay Resume',()=>{
     const {a,d,events}=setup();
     d.started=false;d.transportPaused=false;d.ready=false;
