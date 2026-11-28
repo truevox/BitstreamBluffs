@@ -341,14 +341,18 @@ export function upgradeShopLayout(o = {}) {
  * CONFIRM DELETE row. Changing the page clears the selection in the host. */
 export function courseArchiveManagerLayout(o={}) {
   const archives=Array.isArray(o.archives)?o.archives:[];
+  const total=Number.isSafeInteger(o.totalArchives)&&o.totalArchives>=archives.length?o.totalArchives:archives.length;
+  const isFiltered=typeof o.query==='string'&&o.query.trim().length>0;
   const pageCount=Math.max(1,Math.ceil(archives.length/7));
   const page=Number.isSafeInteger(o.page)?((o.page%pageCount)+pageCount)%pageCount:0;
   const capacity=archiveCapacity(o.profile||{});
   const rows=[
     {kind:'head',key:'head',label:'',right:'BANK '+(o.profile?.bank||0)},
     {kind:'archiveBack',key:'archiveBack',label:'← BACK TO UPGRADES'},
-    {kind:'header',key:'archiveHeader',label:`COURSE ARCHIVES ${archives.length}/${capacity}`},
-    {kind:'archivePager',key:'archivePager',label:'← PREV / NEXT →',state:`${page+1}/${pageCount}`},
+    {kind:'header',key:'archiveHeader',label:isFiltered
+      ?`MATCHING COURSES ${archives.length}/${total} - ${capacity} SLOTS`
+      :`COURSE ARCHIVES ${archives.length}/${capacity}`},
+    {kind:'archivePager',key:'archivePager',label:'FIND SEED  /  ← PAGE →',state:`${page+1}/${pageCount}`},
   ];
   const selected=typeof o.selected==='string'?o.selected:null;
   for(const course of archives.slice(page*7,(page+1)*7)) {
@@ -360,9 +364,12 @@ export function courseArchiveManagerLayout(o={}) {
       label:(selected===key?'[SELECTED] ':'')+seed.slice(0,23),
       state:`MASK ${mask.toString(16).toUpperCase()} F${favoriteCount}`});
   }
-  if(selected && archives.some(c=>c.key===selected))
+  if(selected && archives.some(c=>c.key===selected)){
+    rows.push({kind:'archiveShare',key:'archiveShare',archiveKey:selected,
+      label:'COPY SELECTED SEED + MASK',state:'SHARE'});
     rows.push({kind:'archiveConfirm',key:'archiveConfirm',archiveKey:selected,
       label:'CONFIRM DELETE SELECTED ARCHIVE',state:'ERASE'});
+  }
   rows.push({kind:'static',key:'archiveNotice',label:String(o.notice||'SELECT COURSE FIRST; DELETION IS EXPLICIT').slice(0,58)});
   const texts=[];let y=8;
   for(const row of rows){
