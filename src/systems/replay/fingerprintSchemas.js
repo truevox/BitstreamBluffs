@@ -418,6 +418,8 @@ export const NON_CAUSAL = Object.freeze({
     bsodEdge: PRESENTATION, windPom: PRESENTATION, startGate: PRESENTATION, bestMarker: PRESENTATION,
     deathMarker: PRESENTATION, kodiakRider: PRESENTATION, blackHole: PRESENTATION, ghostRiders: PRESENTATION,
     _camX: PRESENTATION, _camY: PRESENTATION, _zoom: PRESENTATION, _zoomKick: PRESENTATION, shakeAmp: PRESENTATION,
+    _cameraIntent: PRESENTATION + ' (#155 immutable, regenerated every render tick; no physics/replay inputs)',
+    _suspendStageActive: PRESENTATION + ' (#424 ephemeral pre-commit staging latch: suppresses HUD/observers, not physics)',
     _landingShake: PRESENTATION, _frameDt: PRESENTATION, _hudMs: PRESENTATION + ' (HUD refresh throttle)',
     glitch: PRESENTATION + ' (GlitchDirector: visual events and shader only; its seeded rng is not a sim stream)',
     hints: PRESENTATION, tutDone: PRESENTATION, tutShown: PRESENTATION, tutTimers: PRESENTATION, tuckShows: PRESENTATION,

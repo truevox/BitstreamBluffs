@@ -177,6 +177,33 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
     expect(s._cameraIntent).toBeNull();
     expect(s.cameras.main.rotation).toBe(0);
   });
+  test('both new modes retain world-start clamp and full-screen effects overscan on roll',()=>{
+    for(const mode of ['less','drone']){
+      const s=makeScene(mode);
+      s.sled.x=44;s.sled.y=180;
+      s.simClock.tick=1;
+      const updates=[];
+      const makeRect=()=>({
+        setScale(x){updates.push(['scale',x]);return this;},
+        setPosition(x,y){updates.push(['pos',x,y]);return this;},
+      });
+      s.flashRect=makeRect();s.blindRect=makeRect();
+      s.updateCamera(16);
+      const z=s.cameras.main.zoom;
+      const visibleLeft=s.cameras.main.scrollX+480/2-480/(2*z);
+      expect(visibleLeft).toBeGreaterThanOrEqual(-31);
+      if(mode==='less'){
+        expect(s.cameras.main.rotation).toBe(0);
+        expect(s.cameras.main.zoom).toBe(1);
+      }else{
+        expect(s._cameraIntent.mode).toBe('drone');
+        expect(updates.filter(x=>x[0]==='scale').length).toBeGreaterThanOrEqual(2);
+        // Uniform rectangle expands beyond the zoom compensated viewport.
+        expect(updates.at(-2)[1]).toBeGreaterThan(1/z);
+      }
+    }
+  });
+
   test('drone camera leaves view/collision/telegraph planner untouched',()=>{
     const s=makeScene();
     const hazard={x:s.sled.x+22};

@@ -284,6 +284,8 @@ function installRunSceneStateKit(global) {
   const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',
     'streaks', 'flashRect', 'blindRect', 'bsodEdge', 'windPom', 'startGate', 'bestMarker', 'deathMarker', 'ghostRiders',
     'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake',
+    '_cameraIntent', // #155 regenerated immutable render-only intent; never serialize as causal state
+    '_suspendStageActive', // #424 ephemeral staging presentation/observer mute; never stored as a normal run field
     // SIM9: bridge look/veil and cached span are visual; marker height reads joined mesh,
     // not speculative terrain. Matches the shipped RunScene fingerprint exclusions.
     '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn',

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
 
-const vite=await createServer({server:{host:'127.0.0.1',port:8369,strictPort:true}});
+const vite=await createServer({server:{host:'127.0.0.1',port:8392,strictPort:true}});
 let browser;
 try{
   await vite.listen();
@@ -43,6 +43,21 @@ try{
   assert.equal(setting.stored,'drone');
   assert.equal(setting.label,'drone');
   console.log('PULP_REAL_SETTINGS_SELECT_PASS',setting);
+  // Non-reduced mode has only three selectable options; pressing Right
+  // from 100% Pulp must WRAP to 99% Less, not stall on a ghost LOCKED item.
+  await page.evaluate(()=>{
+    const v=window.__bbGame.scene.getScene('TitleScene').view;
+    const i=v.menu.items.findIndex(x=>x.label==='PULP');
+    v.menu._adjust(i,1);
+  });
+  const wrapped=await page.evaluate(()=>window.__bbGame.registry.get('settings')?.pulp);
+  assert.equal(wrapped,'less');
+  await page.evaluate(()=>{
+    const v=window.__bbGame.scene.getScene('TitleScene').view;
+    v.menu._adjust(v.menu.items.findIndex(x=>x.label==='PULP'),-1);
+  });
+  assert.equal(await page.evaluate(()=>window.__bbGame.registry.get('settings')?.pulp),'drone');
+  console.log('PULP_THREE_OPTION_WRAP_PASS');
 
   // Reduce Motion must override the player preference, explain its lock,
   // and reject even a physical attempt to change Pulp while locked.

@@ -191,9 +191,14 @@ export class SettingsView extends View {
         get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
       // Pulp is strictly presentation. Reduce Motion ALWAYS wins and the
       // current choice visibly explains its locked override (not a hidden noop).
-      { kind:'choice',label:'PULP',options:[
-        {value:'less',label:'99% LESS'},{value:'original',label:'ORIGINAL'},
-        {value:'drone',label:'100% PULP'},{value:'locked',label:'LOCKED: LESS'}],
+      { kind:'choice',label:'PULP',get options(){
+        // MenuList._adjust sees only the three real values while unlocked;
+        // LOCKED is a display-only singleton while Reduce Motion owns the
+        // camera. Never leave a non-wrapping phantom fourth choice.
+        return isReducedMotion(scene)?[{value:'locked',label:'LOCKED: LESS'}]:[
+          {value:'less',label:'99% LESS'},{value:'original',label:'ORIGINAL'},
+          {value:'drone',label:'100% PULP'}];
+      },
         get:()=>isReducedMotion(scene)?'locked':(settings().pulp||'original'),
         set:v=>{if(!isReducedMotion(scene)&&v!=='locked')updateSetting(game,'pulp',v);} },
       // Issue #56: the Best and Latest ghosts switch independently (favorites are per course, from Game Over).

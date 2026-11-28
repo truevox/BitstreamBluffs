@@ -3269,6 +3269,19 @@ export class RunScene extends Phaser.Scene {
     if (this.blindRect) this.blindRect.setScale(k).setPosition(px, py);
   }
 
+  /** #155: uniform screen effects must never expose rotated viewport corners. */
+  applyPulpOverlayCoverage(zoom,roll){
+    if(!this.flashRect&&!this.blindRect)return;
+    const k=1/zoom,extra=Math.abs(roll)*2+0.02; // conservative bound on |sin(roll)|
+    const px=(GAME_WIDTH*(zoom-1))/(2*zoom);
+    const py=(GAME_HEIGHT*(zoom-1))/(2*zoom);
+    for(const rect of [this.flashRect,this.blindRect]){
+      if(!rect)continue;
+      rect.setScale(k*(1+extra));
+      rect.setPosition(px-GAME_WIDTH*k*extra/2,py-GAME_HEIGHT*k*extra/2);
+    }
+  }
+
   updateCamera(dt) {
     const cam = this.cameras.main;
     const s = this.sled;
@@ -3303,12 +3316,23 @@ export class RunScene extends Phaser.Scene {
         this.applyZoomCompensation(intent.zoom);
       }
       if(cam.setRotation)cam.setRotation(intent.roll);
-      cam.scrollX=Math.round(intent.focusX-GAME_WIDTH/2);
+      let scrollX=intent.focusX-GAME_WIDTH/2;
+      const visibleLeft=scrollX+GAME_WIDTH/2-GAME_WIDTH/(2*intent.zoom);
+      if(visibleLeft < -30) scrollX+=-30-visibleLeft;
+      cam.scrollX=Math.round(scrollX);
       cam.scrollY=Math.round(intent.focusY-GAME_HEIGHT/2);
+      // Full-screen flash / blindness are uniform, screen-space effects,
+      // NOT a tilted painting attached to the terrain. Overscan their
+      // untextured quads enough to cover the viewport corners under roll.
+      // At max .025rad roll a 7% overscan exceeds both rotated corner gaps.
+      this.applyPulpOverlayCoverage(intent.zoom,intent.roll);
       return;
     }
     // No residual camera roll or zoom from a prior 100% Pulp frame.
-    if(cam.rotation&&cam.setRotation)cam.setRotation(0);
+    if(cam.rotation&&cam.setRotation){
+      cam.setRotation(0);
+      this.applyZoomCompensation(cam.zoom); // remove drone overlay overscan
+    }
     this._cameraIntent=null;
     if(pulp==='less'){
       // 99% Less Pulp: no cosmetic shake, sway, speed-zoom or roll. Keep
@@ -3316,7 +3340,7 @@ export class RunScene extends Phaser.Scene {
       this.shakeAmp=0;
       this._zoom=1;this._zoomKick=0;
       if(cam.zoom!==1){cam.setZoom(1);this.applyZoomCompensation(1);}
-      this._camX=s.x-GAME_WIDTH*.38;
+      this._camX=Math.max(-30,s.x-GAME_WIDTH*.38);
       this._camY=s.y-GAME_HEIGHT/3;
       cam.scrollX=Math.round(this._camX);
       cam.scrollY=Math.round(this._camY);
