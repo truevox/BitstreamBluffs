@@ -848,6 +848,29 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('Quit from opted-in procedural Pause retries ready original exactly once without Title synth',()=>{
+    const {a,d,ctx,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=true;d.pack=null;
+    a._musicTimer=45127;
+    a._musicWanted=true;
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    const scheduler=jest.spyOn(a,'_startScheduler');
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    expect(a._musicTimer).toBe(45127);
+    events.emit(EVT.RUN_ABORT,{reason:'quit',runId:'R',pauseToken:'R:1'});
+    expect(a._musicTimer).toBeNull();
+    expect(a._musicMode).toBe('menu');
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(scheduler).not.toHaveBeenCalled();
+    expect(d.started).toBe(true);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([0,ctx.currentTime,.03]);
+    expect(a._vinylPauseSession).toBeNull();
+    a.destroy();
+  });
+
   test('Quit from opted-in Pause stops run-only procedural fallback without disturbing Title sound policy',()=>{
     const {a,d,events,ctx}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

@@ -868,7 +868,8 @@ export class AudioSynth {
     // The procedural fallback is RUN-only. A real original stem continues
     // into Title; synthesized substitute notes must not outlive the run or
     // masquerade as a stopped original in the Title jukebox.
-    if (this._musicTimer !== null) {
+    const retiredRunFallback=this._musicTimer !== null;
+    if (retiredRunFallback) {
       clearInterval(this._musicTimer);
       this._musicTimer=null;
       if (!this._stemMusic?.started) {
@@ -882,7 +883,16 @@ export class AudioSynth {
       }
     }
     const snap = session || pending?.snapshot;
-    if (!snap?.shouldResume || snap.manualOverride) return;
+    if (!snap?.shouldResume || snap.manualOverride) {
+      // An opted-in Pause kept the procedural music running, so there is no
+      // frozen frame to restore on Quit. Its RUN-only fallback has ended;
+      // Title must try the selected ORIGINAL once if catalog is already
+      // ready. Otherwise onReady will honor the preserved original request.
+      if (retiredRunFallback && !snap?.manualOverride && this._musicWanted &&
+          this._stemMusic?.ready && !this._stemMusic.started &&
+          this.ctx?.state === 'running') this._activateStemMusic();
+      return;
+    }
     // Turning every song off during a default-OFF Pause invalidates the old
     // transport. If a song was re-enabled, Quit must honor the deferred
     // choice too: Title uses its original-only jukebox policy (no synth).
