@@ -1,0 +1,63 @@
+name: P0 real Matter governed episode batch QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lab-real-physics-batch-qa.yml'
+      - 'tools/lab/qa-real-physics-*'
+      - 'tools/lab/test-real-physics-batch-browser.mjs'
+      - 'tools/lab/episode-batch.mjs'
+      - 'src/systems/lab/LabResourceGovernor.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/PhysicsTuner.js'
+      - 'src/entities/**'
+      - 'src/data/**'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lab-real-physics-batch-qa.yml'
+      - 'tools/lab/qa-real-physics-*'
+      - 'tools/lab/test-real-physics-batch-browser.mjs'
+      - 'tools/lab/episode-batch.mjs'
+      - 'src/systems/lab/LabResourceGovernor.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/PhysicsTuner.js'
+      - 'src/entities/**'
+      - 'src/data/**'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  governed-real-matter-batch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact triggering commit
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify source identity and existing scheduler/governor contracts
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          npm test -- --runInBand tests/lab/episode-batch.test.js tests/lab/resource-governor.test.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify compiled real Matter episode batches, order, admission and cancellation
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/lab/test-real-physics-batch-browser.mjs
