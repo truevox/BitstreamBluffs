@@ -432,7 +432,11 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+    // A running procedural fallback is the current audible transport. Tab
+    // visibility / AudioContext unlock may not replace it with an original
+    // that merely accepted start() but still has to fetch/decode its stems.
+    if (this._musicWanted && this._musicTimer === null &&
+        this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
       if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode &&
           !this._paused && !this._stemMusic?.started)
         this._startScheduler();

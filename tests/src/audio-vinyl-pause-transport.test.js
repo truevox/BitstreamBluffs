@@ -959,6 +959,27 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('visibility unlock never replaces a running procedural Pause fallback with an unverified stem',()=>{
+    const {a,d,ctx,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;d.ready=true;
+    a._musicWanted=true;
+    a._musicTimer=55077; // synth fallback already has audible frames scheduled
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._paused).toBe(true);
+    const activate=jest.fn(()=>{d.started=true;a._musicTimer=null;return true;});
+    a._activateStemMusic=activate;
+    ctx.state='suspended';
+    ctx.state='running';
+    a._afterResume(); // visibilitychange -> AudioContext.resume()
+    expect(activate).not.toHaveBeenCalled();
+    expect(a._musicTimer).toBe(55077);
+    expect(a._musicWanted).toBe(true);
+    expect(a._paused).toBe(true);
+    a._musicTimer=null;
+    a.destroy();
+  });
+
   test('private-only song requested before catalog discovery survives a quiet Pause and Resume',()=>{
     const {a,d,events}=setup();
     const privateSong=GAME_SONGS[4].id;
