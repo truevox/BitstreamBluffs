@@ -1546,6 +1546,9 @@ export class StemMusicDirector {
 		this.bus.gain.cancelScheduledValues(t);
 		this.bus.gain.setTargetAtTime(0,t,.007);
 		++this._token; // all older fetches are now stale
+		// A manual SEEK owns a new clock/offset, never reuse a previous
+		// incoming pack's pending async decode offset on a later PAUSE.
+		this._pendingResumeOffset=null;
 		for(const src of this.activeNodes){
 			try {src.stop(t+.014);} catch {}
 		}

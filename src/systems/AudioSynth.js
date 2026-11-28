@@ -1534,7 +1534,9 @@ export class AudioSynth {
       // Choose and invalidate the previous async generation BEFORE
       // AudioContext unlock can call _afterResume() and load another song.
       const moved=this._stemMusic.transportStep(direction<0?-1:1);
-      if(moved)this._jukeboxUserPaused=wasPaused;
+      // Selecting the next song while AUTO-frozen does NOT mean the user
+      // pressed Jukebox PAUSE; keep that persistent human intent unchanged.
+      // If they DID pause manually, it was already true and stays true.
       this.unlock(); // browser user-gesture policy
       return moved;
     } catch {return false;}
