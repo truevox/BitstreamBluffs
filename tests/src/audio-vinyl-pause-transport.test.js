@@ -775,6 +775,33 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('second ON pause while first restore awaits AudioContext unlock retains exact stem frame',()=>{
+    const {a,d,events,ctx}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    const savedOffset=d._resumeOffset;
+    ctx.state='suspended';
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._vinylPauseSession.shouldResume).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylResume?.awaitingContext).toBe(true);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:2'});
+    expect(a._paused).toBe(true);
+    expect(a._vinylResume).toBeNull();
+    expect(a._vinylPauseSession).toMatchObject({
+      shouldResume:true,offset:savedOffset,trackIndex:0,pauseToken:'R:2'});
+    ctx.state='running';
+    a._afterResume();
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    expect(d._resumeOffset).toBe(savedOffset);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    expect(a._musicWanted).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:2'});
+    jest.advanceTimersByTime(300);
+    expect(d.transportPlay).toHaveBeenCalledTimes(1);
+    a.destroy();
+  });
+
   test('hidden/suspended AudioContext defers resume until unlock without drifting',()=>{
     const {a,d,events,ctx}=setup();
     events.emit(EVT.GAME_PAUSE,{});

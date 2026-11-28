@@ -875,6 +875,15 @@ export class AudioSynth {
         d.ctx === this.ctx);
       const audible = this._vinylAudible() && originallyWanted && live;
       const keepPlaying = this.settings?.musicDuringPause === true;
+      // The old Resume may be waiting on an AudioContext unlock or the
+      // reverse vinyl scratch. A rapid second Pause must not erase the ONLY
+      // valid frozen source frame merely because this Pause setting is ON.
+      const prior=old?.snapshot;
+      const carried=!!(keepPlaying && old?.shouldResume && prior?.shouldResume &&
+        !prior.manualOverride && !this._musicWanted &&
+        (prior.procedural ? this._musicTimer===null :
+          d?.transportPaused && !d.started && d._token===prior.token &&
+          d.trackIndex===prior.trackIndex && d._resumeOffset===prior.offset));
       const frozen = !keepPlaying && (activeTransport ? d.transportPause() :
         !!(old?.shouldResume && d?.transportPaused));
       const procedural = !keepPlaying && originallyWanted && !live && !frozen &&
@@ -885,13 +894,20 @@ export class AudioSynth {
         this._musicTimer = null;
       }
       this._vinylPauseSession = {
-        shouldResume:!!(originallyWanted && (frozen || procedural)),
-        procedural,manualOverride:false,
+        shouldResume:!!(originallyWanted && (frozen || procedural || carried)),
+        procedural:procedural || !!(carried && prior.procedural),manualOverride:false,
+        restartOnResume:!!(carried && prior.restartOnResume),
         runId:payload?.runId??null,pauseToken:payload?.pauseToken??null,
-        token:d?._token,trackIndex:d?.trackIndex,offset:d?._resumeOffset,
+        token:carried?prior.token:d?._token,
+        trackIndex:carried?prior.trackIndex:d?.trackIndex,
+        offset:carried?prior.offset:d?._resumeOffset,
       };
       this._enterMenuMusic(); // neutral menu arrangement, same source clock
       this._setPaused(true);
+      // If the previous pause was suspended, _afterResume() will retry. If
+      // only the vinyl timer was pending and the context is already awake,
+      // restore immediately through the same token-checked path.
+      if (carried) this._reconcileManualPauseMusic(true);
       if (audible && !keepPlaying) this._vinylScratch?.play('pause');
     } catch { /* audio failure must not block Control's physical pause */ }
   }
