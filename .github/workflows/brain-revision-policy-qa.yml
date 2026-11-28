@@ -4,14 +4,18 @@ on:
     paths:
       - '.github/workflows/brain-revision-policy-qa.yml'
       - 'src/systems/brain/brainRevisionPolicy.js'
+      - 'src/systems/brain/localBrainCheckpoints.js'
       - 'tests/brain/brain-revision-policy.test.js'
+      - 'tests/brain/lab-checkpoint-storage.test.js'
       - 'package*.json'
   push:
     branches: [main]
     paths:
       - '.github/workflows/brain-revision-policy-qa.yml'
       - 'src/systems/brain/brainRevisionPolicy.js'
+      - 'src/systems/brain/localBrainCheckpoints.js'
       - 'tests/brain/brain-revision-policy.test.js'
+      - 'tests/brain/lab-checkpoint-storage.test.js'
       - 'package*.json'
   workflow_dispatch:
 permissions:
@@ -42,4 +46,4 @@ jobs:
           node tools/ruleset/build-ruleset.mjs --check
           node tools/ruleset/build-ruleset.mjs --check-identity
       - name: No stale fitness or stale brain Idle admission
-        run: npm test -- --runInBand tests/brain/brain-revision-policy.test.js tests/brain/brain-file-preflight.test.js
+        run: npm test -- --runInBand tests/brain/brain-revision-policy.test.js tests/brain/brain-file-preflight.test.js tests/brain/lab-checkpoint-storage.test.js
