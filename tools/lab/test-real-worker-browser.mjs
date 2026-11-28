@@ -74,14 +74,79 @@ try{
    URL.revokeObjectURL(url);
    const unavailable=await run({campaignSeed:'unavailable',count:1,concurrency:1,
     workerFactory:()=>{throw Error('worker denied');}});
-   return {successes,abort,poison,unavailable,launched,terminated,workerType:'module'};
+   // #453: admission governor now guards ACTUAL browser Worker startup, not
+   // merely a separately unit-tested numerical policy.
+   const governed=window.__labWorkerQa.runGovernedBrowserWorkerBatch;
+   const signals={navigatorRef:{hardwareConcurrency:8,deviceMemory:16},documentRef:document};
+   const request={campaignSeed:'training-golden-v1',count:16,
+    authorizedSlots:1,requestedSlots:4,activeWorkers:0,rideActive:false,...signals};
+   const before=launched;
+   const limited=await governed(request);
+   if(!limited.ok||limited.budget.admissionLimit!==1||
+    limited.budget.startsAvailable!==1||launched!==before+1||
+    JSON.stringify(limited.results.map(r=>r.score))!==JSON.stringify(expected))
+    throw Error('Governor bypassed one authorized own-site Sim-Slot or violated golden vector');
+   const limitedWorkers=launched-before;
+   const beforeDenied=launched;
+   const rideHeld=await governed({...request,rideActive:true});
+   const hiddenHeld=await governed({...request,documentRef:{visibilityState:'hidden'}});
+   const occupiedHeld=await governed({...request,activeWorkers:1});
+   if([rideHeld,hiddenHeld,occupiedHeld].some(x=>x.ok||x.code!=='admission-held')||launched!==beforeDenied)
+    throw Error('Governor admitted workers while riding/hidden/fully occupied');
+   const launchedBeforeRide=launched;
+   const waitForStart=async(beforeCount)=>{
+    for(let i=0;i<80&&launched<=beforeCount;i++)
+     await new Promise(done=>setTimeout(done,5));
+    if(launched<=beforeCount)throw Error('Expected actual Worker startup before cancellation');
+   };
+   const rideStart=new AbortController();
+   const pendingRide=governed({...request,count:10000,rideStartSignal:rideStart.signal});
+   await waitForStart(launchedBeforeRide);
+   rideStart.abort();
+   const rideAbort=await pendingRide;
+   if(rideAbort.ok||rideAbort.code!=='aborted')throw Error('Ride start did not stop active Worker batch');
+   const listeners=new Set();
+   const controlledDoc={visibilityState:'visible',
+    addEventListener:(name,fn)=>{if(name==='visibilitychange')listeners.add(fn);},
+    removeEventListener:(name,fn)=>{if(name==='visibilitychange')listeners.delete(fn);}};
+   const beforeHide=launched;
+   const pendingHidden=governed({...request,count:10000,documentRef:controlledDoc});
+   await waitForStart(beforeHide);
+   controlledDoc.visibilityState='hidden';
+   for(const listener of [...listeners])listener(); // synthetic browser event
+   const hiddenAbort=await pendingHidden;
+   if(hiddenAbort.ok||hiddenAbort.code!=='aborted')
+    throw Error('Visibility change did not stop active Worker batch');
+   if(listeners.size!==0)throw Error('Governed worker leaked visibility listeners');
+   // Concurrent requests share one per-tab reservation, not two claims to
+   // the same slot. The first run is deliberately long and then cancelled.
+   const overlapAbort=new AbortController();
+   const overlap=governed({...request,count:10000,signal:overlapAbort.signal});
+   await Promise.resolve();
+   const deniedOverlap=await governed({...request,count:1});
+   if(deniedOverlap.ok||deniedOverlap.code!=='admission-held')
+    throw Error('Concurrent batch double-spent an authorized Sim-Slot');
+   overlapAbort.abort();
+   const cancelledOverlap=await overlap;
+   if(cancelledOverlap.ok||cancelledOverlap.code!=='aborted')
+    throw Error('Concurrent batch cancellation did not release reservation');
+   // A reservation must be available again after cancellation.
+   const afterCancel=await governed({...request,count:1});
+   if(!afterCancel.ok||afterCancel.results.length!==1)
+    throw Error('Cancelled reservation was not restored');
+   return {successes,abort,poison,unavailable,governor:{
+    limitedWorkers,limit:limited.budget.admissionLimit,
+    rideHeld:rideHeld.code,hiddenHeld:hiddenHeld.code,occupiedHeld:occupiedHeld.code,
+    rideAbort:rideAbort.code,hiddenAbort:hiddenAbort.code,overlapDenied:deniedOverlap.code,
+    overlapAbort:cancelledOverlap.code,reusedAfterCancellation:afterCancel.ok},
+    launched,terminated,workerType:'module'};
   }finally{window.Worker=OriginalWorker;}
  });
  assert.deepEqual(report.abort,{ok:false,code:'aborted'});
  assert.deepEqual(report.poison,{ok:false,code:'episode-failed'});
  assert.deepEqual(report.unavailable,{ok:false,code:'worker-unavailable'});
  assert.equal(report.launched,report.terminated,'worker cleanup leaked real workers');
- assert.equal(report.launched,1+2+4+4);
+ assert.ok(report.launched>=1+2+4+4+1);
  assert.deepEqual(errors,[],'browser errors');
  console.log('PASS_COMPILED_REAL_MODULE_WORKER_EPISODES',JSON.stringify({...report,errors}));
  await ctx.close();
