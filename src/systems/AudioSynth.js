@@ -84,6 +84,9 @@ export class AudioSynth {
     this._musicTimer = null;
     this._musicSeed = null;
     this._musicWanted = false;
+    // Explicit human PAUSE is not equivalent to an absent transport. It
+    // survives run restart even when only procedural fallback was audible.
+    this._jukeboxUserPaused = false;
     this._jukeboxMode = false;
     this._musicMode = 'run';
     this._autoStartAttempted = false;
@@ -137,6 +140,16 @@ export class AudioSynth {
     return hasEnabledSongs(selection, installedSongChoices(this._stemMusic?.catalog));
   }
 
+  /** Private-only selections must wait for catalog discovery. This checks
+   * playback INTENT only: NEVER treat an undiscovered track as installed,
+   * start procedural fallback for it, or bypass the offline-music gate.
+   */
+  _hasPendingCatalogSelection() {
+    return this._stemMusic?.ready !== true &&
+      !this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
+      Object.values(this.settings?.musicEnabledSongs || {}).some(value=>value===true);
+  }
+
   /** A private-only selected track may not be discoverable when Title first
    * calls startMenuMusic(). Preserve that *one* autoplay request until the
    * installed catalog arrives, without inventing an uninstalled source or
@@ -151,8 +164,24 @@ export class AudioSynth {
       this.jukeboxPlay();
       return;
     }
-    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs))
-      this._activateStemMusic();
+    // The procedural fallback is already an audible source. Director.start()
+    // merely accepts asynchronous stem decode, not an audible handoff. Keep
+    // the fallback until an explicit user action or the next Title transition
+    // can select the original without interrupting the current song.
+    if (this._musicTimer !== null && (this._paused || this._musicMode === 'run')) return;
+    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+      const started=this._activateStemMusic();
+      const session=this._vinylPauseSession;
+      // Deferred catalog completion can satisfy a pause-menu ON restart.
+      // Its real started transport is no longer waiting to be resumed; a
+      // subsequent OFF must freeze it rather than leave a filtered song live.
+      if (started && this._paused && this.settings?.musicDuringPause===true &&
+          session && !session.manualOverride) {
+        session.shouldResume=false;
+        session.restartOnResume=false;
+        session.procedural=false;
+      }
+    }
   }
 
   // -------------------------------------------------------------------------------------------------------- wiring
@@ -230,7 +259,11 @@ export class AudioSynth {
             if (!this.ctx) return;
             try {
               if (document.hidden) this.ctx.suspend();
-              else if (this._unlocked) this.ctx.resume();
+              else if (this._unlocked) {
+                const pending = this.ctx.resume();
+                if (pending?.then) pending.then(() => this._afterResume()).catch(() => {});
+                else this._afterResume();
+              }
             } catch (e) { /* ignore */ }
           };
           document.addEventListener('visibilitychange', vis);
@@ -389,6 +422,10 @@ export class AudioSynth {
     if (!this.ctx || this.ctx.state !== 'running') return;
     // AudioContext suspension cannot unpause the recording by accident.
     if (this._vinylResume?.awaitingContext) this._finishVinylResume(this._vinylResume);
+    // A paused run can opt into music while the tab's AudioContext is still
+    // suspended. Keep its frozen source/intent until unlock actually succeeds.
+    if (this._paused && this.settings?.musicDuringPause === true)
+      this._reconcileManualPauseMusic(true);
     if (!this._unlocked) {
       this._unlocked = true;
       try { // iOS: play a silent buffer inside the gesture to fully unlock
@@ -403,9 +440,14 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
-      if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode)
-        this._startScheduler();
+    // A running procedural fallback is the current audible transport. Tab
+    // visibility / AudioContext unlock may not replace it with an original
+    // that merely accepted start() but still has to fetch/decode its stems.
+    if (this._musicWanted && this._musicTimer === null &&
+        this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode &&
+          !this._paused && !this._stemMusic?.started)
+        this.musicProviderFailed(); // restores muted bus before starting fallback
     }
   }
 
@@ -648,6 +690,17 @@ export class AudioSynth {
     try {
       if (settings) {
         const hadMusic = this._hasEnabledSongs(this.settings?.musicEnabledSongs);
+        const previouslyPlayingDuringPause = this.settings?.musicDuringPause === true;
+        const newlyEnabled = !hadMusic && this._hasEnabledSongs(settings.musicEnabledSongs);
+        // Installation is unknown before the private catalog arrives. A
+        // deliberate ALL OFF → private-only selection still creates a
+        // playback request, even though no installed song can be confirmed.
+        // This intent is never used to authorize procedural fallback.
+        const hadAnySelection=Object.values(this.settings?.musicEnabledSongs||{})
+          .some(value=>value===true);
+        const requestedAnySelection=Object.values(sanitizeSongSelection(settings.musicEnabledSongs))
+          .some(value=>value===true);
+        const newlyRequested=newlyEnabled || (!hadAnySelection && requestedAnySelection);
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -663,23 +716,73 @@ export class AudioSynth {
           dynamicOrchestra: false, // Gameplay always uses original accompaniment.
           musicShuffle: settings.musicShuffle === true,
           musicCrossfade: settings.musicCrossfade !== false,
+          musicDuringPause: settings.musicDuringPause === true,
         };
         this._stemMusic?.applySettings(this.settings);
+        // The chosen frozen song can be disabled while another song stays
+        // selected. The director correctly retargets the paused track and
+        // resets its offset; our saved track snapshot is now intentionally
+        // stale. Honor the replacement on Resume/opt-in instead of silently
+        // rejecting both the new and old source.
+        const pausedSession=this._vinylPauseSession;
+        const director=this._stemMusic;
+        if (this._paused && pausedSession?.shouldResume &&
+            !pausedSession.manualOverride && !pausedSession.procedural &&
+            director?.transportPaused && director._token===pausedSession.token &&
+            this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            (director.trackIndex!==pausedSession.trackIndex ||
+             director._resumeOffset!==pausedSession.offset)) {
+          pausedSession.restartOnResume=true;
+        }
+        // Enabling a song while gameplay is paused is a preference change,
+        // not an explicit Jukebox PLAY. If all-off invalidated the frozen
+        // transport, restart the selected music only after gameplay resumes.
+        if (newlyRequested && !this._jukeboxUserPaused && this._paused &&
+            this._vinylPauseSession && !this._vinylPauseSession.manualOverride) {
+          // A pause entered while ALL songs were disabled has no frozen
+          // transport, so shouldResume was false. Enabling a song is still
+          // an explicit playback preference for Resume (or immediately if
+          // the user opted into music during this Pause).
+          this._vinylPauseSession.restartOnResume=true;
+          this._vinylPauseSession.shouldResume=true;
+        }
+        if (!this._jukeboxUserPaused &&
+            (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
+             (newlyRequested && this._paused && this.settings.musicDuringPause)))
+          this._reconcileManualPauseMusic(this.settings.musicDuringPause);
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
-        if (this._autoStartAttempted && this._musicMode === 'menu' &&
-            !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
+        if (!this._jukeboxUserPaused && this._autoStartAttempted &&
+            this._musicMode === 'menu' && !this._paused && !hadMusic &&
+            this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
             !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
         if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+          // The player may have disabled the last *installed public* song
+          // while leaving an undiscovered PRIVATE original selected. Carry
+          // that pending original through gameplay Resume, but make Pause
+          // quiet and never synthesize for an unconfirmed catalog entry.
+          if (hadMusic && this._hasPendingCatalogSelection() && this._paused &&
+              this._vinylPauseSession && !this._vinylPauseSession.manualOverride &&
+              !this._jukeboxUserPaused) {
+            this._vinylPauseSession.shouldResume=true;
+            this._vinylPauseSession.restartOnResume=true;
+            this._vinylPauseSession.procedural=false;
+            this._musicWanted=false;
+          }
           if (this._musicTimer) clearInterval(this._musicTimer);
           this._musicTimer = null;
           this._stemMusic?.stop();
           if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
-        } else if (this._musicWanted && this.ctx) {
+        } else if (this._musicWanted && this.ctx && !this._paused &&
+                   this._musicTimer === null && !this._stemMusic?.started) {
+          // A volume/FX setting cannot replace an audible fallback with
+          // a speculative original decode. Only a real playback source
+          // action or Title transition may retire the running scheduler.
           if (!this._activateStemMusic() && !this._musicTimer &&
-              this.ctx.state === 'running' && !this._jukeboxMode) {
+              this.ctx.state === 'running' && !this._jukeboxMode &&
+              !this._paused && !this._stemMusic?.started) {
             this._startScheduler();
           }
         }
@@ -725,16 +828,19 @@ export class AudioSynth {
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
-      // Only manual gameplay pauses silence the source. Title/GameOver
-      // still play continuous full-bandwidth music, and explicit PauseScene
-      // jukebox actions can play during pause without a low-pass filter.
-      const manualJukebox = !!(paused && this._vinylPauseSession?.manualOverride &&
-        this._jukeboxMode && this._musicWanted);
+      // Gameplay pauses are quiet by default. An opted-in session stays
+      // full bandwidth, as do explicit pause-menu jukebox actions.
+      const pauseMusic = !!(paused && (this.settings?.musicDuringPause === true ||
+        (this._vinylPauseSession?.manualOverride && this._jukeboxMode && this._musicWanted)));
       const fadeTime = paused ? 0.025 : 0.05;
       this.nodes.musicFilter.frequency.setTargetAtTime(
-        paused && !manualJukebox ? 500 : 18000, t, fadeTime);
-      const sourceGain = paused && !manualJukebox ? 0 :
-        this._stemMusic?.started ? 0 : this._musicWanted ? 1 : 0;
+        paused && !pauseMusic ? 500 : 18000, t, fadeTime);
+      // Wanted music is not equivalent to an AUDIBLE procedural source:
+      // explicit Jukebox SKIP may retire the fallback timer while awaiting
+      // an original, and must not re-open already-scheduled synth notes.
+      const sourceGain = paused && !pauseMusic ? 0 :
+        this._stemMusic?.started ? 0 :
+        this._musicWanted && this._musicTimer !== null ? 1 : 0;
       this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, fadeTime);
       this._applyWindFromBsod();
     } catch { /* unsupported/closed nodes must never block gameplay */ }
@@ -784,14 +890,54 @@ export class AudioSynth {
     const pending = session ? this._cancelVinylTransition() : null;
     this._vinylPauseSession = null;
     this._paused = false;
+    // The procedural fallback is RUN-only. A real original stem continues
+    // into Title; synthesized substitute notes must not outlive the run or
+    // masquerade as a stopped original in the Title jukebox.
+    const retiredRunFallback=this._musicTimer !== null;
+    if (retiredRunFallback) {
+      clearInterval(this._musicTimer);
+      this._musicTimer=null;
+      if (!this._stemMusic?.started) {
+        // Muting RUN-only synth does not cancel the user's ORIGINAL source
+        // request. A catalog may still finish loading after we enter Title;
+        // onReady should be allowed to start the original, without starting
+        // another procedural scheduler or overriding an explicit Jukebox PAUSE.
+        this._musicWanted=(this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+          this._hasPendingCatalogSelection()) && !session?.manualOverride;
+        this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
+      }
+    }
     const snap = session || pending?.snapshot;
-    if (!snap?.shouldResume || snap.manualOverride) return;
+    if (!snap?.shouldResume || snap.manualOverride) {
+      // An opted-in Pause kept the procedural music running, so there is no
+      // frozen frame to restore on Quit. Its RUN-only fallback has ended;
+      // Title must try the selected ORIGINAL once if catalog is already
+      // ready. Otherwise onReady will honor the preserved original request.
+      if (retiredRunFallback && !snap?.manualOverride && this._musicWanted &&
+          this._stemMusic?.ready && !this._stemMusic.started &&
+          this.ctx?.state === 'running') this._activateStemMusic();
+      return;
+    }
+    // Turning every song off during a default-OFF Pause invalidates the old
+    // transport. If a song was re-enabled, Quit must honor the deferred
+    // choice too: Title uses its original-only jukebox policy (no synth).
+    if (snap.restartOnResume) {
+      if (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+          this._hasPendingCatalogSelection()) {
+        this._musicWanted = true;
+        if (this.ctx?.state === 'running' && this._stemMusic?.ready)
+          this._activateStemMusic();
+      }
+      return;
+    }
     const d = this._stemMusic;
     if (snap.procedural) {
-      this._musicWanted = true;
-      if (this.ctx?.state === 'running') {
-        if (!this._activateStemMusic() && !this._musicTimer) this._startScheduler();
-      }
+      // Restore only an original catalog source on Title. This is a menu,
+      // never an alternative run-scoring procedural soundtrack session.
+      this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+        this._hasPendingCatalogSelection();
+      if (this._musicWanted && this.ctx?.state === 'running' && this._stemMusic?.ready)
+        this._activateStemMusic();
       return;
     }
     if (!d?.transportPaused || d.started || d._token !== snap.token ||
@@ -819,26 +965,143 @@ export class AudioSynth {
       // WebAudio transport. This also preserves historic menu continuity.
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
+      // Freeze any started transport bound to this AudioContext, including
+      // gaps between scheduled stem nodes and async decode/boundary waits.
+      // Only sources with active nodes count as AUDIBLE for the vinyl scratch.
+      const activeTransport = !!(d?.started && !d.transportPaused &&
+        d.ctx === this.ctx);
       const audible = this._vinylAudible() && originallyWanted && live;
-      const frozen = live ? d.transportPause() :
-        !!(old?.shouldResume && d?.transportPaused);
-      const procedural = originallyWanted && !live && !frozen &&
+      const keepPlaying = this.settings?.musicDuringPause === true;
+      // The old Resume may be waiting on an AudioContext unlock or the
+      // reverse vinyl scratch. A rapid second Pause must not erase the ONLY
+      // valid frozen source frame merely because this Pause setting is ON.
+      const prior=old?.snapshot;
+      const carried=!!(keepPlaying && old?.shouldResume && prior?.shouldResume &&
+        !prior.manualOverride && !this._musicWanted &&
+        (prior.procedural ? this._musicTimer===null :
+          d?.transportPaused && !d.started && d._token===prior.token &&
+          d.trackIndex===prior.trackIndex && d._resumeOffset===prior.offset));
+      const frozen = !keepPlaying && (activeTransport ? d.transportPause() :
+        !!(old?.shouldResume && d?.transportPaused));
+      const procedural = !keepPlaying && originallyWanted && !live && !frozen &&
         this._musicTimer !== null;
-      if (frozen || procedural) {
+      // A selected song may still be waiting on catalog discovery. Default
+      // OFF Pause has no source node to freeze, but must retain that start
+      // request for the next gameplay Resume (and forbid late auto-play).
+      const pendingStart = !keepPlaying && originallyWanted && !frozen &&
+        !procedural && !d?.started && !d?.transportPaused &&
+        this._musicTimer === null;
+      if (frozen || procedural || pendingStart) {
         this._musicWanted = false; // tab unlock cannot restart a paused song
         if (this._musicTimer !== null) clearInterval(this._musicTimer);
         this._musicTimer = null;
       }
       this._vinylPauseSession = {
-        shouldResume:!!(originallyWanted && (frozen || procedural)),
-        procedural,manualOverride:false,
+        shouldResume:!!(originallyWanted && (frozen || procedural || carried || pendingStart)),
+        procedural:procedural || !!(carried && prior.procedural),manualOverride:false,
+        restartOnResume:!!(pendingStart || (carried && prior.restartOnResume)),
         runId:payload?.runId??null,pauseToken:payload?.pauseToken??null,
-        token:d?._token,trackIndex:d?.trackIndex,offset:d?._resumeOffset,
+        token:carried?prior.token:d?._token,
+        trackIndex:carried?prior.trackIndex:d?.trackIndex,
+        offset:carried?prior.offset:d?._resumeOffset,
       };
       this._enterMenuMusic(); // neutral menu arrangement, same source clock
       this._setPaused(true);
-      if (audible) this._vinylScratch?.play('pause');
+      // If the previous pause was suspended, _afterResume() will retry. If
+      // only the vinyl timer was pending and the context is already awake,
+      // restore immediately through the same token-checked path.
+      if (carried) this._reconcileManualPauseMusic(true);
+      if (audible && !keepPlaying) this._vinylScratch?.play('pause');
     } catch { /* audio failure must not block Control's physical pause */ }
+  }
+
+  /** Apply an ON/OFF change made in Settings while the manual Pause screen is
+   * open. Never override a deliberate pause-menu jukebox choice or a changed
+   * source generation. The existing run's pause token remains authoritative.
+   */
+  _reconcileManualPauseMusic(keepPlaying) {
+    const session = this._vinylPauseSession;
+    if (!this._paused || !session || session.manualOverride ||
+        this._jukeboxUserPaused) return;
+    const d = this._stemMusic;
+    if (keepPlaying) {
+      if (session.restartOnResume &&
+          (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+           this._hasPendingCatalogSelection())) {
+        // Turning continuous Pause music ON permits the newly selected
+        // original source before gameplay resumes. A private-only song may
+        // remain undiscovered: keep its request for onReady, but never
+        // substitute synth or claim that an uninstalled song is playable.
+        this._musicWanted = true;
+        if (this.ctx?.state === 'running' &&
+            this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+          const started=this._activateStemMusic();
+          if (!started && !this._musicTimer) this.musicProviderFailed();
+          if (started || this._musicTimer !== null) {
+            session.restartOnResume = false;
+            session.shouldResume = false;
+            session.procedural = false;
+          }
+        }
+      } else if (!session.shouldResume && this._musicWanted &&
+          !d?.started && this._musicTimer === null &&
+          this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
+          this.ctx?.state === 'running') {
+        // ON permits music even if the chosen original is unavailable.
+        // All-songs-off stopped the procedural timer; re-enabling a song
+        // must restore that same source-first fallback (never in offline
+        // original-only preview, and never after manual Jukebox intent).
+        if (!this._activateStemMusic()) this.musicProviderFailed();
+      } else if (session.shouldResume) {
+        if (session.procedural) {
+          // Do not consume the restore intent while the AudioContext is
+          // suspended. On unlock, _afterResume() retries this same session.
+          if (this.ctx?.state === 'running') {
+            this._musicWanted = true;
+            if (!this._activateStemMusic() && !this._musicTimer)
+              this._startScheduler();
+            if (d?.started || this._musicTimer) {
+              session.shouldResume = false;
+              session.procedural = false;
+            } else this._musicWanted = false;
+          }
+        } else if (this.ctx?.state === 'running' &&
+            d?.transportPaused && !d.started &&
+            d._token === session.token && d.trackIndex === session.trackIndex &&
+            d._resumeOffset === session.offset &&
+            this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+          if (d.transportPlay()) {
+            this._musicWanted = true;
+            session.shouldResume = false;
+          }
+        }
+      }
+    } else if (session.shouldResume && session.restartOnResume &&
+        this._musicWanted && this._hasPendingCatalogSelection()) {
+      // Player turned OFF continuous music again before a private catalog
+      // finished loading. Leave its original-only restart intent in this
+      // pause transaction, but do NOT let catalog-ready auto-play on Pause.
+      this._musicWanted=false;
+    } else if (!session.shouldResume && this._musicWanted) {
+      const live = !!(d?.started && !d.transportPaused &&
+        d.ctx === this.ctx);
+      const frozen = live && d.transportPause();
+      const procedural = !frozen && this._musicTimer !== null;
+      const pendingStart = !frozen && !procedural && !d?.started &&
+        !d?.transportPaused &&
+        (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+         this._hasPendingCatalogSelection());
+      if (frozen || procedural || pendingStart) {
+        this._musicWanted = false;
+        if (this._musicTimer !== null) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+        Object.assign(session, {
+          shouldResume: true, procedural, restartOnResume:!!pendingStart,
+          token: d?._token, trackIndex: d?.trackIndex, offset: d?._resumeOffset,
+        });
+      }
+    }
+    this._setPaused(true);
   }
 
   _finishVinylResume(pending) {
@@ -860,7 +1123,17 @@ export class AudioSynth {
     this._jukeboxMode = false;
     if (snap.procedural) {
       if (!this._activateStemMusic() && this.ctx.state === 'running' &&
-          !this._musicTimer) this._startScheduler();
+          !this._musicTimer) {
+        // Restoring the timer alone is silent: OFF muted the procedural
+        // source bus while the run was paused. The audio context is running
+        // now; restore its gain before restarting the legal fallback.
+        if (!this.game?.registry?.get?.('offlineMusicDownloads')) {
+          if (!this._baseRng || !Array.isArray(this._progOrder))
+            this._seedProceduralMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
+          this.nodes?.musicSrc?.gain?.setTargetAtTime?.(1,this.ctx.currentTime,0.04);
+        }
+        this._startScheduler(); // offline preview still refuses synthesized audio
+      }
     } else if (!d.transportPlay()) this._musicWanted = false;
   }
 
@@ -883,9 +1156,30 @@ export class AudioSynth {
       this._stemMusic?.setMenuMode(false);
       this._onBsodState(null);
       this._setPaused(false);
-      if (!session?.shouldResume || session.manualOverride) return;
+      if (!session?.shouldResume || session.manualOverride) {
+        // Preserve the already-audible procedural track across Resume too:
+        // merely READY catalog is not proof stems have decoded. The next
+        // explicit Jukebox action or Title original-only handoff owns it.
+        return;
+      }
       const d = this._stemMusic;
+      // Only the confirmed installed roster may produce sound. Yet a
+      // PRIVATE-ONLY selection can be unresolved when gameplay resumes;
+      // keep the user's original-only request alive for onReady rather
+      // than discarding it before catalog discovery finishes.
+      if (session.restartOnResume && this._hasPendingCatalogSelection()) {
+        this._musicWanted=true;
+        return;
+      }
       if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+      if (session.restartOnResume) {
+        // The previous source was invalidated by all-songs-off. Use the
+        // standard source-first start path: when original stems are not yet
+        // available it initializes a deterministic procedural fallback,
+        // including the offline-music prohibition and WebAudio gain.
+        this.startMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
+        return;
+      }
       if (!session.procedural && (!d?.transportPaused || d.started ||
           d._token !== session.token || d.trackIndex !== session.trackIndex ||
           d._resumeOffset !== session.offset)) return;
@@ -1066,6 +1360,11 @@ export class AudioSynth {
   /** Run transitions change timbre and effects but never restart a playing song. */
   _enterRunMusic(seed) {
     this._menuAutoplayPending = false; // a late catalog fetch cannot restart Title music in-game
+    // The original Title soundtrack can survive unchanged into Run, so
+    // startMusic() is intentionally SKIPPED when a stem is already playing.
+    // Seed the independent procedural-failure fallback for THIS run anyway;
+    // never let a late decode error borrow the previous run's notes/RNG.
+    this._seedProceduralMusic(seed);
     this._musicMode = 'run';
     this._jukeboxMode = false;
     // #65: choose actual Debutmont WHILE still using the clean menu
@@ -1079,7 +1378,8 @@ export class AudioSynth {
     // Respect an explicit manual pause in the jukebox.
     // An existing song is already advancing: don't call even a nominal
     // start routine, and do not reset the clock at the next run.
-    if (!this._stemMusic?.transportPaused && !this._stemMusic?.started)
+    if (!this._jukeboxUserPaused && !this._stemMusic?.transportPaused &&
+        !this._stemMusic?.started)
       this.startMusic(seed);
   }
 
@@ -1088,7 +1388,8 @@ export class AudioSynth {
   _activateStemMusic() {
     if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
     if (this._paused && this._vinylPauseSession &&
-        !this._vinylPauseSession.manualOverride) return false;
+        !this._vinylPauseSession.manualOverride &&
+        !(this.settings?.musicDuringPause === true && this._musicWanted)) return false;
     const player = this._stemMusic;
     if (!player || !player.ready || !this.ctx || !this.nodes) return false;
     player.attach(this.ctx, this.nodes.musicFilter);
@@ -1103,7 +1404,13 @@ export class AudioSynth {
   /** Failure of a pack load only falls back to procedural when some
    * songs remain selected, never in the all-off state. */
   musicProviderFailed() {
-    if (!this._musicWanted || this._jukeboxMode ||
+    // During an opted-in manual Pause, Menu Mode is only the neutral mix;
+    // it must not suppress the gameplay fallback when the original stems
+    // fail to decode. Explicit Jukebox choices still own their own transport.
+    const continuousPause = this._paused && this._vinylPauseSession &&
+      !this._vinylPauseSession.manualOverride &&
+      this.settings?.musicDuringPause === true;
+    if (!this._musicWanted || (this._jukeboxMode && !continuousPause) ||
         !this._hasEnabledSongs(this.settings.musicEnabledSongs)) return;
     if (this.ctx?.state !== 'running' || !this.nodes?.musicSrc || this._musicTimer) return;
     // An attempted stem launch deliberately muted procedural musicSrc.
@@ -1111,7 +1418,13 @@ export class AudioSynth {
     // Restore only this fallback bus, not any original source / SFX bus.
     const t = this.ctx.currentTime;
     this.nodes.musicSrc.gain.cancelScheduledValues(t);
-    this.nodes.musicSrc.gain.setTargetAtTime(this._paused ? 0.45 : 1, t, 0.04);
+    this.nodes.musicSrc.gain.setTargetAtTime(continuousPause ? 1 : this._paused ? 0.45 : 1, t, 0.04);
+    // A title-started original recording can reach Run without startMusic()
+    // ever initializing the procedural RNG. A late pack failure must not
+    // start a silent scheduler that throws each tick for missing seed state.
+    if (!this.game?.registry?.get?.('offlineMusicDownloads') &&
+        (!this._baseRng || !Array.isArray(this._progOrder)))
+      this._seedProceduralMusic(this._musicSeed ?? this.game?.registry?.get?.(REG.SEED) ?? '');
     this._startScheduler();
   }
 
@@ -1121,29 +1434,33 @@ export class AudioSynth {
    * @param {string} seed
    * @returns {void}
    */
+  _seedProceduralMusic(seed) {
+    this._musicSeed = String(seed == null ? '' : seed);
+    if (!this._arrCache) this._arrCache=new Map();
+    else this._arrCache.clear();
+    const base = new Rng(this._musicSeed).fork('music');
+    this._baseBpm = 118 + base.int(0, 14);
+    const order = [0, 1, 2, 3];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = base.int(0, i);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    this._progOrder = order;
+    this._baseRng = base;
+    this._step = 0;
+    this._nextTime = null;
+    this._distIntensity = 0;
+    this._speedIntensity = 0;
+    this._updateIntensity();
+  }
+
   startMusic(seed) {
     try {
       this._jukeboxMode = false;
-      this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
-      this._arrCache.clear();
-      // Arrange the fallback deterministically even if the catalog has not
-      // arrived yet. A late pack failure can start the procedural scheduler;
-      // it must never inherit undefined RNG, progression or step state.
-      const base = new Rng(this._musicSeed).fork('music');
-      this._baseBpm = 118 + base.int(0, 14);
-      const order = [0, 1, 2, 3];
-      for (let i = order.length - 1; i > 0; i--) {
-        const j = base.int(0, i);
-        [order[i], order[j]] = [order[j], order[i]];
-      }
-      this._progOrder = order;
-      this._baseRng = base;
-      this._step = 0;
-      this._nextTime = null;
-      this._distIntensity = 0;
-      this._speedIntensity = 0;
-      this._updateIntensity();
+      // Source-first runs still need an initialized, deterministic fallback
+      // if the selected stems fail to load later in the same run.
+      this._seedProceduralMusic(seed);
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
         this._stemMusic?.stop();
         if (this._musicTimer) clearInterval(this._musicTimer);
@@ -1168,9 +1485,17 @@ export class AudioSynth {
    * because a disabled playlist means genuine silence.
    */
   jukeboxSnapshot() {
-    return this._stemMusic?.transportSnapshot()||{
+    const snapshot=this._stemMusic?.transportSnapshot()||{
       state:'stopped',current:null,previous:null,upcoming:[],position:0,
     };
+    // The continuous Pause setting can lawfully play the seeded procedural
+    // fallback if the original catalog cannot decode. Give the same Jukebox
+    // a truthful PLAYING indicator and a PAUSE action for that audible bus;
+    // do not pretend the currently selected original track is sounding.
+    if (this._paused && this._musicWanted && this._musicTimer!==null &&
+        this._vinylPauseSession && !this._vinylPauseSession.manualOverride)
+      return {...snapshot,state:'playing',current:{id:'procedural',title:'PROCEDURAL FALLBACK'}};
+    return snapshot;
   }
 
   jukeboxPlay() {
@@ -1180,6 +1505,7 @@ export class AudioSynth {
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       this._jukeboxMode = true;
+      this._jukeboxUserPaused = false;
       this._musicWanted = true;
       if (this._paused) this._setPaused(true);
       this.unlock();  // called from actual user interaction
@@ -1190,10 +1516,12 @@ export class AudioSynth {
 
   jukeboxPause() {
     this._menuAutoplayPending = false; // intentional manual pause cancels pending autoplay
+    const proceduralPlaying=this._paused && this._musicWanted && this._musicTimer!==null;
     this._vinylJukeboxIntent();
-    const ok=this._stemMusic?.transportPause()||false;
+    const ok=(this._stemMusic?.transportPause()||false)||proceduralPlaying;
     if(ok){
-      this._musicWanted=false; // don't auto-resume after tab suspension
+      this._jukeboxUserPaused=true;
+      this._musicWanted=false; // don't auto-resume after tab suspension OR Restart
       if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
       if (this._paused) this._setPaused(true);
     }
@@ -1204,9 +1532,26 @@ export class AudioSynth {
     this._menuAutoplayPending = false; // next/previous is explicit manual intent
     try {
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      // Don't consume an explicit Next/Previous when no catalog can execute
+      // the request. In particular, don't kill a valid procedural fallback
+      // on a button that could not advance the original playlist.
+      if (!this._stemMusic?.ready) return false;
+      // A skip hands sound ownership to an explicitly selected ORIGINAL.
+      // Retire any pause-only procedural substitute before the generation
+      // changes, even when the next original is not yet decodable.
+      if (this._paused && this._musicTimer !== null) {
+        clearInterval(this._musicTimer);
+        this._musicTimer=null;
+        this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
+      }
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
-      const wasPaused=this._stemMusic.transportPaused;
+      const wasPaused=this._stemMusic.transportPaused || this._jukeboxUserPaused;
+      // Explicit human PAUSE may have silenced only a procedural fallback,
+      // leaving no original source node to freeze. Carry that paused intent
+      // into the director's selection-only Step: it must not auto-PLAY.
+      if(this._jukeboxUserPaused && !this._stemMusic.transportPaused)
+        this._stemMusic.transportPaused=true;
       this._jukeboxMode=true;
       this._musicWanted=!wasPaused;
       if (this._paused) this._setPaused(true);
@@ -1214,6 +1559,9 @@ export class AudioSynth {
       // Choose and invalidate the previous async generation BEFORE
       // AudioContext unlock can call _afterResume() and load another song.
       const moved=this._stemMusic.transportStep(direction<0?-1:1);
+      // Selecting the next song while AUTO-frozen does NOT mean the user
+      // pressed Jukebox PAUSE; keep that persistent human intent unchanged.
+      // If they DID pause manually, it was already true and stays true.
       this.unlock(); // browser user-gesture policy
       return moved;
     } catch {return false;}

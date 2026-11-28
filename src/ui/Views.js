@@ -411,6 +411,10 @@ export class SoundManagerView extends View {
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicCrossfade!==false,
         set:v=>updateSetting(game,'musicCrossfade',v)},
+      {kind:'choice',label:'MUSIC DURING PAUSE',options:[
+          {value:false,label:'OFF'},{value:true,label:'ON'}],
+        get:()=>settings().musicDuringPause===true,
+        set:v=>updateSetting(game,'musicDuringPause',v)},
       ...(unlocked ? [
         {kind:'choice',label:'ORIGINAL VOCALS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],

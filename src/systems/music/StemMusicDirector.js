@@ -105,6 +105,7 @@ export class StemMusicDirector {
 		this._loading = null;
 		this.transportPaused = false;
 		this._resumeOffset = 0;
+		this._pendingResumeOffset = null; // decoded stem has no playback clock yet
 		this._resumeGateAt = null; // precise first audible frame after manual pause
 		this._transportHistory = [];
 		this._lastPlayed = null;
@@ -1082,6 +1083,8 @@ export class StemMusicDirector {
 			const index = this.songEnabled[this.catalog[this.trackIndex]?.id] !== false
 				? this.trackIndex : next;
 			const offset=this._resumeOffset;
+			// Pause may arrive while decoding, before a source clock exists.
+			this._pendingResumeOffset=offset;
 			this._resumeOffset=0;
 			const pending=this._beginTrack(index,null,offset);
 			this._loading=pending;
@@ -1212,6 +1215,12 @@ export class StemMusicDirector {
 			this.track = info.track;
 			this.packBase = info.base;
 			this.trackIndex = index;
+			// The old song's clockStart remains valid UNTIL this incoming song's
+			// first decoded buffers own a new WebAudio clock. A Pause in that
+			// async interval must save this song's requested offset (often zero),
+			// never the outgoing song's elapsed seconds under the new track ID.
+			if(!transition) this._pendingResumeOffset=clamp(Number(offsetSeconds)||0,0,
+				Math.max(0,info.pack.duration-.1));
 			this._consumeShuffledIndex(index);
 			this.captionWords = [];
 			for (const name of info.pack.sourceNames) {
@@ -1255,6 +1264,7 @@ export class StemMusicDirector {
 				Math.max(0,this.pack.duration-.1));
 			const firstSourceTime=Math.max(this.ctx.currentTime+.12,desiredAt||0);
 			this.clockStart=firstSourceTime-actualResumeOffset;
+			this._pendingResumeOffset=null;
 			if(transition&&transition.end-firstSourceTime>=1){
 				this._incomingFade={start:firstSourceTime,end:transition.end,token};
 				for(const record of this._sourceEnvelopes.values()){
@@ -1455,21 +1465,27 @@ export class StemMusicDirector {
 			previous:this._lastPlayed||this._transportHistory.at(-1)||null,
 			upcoming,
 			position:this.transportPaused?this._resumeOffset:
+				this._pendingResumeOffset!==null&&this._pendingResumeOffset!==undefined?
+					this._pendingResumeOffset:
 				this.started&&this.ctx&&this.clockStart!==null?
 					// A manually resumed source is scheduled slightly in the future.
 					// Don't show its saved position moving BACKWARD during that silent
 					// pre-start window; audio itself already has the exact-frame gate.
 					Math.max(0,Math.max(this.ctx.currentTime,
-						this._resumeGateAt??this.ctx.currentTime)-this.clockStart):0,
+						this._resumeGateAt??this.ctx.currentTime)-this.clockStart):
+					(this._pendingResumeOffset??this._resumeOffset??0),
 			audioSuspended:this.ctx?.state==='suspended',
 		};
 	}
 
 	transportPause() {
 		if(!this.started)return false;
-		const position=this.pack&&this.ctx&&this.clockStart!==null?
-			clamp(this.ctx.currentTime-this.clockStart,0,
-				Math.max(0,this.pack.duration-.1)):0;
+		const position=this._pendingResumeOffset!==null&&this._pendingResumeOffset!==undefined?
+			this._pendingResumeOffset:
+			this.pack&&this.ctx&&this.clockStart!==null?
+				clamp(Math.max(this.ctx.currentTime,this._resumeGateAt??this.ctx.currentTime)-this.clockStart,0,
+					Math.max(0,this.pack.duration-.1)):
+				(this._resumeOffset??0);
 		this.stop();
 		this._resumeOffset=position;
 		this.transportPaused=true;
@@ -1530,6 +1546,9 @@ export class StemMusicDirector {
 		this.bus.gain.cancelScheduledValues(t);
 		this.bus.gain.setTargetAtTime(0,t,.007);
 		++this._token; // all older fetches are now stale
+		// A manual SEEK owns a new clock/offset, never reuse a previous
+		// incoming pack's pending async decode offset on a later PAUSE.
+		this._pendingResumeOffset=null;
 		for(const src of this.activeNodes){
 			try {src.stop(t+.014);} catch {}
 		}
@@ -1563,6 +1582,7 @@ export class StemMusicDirector {
 		this.microBees?.setPositions([],{enabled:false});
 		this.transportPaused=false;
 		this._resumeOffset=0;
+		this._pendingResumeOffset=null;
 		this._resumeGateAt=null;
 		this._token++;
 		if (this._timer) clearInterval(this._timer);

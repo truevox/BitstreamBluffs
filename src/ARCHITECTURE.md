@@ -345,8 +345,8 @@ only gameplay emitter.
 | `COMBO_CHANGED`, `SCORE_CHANGED`, `DISTANCE_CHANGED` | RunScene (from ScoreManager results) | UIScene |
 | `ZONE_ENTER`, `ZONE_EXIT` | RunScene (compares `getZonesAt(sled.x)` each frame) | UIScene (indicator), AudioSynth |
 | `GLITCH_START`, `GLITCH_END` | RunScene (from `GlitchDirector.update`) | GlitchPipeline (shader intensity), AudioSynth (glitch bus), UIScene (flicker) |
-| `GAME_PAUSE` | RunScene | AudioSynth (menu-neutral music; actual playlist clock continues), UIScene |
-| `GAME_RESUME` | PauseScene | AudioSynth, RunScene (re-enable input) |
+| `GAME_PAUSE` | RunScene | AudioSynth (neutral menu mix; freezes stem clock by default, or keeps it running with the persistent `musicDuringPause` preference), UIScene |
+| `GAME_RESUME` | PauseScene | AudioSynth (restore frozen stem or keep the same continuous song, respecting explicit pause-menu jukebox actions), RunScene (re-enable input) |
 | `SETTINGS_CHANGED` | `updateSetting()` | AudioSynth, InputRouter, UIScene, RunScene (screenShake), anything cached from palette |
 | `INPUT_ACTION` | InputRouter | Title/Pause/GameOver scenes (menus), AudioSynth (unlock on first) |
 
