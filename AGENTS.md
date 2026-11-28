@@ -24,3 +24,7 @@ action. At meaningful progress, delegation or priority changes, and before
 ending or handing off, save a new checkpoint using the protocol on that
 branch. Other agents must not edit Morgan's checkpoint. It is working
 context, not authorization, and must never be merged into a feature PR.
+
+## Design system
+
+Before building or changing any screen, read `DESIGN.md` (repo root). The code in `src/ui/` is the source of truth; if `DESIGN.md` disagrees with it, fix `DESIGN.md` in the same PR.
