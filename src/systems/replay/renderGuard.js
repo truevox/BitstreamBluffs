@@ -45,6 +45,7 @@ export const RENDER_OWNED = Object.freeze({
     '_lastDraw', // redraw throttle stamp written by draw(); stepMotion (sim) only resets it to force a redraw, nothing sim reads it
   ]),
   RunScene: Object.freeze([
+    '_cameraIntent', // #155 pure, frozen presentation-only camera projection; never read by sim/telegraph logic
     '_camX', // camera follow state advanced by updateCamera; read only by camera/zoom code (snapCamera, _updateView)
     '_camY', // camera follow state advanced by updateCamera; read only by camera/zoom code
     '_zoom', // camera zoom set by updateCamera; presentation (cam.zoom)

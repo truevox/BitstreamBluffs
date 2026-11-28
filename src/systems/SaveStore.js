@@ -36,6 +36,7 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} musicCrossfade  Default ON; false preserves exact-boundary song handoffs.
  * @property {boolean} dynamicOrchestra  Retired gameplay setting; always false.
  * @property {boolean} screenShake       false disables shake (accessibility).
+ * @property {'less'|'original'|'drone'} pulp  Presentation-only camera style; Reduce Motion overrides to less.
  * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
  * @property {boolean} ghostLatest       show the Latest ghost on its course (issue #56).
  * @property {number} attemptHistoryKeep  past attempts kept per course for the Cemetery Montage (#68), 0..MAX_ATTEMPT_KEEP; 0 = keep none.
@@ -89,6 +90,7 @@ export function defaultSettings() {
     musicShuffle: false,
     musicCrossfade: true,
     dynamicOrchestra: false,
+    pulp: 'original',
     reduceMotion: 'auto',
     worldDance: true,
     musicVocals: false,
@@ -134,6 +136,7 @@ export function sanitizeSettings(raw) {
     musicShuffle: typeof raw.musicShuffle === 'boolean' ? raw.musicShuffle : d.musicShuffle,
     musicCrossfade: typeof raw.musicCrossfade === 'boolean' ? raw.musicCrossfade : d.musicCrossfade,
     dynamicOrchestra: false,
+    pulp: ['less','original','drone'].includes(raw.pulp) ? raw.pulp : d.pulp,
     reduceMotion: ['auto', 'on', 'off'].includes(raw.reduceMotion) ? raw.reduceMotion : d.reduceMotion,
     worldDance: typeof raw.worldDance === 'boolean' ? raw.worldDance : d.worldDance,
     musicVocals: raw.musicVocals === true,

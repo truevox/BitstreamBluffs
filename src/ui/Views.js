@@ -18,7 +18,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
-import { transitionIn, transitionOut } from './Motion.js';
+import { transitionIn, transitionOut, isReducedMotion } from './Motion.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -161,15 +161,15 @@ export class LeaderboardView extends View {
 }
 
 /** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
-const SETTINGS_ROWS = 17;
-/** Row pitch: 14 px up to fourteen rows; 12 px beyond, so seventeen rows (256 px panel at y=8) still end above the 270 px floor. */
-const SETTINGS_ROW_H = SETTINGS_ROWS > 14 ? 12 : 14;
+const SETTINGS_ROWS = 18;
+/** Pulp adds a row without shrinking the 5x7 font: an 11px pitch keeps all 18 rows within the 270px arcade canvas. */
+const SETTINGS_ROW_H = SETTINGS_ROWS > 17 ? 11 : SETTINGS_ROWS > 14 ? 12 : 14;
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    // Height follows the row count (22 + rows * pitch + 30): seventeen 12 px rows
-    // yield 256 px, positioned at y=8 and ending at y=264 in a 270px view.
+    // Eighteen 11 px rows retain readable 5x7 glyphs; 250px panel ends
+    // safely within the 270px native arcade canvas.
     const h = 22 + SETTINGS_ROWS * SETTINGS_ROW_H + 30;
     super(scene, theme, { w: 360, h, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
@@ -189,6 +189,13 @@ export class SettingsView extends View {
       { kind:'choice',label:'REDUCE MOTION',options:[
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
+      // Pulp is strictly presentation. Reduce Motion ALWAYS wins and the
+      // current choice visibly explains its locked override (not a hidden noop).
+      { kind:'choice',label:'PULP',options:[
+        {value:'less',label:'99% LESS'},{value:'original',label:'ORIGINAL'},
+        {value:'drone',label:'100% PULP'},{value:'locked',label:'LOCKED: LESS'}],
+        get:()=>isReducedMotion(scene)?'locked':(settings().pulp||'original'),
+        set:v=>{if(!isReducedMotion(scene)&&v!=='locked')updateSetting(game,'pulp',v);} },
       // Issue #56: the Best and Latest ghosts switch independently (favorites are per course, from Game Over).
       { kind:'choice',label:'GHOSTS',options:[
         {value:'both',label:'BEST+LATEST'},{value:'best',label:'BEST'},{value:'latest',label:'LATEST'},{value:'off',label:'OFF'}],

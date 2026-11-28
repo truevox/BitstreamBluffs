@@ -84,6 +84,7 @@ import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
+import {droneCameraIntent,effectivePulpLevel} from '../systems/PulpCameraIntent.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { installPortableMatter } from '../systems/MatterPortable.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
@@ -3246,6 +3247,8 @@ export class RunScene extends Phaser.Scene {
   snapCamera() {
     const cam = this.cameras.main;
     const s = this.sled;
+    if(cam.setRotation)cam.setRotation(0);
+    this._cameraIntent=null;
     this._camX = s.x - GAME_WIDTH * 0.38;
     this._camY = s.y - GAME_HEIGHT / 3;
     this._zoom = 1;
@@ -3269,6 +3272,57 @@ export class RunScene extends Phaser.Scene {
   updateCamera(dt) {
     const cam = this.cameras.main;
     const s = this.sled;
+    // #155 Pulp: consume ONLY immutable pose/seed/clock snapshots, never
+    // mutate physics or RNG or feed rendered camera bounds to telegraph
+    // timing. The 2D drone is a pure camera-intent projection that is
+    // identical when a replay is rendered at a different display FPS.
+    const pulp=effectivePulpLevel(this.settings?.pulp,isReducedMotion(this));
+    if(pulp==='drone'){
+      let hazardAheadPx=Infinity;
+      // Read existing generated hazards. No terrain generation, collision
+      // mutation or new RNG draw can be triggered by this camera query.
+      if(this.hazards?.values)for(const list of this.hazards.values()){
+        for(const h of list){
+          const dx=h.x-s.x;
+          if(Number.isFinite(dx)&&dx>=0&&dx<hazardAheadPx)hazardAheadPx=dx;
+        }
+      }
+      const intent=droneCameraIntent({
+        seed:this.seed,tick:this.simClock?.tick??0,
+        tickMs:this.simClock?.tickMs??1000/120,
+        x:s.x,y:s.y,vx:s.vx,vy:s.vy,speed:s.speed,
+        grounded:s.grounded,bsodProximity:this.bsodState?.proximity01??0,
+        hazardAheadPx,
+      });
+      this._cameraIntent=intent;
+      this._camX=s.x-intent.riderScreenX/intent.zoom;
+      this._camY=s.y-intent.riderScreenY/intent.zoom;
+      this._zoom=intent.zoom;
+      if(cam.zoom!==intent.zoom){
+        cam.setZoom(intent.zoom);
+        this.applyZoomCompensation(intent.zoom);
+      }
+      if(cam.setRotation)cam.setRotation(intent.roll);
+      cam.scrollX=Math.round(intent.focusX-GAME_WIDTH/2);
+      cam.scrollY=Math.round(intent.focusY-GAME_HEIGHT/2);
+      return;
+    }
+    // No residual camera roll or zoom from a prior 100% Pulp frame.
+    if(cam.rotation&&cam.setRotation)cam.setRotation(0);
+    this._cameraIntent=null;
+    if(pulp==='less'){
+      // 99% Less Pulp: no cosmetic shake, sway, speed-zoom or roll. Keep
+      // predictable rider framing without reusing or touching game RNG.
+      this.shakeAmp=0;
+      this._zoom=1;this._zoomKick=0;
+      if(cam.zoom!==1){cam.setZoom(1);this.applyZoomCompensation(1);}
+      this._camX=s.x-GAME_WIDTH*.38;
+      this._camY=s.y-GAME_HEIGHT/3;
+      cam.scrollX=Math.round(this._camX);
+      cam.scrollY=Math.round(this._camY);
+      return;
+    }
+    // Original Pulp: intentionally retain every existing calculation.
     // Look ahead in the direction of travel; Y keeps ~1/3 of the screen above the rider and peeks lower when falling.
     const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx)
       + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400) + LOOK_ULTRA_EXTRA_PX * smooth01((s.vx - 850) / 450)

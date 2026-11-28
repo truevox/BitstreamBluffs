@@ -131,3 +131,60 @@ describe('RunScene.updateCamera uses the curve', () => {
     expect(sx).toBeLessThan(GAME_WIDTH * 0.6);
   });
 });
+
+describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
+  function makeScene(mode='drone',reduced=false){
+    const s=Object.create(RunScene.prototype);
+    const cam={zoom:1,rotation:0,scrollX:0,scrollY:0,
+      setZoom(z){this.zoom=z;},setRotation(r){this.rotation=r;}};
+    Object.assign(s,{
+      sled:{x:50000,y:3000,vx:825,vy:-130,speed:870,grounded:false},
+      seed:'pulp-canary',simClock:{tick:936,tickMs:1000/120},
+      bsodState:{proximity01:.2},hazards:new Map(),
+      cameras:{main:cam},settings:{pulp:mode,reduceMotion:reduced?'on':'off'},
+      registry:{get:()=>({reduceMotion:reduced?'on':'off'})},
+      _camX:49800,_camY:2910,_zoom:1,_zoomKick:0,shakeAmp:0,
+      bg:null,flashRect:null,blindRect:null,
+    });
+    return s;
+  }
+  test('100% Pulp camera path repeats exactly at the same authoritative tick across display FPS',()=>{
+    const a=makeScene(),b=makeScene();
+    const initial=JSON.stringify(a.sled);
+    a.updateCamera(16.6);
+    b.updateCamera(5.5);
+    expect(a._cameraIntent).toEqual(b._cameraIntent);
+    for(const key of ['zoom','rotation','scrollX','scrollY'])
+      expect(a.cameras.main[key]).toBe(b.cameras.main[key]);
+    expect(a.cameras.main.rotation).not.toBe(0);
+    expect(JSON.stringify(a.sled)).toBe(initial);
+    expect(a.simClock.tick).toBe(936);
+    expect(a.shakeAmp).toBe(0);
+  });
+  test('reduce-motion overrides saved 100% mode and locks zoom and roll',()=>{
+    const s=makeScene('drone',true);
+    s.updateCamera(16.6);
+    expect(s._cameraIntent).toBeNull();
+    expect(s.cameras.main.zoom).toBe(1);
+    expect(s.cameras.main.rotation).toBe(0);
+    expect(s.cameras.main.scrollX).toBe(Math.round(s.sled.x-480*.38));
+    s.settings.reduceMotion='off';
+    s.registry.get=()=>({reduceMotion:'off'});
+    s.updateCamera(16.6);
+    expect(s._cameraIntent.mode).toBe('drone');
+    s.settings.pulp='original';
+    s.updateCamera(16.6);
+    expect(s._cameraIntent).toBeNull();
+    expect(s.cameras.main.rotation).toBe(0);
+  });
+  test('drone camera leaves view/collision/telegraph planner untouched',()=>{
+    const s=makeScene();
+    const hazard={x:s.sled.x+22};
+    s.hazards.set(1,[hazard]);
+    const before=JSON.stringify(hazard);
+    s.updateCamera(16.6);
+    expect(JSON.stringify(hazard)).toBe(before);
+    expect(s._cameraIntent.lookAhead).toBeGreaterThanOrEqual(250);
+    expect(typeof s._cameraIntent.focusX).toBe('number');
+  });
+});
