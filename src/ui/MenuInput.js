@@ -35,6 +35,7 @@ const KEY_MAP = {
   g: 'ghost', G: 'ghost',
   // Issue #68: Game Over Cemetery Montage. Other menus ignore the action.
   m: 'montage', M: 'montage',
+  l: 'localranks', L: 'localranks',
 };
 const DIRS = new Set(['up', 'down', 'left', 'right']);
 const ROUTER_MAP = {

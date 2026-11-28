@@ -101,6 +101,13 @@ function candidateOf(record) {
   };
 }
 
+/** Exact stored-run cohort, using the same canonical validation as the
+ * calculator. A local ledger hash is not proof of human play. */
+export function localRankingSelectionForRecord(record) {
+  const candidate = candidateOf(record);
+  return candidate ? JSON.parse(candidate.scopeKey) : null;
+}
+
 function localCohort(history, scopeKey) {
   const byRun = new Map();
   const conflicts = new Set();
