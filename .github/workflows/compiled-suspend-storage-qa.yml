@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/compiled-suspend-storage-qa.yml'
       - 'tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs'
+      - 'tools/savestate-experiment/test-persistent-profile-crash-suspend-browser.mjs'
       - 'tools/pwa/**'
       - 'src/scenes/**'
       - 'src/systems/savestate/**'
@@ -14,6 +15,7 @@ on:
     paths:
       - '.github/workflows/compiled-suspend-storage-qa.yml'
       - 'tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs'
+      - 'tools/savestate-experiment/test-persistent-profile-crash-suspend-browser.mjs'
       - 'tools/pwa/**'
       - 'src/scenes/**'
       - 'src/systems/savestate/**'
@@ -55,3 +57,7 @@ jobs:
         run: |
           export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
           node tools/savestate-experiment/test-compiled-suspend-quota-eviction-browser.mjs dist-quota-eviction
+      - name: Actual Chromium process crash, same disk profile, cold offline single-use Resume
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/savestate-experiment/test-persistent-profile-crash-suspend-browser.mjs dist-quota-eviction
