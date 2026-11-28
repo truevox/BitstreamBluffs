@@ -17,6 +17,8 @@ import { MenuList } from './MenuList.js';
 import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
+import { shareableSeed } from './Format.js';
+import { searchArchiveCourses, normalizeArchiveSearch } from '../systems/ghost/CourseArchiveSearch.js';
 import { uiSfx } from './Sound.js';
 import { transitionIn, transitionOut } from './Motion.js';
 import { ellipsize, measureText } from './PixelFont.js';
@@ -1736,6 +1738,7 @@ export class AchievementsView extends View {
   }
 
   destroy() {
+    this._closeArchiveSearch();
     if (this.unbindDeco) this.unbindDeco();
     this.unbindDeco = null;
     super.destroy();
@@ -1879,6 +1882,10 @@ export class ShopView extends View {
     this.archiveSelected = null;
     this.archiveNotice = '';
     this.archiveBusy = false;
+    this.archiveQuery = '';
+    this.archiveSearchBox = null;
+    this.archiveSearchPanel = null;
+    this.archiveSearchDim = null;
     // state chips, washes and rules live on one Graphics UNDER the list (added before any menu exists, so
     // every rebuilt menu lands above it); repainted from the current layout on every _build
     this.deco = scene.add.graphics();
@@ -1906,9 +1913,11 @@ export class ShopView extends View {
     if (this.archivePage) return layout.rows.map((r) => {
       if(r.kind==='archiveBack')return {kind:'action',label:r.label,onSelect:()=>this._showUpgrades()};
       if(r.kind==='archivePager')return {kind:'action',rowKind:'archivePager',label:r.label,sub:r.state,
-        onSelect:()=>this._turnArchivePage(1)};
+        onSelect:()=>this._openArchiveSearch()};
       if(r.kind==='archiveEntry')return {kind:'action',id:r.archiveKey,label:r.label,sub:r.state,
         onSelect:()=>this._selectArchive(r.archiveKey)};
+      if(r.kind==='archiveShare')return {kind:'action',id:r.archiveKey,label:r.label,sub:r.state,
+        onSelect:()=>this._copySelectedArchive()};
       if(r.kind==='archiveConfirm')return {kind:'action',id:r.archiveKey,label:r.label,sub:r.state,
         onSelect:()=>this._deleteSelectedArchive()};
       return {kind:'static',label:r.label,disabled:true};
@@ -1993,8 +2002,9 @@ export class ShopView extends View {
   }
 
   _build() {
-    const layout = this.archivePage ? courseArchiveManagerLayout({profile:this._profile(),archives:this.archives,
-      page:this.archivePageIndex,selected:this.archiveSelected,notice:this.archiveNotice})
+    const layout = this.archivePage ? courseArchiveManagerLayout({profile:this._profile(),
+      archives:searchArchiveCourses(this.archives,this.archiveQuery),totalArchives:this.archives.length,
+      query:this.archiveQuery,page:this.archivePageIndex,selected:this.archiveSelected,notice:this.archiveNotice})
       : this.gymSetupPage ? gymSetupLayout({profile:this._profile()})
       : this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
       : shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
@@ -2104,7 +2114,8 @@ export class ShopView extends View {
 
   async _openArchiveManager(){
     this.gymSetupPage=false;this.upgradePage=false;this.archivePage=true;
-    this.archivePageIndex=0;this.archiveSelected=null;this.archiveNotice='READING LOCAL COURSES...';
+    this.archivePageIndex=0;this.archiveSelected=null;this.archiveQuery='';
+    this.archiveNotice='READING LOCAL COURSES...';
     this._build();
     await this._loadArchiveCourses();
   }
@@ -2116,23 +2127,79 @@ export class ShopView extends View {
     this.archiveNotice=Array.isArray(list)
       ?(this.archiveNotice.startsWith('ARCHIVE DELETED')?this.archiveNotice:'SELECT COURSE, THEN CONFIRM DELETE')
       :'STORAGE UNAVAILABLE; NO DELETE';
-    this.archivePageIndex=Math.min(this.archivePageIndex,Math.max(0,Math.ceil(this.archives.length/7)-1));
+    const visible=searchArchiveCourses(this.archives,this.archiveQuery);
+    if(this.archiveSelected&&!visible.some(c=>c.key===this.archiveSelected))this.archiveSelected=null;
+    this.archivePageIndex=Math.min(this.archivePageIndex,Math.max(0,Math.ceil(visible.length/7)-1));
     this._build();
   }
 
   _turnArchivePage(dir){
-    const count=Math.max(1,Math.ceil(this.archives.length/7));
+    const count=Math.max(1,Math.ceil(searchArchiveCourses(this.archives,this.archiveQuery).length/7));
     this.archivePageIndex=(this.archivePageIndex+(dir<0?-1:1)+count)%count;
     this.archiveSelected=null;
     this._build();
   }
 
   _selectArchive(key){
-    if(!this.archivePage||!this.archives.some(c=>c.key===key))return;
+    if(!this.archivePage||!searchArchiveCourses(this.archives,this.archiveQuery).some(c=>c.key===key))return;
     this.archiveSelected=key;
     this.archiveNotice='TO DELETE, SELECT SEPARATE CONFIRM ROW';
     this._build();
     uiSfx(this.scene,'uiMove');
+  }
+
+  /** Search stays in the Shop scene: typed keys do not hit MenuInput or RunScene. */
+  _openArchiveSearch() {
+    if(!this.archivePage||this.archiveBusy||this.archiveSearchBox||!this.alive)return;
+    this.archiveSearchDim=this.scene.add.rectangle(0,0,GAME_WIDTH,GAME_HEIGHT,0x000000,0.7)
+      .setOrigin(0,0).setDepth(700).setInteractive();
+    this.archiveSearchPanel=new Panel(this.scene,this.theme,{
+      x:55,y:75,w:370,h:118,title:'FIND LOCAL COURSE SEEDS',color:'cyan',fillAlpha:1,
+    }).setDepth(701);
+    const text=(y,value,color='text')=>this.archiveSearchPanel.add(
+      new NeonText(this.scene,this.theme,14,y,value,{color,outline:'none'}));
+    text(29,'SEED SUBSTRING, @DECIMAL MASK OR #FAV','cyan');
+    text(40,'NO GAMEPLAY TRAITS GUESSED; LOCAL ONLY.');
+    const control=(x,label,fn)=>{
+      const b=new Button(this.scene,this.theme,{x,y:82,w:90,h:17,label,color:'lime',onClick:fn});
+      this.archiveSearchPanel.add(b);
+    };
+    this.archiveSearchBox=new DomTextBox(this.scene,this.theme,{
+      x:72,y:126,w:336,h:20,value:this.archiveQuery,maxLength:48,
+      placeholder:'SEED / @MASK / #FAV',onSubmit:value=>this._applyArchiveSearch(value),
+      onCancel:()=>this._closeArchiveSearch(),
+    });
+    control(14,'APPLY',()=>this._applyArchiveSearch(this.archiveSearchBox?.getValue()||''));
+    control(110,'CLEAR',()=>this._applyArchiveSearch(''));
+    control(206,'BACK',()=>this._closeArchiveSearch());
+    this.archiveSearchBox.focus();
+  }
+
+  _applyArchiveSearch(value) {
+    if(!this.archivePage||!this.alive)return;
+    this.archiveQuery=normalizeArchiveSearch(value);
+    this.archiveSelected=null;this.archivePageIndex=0;
+    this._closeArchiveSearch();
+    this.archiveNotice=this.archiveQuery?'FILTER ACTIVE; SELECT COURSE BEFORE DELETE':'SELECT COURSE, THEN CONFIRM DELETE';
+    this._build();
+  }
+
+  _closeArchiveSearch() {
+    this.archiveSearchBox?.destroy();this.archiveSearchBox=null;
+    this.archiveSearchPanel?.destroy();this.archiveSearchPanel=null;
+    this.archiveSearchDim?.destroy();this.archiveSearchDim=null;
+  }
+
+  async _copySelectedArchive() {
+    const key=this.archiveSelected;
+    if(!this.archivePage||this.archiveBusy||!key||!this.alive)return;
+    const entry=searchArchiveCourses(this.archives,this.archiveQuery).find(c=>c.key===key);
+    if(!entry)return;
+    const code=shareableSeed({seed:entry.seed,biomeMask:entry.biomeMask});
+    const ok=await copyText(code);
+    if(!this.alive||!this.archivePage||this.archiveSelected!==key)return;
+    this.archiveNotice=ok?'SEED+MASK COPIED. CAN BE SHARED OFFLINE.':'CLIPBOARD BLOCKED; LOCAL ARCHIVE UNCHANGED';
+    this._build();
   }
 
   async _deleteSelectedArchive(){
@@ -2241,6 +2308,11 @@ export class ShopView extends View {
   }
 
   handleAction(action) {
+    if(this.archiveSearchBox){
+      if(action==='cancel')this._closeArchiveSearch();
+      else if(action==='confirm')this._applyArchiveSearch(this.archiveSearchBox.getValue());
+      return true;
+    }
     if (action === 'cancel') { this.close(); return true; }
     if (this.archivePage && (action === 'left' || action === 'right')){
       this._turnArchivePage(action==='left'?-1:1);return true;
@@ -2258,6 +2330,7 @@ export class ShopView extends View {
   }
 
   destroy() {
+    this._closeArchiveSearch();
     if (this.unbindDeco) this.unbindDeco();
     this.unbindDeco = null;
     for (const t of this.bankTexts || []) t.destroy();
@@ -2372,6 +2445,7 @@ export class TitlesView extends View {
   }
 
   destroy() {
+    this._closeArchiveSearch();
     if (this.unbindDeco) this.unbindDeco();
     this.unbindDeco = null;
     for (const t of this.bankTexts || []) t.destroy();
