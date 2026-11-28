@@ -91,6 +91,17 @@ describe('retryAction: true (Game Over)', () => {
     expect(a.got).toEqual(['confirm:gamepad']);
   });
 
+  test('Game Over keyboard R and gamepad RT use the same explicit REPORT action', () => {
+    const r=rig({retryAction:true});
+    r.key('r');
+    expect(r.got).toEqual(['report:keyboard']);
+    const p=rig({retryAction:true});
+    pads=pad([7]);p.frame();p.frame();
+    expect(p.got).toEqual(['report:gamepad']);
+    const title=rig();pads=pad([7]);title.frame();
+    expect(title.got).toEqual([]);
+  });
+
   test('while text entry owns the keyboard, Space does not fire retry through the router', () => {
     const r = rig({ retryAction: true });
     r.mi.rawKeyHandler = () => true;

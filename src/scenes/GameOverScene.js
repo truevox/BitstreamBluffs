@@ -362,8 +362,8 @@ export class GameOverScene extends Phaser.Scene {
       // #78: direct entry to the existing explicit, local-only evidence
       // export. Player must still choose EXPORT; nothing is uploaded.
       // The title-tab gap ends at x155, where GHOST FAV begins.
-      this.reportBtn = new Button(this, theme, { x: 105, y: 1, w: 49, h: 12,
-        label: 'REPORT', color: 'amber', onClick: () => this._openLocalReport() });
+      this.reportBtn = new Button(this, theme, { x: 92, y: 1, w: 63, h: 12,
+        label: 'REPORT R/RT', color: 'amber', onClick: () => this._openLocalReport() });
       this.reportBtn.setDisabled(true); // asynchronous qualification must resolve first
       p.add(this.reportBtn);
       if (this.registry.get(REG.GHOSTS)) {
@@ -1473,6 +1473,7 @@ export class GameOverScene extends Phaser.Scene {
       return;
     }
     if (this.ghostView) { this.ghostView.handleAction(action); return; }
+    if (action === 'report' && !this.shopOpen && !this.entry) { this._openLocalReport(); return; }
     if (action === 'ghost' && !this.shopOpen && !this.entry) { this._openGhosts(); return; }
     if (action === 'montage' && !this.shopOpen && !this.entry) { this._openMontage(); return; }
     if (this.shopOpen) {

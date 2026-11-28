@@ -12,9 +12,29 @@ try{
     '--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-webgl',
   ]});
   const page=await browser.newPage({viewport:{width:1100,height:720},acceptDownloads:true});
-  const errors=[],uploads=[],downloads=[];
+  const errors=[],requests=[],downloads=[];
+  let watchReportTraffic=false;
+  // This running game independently streams the original soundtrack. Do not
+  // confuse its pre-existing, known OGG GETs with replay evidence uploads;
+  // accept only exact-host music assets with no query parameters.
+  const allowedMusicRequest=(req)=>{
+    try{
+      const u=new URL(req.url);
+      return req.method==='GET' && u.origin==='https://bsb-audio.bearcave.win' &&
+        /^\/releases\/[^/]+\/packs\/.+\.ogg$/.test(u.pathname) &&
+        !u.search && !u.hash;
+    }catch{return false;}
+  };
+  const assertPrivateNetwork=(runId,digest)=>{
+    const unexpected=requests.filter(r=>!allowedMusicRequest(r));
+    assert.deepEqual(unexpected,[],'REPORT/EXPORT cannot issue a network request except original music OGG GETs');
+    for(const r of requests){
+      assert.ok(!r.url.includes(runId),'run ID appeared in outbound URL');
+      if(digest)assert.ok(!r.url.includes(digest),'replay digest appeared in outbound URL');
+    }
+  };
   page.on('pageerror',e=>errors.push(String(e)));
-  page.on('request',r=>{if(!['GET','HEAD'].includes(r.method()))uploads.push(r.method()+' '+r.url());});
+  page.on('request',r=>{if(watchReportTraffic)requests.push({method:r.method(),url:r.url()});});
   page.on('download',d=>downloads.push(d.suggestedFilename()));
   await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:25000});
@@ -49,9 +69,10 @@ try{
   });
   assert.equal(before.recordId,before.tapeId);
   assert.equal(before.report,true);
-  assert.equal(before.btnLabel,'REPORT');
+  assert.equal(before.btnLabel,'REPORT R/RT');
   assert.equal(before.modal,false);
   assert.deepEqual(downloads,[]);
+  watchReportTraffic=true; // every HTTP method, including GET and HEAD
   // Actual rendered Button pointer target, not calling the scene action.
   const pos=await page.evaluate(()=>{
     const g=window.__bbGame,z=g.scene.getScene('GameOverScene').reportBtn.zone;
@@ -74,7 +95,7 @@ try{
   assert.equal(opened.exportButton,'EXPORT');
   assert.equal(opened.title,'LOCAL REPLAY EVIDENCE');
   assert.deepEqual(downloads,[],'opening report must not auto-download evidence');
-  assert.deepEqual(uploads,[],'opening report must not upload data');
+  assertPrivateNetwork(before.recordId,null);
   await page.waitForFunction(()=>{
     const v=window.__bbGame.scene.getScene('GameOverScene').ghostView;
     return v?.buttons?.[1]?.disabled===false;
@@ -101,12 +122,18 @@ try{
   const downloaded=await downloadPromise;
   assert.match(downloaded.suggestedFilename(),/^[a-f0-9]{64}\.bbreplay$/i);
   assert.equal(downloads.length,1);
-  assert.deepEqual(uploads,[]);
+  assertPrivateNetwork(before.recordId,downloaded.suggestedFilename().replace(/\.bbreplay$/,''));
   const afterExport=await page.evaluate(()=>{
     const v=window.__bbGame.scene.getScene('GameOverScene').ghostView;
     return {status:v?.status?.main?.text,detail:v?.detail?.main?.text};
   });
   assert.match(afterExport.status,/LOCAL FILE EXPORT REQUESTED/);
+  await page.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView.close());
+  await page.waitForFunction(()=>!window.__bbGame.scene.getScene('GameOverScene').ghostView);
+  await page.keyboard.press('r');
+  await page.waitForFunction(()=>!!window.__bbGame.scene.getScene('GameOverScene').ghostView,
+    null,{timeout:5000});
+  assert.equal(downloads.length,1,'keyboard shortcut only opens the modal, not another export');
   await page.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView.close());
   await page.waitForFunction(()=>!window.__bbGame.scene.getScene('GameOverScene').ghostView);
   // A real initials input owns Enter/Escape while active. REPORT must be
