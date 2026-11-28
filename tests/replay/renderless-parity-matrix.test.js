@@ -4,10 +4,11 @@
  */
 import { jest } from '@jest/globals';
 
-const { installPhaserStub, createRun } = await import('./headlessRun.js');
+const { installPhaserStub, createRun, makeContent } = await import('./headlessRun.js');
 installPhaserStub(jest);
 const { RunScene } = await import('../../src/scenes/RunScene.js');
-const { REG } = await import('../../src/constants.js');
+const { REG, PIXELS_PER_METER } = await import('../../src/constants.js');
+const { biomeForSector, SECTOR_M, BASE_SECTORS } = await import('../../src/systems/TerrainGenerator.js');
 const { captureCausalState } = await import('../../src/systems/replay/fingerprintCapture.js');
 const { fingerprintState, FP_SUBSYSTEMS } = await import('../../src/systems/replay/fingerprint.js');
 
@@ -69,4 +70,43 @@ describe('#122 browserless real Matter render-on/off causal matrix',()=>{
   ['all-biome mask, shield and palette repaint',{seed:'HEADLESS-ALL',biomeMask:0xffff,level:12,ticks:900,shieldAt:1,shieldOffAt:260,paletteAt:480,minCheckpoints:2}],
   ['nonzero biome with trick edges and palette repaint',{seed:'HEADLESS-TRICKS',biomeMask:3,level:6,policy:'tricks',ticks:840,paletteAt:240,minCheckpoints:2}],
  ])('%s',(_name,options)=>{parity(options);});
+});
+
+/** #122 individual-biome mask matrix, not just the old all-bits mask.
+ *
+ * A normal fresh run cannot reach 1km+ biomes in the first 720 ticks if it
+ * crashes early. Keep honest evidence separate: (1) real RunScene/Matter
+ * render-on/off parity for each admitted single-bit config, (2) real terrain
+ * generator sector/colour assignment at a future selected biome sector.
+ * Do NOT call this proof of live 300-second in-biome physics or worker parity.
+ */
+const biomeDefinitions=Object.values(makeContent().biomes).sort((a,b)=>a.bit-b.bit);
+const independentBiomes=biomeDefinitions.filter(b=>b.bit>1);
+
+describe('#122 every named non-home biome individually admitted into real terrain + render parity',()=>{
+ test('content schema presents ten independent non-home single-bit biomes',()=>{
+  expect(biomeDefinitions.map(b=>b.bit)).toEqual([1,2,4,8,16,32,64,128,256,512,1024]);
+  expect(new Set(biomeDefinitions.map(b=>b.id)).size).toBe(11);
+ });
+ test.each(independentBiomes.map(b=>[b.id,b.bit]))('%s single-bit terrain and renderless parity', (biomeId,bit)=>{
+  const seed=`HEADLESS-INDIVIDUAL-${biomeId}`;
+  const {shown,hidden,checkpoints}=parity({seed,biomeMask:bit,level:12,
+   ticks:700,shieldAt:1,shieldOffAt:320,paletteAt:300,
+   minCheckpoints:2});
+  expect(checkpoints).toBeGreaterThanOrEqual(2);
+  expect(shown.biomeMask).toBe(bit);
+  expect(hidden.biomeMask).toBe(bit);
+  const defs=shown.terrain.biomeDefs;
+  const sector=Array.from({length:96},(_,i)=>BASE_SECTORS+i)
+   .find(i=>biomeForSector(seed,i,bit,defs)===biomeId);
+  expect(sector).toBeDefined();
+  // This is a REAL future chunk/biome palette lookup in the same production
+  // generator class; it does NOT teleport the player into that sector.
+  const x=(sector*SECTOR_M+250)*PIXELS_PER_METER;
+  expect(shown.terrain.biomeAtX(x)).toBe(biomeId);
+  expect(hidden.terrain.biomeAtX(x)).toBe(biomeId);
+  expect(shown.terrain.getChunkAt(x)?.biome).toBe(biomeId);
+  expect(hidden.terrain.getChunkAt(x)?.biome).toBe(biomeId);
+  expect(witnessed(shown)).toEqual(witnessed(hidden));
+ });
 });
