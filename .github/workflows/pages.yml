@@ -60,8 +60,16 @@ jobs:
         env:
           BASE: ${{ steps.base.outputs.path }}
         run: node tools/pwa/build-pages-site.mjs "$BASE" dist
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium (runner APT mirror fallback)
+        run: |
+          # Hosted Ubuntu normally already has Chromium's runtime libraries.
+          # Its optional third-party APT mirror can return HTTP 403 while
+          # --with-deps installs packages, even when Chromium itself works.
+          # Browser smoke/offline checks BELOW remain mandatory and fail closed.
+          if ! npx playwright install --with-deps chromium; then
+            echo "::warning::Chromium OS dependency install failed; trying browser download using runner libraries"
+            npx playwright install chromium
+          fi
       - name: Smoke test production game
         env:
           BASE: ${{ steps.base.outputs.path }}
