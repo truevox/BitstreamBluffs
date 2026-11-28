@@ -1,0 +1,5 @@
+[
+ {"seed":"PHYSICS-WORKER-BASE","tick":420,"crashed":false,"score":76,"checkpoints":[[120,"xxh32x2:a14e9d0fc14b12ee"],[240,"xxh32x2:e4686d23cba3afc0"],[360,"xxh32x2:a44e38b80658f750"]]},
+ {"seed":"PHYSICS-WORKER-TRICKS","tick":420,"crashed":false,"score":63,"checkpoints":[[120,"xxh32x2:3201d791beaf4b95"],[240,"xxh32x2:c87deea8583db131"],[360,"xxh32x2:b55b6e4bb9018088"]]},
+ {"seed":"PHYSICS-WORKER-VERTIGO","tick":618,"crashed":true,"score":80,"checkpoints":[[120,"xxh32x2:0f5e566d91d967c5"],[240,"xxh32x2:1c10a2507572a4c0"],[360,"xxh32x2:56d2b259f432af20"],[480,"xxh32x2:42686f3016d83ee5"],[600,"xxh32x2:4649eef3d752d135"]]}
+]
