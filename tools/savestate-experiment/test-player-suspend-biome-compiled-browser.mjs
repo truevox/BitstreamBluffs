@@ -11,7 +11,11 @@ import {chromium} from 'playwright';
 const root=resolve(process.argv[2]||'dist');
 const denyArg=process.argv.find(x=>x.startsWith('--deny='));
 const deny=denyArg?.split('=')[1]||'';
+const preexistingReady=process.argv.includes('--preexisting-ready');
+const occupiedStock=process.argv.includes('--occupied-stock');
 assert(!deny||['upgrade','magnet','kodiak'].includes(deny),'unsupported denial scenario');
+assert(!occupiedStock||preexistingReady&&!deny,'occupied stock requires a preexisting READY slot and no denial');
+assert(!preexistingReady||occupiedStock||deny,'preexisting READY must be exercised against an existing-mode denial');
 const maskArg=process.argv.find(x=>x.startsWith('--mask='));
 const mask=maskArg?Number(maskArg.split('=')[1]):3;
 assert(Number.isSafeInteger(mask)&&mask>0&&mask<=0xffffffff,'positive uint32 biome mask needed');
@@ -27,8 +31,16 @@ const slotRead=async page=>page.evaluate(async()=>{
  return new Promise((resolve,reject)=>{
   req.onsuccess=()=>{
    const db=req.result,tx=db.transaction('slots','readonly'),get=tx.objectStore('slots').get('local-suspend');
-   get.onsuccess=()=>{resolve(get.result?{status:get.result.status,runId:get.result.runId,
-    tick:get.result.tick,bytes:get.result.bytes?.length}:null);db.close();};
+   get.onsuccess=async()=>{
+    try{
+     const row=get.result;
+     if(!row){resolve(null);return;}
+     const bytes=Uint8Array.from(row.bytes);
+     const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+     resolve({status:row.status,runId:row.runId,tick:row.tick,bytes:bytes.length,
+      sha256:Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('')});
+    }catch(error){reject(error);}finally{db.close();}
+   };
    get.onerror=()=>{reject(get.error);db.close();};
   };
   req.onerror=()=>reject(req.error);
@@ -76,6 +88,34 @@ try{
   shells:(await caches.keys()).filter(k=>k.startsWith('bitstream-shell-v1-')),
  }));
  assert(installed.controller&&installed.registration&&installed.shells.length>=1,'not installed offline PWA');
+
+ // A real stock RunScene first creates an occupied READY slot via a physical
+ // Suspend click. Subsequent runs must not silently erase, claim or replace it.
+ let originalReady=null;
+ if(preexistingReady){
+  await p.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('occupied-slot-original',0));
+  await p.waitForFunction(()=>window.__bbGame.scene.isActive('RunScene')&&
+   window.__bbGame.scene.getScene('RunScene').simClock?.tick>=180,null,{timeout:80000});
+  await p.evaluate(()=>window.__bbGame.scene.getScene('RunScene').pauseRun());
+  await p.waitForFunction(()=>window.__bbGame.scene.isActive('PauseScene'),null,{timeout:20000});
+  await p.waitForTimeout(650);
+  const sourcePoint=await p.evaluate(()=>{
+   const g=window.__bbGame,pause=g.scene.getScene('PauseScene');
+   if(!pause.canSuspend)throw Error('original stock run cannot Suspend');
+   const i=pause.menu.items.findIndex(row=>row.label==='SUSPEND RUN');
+   const zone=pause.menu.rows[i].zone,m=zone.getWorldTransformMatrix(),point=m.transformPoint(zone.width/2,zone.height/2);
+   const rect=g.canvas.getBoundingClientRect();
+   return {x:rect.x+point.x*rect.width/g.scale.gameSize.width,
+    y:rect.y+point.y*rect.height/g.scale.gameSize.height};
+  });
+  await clickGame(p,sourcePoint);actions.push('physical-original-stock-suspend');
+  await p.waitForFunction(()=>window.__bbGame.scene.isActive('TitleScene')&&
+   window.__bbGame.scene.getScene('TitleScene')._suspendReady===true,null,{timeout:30000});
+  originalReady=await slotRead(p);
+  assert(originalReady?.status==='ready'&&originalReady.runId&&originalReady.tick>=180&&
+   originalReady.bytes>60000&&originalReady.sha256?.length===64,
+   'original stock READY missing '+JSON.stringify(originalReady));
+ }
  await p.evaluate(({mask,deny})=>{
   const g=window.__bbGame,reg=g.registry,prof={...(reg.get('profile')||{})};
   if(deny==='upgrade')Object.assign(prof,{upgradesEnabled:true,upgrades:{speed:1}});
@@ -104,9 +144,80 @@ try{
   const reason={upgrade:'UPGRADED RUN',magnet:'MAGNETS ENABLED',kodiak:'KODIAKS ENABLED'}[deny];
   assert(evidence.suspendNotice===`SUSPEND OFF: ${reason}`,
    'Pause did not explain unavailable save '+JSON.stringify(evidence));
-  assert.equal(await slotRead(p),null,'unsupported run created a READY save');
+  assert.deepEqual(await slotRead(p),originalReady,
+   'unsupported run changed existing READY slot (or created phantom slot)');
+  // Reopening the installed PWA must not turn the old slot into a bad/new run.
+  if(preexistingReady){
+   await p.reload({waitUntil:'domcontentloaded'});
+   await p.waitForFunction(()=>window.__bbGame.scene.isActive('TitleScene')&&
+    window.__bbGame.scene.getScene('TitleScene')._suspendReady===true,null,{timeout:30000});
+   assert.deepEqual(await slotRead(p),originalReady,'old READY lost on cold Title reopen');
+  }
   assert.deepEqual(errors,[]);
-  console.log('PASS_COMPILED_PWA_SUSPEND_DENIAL',JSON.stringify({deny,evidence,noPhantomSlot:true,errors,outbound}));
+  console.log('PASS_COMPILED_PWA_SUSPEND_DENIAL',JSON.stringify({deny,evidence,
+   originalReady,preexistingPreserved:preexistingReady,noPhantomSlot:!preexistingReady,errors,outbound}));
+  await context.close();
+ } else if(occupiedStock){
+  await p.waitForTimeout(650);
+  const before=await p.evaluate(()=>{
+   const g=window.__bbGame,r=g.scene.getScene('RunScene'),pause=g.scene.getScene('PauseScene');
+   const i=pause.menu.items.findIndex(row=>row.label==='SUSPEND RUN');
+   if(i<0||!pause.canSuspend)throw Error('second stock source not Suspend-eligible');
+   const zone=pause.menu.rows[i].zone,m=zone.getWorldTransformMatrix(),pt=m.transformPoint(zone.width/2,zone.height/2),rect=g.canvas.getBoundingClientRect();
+   return {runId:r.runId,tick:r.simClock.tick,paused:g.scene.isPaused('RunScene'),
+    point:{x:rect.x+pt.x*rect.width/g.scale.gameSize.width,
+     y:rect.y+pt.y*rect.height/g.scale.gameSize.height}};
+  });
+  assert(before.paused&&before.runId!==originalReady.runId,'second stock source invalid');
+  await clickGame(p,before.point);actions.push('physical-occupied-stock-suspend');
+  await p.waitForFunction(()=>{
+   const g=window.__bbGame,pause=g.scene.getScene('PauseScene');
+   return g.scene.isActive('PauseScene')&&pause.suspendStatus?.main?.text?.includes('SUSPEND FAILED: SLOT OCCUPIED');
+  },null,{timeout:30000});
+  const denied=await p.evaluate(()=>{
+   const g=window.__bbGame,pause=g.scene.getScene('PauseScene'),r=g.scene.getScene('RunScene');
+   return {pauseSceneActive:g.scene.isActive('PauseScene'),paused:g.scene.isPaused('RunScene'),
+    runId:r.runId,tick:r.simClock.tick,leaving:pause.leaving,status:pause.suspendStatus.main.text};
+  });
+  assert(denied.pauseSceneActive&&denied.paused&&!denied.leaving&&denied.runId===before.runId&&
+   denied.tick===before.tick,'occupied slot damaged second paused source '+JSON.stringify(denied));
+  assert.deepEqual(await slotRead(p),originalReady,'occupied stock overwritten original READY');
+  await p.reload({waitUntil:'domcontentloaded'});
+  await p.waitForFunction(()=>window.__bbGame?.scene.isActive('TitleScene')&&
+   window.__bbGame.scene.getScene('TitleScene')._suspendReady===true,null,{timeout:60000});
+  assert.deepEqual(await slotRead(p),originalReady,'occupied stock lost READY after reload');
+  // The preserved source is not merely a matching hash: it must still
+  // complete the original one-use player Resume after the rejected save.
+  await p.evaluate(()=>{
+   window.__occupiedResumeEvents=[];
+   const g=window.__bbGame;
+   g.events.on('bb:runStart',event=>{
+    if(event?.resumed)window.__occupiedResumeEvents.push({runId:event.runId,
+     tick:g.scene.getScene('RunScene').simClock.tick});
+   });
+  });
+  const resumePoint=await p.evaluate(()=>{
+   const g=window.__bbGame,b=g.scene.getScene('TitleScene').suspendButton,
+    m=b.getWorldTransformMatrix(),pt=m.transformPoint(b.w/2,b.h/2),rect=g.canvas.getBoundingClientRect();
+   if(!b.visible||b.disabled||b.label.main.text!=='R RESUME SAVE')
+    throw Error('occupied original not offered for Resume');
+   return {x:rect.x+pt.x*rect.width/g.scale.gameSize.width,
+    y:rect.y+pt.y*rect.height/g.scale.gameSize.height};
+  });
+  await clickGame(p,resumePoint);actions.push('physical-original-resume-after-denial');
+  await p.waitForFunction(()=>window.__bbGame.scene.isActive('RunScene')&&
+   !window.__bbGame.scene.isActive('TitleScene'),null,{timeout:30000});
+  const resume=await p.evaluate(()=>({
+   runId:window.__bbGame.scene.getScene('RunScene').runId,
+   events:window.__occupiedResumeEvents,
+  }));
+  assert(resume.runId===originalReady.runId&&resume.events.length===1&&
+   resume.events[0].runId===originalReady.runId&&resume.events[0].tick===originalReady.tick,
+   'original READY did not resume exact source run after occupied-slot denial '+JSON.stringify(resume));
+  assert.equal(await slotRead(p),null,'one-use original slot was not consumed on resume');
+  assert.deepEqual(errors,[]);
+  console.log('PASS_COMPILED_PWA_OCCUPIED_STOCK_SUSPEND_REFUSAL',JSON.stringify({
+   installed,originalReady,before,denied,resume,originalPreservedOnReload:true,actions,errors,outbound}));
   await context.close();
  } else {
 
