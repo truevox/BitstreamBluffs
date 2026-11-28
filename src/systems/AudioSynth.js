@@ -1264,6 +1264,11 @@ export class AudioSynth {
   /** Run transitions change timbre and effects but never restart a playing song. */
   _enterRunMusic(seed) {
     this._menuAutoplayPending = false; // a late catalog fetch cannot restart Title music in-game
+    // The original Title soundtrack can survive unchanged into Run, so
+    // startMusic() is intentionally SKIPPED when a stem is already playing.
+    // Seed the independent procedural-failure fallback for THIS run anyway;
+    // never let a late decode error borrow the previous run's notes/RNG.
+    this._seedProceduralMusic(seed);
     this._musicMode = 'run';
     this._jukeboxMode = false;
     // #65: choose actual Debutmont WHILE still using the clean menu

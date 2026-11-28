@@ -822,6 +822,32 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('inherited Title stem does not reuse previous run RNG when fallback begins during Pause',()=>{
+    const {a,d,events}=setup();
+    a._seedProceduralMusic('previous-run-seed');
+    const stale=a._baseRng;
+    const previousOrder=a._progOrder.slice();
+    expect(d.started).toBe(true);
+    d.setBiome=jest.fn(); // the real director has this; synthetic transport fixture doesn't
+    events.emit(EVT.RUN_START,{seed:'current-run-seed'});
+    expect(a._musicSeed).toBe('current-run-seed');
+    expect(a._baseRng).not.toBe(stale);
+    expect(a._progOrder).toHaveLength(previousOrder.length);
+    expect(d.started).toBe(true); // never interrupts the original Title source
+    expect(d.transportPause).not.toHaveBeenCalled();
+    const currentRunRng=a._baseRng;
+    a.applySettings({...a.settings,musicDuringPause:true});
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    d.started=false;d.pack=null;
+    a._startScheduler=jest.fn(()=>{a._musicTimer=9001;});
+    a.musicProviderFailed();
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a._baseRng).toBe(currentRunRng);
+    expect(a._musicSeed).toBe('current-run-seed');
+    a._musicTimer=null;
+    a.destroy();
+  });
+
   test('Quit from opted-in Pause stops run-only procedural fallback without disturbing Title sound policy',()=>{
     const {a,d,events,ctx}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});
