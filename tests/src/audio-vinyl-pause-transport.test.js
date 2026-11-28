@@ -181,6 +181,52 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('opted-in Pause restores procedural fallback after ALL songs OFF then ON',()=>{
+    const {a,d,events,ctx}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;d.activeNodes.clear();
+    a._musicTimer=32765; // already playing an authentic procedural fallback
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    expect(a._musicTimer).toBeNull();
+    expect(a._vinylPauseSession.manualOverride).toBe(false);
+    a._activateStemMusic=jest.fn(()=>false); // original catalog unavailable
+    a._startScheduler=jest.fn(()=>{a._musicTimer=9771;});
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([1,ctx.currentTime,.04]);
+    expect(a._paused).toBe(true);
+    expect(a._musicWanted).toBe(true);
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    expect(a._startScheduler).toHaveBeenCalledTimes(1);
+    a._musicTimer=null;
+    a.destroy();
+  });
+
+  test('default OFF Pause all-songs-off then ON, Quit restores selected menu soundtrack',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'R',pauseToken:'R:1'});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    d.started=false;d.transportPaused=false;d._token++;d._resumeOffset=0;
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    events.emit(EVT.RUN_ABORT,{reason:'quit',runId:'R',pauseToken:'R:1'});
+    expect(a._musicMode).toBe('menu');
+    expect(a._paused).toBe(false);
+    expect(a._vinylPauseSession).toBeNull();
+    expect(a._musicWanted).toBe(true);
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(d.transportPlay).not.toHaveBeenCalled(); // invalidated original never revived
+    expect(a._vinylScratch.play).toHaveBeenCalledTimes(1); // no Quit scratch
+    a.destroy();
+  });
+
   test('procedural source resumes AUDIBLY after toggling continuous Pause OFF',()=>{
     const {a,d,events,ctx}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

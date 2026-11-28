@@ -808,6 +808,16 @@ export class AudioSynth {
     this._paused = false;
     const snap = session || pending?.snapshot;
     if (!snap?.shouldResume || snap.manualOverride) return;
+    // Turning every song off during a default-OFF Pause invalidates the old
+    // transport. If a song was re-enabled, Quit must honor the deferred
+    // choice too: Title uses its original-only jukebox policy (no synth).
+    if (snap.restartOnResume) {
+      if (this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+        this._musicWanted = true;
+        if (this.ctx?.state === 'running') this._activateStemMusic();
+      }
+      return;
+    }
     const d = this._stemMusic;
     if (snap.procedural) {
       this._musicWanted = true;
@@ -888,6 +898,15 @@ export class AudioSynth {
           session.restartOnResume = false;
           session.shouldResume = false;
         }
+      } else if (!session.shouldResume && this._musicWanted &&
+          !d?.started && this._musicTimer === null &&
+          this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
+          this.ctx?.state === 'running') {
+        // ON permits music even if the chosen original is unavailable.
+        // All-songs-off stopped the procedural timer; re-enabling a song
+        // must restore that same source-first fallback (never in offline
+        // original-only preview, and never after manual Jukebox intent).
+        if (!this._activateStemMusic()) this.musicProviderFailed();
       } else if (session.shouldResume) {
         if (session.procedural) {
           // Do not consume the restore intent while the AudioContext is
