@@ -1114,6 +1114,26 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('catalog-ready cannot interrupt audible procedural opt-in Pause before gameplay Resume',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=false;d.pack=null;
+    a._musicWanted=true;a._musicTimer=82731;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._paused).toBe(true);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    const attempted=jest.fn(()=>{d.started=true;a._musicTimer=null;return true;});
+    a._activateStemMusic=attempted;
+    d.ready=true;
+    a._onStemCatalogReady();
+    expect(attempted).not.toHaveBeenCalled();
+    expect(a._musicTimer).toBe(82731); // no gap during a manual pause
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(attempted).toHaveBeenCalledTimes(1); // handoff only after gameplay Resume
+    expect(a._paused).toBe(false);
+    a.destroy();
+  });
+
   test('visibility unlock never replaces a running procedural Pause fallback with an unverified stem',()=>{
     const {a,d,ctx,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});
