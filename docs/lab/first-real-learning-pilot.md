@@ -27,3 +27,14 @@ Unit tests pin training/heldout separation, refusal of foreign or duplicated out
 Still needed before #454 can close: a first reviewed #24 observation/action/model ABI, #122 certified pure/headless causal stepping (all biomes, hazards, 300 s, shields), actual policy optimization and frozen snapshots wired into #451 checkpoint and #452 stale-evaluation policy, #25 player-facing champion/graph/ghost feedback, and timed genuine learning measurements on named cheap Chromebooks and desktop. This pilot is not a release or a customer-facing feature.
 
 **Provenance:** Gal Friday engineer-selected experimental training heuristic and evaluation protocol for owner-specified goal in #454, not an assertion that the owner approved these algorithm choices. [skip netlify]
+
+## First recorded experiment (November 28, 2026)
+
+Source SHA `21097e8aacbd2d73dd15f6e7befdf190791e11c0`, clean at the time of measurement, SIM_REVISION 9. The complete 10-episode source-stamped report is preserved in [`evidence/real-runscene-hop-search-sim9-20261128.json`](evidence/real-runscene-hop-search-sim9-20261128.json).
+
+- Training: 280 ms mean **536.3 m**, 380 ms default mean **493.85 m**, 480 ms mean **493.0 m**. 280 ms selected *on training courses only*.
+- Fresh held-out: baseline mean **889.4 m**, frozen winner mean **889.95 m**; difference **+0.55 m** across two seeds. One held-out course reached the 900 m test ceiling for both policies.
+- The provisional visibility threshold was **8.894 m** (1% of baseline held-out mean), therefore the honest outcome is **`inconclusive-small-gain`**, *not* demonstrated learning or generalization.
+- The experiment cost **10 genuine physics runs / about 52.1 seconds** on this test machine; no actual cheap Chromebook measurement and no evidence yet for two-minute learned skill. This is also not a significance test: only two training and two held-out courses were sampled.
+
+No score, rewards, official records, network AI submissions, or trained model deployment resulted from this experiment. Algorithm and acceptance policy remain provisional Friday engineering choices.
