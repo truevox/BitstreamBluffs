@@ -1,266 +1,310 @@
-# Lab MVP vertical slice: engineering plan
+# Lab MVP vertical slice: engineering plan (v2)
 
-Reviewed with gstack `/plan-eng-review` (v1.58.5.0) on 2026-11-28 against `main @ 1ca95c3`.
-Scope chosen: **Lab MVP vertical slice** (Step 0 scope reduction of #24). Every decision below was
-made explicitly by Marv; the option letter is recorded so nobody re-litigates it by accident.
+Reviewed with gstack `/plan-eng-review` (v1.58.5.0) on 2026-11-28 against `main @ 1ca95c3`, then
+revised the same day after two outside-voice reviews (GPT Friday and Neon). Every decision was made
+explicitly by Marv. v2 keeps most of the architecture and changes the **order**: prove learning, then
+feasibility, then the hook with real players, and only then productize.
 
-Product context: the Lab is **premium-only** (Steam, web unlock, honor button, schools). Free web
-players get one guided Lab run. That makes #24's "Web 1 slot" wording obsolete (see T13).
+> Why v2: v1 reviewed the Lab as an ML engineering project. The product is "a little idiot on a sled
+> that learns." Nobody had watched a brain learn yet, so v1 would have built validators, fuzzers and
+> CI around an untested ABI and fitness function.
 
-## Goal
+## Platform (decided 2026-11-28)
 
-Prove the hook before building the economy around it: a player-owned brain trains on the **real**
-game, deterministically, in background workers, on Chromium, Firefox and WebKit, and the guided
-first run reaches a real milestone inside its time budget on a weak machine.
+- **The Lab runs only on Chromium:** the Steam app (Electron, one pinned Chromium) and Chromium
+  browsers (Chrome, Edge, ChromeOS). Firefox and Safari show a calm "The Lab needs Chrome or the Steam
+  app" with no sales pitch. Sledding and Autopilot work everywhere.
+- Premium = Steam, web unlock, honor button, schools (Chromebooks qualify). Free web players on
+  Chromium get one guided Lab run.
+- Consequences: no Firefox/WebKit training goldens or physics parity jobs; Chromium reports
+  `deviceMemory`, so the unknown-memory worker ramp (v1 decision 4.1) is dropped.
+
+## Phases and gates
+
+```
+ PHASE 0  prove learning      disposable spike on existing harness       GATE: Marv watches a champion
+          (tools/lab/spike/)  bake-off, fitness, ABI candidates,               improve; algorithm,
+                              champion replay viewer, 30 seeds                 ABI, fitness, cadence chosen
+     │
+ PHASE 1  prove feasibility   benchmark (setup/sim/heap, worker pool),   GATE: first milestone inside
+                              real worker throttling + real Chromebook,        budget on weak hardware
+                              Electron vs Node golden
+     │
+ PHASE 2  prove the hook      rough guided-run prototype, tested with    GATE: acceptance targets
+                              unfamiliar players                               (below, adjustable)
+     │
+ PHASE 3  productize          T1-T13 below                               GATE: all tests green
+```
+
+Nothing from Phase 0 ships. Its code lives under `tools/lab/spike/` and may be deleted. Phase 3 rebuilds
+the chosen pieces properly.
+
+### Proposed acceptance targets (Phase 2 gate; proposals from Neon, Marv may adjust)
+
+| Metric | Initial target |
+|---|---|
+| First visible learning milestone | within 60 s |
+| Meaningful riding improvement | within 3 min |
+| Guided experience complete | within 5 min |
+| Success rate across independent training seeds | >= 90% |
+| Unfamiliar playtesters | >= 20 |
+| Players who choose to train again | >= 50% |
+| Fake or prerecorded milestones | zero |
 
 ## Decisions (locked)
 
 | # | Topic | Decision |
 |---|---|---|
-| 0 | Scope | A: Lab MVP vertical slice. Defer leases, Potions, forfeit accounting, extra algorithms, Autopilot economy, Lab UI (#498) |
-| 1.1 | Headless run | A: promote harness into `src/` with **strict** stubs (explicit allow-list of graphics-only no-ops; anything else throws in CI) + render-on/off fingerprint parity gate on policy-driven tapes |
-| 1.2 | Model ABI v1 | A: brain decides every 4 sim ticks (30 Hz at `SIM_TICK_HZ = 120`) and holds its buttons in between; one pure `observe()` reads physics state only; action set = gamepad fields (push, tilt -1/0/+1, heli, hop, airBrake); brain files stamped with `abiVersion` + `SIM_REVISION` |
-| 1.3 | Trainer | A: brain format + runtime = general feed-forward **graph** (NEAT-ready); v1 trainer = fixed-shape network + seeded evolution, in-house; NEAT is slice 2 on the same format |
-| 1.4 | Interrupts | A: generations are atomic; checkpoint after every completed generation; interrupted generation re-runs from its checkpoint; UI says "resumed from generation N" |
-| 2.1 | Scheduler location | A: move `episode-batch` + `worker-episode-batch` to `src/systems/lab/` (pure move PR), single copy |
-| 2.2 | Error names | A: one frozen `src/systems/lab/labErrors.js` table (code, retryable, messageKey); test fails on unknown codes |
-| 2.3 | Readability | B: Prettier + ESLint repo-wide, plus src-style Lab modules and two ASCII diagrams in code (guardrails below) |
-| 3.1 | Browsers | A: golden training test + 300 s physics parity on Chromium, Firefox, WebKit, all matching the Node baseline |
-| 3.2 | Guided run | A: fixed seed + starting population, pinned milestone ladder, Playwright proof on 6x CPU throttle, 1 worker |
-| 3.3 | Hostile files | A: named-rejection unit tests + fast-check property fuzzing (dev-only dep) with a time cap |
-| 4.1 | Worker cap | A: when memory is unknown (Firefox/Safari), measured ramp: +1 worker while per-worker speed >= 80% of solo and no errors, cap min(CPU cap, 4), remembered per device, drop to 1 on failure or play |
-| 4.2 | Train mode | A: runner modes `train` (no fingerprints/recorder) and `verify` (full); champion re-verified each generation; benchmarked |
-| 4.3 | Episode setup | A: measure setup vs sim time; per-worker deep-frozen content cache allowed; scene reuse forbidden unless a 1,000-reuse parity test passes |
+| 0 | Scope | Lab MVP vertical slice. Defer leases, Potions, forfeit accounting, extra algorithms, Autopilot economy, full Lab UI (#498) |
+| OV1 | Order | Phase 0 → 1 → 2 → 3 as above (both reviewers) |
+| OV3 | Hook proof | Champion replay viewer in Phase 0; rough guided-run prototype playtested with unfamiliar players before Phase 3 |
+| OV4 | Engines | Lab on Electron + Chromium browsers only |
+| 1.1 | Headless run | Promote harness into `src/` with strict stubs at **subsystem** granularity (sound, tweens, particles, cameras, `add.*`, textures allowed as no-ops); throw on an unknown subsystem or when game logic reads a value back from a stub; render-on/off parity gate on policy tapes; move RunScene toward a view-sink (`scene.fx`/`scene.hud`) gradually as it is touched |
+| 1.2 | Model ABI | Locked **after** Phase 0. Candidate set below. Stamped with `abiVersion` + `SIM_REVISION` |
+| 1.3 | Brain format | Feed-forward graph with a **forward-only ordering rule**: nodes ordered inputs → hidden → outputs, every connection goes from a lower to a higher index. Cycles impossible by construction; evaluation over flat typed arrays. NEAT-compatible by topological sort on save. Trainer algorithm chosen by the Phase 0 bake-off |
+| 1.4 | Interrupts | Ranking and breeding atomic. Finished episode results (index-addressed) survive governor throttling and worker-count changes; remaining episodes drain on the resized pool. Discard only on cancel, unrecoverable crash, or tab/app close. Short generation-time budget. Checkpoint after each completed generation |
+| 2.1 | Scheduler location | Move `episode-batch` + `worker-episode-batch` to `src/systems/lab/` (pure move), single copy; then persistent worker pool |
+| 2.2 | Error names | `src/systems/lab/labErrors.js` table (code, retryable, messageKey); stability promised only for codes players or files can see |
+| 2.3 | Formatting | Prettier + ESLint config enforced on **new and modified Lab/brain modules only**; repo-wide sweep deferred to an integration freeze (62 open PRs on 2026-11-28) |
+| 3.1 | Goldens | Training golden on Node + Chrome (Playwright) + Electron; compare population and fitness hashes, not only the champion |
+| 3.2 | Guided run | Fixed seed + starting population for onboarding and regression, **plus** 30 independent population seeds and held-out courses with a preset success bar (median and p90 time to milestone); weak-machine proof uses real worker-target throttling and a real low-end Chromebook |
+| 3.3 | Brain files | ~15 targeted hostile-file tests + small fast-check fuzz, scheduled in Phase 3 |
+| 4.1 | Worker cap | Existing Chromium memory rule stands; add a tab-kill sentinel |
+| 4.2 | Verify | Re-verify only new milestone champions, cached by brain + course + ruleset hash; `VERIFY_MISMATCH` code |
+| 4.3 | Episode setup | Measured in Phase 1; per-worker deep-frozen content cache allowed; scene reuse only behind a 1,000-reuse parity test (#510) |
 
-### Prettier/ESLint guardrails (decision 2.3)
+### Accepted outside-voice additions
 
-- One **format-only** PR, nothing else in it; add its commit to `.git-blame-ignore-revs`.
-- ESLint autofix limited to non-semantic rules; anything that could change behavior is report-only.
-- That PR must pass the full Jest suite, determinism goldens (pmath, matter-portable, savestate,
-  sim-math-boundary) and `headless-render-parity-qa` / `real-runscene-worker-physics-qa` unchanged.
-- Exclude vendored/generated files and recorded fixtures/goldens.
-- Land it when the open-PR queue is near-empty and coordinate with Morgan's checkpoint, because it
-  conflicts with every in-flight branch. Land it **before** Lab code starts so new code is born formatted.
-- Title starts with `[skip netlify]` (AGENTS.md).
+- **Fair courses:** every candidate in a generation rides the same course seeds; courses rotate across
+  generations; champions are evaluated on held-out courses.
+- **Per-generation RNG = hash(runSeed, gen)**, so retries and resumes cannot drift.
+- **Normalize -0** to 0 on save and load (JSON writes -0 as 0).
+- **Optimizer state is versioned separately** from the runnable brain file.
+- **Checkpoint ownership:** campaign identity + compare-and-swap. Today `localBrainCheckpoints` rejects
+  only older generations, so two tabs at the same generation can overwrite each other (verified).
+- **IDB retention:** one latest checkpoint + pinned milestone snapshots.
+- **Size budget:** measure worst-case population + optimizer size against the preflight limits
+  (2 MiB, 80,000 JSON nodes); compact weight arrays; portable brain exports separate from resumable
+  checkpoints.
+- **Free-run accounting:** the one free guided run is consumed only after it was actually delivered,
+  never by a crash, interruption or storage refusal.
+- **Real worker throttling:** CDP page throttling does not slow dedicated workers (verified
+  2026-11-28: main thread 453 → 3090 ms at 6x, worker 512 → 485 ms). Throttle worker targets
+  explicitly and assert an in-worker calibration loop runs ~6x slower; also run on a real low-end
+  Chromebook (Kompanio class).
+- **Persistent worker pool:** the current transport creates and terminates workers every batch
+  (verified); keep a pool, fresh simulation per episode.
+- **Tab-kill sentinel:** write a "workers starting" marker before spawning; if the page dies hard,
+  the next load steps the worker cap down permanently (with a version/TTL).
+- **Background-training contract:** define and test training behavior during menus, riding, and a
+  hidden tab or minimized app. The governor stops admitting new work but never kills in-flight work.
+- **NEAT is a candidate, not a scheduled slice 2** (#508): Phase 0 results and player data decide.
 
 ## What already exists (reuse, do not rebuild)
 
-| Existing | Where | Used by this plan as |
+| Existing | Where | Used as |
 |---|---|---|
-| Real RunScene physics in a worker, 300 s cumulative parity (#122/#134) | `tools/lab/qa-real-physics-*.mjs`, CI `real-runscene-worker-physics-qa` | the base of the production headless runner (promoted, stubs made strict) |
-| Render on/off parity | CI `headless-render-parity-qa` | extended to policy-driven tapes |
-| Deterministic index-ordered scheduler, per-index seeds, all-or-nothing batches | `tools/lab/episode-batch.mjs` | moved to `src/systems/lab/`, drives each generation |
-| Worker transport with abort/timeout | `tools/lab/worker-episode-batch.mjs` | moved; error strings mapped to `labErrors` |
-| Brain JSON preflight (#450) | `src/systems/brain/brainFilePreflight.js` | first stage; ABI validator runs after it |
-| SIM_REVISION policy (#452) | `src/systems/brain/brainRevisionPolicy.js`, `replay/ruleset.js` | stamp + compatibility verdicts |
-| Local checkpoints + download (#451) | `src/systems/brain/localBrainCheckpoints.js` | per-generation checkpoints |
-| Play-aware governor (#453) | `src/systems/lab/LabResourceGovernor.js` | admission; gains the unknown-memory ramp |
-| Portable math + boundary test (#121) | `src/systems/pmath.js`, `tests/determinism/sim-math-boundary.test.js` (scans all of `src/`) | policy runtime uses pmath; automatically covered |
-| Platform capability adapter (#441) | src | unchanged |
+| Real RunScene physics in a worker, 300 s cumulative parity (#122/#134) | `tools/lab/qa-real-physics-*.mjs` | Phase 0 spike base; Phase 3 production runner |
+| Render on/off parity | CI `headless-render-parity-qa` | extended to policy tapes |
+| Deterministic index-ordered scheduler | `tools/lab/episode-batch.mjs` | spike, then moved to `src/systems/lab/` |
+| Worker transport | `tools/lab/worker-episode-batch.mjs` | moved; becomes a persistent pool |
+| Brain JSON preflight (#450) | `src/systems/brain/brainFilePreflight.js` | first intake stage |
+| SIM_REVISION policy (#452) | `src/systems/brain/brainRevisionPolicy.js` | stamp + verdicts |
+| Local checkpoints (#451) | `src/systems/brain/localBrainCheckpoints.js` | gains campaign identity + CAS |
+| Play-aware governor (#453) | `src/systems/lab/LabResourceGovernor.js` | admission + tab-kill sentinel |
+| Portable math (#121) + Matter patch | `src/systems/pmath.js`, `src/systems/MatterPortable.js` | policy runtime uses pmath |
 
-Nothing in this plan rebuilds physics, seeding, storage or admission.
+## Phase 0: prove learning (disposable)
 
-## Architecture
+- **Spike harness** on the existing runner: a policy hook called every N ticks, pluggable observation
+  sets, pluggable fitness functions, all under `tools/lab/spike/`.
+- **Fitness candidates** (progressive objectives): controlled movement → stable landings → hazard
+  survival → intentional tricks → competitive riding. Training fitness is separate from the
+  player-facing score. Each candidate is tested for exploits (crawling to avoid crashes, bounce
+  farming, suicidal trick spam, idling).
+- **Observation candidates:** sled velocity in a slope-relative frame, angle as sin/cos (no
+  discontinuity), angular velocity, grounded, **height above terrain**, terrain samples **relative to
+  sled height** plus local slope, hazard **type + relative dx/dy (+ velocity)**, heli power and action
+  cooldowns, BSOD proximity and closing speed, previous action. Everything normalized to about [-1, 1].
+- **Button semantics:** specify held, pressed and released per action. The existing tape already
+  separates `pressed.hop` / `pressed.airBrake` from held controls; a 4-tick hold must not jam or
+  double-trigger edge actions.
+- **Cadence:** compare 15, 30 and 60 Hz decisions at equal compute.
+- **Algorithm bake-off** at equal simulation budget, on common course seeds: linear policy + mutation;
+  small fixed network + elitist evolution; small fixed network + diagonal Gaussian evolution strategy.
+  Baselines: random search and an independently written heuristic controller. No AI-generated
+  demonstration runs feed the population. Pick the simplest method that shows visible improvement
+  reliably.
+- **Champion replay viewer** (dev-only route): Gen 1 vs Gen N champion riding in the real rendered
+  RunScene with an input overlay. Marv watches the milestone before anything is locked.
+- **Generalization:** 30 population seeds, held-out courses, preset success bar, median and p90 time
+  to milestone.
+
+## Phase 1: prove feasibility
+
+- **Benchmark:** per-episode setup vs sim time, heap growth over 500 episodes, persistent vs
+  per-batch workers, train vs verify mode.
+- **Weak hardware:** worker-target throttling with in-worker calibration, plus a real low-end
+  Chromebook run: cold start to first milestone, peak memory, responsiveness while training.
+- **Electron golden:** the Phase 0 winner produces identical population/fitness hashes in Node,
+  Chrome and Electron.
+- If setup dominates or heap grows, decide on #510 (scene reuse behind its parity test) here.
+
+## Phase 2: prove the hook
+
+A rough guided-run prototype on Chromium web and Electron: name your rider, watch it flop, start
+training, watch it improve, race or spectate it, keep or export it. No full Lab UI. Test with
+unfamiliar players against the acceptance targets. DESIGN.md §10 rules apply (honest milestones, no
+unlock pitch in the guided run).
+
+## Phase 3: productize
+
+### Architecture
 
 ```
- MAIN THREAD                                   WORKER (x N, governor-admitted)
+ MAIN THREAD                                   PERSISTENT WORKER POOL (governor-admitted)
  ┌──────────────────────────────┐              ┌────────────────────────────────────┐
  │ Trainer (generation loop)    │  episode     │ headlessRun(mode)                  │
- │  pop[gen] ──► episodeBatch ──┼─{idx,seed,──►│  strict stubs + real RunScene      │
- │       ▲        (index order) │   brain}     │  every 4 ticks:                    │
+ │  pop[gen] on common courses ─┼─{idx,seed,──►│  subsystem-strict stubs + RunScene │
+ │       ▲   (index order)      │   brain}     │  every N ticks:                    │
  │       │                      │              │    obs = observe(scene)  (physics) │
- │  rank by fitness             │◄─{idx,fit,───┤    act = policyRuntime(brain, obs) │
- │       │                      │   code}      │    hold act for 4 ticks            │
- │  verify champion (1 ep,      │              │  mode=train : fitness only         │
- │   mode=verify, fingerprints) │              │  mode=verify: + fingerprints       │
- │       │                      │              └────────────────────────────────────┘
- │  checkpoint(gen) ──► LocalBrainCheckpoints (IDB)
- │       │
- │  breed (seeded RNG from checkpoint state) ──► pop[gen+1]
+ │  results[idx] kept across    │◄─{idx,fit,───┤    act = policyRuntime(brain, obs) │
+ │  throttle / pool resize      │   code}      │    held / pressed semantics        │
+ │       │                      │              │  mode=train : fitness only         │
+ │  rank (atomic)               │              │  mode=verify: + fingerprints       │
+ │  verify NEW milestone champ  │              └────────────────────────────────────┘
+ │   (cached by brain+course+ruleset hash)
+ │  checkpoint(gen) ──► LocalBrainCheckpoints (campaign id + CAS; latest + milestones)
+ │  breed (RNG = hash(runSeed, gen)) ──► pop[gen+1]
  └──────────────────────────────┘
 ```
 
 Brain file intake:
 
 ```
- file bytes ─► brainFilePreflight (#450: size, structure, no prototype poison)
-           ─► abiValidator (#24): abiVersion, SIM_REVISION verdict, graph checks
-                (DAG/no cycles, no dangling refs, finite weights, node/edge/fan-in caps)
+ file bytes ─► brainFilePreflight (#450)
+           ─► abiValidator: abiVersion, SIM_REVISION verdict, forward-only index rule,
+              finite weights, node/edge/fan-in caps, -0 normalized
            ─► ok {brain}  |  labErrors code (ABI_MISMATCH, SIM_REVISION_MISMATCH,
-                                               BRAIN_TOO_LARGE, GRAPH_CYCLE, ...)
+                                               BRAIN_TOO_LARGE, BAD_EDGE_ORDER, ...)
 ```
 
-Generation state machine (atomic):
+Generation state machine:
 
 ```
- IDLE ─start─► EVALUATING ─all episodes ok─► RANKED ─► VERIFIED ─► CHECKPOINTED ─► BRED ─┐
-   ▲               │                                                                     │
-   │               └─abort / worker crash / governor throttle / tab sleep─► INTERRUPTED  │
-   │                                     (no partial results kept)            │          │
-   │                     resume: reload last CHECKPOINTED gen ◄────────────────┘          │
-   └──────────────────────────── next generation ◄──────────────────────────────────────┘
+ IDLE ─start─► EVALUATING ──all results in──► RANKED ─► (VERIFIED if new milestone) ─► CHECKPOINTED ─► BRED ─┐
+   ▲             │   ▲                                                                                      │
+   │  throttle / │   │ drain remaining episodes                                                             │
+   │  pool resize└───┘ (finished results kept)                                                              │
+   │             │                                                                                          │
+   │             └─cancel / unrecoverable crash / tab or app close─► INTERRUPTED (results dropped)          │
+   │                           resume: reload last CHECKPOINTED gen, re-run that generation                 │
+   └──────────────────────────────────────── next generation ◄─────────────────────────────────────────────┘
 ```
 
-Inline ASCII diagrams required in code: the trainer generation loop (trainer module) and the
-main-thread <-> worker message flow (worker transport).
+Inline ASCII diagrams required in code: the generation loop (trainer) and the main-thread ↔ worker
+message flow (worker pool).
 
-## Model ABI v1 (summary for #24)
+### Tasks
 
-- Cadence: decide on ticks where `tick % 4 === 0`; hold the action until the next decision.
-- Observation: fixed-length numeric vector from physics state only, via a single pure `observe(scene)`:
-  sled velocity (x, y), angle, angular velocity, grounded flag, K terrain height samples ahead at
-  fixed spacing, distance to nearest hazard ahead. K and spacing are part of `abiVersion` 1.
-- Actions: push (bool), tilt (-1/0/+1), heli (bool), hop (bool), airBrake (bool), decoded from
-  output nodes by fixed thresholds.
-- Brain: feed-forward graph (nodes, connections with weights, fixed evaluation order), activation
-  functions from pmath only.
-- Stamp: `abiVersion`, `simRevision`, trainer id, generation, seed lineage.
+- [ ] **T1 (P1, CC ~30 min)** — repo — Prettier + ESLint config enforced on new/modified Lab and brain modules only
+- [ ] **T2 (P1, CC ~1 hr)** — lab — Move scheduler + transport to `src/systems/lab/` (pure move), then persistent worker pool
+- [ ] **T3 (P1, CC ~30 min)** — lab — `labErrors.js` (public codes stable), migrate existing strings
+- [ ] **T4 (P1, CC ~3 hr)** — brain — Lock ABI v1 from Phase 0; `observe()`; `abiValidator` with forward-only rule, caps, -0 normalization; optimizer version separate from brain format
+- [ ] **T5 (P1, CC ~45 min)** — brain — ~15 hostile-file tests + fast-check fuzz in `brain-hostile-file-qa`
+- [ ] **T6 (P1, CC ~1 hr)** — brain — Policy runtime on flat typed arrays, pmath activations, held/pressed semantics
+- [ ] **T7 (P1, CC ~2 hr)** — lab — headlessRun: subsystem-strict stubs, train/verify modes, frozen content cache, render parity on policy tapes
+- [ ] **T8 (P1, CC ~5 hr)** — lab — Trainer v1 (Phase 0 winner): common courses + rotation + held-out eval, RNG = hash(runSeed, gen), atomic selection with results kept across throttle/resize, generation-time budget, milestone-only verify cache, `VERIFY_MISMATCH`
+- [ ] **T9 (P1, CC ~2 hr)** — brain — Checkpoints: campaign identity + compare-and-swap, retention (latest + milestones), size budget vs preflight limits, exports separate from checkpoints
+- [ ] **T10 (P1, CC ~1 hr)** — CI — Training golden: Node + Chrome + Electron; 1 vs 4 workers; resume at gen 4; population + fitness hashes
+- [ ] **T11 (P1, CC ~2 hr)** — lab — Free-run accounting, background-training contract tests, tab-kill sentinel, browser gate ("The Lab needs Chrome or the Steam app")
+- [ ] **T12 (P1, CC ~2 hr)** — CI — Guided-run regression: fixed-seed milestone ladder (per PR), 30-seed generalization + real worker throttle (nightly)
+- [ ] **T13 (P2, CC ~10 min)** — issues — #24 platform note, #508 relabel, #510 trigger moved to Phase 1
 
-## Test plan
+Phase 0-2 effort: CC ~2-4 days plus playtest calendar time. Phase 3: CC ~3-4 days.
+
+### Test plan (Phase 3)
 
 ```
 CODE PATHS                                     REQUIRED TEST
 [=] src/systems/lab/episodeBatch (moved)        repoint tests/lab/episode-batch.test.js
-[=] src/systems/lab/workerEpisodeBatch (moved)  lab-real-worker-qa repointed
+[+] worker pool                                 lab-real-worker-qa: reuse, crash → WORKER_CRASHED, resize
 [+] headlessRun
-  ├── allow-listed no-op graphics calls         unit: each is a no-op
-  ├── unknown stub access → throws              unit: fails loudly with a named error
-  ├── render on/off parity (policy tapes)       extend headless-render-parity-qa
-  └── train vs verify modes                     unit: same fitness/crash/distance in both modes
-[+] observe(scene)
-  ├── fixed length, finite values               unit + golden vectors at fixed ticks
-  └── physics-only                              unit: identical with stubRender on/off
-[+] abiValidator
-  ├── abiVersion / SIM_REVISION mismatch        unit → labErrors codes
-  ├── cycle, dangling ref, NaN/Inf weight       unit → labErrors codes
-  ├── node/edge/fan-in caps                     unit → BRAIN_TOO_LARGE
-  └── anything else                             fast-check fuzz: ok-or-known-code, never throws/hangs, time cap
-[+] policyRuntime
-  ├── fixed eval order, pmath activations       golden outputs for fixed brains + inputs
-  └── 4-tick hold                               unit
+  ├── allowed subsystems are no-ops             unit
+  ├── unknown subsystem / value read → throws   unit, named error
+  ├── render on/off parity (policy tapes)       headless-render-parity-qa
+  └── train vs verify                           unit: same fitness/crash/distance
+[+] observe(scene)                              golden vectors; normalized range; stubRender on/off identical
+[+] abiValidator                                ~15 named-rejection tests + fast-check fuzz (never throws/hangs, time cap)
+[+] policyRuntime                               golden outputs; held/pressed edge cases; sim-math-boundary
 [+] trainer
-  ├── loop evaluate→rank→verify→checkpoint→breed unit with a fake fitness fn
-  ├── resume                                    E2E: kill at gen 4 and resume == 10 straight gens
-  └── worker count independence                 E2E: same champion hash at 1 and 4 workers
-[+] golden training test                        Node + Chromium + Firefox + WebKit, all equal Node
-[+] cross-engine physics parity                 300 s parity on Firefox + WebKit (new CI jobs)
-[+] labErrors                                   unit: every module emits only table codes
-[+] governor unknown-memory ramp                unit: ramp, cap 4, back-off on error/play, remembered
-[+] Prettier/ESLint PR                          full existing suite unchanged
+  ├── common courses + held-out eval            unit
+  ├── results survive throttle/resize           unit + E2E
+  ├── resume                                    E2E: kill at gen 4 + resume == 10 straight gens
+  └── worker-count independence                 E2E: 1 vs 4 workers, population + fitness hashes
+[+] checkpoints                                 CAS conflict (two tabs), retention, size budget
+[+] golden training                             Node + Chrome + Electron identical
+[+] free-run accounting                         crash/refusal mid-run does not consume the free run
+[+] background contract                         menus, riding, hidden tab, minimized app
+[+] tab-kill sentinel                           simulated hard kill steps cap down
+[+] browser gate                                Firefox/Safari see the gate, sledding unaffected
 USER FLOWS
-[+] Guided run (headless, pre-UI)               golden milestone ladder + 6x-throttled 1-worker run hits
-                                                first milestone inside budget
-[+] Interrupted training                        E2E: resumes, reports "resumed from generation N"
-[+] Import a friend's brain                     E2E: valid loads; hostile rejected with a code
+[+] Guided run                                  ladder golden (PR) + 30 seeds + real throttle (nightly)
+[+] Interrupted training                        "resumed from generation N"
+[+] Import a friend's brain                     valid loads; hostile rejected with a public code
 ```
 
-## Failure modes
+### Failure modes
 
 | Codepath | Realistic failure | Test? | Handling? | User sees |
 |---|---|---|---|---|
-| headlessRun | RunScene gains a stub-dependent gameplay call | strict-stub unit + parity CI | throws in CI | n/a (caught pre-merge) |
-| observe() | reads a render-only field, live vs headless diverge | stubRender on/off unit | test gate | n/a |
-| abiValidator | brain with 500k fan-in pins CPU | caps unit + fuzz | BRAIN_TOO_LARGE | clear rejection message |
-| policyRuntime | native Math.tanh slips in, cross-engine drift | sim-math-boundary + cross-engine golden | test gate | n/a |
-| trainer | tab sleeps mid-generation | resume E2E | re-run gen from checkpoint | "resumed from generation N" |
-| trainer | IDB refuses durable write | existing checkpoint tests | STORAGE_REFUSED, pending export kept | clear warning + download offer |
-| worker transport | worker OOM crash | lab-real-worker-qa | WORKER_CRASHED, generation re-runs, governor backs off | calm retry notice |
-| governor ramp | Safari memory pressure kills tab at 4 workers | unit only | ramp stops on error | **risk: tab death is not catchable in-page**; mitigated by cap 4 and remembered result |
-| guided run | slow device misses first milestone | 6x throttle E2E | honest "progress kept" path | real progress, no fake result |
+| Phase 0 | no algorithm learns visibly in budget | bake-off + replay | gate stops Phase 3 | n/a (caught before productizing) |
+| headlessRun | gameplay starts depending on a stubbed subsystem | strict stubs + parity CI | throws in CI | n/a |
+| observe() | reads a render-only field | stubRender on/off unit | test gate | n/a |
+| abiValidator | brain with huge fan-in pins CPU | caps + fuzz | BRAIN_TOO_LARGE | clear rejection |
+| trainer | player starts riding mid-generation | throttle E2E | results kept, drain on smaller pool | training slows, never resets |
+| trainer | app closed mid-generation | resume E2E | re-run generation from checkpoint | "resumed from generation N" |
+| trainer | verify disagrees with train | unit | VERIFY_MISMATCH, milestone withheld | honest "couldn't confirm" notice |
+| checkpoints | two tabs write the same generation | CAS test | second writer refused | "training continues in another tab" |
+| storage | IDB refuses durable write | existing tests | STORAGE_REFUSED, export kept | warning + download offer |
+| worker pool | Chromebook kills the tab under memory | sentinel test | cap steps down on next load | fewer workers, no crash loop |
+| guided run | slow device misses milestone | real throttle + Chromebook | honest progress-kept path | real progress, no fake result |
+| free run | crash during the one free run | accounting test | run not consumed | can try again |
 
-Critical gaps (no test AND no handling AND silent): **none** after the decisions above. The Safari
-tab-kill row is the one residual risk.
+Critical gaps (no test AND no handling AND silent): none.
 
-## NOT in scope (this slice)
+## NOT in scope
 
-- Sim-Slot leases, Power Potions, Stop & Reconfigure forfeit accounting: economy around the hook; build after the hook is proven (#509).
-- NEAT (#508), MAP-Elites, Novelty, PBT, RL: slice 2+; the graph format makes NEAT a drop-in.
-- Autopilot earnings/economy and offline Autopilot: separate slice; needs frozen-snapshot rules from #24.
-- Lab UI (#498) and guided-run screens: built on top of this slice's headless proof.
-- Remote/server workers and tournament server: not needed for local training.
-- Player-tape contribution to training ("YOU TAUGHT THAT"): needs a measured provenance channel; later slice.
-- Public Bazaar: decided out for Early Access; local import/export only.
-- Scene reuse between episodes: forbidden until a 1,000-reuse parity test exists and the benchmark says it is worth it (#510, conditional).
+- Firefox/Safari Lab support: decided out; gate screen instead.
+- Sim-Slot leases, Power Potions, Stop & Reconfigure forfeit accounting (#509).
+- NEAT (#508, candidate only), MAP-Elites, Novelty, PBT, RL.
+- Autopilot earnings/economy and offline Autopilot.
+- Full Lab UI (#498): Phase 2 is a rough prototype only.
+- Remote/server workers and tournament server.
+- Player-tape contribution to training ("YOU TAUGHT THAT").
+- Public Bazaar; local import/export only.
+- Repo-wide formatting sweep: waits for an integration freeze.
+- Scene reuse (#510): only if Phase 1 says setup dominates, behind a 1,000-reuse parity test.
 
 ## Parallelization
 
-| Step | Modules | Depends on |
-|---|---|---|
-| T1 Prettier/ESLint | whole repo | — |
-| T2 move scheduler | src/systems/lab, tools/lab, tests/lab | T1 |
-| T3 labErrors | src/systems/lab | T1 |
-| T4-T6 ABI, validator, fuzz, runtime | src/systems/brain, tests | T3 |
-| T7 headlessRun | src/systems/lab, tools/lab, CI | T2, T3 |
-| T11 governor ramp | src/systems/lab (governor only) | T1 |
-| T14 cross-engine physics CI | .github, tools/lab | T1 |
-| T8 trainer | src/systems/lab | T4-T7 |
-| T9, T10, T12 goldens, guided run, benchmark | tests, CI, tools | T8 |
-
-- Lane 0: T1 alone, first.
-- Lane A: T2 → T7 (src/systems/lab runner).
-- Lane B: T3 → T4 → T5 → T6 (errors, brain format, runtime).
-- Lane C: T14 (CI only). Lane D: T11 (governor).
-- Then T8, then T9 + T10 + T12 in parallel.
-- Conflict flag: Lanes A, B (T3) and D all touch `src/systems/lab/`. Land T3 first (tiny), then A and D touch different files.
-
-## Implementation tasks
-
-- [ ] **T1 (P1, human ~1 day / CC ~1 hr)** — repo — Prettier + ESLint format-only PR with guardrails above
-  - Surfaced by: Code quality 2.3
-  - Verify: full Jest + determinism goldens + headless/worker parity CI unchanged
-- [ ] **T2 (P1, human ~4 hr / CC ~20 min)** — lab — Move episode-batch + worker-episode-batch to `src/systems/lab/`
-  - Surfaced by: Code quality 2.1
-  - Verify: tests/lab/episode-batch.test.js, lab-real-worker-qa, lab-episode-scheduler-qa green
-- [ ] **T3 (P1, human ~1 day / CC ~30 min)** — lab — `labErrors.js` table; migrate existing string codes
-  - Surfaced by: Code quality 2.2
-  - Verify: unit test rejects unknown codes from any Lab module
-- [ ] **T4 (P1, human ~1 wk / CC ~3 hr)** — brain — ABI v1 spec, `observe()`, `abiValidator` after preflight
-  - Surfaced by: Architecture 1.2; unblocks #450
-  - Verify: golden observation vectors; stubRender on/off identical; validator unit tests
-- [ ] **T5 (P1, human ~2 days / CC ~45 min)** — brain — Hostile-file unit tests + fast-check fuzz in brain-hostile-file-qa
-  - Surfaced by: Tests 3.3
-  - Verify: fuzz run of >= 10k cases, never throws/hangs, time cap holds
-- [ ] **T6 (P1, human ~3 days / CC ~1 hr)** — brain — Graph policy runtime (fixed order, pmath, 4-tick hold)
-  - Surfaced by: Architecture 1.2, 1.3
-  - Verify: golden outputs; sim-math-boundary green
-- [ ] **T7 (P1, human ~3 days / CC ~2 hr)** — lab — Promote headlessRun with strict stubs, train/verify modes, frozen content cache; extend render parity to policy tapes
-  - Surfaced by: Architecture 1.1, Performance 4.2, 4.3
-  - Verify: strict-stub tests; train vs verify same fitness; headless-render-parity-qa
-- [ ] **T8 (P1, human ~1.5 wk / CC ~5 hr)** — lab — Trainer v1: fixed shape + seeded evolution, atomic generations, per-gen checkpoint, champion verify
-  - Surfaced by: Architecture 1.3, 1.4
-  - Verify: loop unit tests; resume E2E
-- [ ] **T9 (P1, human ~2 days / CC ~1 hr)** — CI — Golden training test (1 vs 4 workers, resume at gen 4) on Node + Chromium + Firefox + WebKit
-  - Surfaced by: Tests 3.1, Architecture 1.4
-  - Verify: identical champion hash everywhere
-- [ ] **T10 (P1, human ~3 days / CC ~2 hr)** — lab — Guided-run headless proof: fixed seed/population, milestone ladder golden, 6x-throttled 1-worker run inside budget
-  - Surfaced by: Tests 3.2
-  - Verify: Playwright throttled run hits first milestone inside budget
-- [ ] **T11 (P2, human ~2 days / CC ~1 hr)** — lab — Governor unknown-memory measured ramp (cap 4, remembered, back-off)
-  - Surfaced by: Performance 4.1
-  - Verify: governor unit tests; Firefox/WebKit worker QA
-- [ ] **T12 (P2, human ~1 day / CC ~30 min)** — tools — Benchmark: setup vs sim time, train vs verify
-  - Surfaced by: Performance 4.2, 4.3
-  - Verify: script prints per-mode ms/episode on Chromium
-- [ ] **T13 (P2, human ~1 hr / CC ~10 min)** — issues — Update #24: premium-only Lab, MVP split, link deferred items
-  - Surfaced by: Step 0
-  - Verify: issue body no longer says "Web 1 slot"
-- [ ] **T14 (P1, human ~1 day / CC ~45 min)** — CI — 300 s physics parity on Firefox + WebKit
-  - Surfaced by: Tests 3.1
-  - Verify: new CI jobs green and equal to Node baseline
-
-Effort for the slice: human ~6-8 weeks / CC ~4-6 days.
+- Phase 0 is one lane (spike + bake-off + replay viewer), with the 30-seed run after the winner is picked.
+- Phase 1: benchmark, weak-hardware proof, Electron golden can run in parallel (tools/, CI, electron/).
+- Phase 3: T1 → (Lane A: T2 → T7) ‖ (Lane B: T3 → T4 → T5 → T6) ‖ (Lane C: T9) → T8 → T10 + T11 + T12.
+- Conflict flag: lanes A and B both touch `src/systems/lab/`; land T3 first (tiny).
 
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | monetization + Lab premium-only (2026-11-27) |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | PENDING | outside voice sent to GPT Friday/Neon instead |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 13 issues, all resolved; 0 critical gaps |
+| Outside voice | GPT Friday + Neon | Independent 2nd opinion | 1 | CLEAR | order, fitness, ABI, hook proof, 4 verified bugs/claims; all decided |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN, v2) | 13 issues + 7 cross-model tensions + 16 additions, all decided |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | DESIGN.md + mockups (2026-11-27) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | n/a | |
 
-- **VERDICT:** CEO + DESIGN + ENG CLEARED, ready to implement after the outside-voice pass.
+- **CROSS-MODEL:** both outside reviewers independently put learnability first, flagged the
+  unspecified fitness function and under-observed ABI, and rejected the repo-wide format pass.
+- **VERDICT:** CEO + DESIGN + ENG CLEARED. Start Phase 0.
 
-**UNRESOLVED DECISIONS:**
-- Outside-voice (GPT Friday/Neon) findings not yet received; any cross-model tension gets its own decision before T4/T8 start.
+NO UNRESOLVED DECISIONS

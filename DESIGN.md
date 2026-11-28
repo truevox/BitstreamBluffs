@@ -246,6 +246,9 @@ Loading, empty, error, success and partial are all designed. Highlights:
 - **Free web:** sled and Autopilot, supported by **opt-in rewarded ads only**. Premium (Steam, unlock,
   honor button, schools): no ads, full Lab, offline Autopilot earnings, and **double Shards by
   default**, so paying never means slower progress than watching ads.
+- **Where the Lab runs:** the Steam app (Electron) and Chromium browsers (Chrome, Edge, ChromeOS).
+  Firefox and Safari show a calm "THE LAB NEEDS CHROME OR THE STEAM APP" with no sales pitch;
+  sledding and Autopilot work everywhere. The free guided Lab run is offered on Chromium only.
 - **Ads are never mid-run, never stacked, never a nag, never a pop-up, and never delay RETRY.**
 - **Crash rewind:** a pickup arms it. Premium rewinds work immediately. A free player who wants the
   rewind watches an ad; RETRY stays available the whole time and declining costs nothing. If the ad
