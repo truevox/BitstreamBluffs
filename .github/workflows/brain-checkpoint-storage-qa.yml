@@ -1,0 +1,51 @@
+name: AlphaBluffs brain checkpoint durability substrate
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/brain-checkpoint-storage-qa.yml'
+      - 'src/systems/brain/**'
+      - 'tests/brain/**'
+      - 'tools/lab/test-brain-checkpoint-browser.mjs'
+      - 'docs/brain/local-checkpoint-substrate.md'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/brain-checkpoint-storage-qa.yml'
+      - 'src/systems/brain/**'
+      - 'tests/brain/**'
+      - 'tools/lab/test-brain-checkpoint-browser.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checkpoint-durability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Confirm exact tested commit
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Existing causal source and identity remain unchanged
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Complete snapshot, denial, export and quarantine unit gates
+        run: npm test -- --runInBand tests/brain/brain-file-preflight.test.js tests/brain/lab-checkpoint-storage.test.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Actual browser atomic IDB, reload, corrupt bytes, quota report and partition-loss warning
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/lab/test-brain-checkpoint-browser.mjs

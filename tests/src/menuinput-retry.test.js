@@ -91,6 +91,27 @@ describe('retryAction: true (Game Over)', () => {
     expect(a.got).toEqual(['confirm:gamepad']);
   });
 
+  test('Game Over keyboard R and gamepad RT use the same explicit REPORT action', () => {
+    const r=rig({retryAction:true});
+    r.key('r');
+    expect(r.got).toEqual(['report:keyboard']);
+    const p=rig({retryAction:true});
+    pads=pad([7]);p.frame();p.frame();
+    expect(p.got).toEqual(['report:gamepad']);
+    pads=[]; // fresh press: initialize Title with RT UP, then press it
+    const title=rig();pads=pad([7]);title.frame();
+    expect(title.got).toEqual([]);
+  });
+
+  test('Game Over keyboard L and gamepad Select/View open personal ranks, but Title ignores pad Select', () => {
+    const k=rig({retryAction:true}); k.key('l');
+    expect(k.got).toEqual(['localranks:keyboard']);
+    const g=rig({retryAction:true}); pads=pad([8]);g.frame();g.frame();
+    expect(g.got).toEqual(['localranks:gamepad']);
+    const menu=rig(); pads=pad([8]);menu.frame();
+    expect(menu.got).toEqual([]);
+  });
+
   test('while text entry owns the keyboard, Space does not fire retry through the router', () => {
     const r = rig({ retryAction: true });
     r.mi.rawKeyHandler = () => true;
