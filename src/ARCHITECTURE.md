@@ -6,7 +6,7 @@ names and payload shapes, data shapes, registry keys) are a contract.** If you m
 the stub's JSDoc in the same change and tell the others in your hand-off. Additive changes (new optional fields, new
 methods) are fine. Everything is plain JS ES modules + JSDoc; Phaser 3.90, Matter, Vite.
 
-The legacy implementation in `js/` is untouched and unrelated; do not import from it.
+The pre-`src/` implementation was retired in #456. Its complete code and engine-only tests remain recoverable at Git tag `archive/pre-legacy-js-retirement-20261127` (commit `10137b0f`); do not import from the retired engine.
 
 ## 2026-11-23 owner-approved production AirBrake — SIM9 release plan
 

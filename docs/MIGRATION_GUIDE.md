@@ -1,3 +1,7 @@
+> **Historical only — do not follow for current development.** This guide describes the now-retired `js/` engine and its old modular experiment, not the present game. The full legacy tree and tests are preserved in Git tag [`archive/pre-legacy-js-retirement-20261127`](https://github.com/truevox/BitstreamBluffs/tree/archive/pre-legacy-js-retirement-20261127). Current development belongs in [`src/`](../src/) and [`src/ARCHITECTURE.md`](../src/ARCHITECTURE.md); no player-facing engine selector described below exists in the current game.
+
+---
+
 # Bitstream Bluffs - Migration Guide
 
 ## Introduction to the Modular Architecture
