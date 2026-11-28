@@ -1,0 +1,66 @@
+name: AlphaBluffs genuine RunScene learning pilot QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lab-first-real-learning-pilot-qa.yml'
+      - 'tools/lab/first-real-learning-pilot.mjs'
+      - 'tools/lab/real-physics-learning-evidence.mjs'
+      - 'tests/lab/real-physics-learning-evidence.test.js'
+      - 'docs/lab/first-real-learning-pilot.md'
+      - 'tools/sim/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lab-first-real-learning-pilot-qa.yml'
+      - 'tools/lab/first-real-learning-pilot.mjs'
+      - 'tools/lab/real-physics-learning-evidence.mjs'
+      - 'tests/lab/real-physics-learning-evidence.test.js'
+      - 'tools/sim/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runscene-learning-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require exact triggering SHA
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Keep canonical simulation identity intact
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Strict selection and held-out result evidence contracts
+        run: npm test -- --runInBand tests/lab/real-physics-learning-evidence.test.js
+      - name: Install system Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real authoritative game policy-search and separate held-out evaluation
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/lab/first-real-learning-pilot.mjs \
+            --candidates 300,380 \
+            --training ci-lab-train-01,ci-lab-train-02 \
+            --holdout ci-lab-held-01,ci-lab-held-02 \
+            --maxM 600 --maxSec 25 --workers 2 \
+            --out "$RUNNER_TEMP/real-runscene-learning-pilot.json"
+      - name: Preserve measured evidence even when no genuine improvement
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-runscene-learning-pilot
+          path: ${{ runner.temp }}/real-runscene-learning-pilot.json
+          if-no-files-found: ignore
+          retention-days: 14
