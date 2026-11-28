@@ -200,9 +200,18 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     const title = g.scene.getScene('TitleScene');
     title.starting = false;
     title.startRun(seed, mask);
-    await wait(1600);
-    const run = g.scene.getScene('RunScene');
-    if (!run) return { fatal: 'RunScene did not start' };
+    // #241: fixed 1600ms can be too early under load or too late after a
+    // natural crash. Poll for an actually active, in-World sled and queue the
+    // intended test crash while that *same* run is genuinely alive.
+    const startedDeadline = Date.now() + 12000;
+    let run = null;
+    while (Date.now() < startedDeadline) {
+      const r = g.scene.getScene('RunScene');
+      if (r && r.scene && r.scene.isActive() && r.sled &&
+          !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+      await wait(50);
+    }
+    if (!run) return { fatal: 'RunScene never produced a live sled before the 12s startup deadline' };
     const startedMask = g.registry.get('biomeMask');
     const shieldAtStart = run.shieldCharges || 0;
     run.runTimeMs = 5000;
@@ -300,12 +309,29 @@ async function dailyOutcome(browser, port, { viaMenu }) {
         const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
         if (!item) return { fatal: 'no DAILY RUN menu item' };
         item.onSelect();
+        // #241: DAILY RUN now opens the two-mode chooser. Launch via the
+        // actual DAILY CLASSIC menu action, not the private _startDaily API.
+        // Otherwise the test silently examines the preceding RunScene, and
+        // ledger v2 never runs because no official daily started.
+        const modeItem = t.view && t.view.menu && t.view.menu.items
+          .find((i) => i.label === 'DAILY CLASSIC');
+        if (!modeItem) return { fatal: 'DAILY RUN did not open DAILY CLASSIC chooser' };
+        modeItem.onSelect();
       } else {
         t.startRun(seed);
       }
-      await wait(1600);
-      const run = g.scene.getScene('RunScene');
-      if (!run || !run.sled) return { fatal: 'run did not start' };
+      // #241: after selecting DAILY CLASSIC, wait for the actual active
+      // RunScene rather than reading it at an arbitrary wall-time delay.
+      // This is still the menu-selected daily, not a simulated/private launch.
+      let run = null;
+      const startedDeadline = Date.now() + 12000;
+      while (Date.now() < startedDeadline) {
+        const r = g.scene.getScene('RunScene');
+        if (r && r.scene && r.scene.isActive() && r.sled &&
+            !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+        await wait(50);
+      }
+      if (!run) return { fatal: 'daily run never produced a live sled before the 12s startup deadline' };
       const official = run.dailyOfficial === true;
       run.runTimeMs = 5000;
       run.pendingCrash = { cause: 'chasm' };
@@ -416,15 +442,28 @@ async function main() {
           return await page.evaluate(async ({ pressRetry, shards }) => {
             const g = window.__bbGame;
             const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            // Do not force a TitleScene transition while Boot/Preload is still
+            // bringing in CONTENT. Under browser load it may exist as an object
+            // before its real menu and registry are initialized. Start through
+            // the actual ready menu path, and insist the requested run is live.
+            let title = null;
+            const titleDeadline = Date.now() + 15000;
+            while (Date.now() < titleDeadline) {
+              const t = g.scene.getScene('TitleScene');
+              if (t?.scene?.isActive() && t.menu?.items?.length && !t.starting) { title = t; break; }
+              await wait(100);
+            }
+            if (!title) return { fatal: 'TitleScene was not ready for the shop probe' };
             g.registry.set('biomeMask', 0);
-            g.scene.start('TitleScene');
-            await wait(900);
-            const title = g.scene.getScene('TitleScene');
-            title.starting = false;
             title.startRun('shop-seed', 0);
-            await wait(1600);
-            const run = g.scene.getScene('RunScene');
-            if (!run) return { fatal: 'RunScene did not start' };
+            let run = null;
+            const runDeadline = Date.now() + 15000;
+            while (Date.now() < runDeadline) {
+              const r = g.scene.getScene('RunScene');
+              if (r?.scene?.isActive() && r.sled?.inWorld && !r.sled.destroyed && !r.crashed && r.seed === 'shop-seed') { run = r; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'requested shop-seed RunScene did not become active with a live sled' };
             // Give the run shards so the credit moves the bank by a known amount. `shards` in the record is
             // `shardCount` (a count, 1 shard each), so that is what a real run would have incremented per
             // pickup; setting it here is the same value the collect loop would have produced.
@@ -702,6 +741,13 @@ async function main() {
 
             const over1 = g.scene.getScene('GameOverScene');
             if (!over1) return { fatal: 'no GameOverScene' };
+            // #241: Game Over deliberately reveals its labels in stages.
+            // The previous fixed 350ms read sampled only 10-20 glyphs before
+            // the panels and tallies existed, then mistook the animation for a
+            // broken UI. Verify the FULLY RENDERED scene without skipping it.
+            const revealDeadline = Date.now() + 6000;
+            while (!over1.revealDone && Date.now() < revealDeadline) await wait(50);
+            if (!over1.revealDone) return { fatal: 'Game Over reveal never finished (modded board)' };
             const boardOnly = inspectScene(over1);
 
             // Also exercise a qualifying modded run (score >= 200) -> NEW MODDED TOP 10! -> saveEntry('MRV') -> MODDED // YOU ARE ON THE BOARD.
@@ -719,6 +765,9 @@ async function main() {
             await wait(900);
             const over2 = g.scene.getScene('GameOverScene');
             if (!over2) return { fatal: 'no qualifying GameOverScene' };
+            const entryDeadline = Date.now() + 6000;
+            while (!over2.revealDone && Date.now() < entryDeadline) await wait(50);
+            if (!over2.revealDone) return { fatal: 'Game Over reveal never finished (initials entry)' };
             const entryState = inspectScene(over2);
             const hadEntry = Boolean(over2.entry);
             if (over2.entry) {
@@ -767,7 +816,18 @@ async function main() {
     {
       const { page, errors, out } = await playToGameOver(browser, port, 0);
       try {
+        // The Game Over reveal deliberately starts sparse; a toast measured
+        // against the half-hidden backdrop falsely reports only 8-18 glyphs.
+        // Wait for the player's actual final screen before auditing overlays.
+        const settled = await page.evaluate(async () => {
+          const scene = window.__bbGame.scene.getScene('GameOverScene');
+          const deadline = Date.now() + 6000;
+          while (scene && !scene.revealDone && Date.now() < deadline)
+            await new Promise((r) => setTimeout(r, 50));
+          return Boolean(scene && scene.revealDone);
+        });
         if (out.fatal) fail('W5: run reaches Game Over', out.fatal);
+        else if (!settled) fail('W5: Game Over reveal completes for toast audit', 'timed out before the actual UI was fully revealed');
         else if (errors.length) fail('W5: no page errors', errors.join(' | '));
         else if (!out.active) fail('W5: GameOverScene active', 'scene not active');
         else {
@@ -938,13 +998,20 @@ async function main() {
                   if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) bad.push(`${a.text} <-> ${b.text}`);
                 }
               }
-              const panel = v && v.panel ? { x: v.panel.x, y: v.panel.y, w: v.panel.w, h: v.panel.h } : null;
+              // #241: frameWidth is the stable layout dimension; `w` is a
+              // Phaser transform coordinate overwritten by setPosition() on
+              // every modal transition. Never treat transform w as box width.
+              const panel = v && v.panel ? { x: v.panel.x, y: v.panel.y,
+                w: v.panel.frameWidth, h: v.panel.h } : null;
               const outside = panel
                 ? rects.filter((r) => r.x < panel.x || r.y < panel.y || r.x + r.w > panel.x + panel.w || r.y + r.inkH > panel.y + panel.h)
                 : [];
               return {
                 count: rects.length,
                 bad,
+                // Catch a collapsed UI frame rather than masking its glyphs.
+                panelWidth: panel ? panel.w : null,
+                layoutWidth: v.w,
                 outside: outside.map((r) => `${r.text}@${r.x.toFixed(0)},${r.y.toFixed(0)}`),
                 minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
               };
@@ -989,6 +1056,8 @@ async function main() {
           else if (!grid.page1HasHeader) fail('W5 grid: shows group headers', JSON.stringify(grid.page1Text));
           else if (!grid.hasPageLabel) fail('W5 grid: shows a page indicator', JSON.stringify(grid.page1Text));
           else if (grid.pages > 1 && !grid.diff) fail('W5 grid: paging changes the rows', `pages=${grid.pages} page2=${grid.page2Num}`);
+          else if (grid.audits.some((a) => !Number.isFinite(a.panelWidth) || a.panelWidth <= 0 || a.panelWidth !== a.layoutWidth))
+            fail('W5 grid: panel width survives open and pagination', `widths ${JSON.stringify(grid.audits.map((a) => [a.panelWidth, a.layoutWidth]))}`);
           else if (grid.audits.some((a) => a.count < 8)) fail('W5 grid: the probe actually measured the screen', `glyph counts ${JSON.stringify(grid.audits.map((a) => a.count))}`);
           else if (grid.audits.some((a) => a.minInkH < 7.9)) fail('W5 grid: every glyph keeps a full ink height', `min ${Math.min(...grid.audits.map((a) => a.minInkH))}`);
           else if (grid.audits.some((a) => a.bad.length)) {
@@ -1397,9 +1466,19 @@ async function main() {
           const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
           if (!item) return { fatal: 'no DAILY RUN menu item' };
           item.onSelect();
-          await wait(1600);
-          const run = g.scene.getScene('RunScene');
-          if (!run) return { fatal: 'daily run did not start' };
+          const modeItem = t.view && t.view.menu && t.view.menu.items
+            .find((i) => i.label === 'DAILY CLASSIC');
+          if (!modeItem) return { fatal: 'DAILY RUN did not open DAILY CLASSIC chooser' };
+          modeItem.onSelect();
+          let run = null;
+          const startedDeadline = Date.now() + 12000;
+          while (Date.now() < startedDeadline) {
+            const r = g.scene.getScene('RunScene');
+            if (r && r.scene && r.scene.isActive() && r.sled &&
+                !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+            await wait(50);
+          }
+          if (!run) return { fatal: 'daily run did not produce a live sled before 12s startup deadline' };
           return {
             seed: run.seed,
             mask: run.biomeMask,
@@ -1503,9 +1582,19 @@ async function main() {
             const t = g.scene.getScene('TitleScene');
             t.starting = false;
             t.startRun('look-cb', 0);
-            await wait(1600);
-            const run = g.scene.getScene('RunScene');
-            if (!run) return { fatal: 'RunScene did not start' };
+            // #241: wait for a LIVE sled rather than blindly sleeping 1600ms.
+            // Some slower runs have already crashed and destroyed their sled
+            // by then; reading _cosmetic on undefined did not test colourblind
+            // mode. Preserve the real live-run requirement, fail closed.
+            const deadline = Date.now() + 10000;
+            let run = null;
+            while (Date.now() < deadline) {
+              const r = g.scene.getScene('RunScene');
+              if (r && r.scene && r.scene.isActive() && r.sled &&
+                  !r.sled.destroyed && r.sled.inWorld) { run = r; break; }
+              await wait(50);
+            }
+            if (!run) return { fatal: 'No live RunScene sled for colourblind test' };
             const pal = run.palette;
             return {
               overridden: !!(run.look && run.look.overridden),
@@ -1879,15 +1968,27 @@ async function main() {
         const o = await page.evaluate(async () => {
           const g = window.__bbGame;
           const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          // A registered game object is not yet a ready Title screen. Wait for
+          // actual built UI/content instead of imposing 900+1400ms sleeps;
+          // under a concurrent browser workload the preload can take longer.
+          let title = null;
+          const titleDeadline = Date.now() + 15000;
+          while (Date.now() < titleDeadline) {
+            const t = g.scene.getScene('TitleScene');
+            if (t?.scene?.isActive() && t.menu?.items?.length && !t.starting) { title = t; break; }
+            await wait(100);
+          }
+          if (!title) return { fatal: 'TitleScene was not ready for high-speed camera probe' };
           g.registry.set('biomeMask', 0);
-          g.scene.start('TitleScene');
-          await wait(900);
-          const title = g.scene.getScene('TitleScene');
-          title.starting = false;
           title.startRun('gate-seed', 0);
-          await wait(1400);
-          const run = g.scene.getScene('RunScene');
-          if (!run || !run.sled) return { fatal: 'RunScene did not start' };
+          let run = null;
+          const runDeadline = Date.now() + 15000;
+          while (Date.now() < runDeadline) {
+            const r = g.scene.getScene('RunScene');
+            if (r?.scene?.isActive() && r.sled?.inWorld && !r.sled.destroyed && !r.crashed && r.seed === 'gate-seed') { run = r; break; }
+            await wait(100);
+          }
+          if (!run) return { fatal: 'requested gate-seed RunScene did not become active with a live sled' };
           g.loop.sleep();
           const real = run.sled;
           const V = 1200;
@@ -3278,14 +3379,27 @@ async function main() {
                   let maxV = 0;
                   let minV = Infinity;
                   let lastX = h.gfx.x;
+                  let lastTick = run.simClock.tick;
                   hits.length = 0;
                   for (let i = 0; i < 400; i++) {
                     if (liveFrom === null) keepAlive();
                     step(1);
                     if (h.destroyed) break;
-                    const fv = (h.gfx.x - lastX) / 0.016;
+                    // #241: run.update(clock, 16) is a *render* frame, not one
+                    // 16ms physics step. The fixed 120Hz SimClock can advance
+                    // 1 or 2 authoritative ticks each call. Dividing a 2-tick
+                    // displacement by 16ms falsely reports 83.3px/s for an
+                    // 80px/s-capped boulder. Use the EXACT elapsed sim ticks;
+                    // keep the real <=80px/s collision/motion assertions.
+                    const elapsedTicks = run.simClock.tick - lastTick;
+                    const fv = elapsedTicks > 0
+                      ? (h.gfx.x - lastX) * 1000 / (elapsedTicks * run.simClock.tickMs)
+                      : 0;
                     lastX = h.gfx.x;
-                    if (h.roll.activeAtMs !== null && h.rolling) { maxV = Math.max(maxV, fv); minV = Math.min(minV, fv); }
+                    lastTick = run.simClock.tick;
+                    if (elapsedTicks > 0 && h.roll.activeAtMs !== null && h.rolling) {
+                      maxV = Math.max(maxV, fv); minV = Math.min(minV, fv);
+                    }
                     groundErr = Math.max(groundErr, Math.abs(h.gfx.y - run.terrain.heightAt(h.gfx.x)));
                     if (h.roll.activeAtMs === null) { if (h.cx !== cx0) movedEarly++; continue; }
                     if (actT === null) {
@@ -3884,13 +3998,17 @@ async function main() {
                 const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
                 run._resetBiomeEffects();
                 run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+                run.simClock.accMs = 0; // a new controlled trial starts on the same fixed-tick boundary
               };
               const slope = (x) => Math.atan2(T.heightAt(x + 10) - T.heightAt(x - 10), 20) * 180 / Math.PI;
               /**
                * One real landing: settle on the ground (no air or trick state carries over), then the same pose (h px above
                * x, along the slope, 380 / 150 px/s) and input (tilt held `k` frames); optional pickup taken right before.
                */
-              const landX = run.sled.x + 500;
+              // A fixed coordinate from the start seed, not whatever x the sled
+              // reaches during a variable 300ms real browser bootstrap. The
+              // latter made a strict landing-angle gate timing-dependent.
+              const landX = run.startX + 500;
               const landing = (h, td, k, p) => {
                 keepAlive(); hold = -1;
                 run.sled.setPose(landX - 300, T.heightAt(landX - 300) - 18, slope(landX), 300, 0);
@@ -3909,7 +4027,7 @@ async function main() {
               const stabilizeProbe = (p) => {
                 for (const td of [1, -1]) {
                   for (let h = 92; h <= 116; h += 4) {
-                    for (const k of [21, 22, 23]) {
+                    for (const k of [24, 25, 26, 27]) {
                       const a = landing(h, td, k, null);
                       if (a.crash === 'badLanding' && a.q === 'crash' && Math.abs(a.ang) > 78 && Math.abs(a.ang) <= 90) {
                         const again = landing(h, td, k, null);
@@ -4180,9 +4298,18 @@ async function main() {
           g.events.on('bb:landing', onLand);
           try {
             // the run's own bouncySpring zone and its own Stabilizer Rails
-            let zone = null;
-            for (let i = 0; i < 200 && !zone; i++) { const ch = T.getChunk(i); const z = ch.zones.find((q) => q.modId === 'bouncySpring'); if (z) zone = { ...z, chunk: i }; }
-            if (!zone) return { fatal: 'no bouncySpring zone in the first 200 chunks' };
+            // The FIRST spring (chunk 11) has a genuine Packet Spike 880px
+            // downstream; its bounce reaches it during the 120-frame sample.
+            // For a controlled A/B/C comparison use the SAME seeded world's
+            // spring at pinned chunk 29: it has a naturally clear 1600px
+            // runout and gives an actual >= 120px/s, non-pogo rebound. This is not a
+            // replacement simulator or a hazard mask: the actual terrain,
+            // colliders and hazards remain live during all three arms.
+            const SPRING_FIXTURE_CHUNK = 29;
+            const springChunk = T.getChunk(SPRING_FIXTURE_CHUNK);
+            const realZone = springChunk.zones.find((q) => q.modId === 'bouncySpring');
+            const zone = realZone ? { ...realZone, chunk: SPRING_FIXTURE_CHUNK } : null;
+            if (!zone) return { fatal: 'the real bouncySpring zone moved from pinned safe-runout chunk 29' };
             let rails = null;
             for (let i = 0; i < 200 && !rails; i++) { const ch = T.getChunk(i); const s = ch.powerups.find((q) => q.defId === 'stabilizerRails'); if (s) rails = { ch, sp: s }; }
             // the colliders of the zone have to exist before the sled is dropped into it
@@ -4190,7 +4317,17 @@ async function main() {
             if (rails && !run.mesh.chunks.has(rails.ch.index)) run.takeChunk(rails.ch);
             const pu = rails ? (run.powerups.get(rails.ch.index) || []).find((e) => e.def.id === 'stabilizerRails') : null;
             if (!pu) return { fatal: 'no stabilizerRails pickup in the first 200 chunks' };
-            const zx = Math.round((zone.x0 + zone.x1) / 2);
+            // Use the same real upstream zone entry for all three arms.
+            const zx = Math.round(zone.x0 + Math.min(96, (zone.x1 - zone.x0) / 4));
+            // Fail closed if generator edits move a live hazard into this probe.
+            // Unlike a crash-suppressing probe, we still run every real sensor.
+            const forwardHazards = [];
+            for (let j = SPRING_FIXTURE_CHUNK; j <= SPRING_FIXTURE_CHUNK + 2; j++) {
+              for (const h of T.getChunk(j).hazards) {
+                if (h.x > zx - 80 && h.x < zx + 1600) forwardHazards.push(`${h.defId}@${h.x}`);
+              }
+            }
+            if (forwardHazards.length) return { fatal: `the real spring runout is no longer hazard-clear: ${forwardHazards.join(',')}` };
             const H = 200; const VX = 200; const VY = 700;
             /**
              * One arm: the same pose, the same frames, from a clean state.
@@ -4201,6 +4338,7 @@ async function main() {
               const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
               run._resetBiomeEffects();
               run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+              run.simClock.accMs = 0; // a new controlled trial starts on the same fixed-tick boundary
               run.sled.invulnerableMs = 0; run.pendingCrash = null; run.crashed = false;
               crashes.length = 0; lands.length = 0;
               const zoneDefs = run.getZoneDefs;

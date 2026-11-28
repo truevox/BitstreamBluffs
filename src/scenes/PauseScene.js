@@ -224,7 +224,7 @@ export class PauseScene extends Phaser.Scene {
       },
       onComplete: () => { this.hdrA.setX(this.hdrX - 1); this.hdrB.setX(this.hdrX + 1); },
     });
-    transitionIn(this, panel, { w: panel.w, h: panel.h, color: this.theme.color('magenta'), duration: 240 });
+    transitionIn(this, panel, { w: panel.frameWidth, h: panel.h, color: this.theme.color('magenta'), duration: 240 });
   }
 
   /** Close: everything fades quickly, then `done` runs the real action. */
