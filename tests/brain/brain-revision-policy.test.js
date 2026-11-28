@@ -1,6 +1,6 @@
 import {assessBrainRevision as assess,BRAIN_REVISION_POLICY_ABI} from '../../src/systems/brain/brainRevisionPolicy.js';
-const current={storedSimRevision:9,currentSimRevision:9,storedModelAbi:1,
- currentModelAbi:1,hasTrustedEvaluation:true};
+const current={storedSimRevision:9,currentSimRevision:9,storedModelAbi:'draft-test-1',
+ currentModelAbi:'draft-test-1',hasTrustedEvaluation:true};
 test('same installed SIM_REVISION and model ABI only admits previously trusted metadata',()=>{
  expect(BRAIN_REVISION_POLICY_ABI).toBe(1);
  expect(assess(current)).toMatchObject({ok:true,reason:'current',
@@ -24,14 +24,15 @@ test('SIM_REVISION downgrade also forbids fitness authority',()=>{
   reason:'sim-revision-changed',stats:'stale',idle:'baseline'});
 });
 test('model ABI mismatch blocks evaluation and Idle even when revision matches',()=>{
- expect(assess({...current,currentModelAbi:2})).toMatchObject({ok:false,
+ expect(assess({...current,currentModelAbi:'future-brain-2'})).toMatchObject({ok:false,
   reason:'model-abi-incompatible',stats:'stale',
   reevaluation:'blocked-pending-validation',idle:'baseline'});
 });
 test('no implicit trust from missing, corrupted, or unversioned metadata',()=>{
  for(const patch of [{storedSimRevision:undefined},{storedSimRevision:0},
   {storedSimRevision:'9'},{storedSimRevision:NaN},{storedModelAbi:null},
-  {storedModelAbi:Infinity},{currentModelAbi:0},{currentSimRevision:undefined},
+  {storedModelAbi:Infinity},{storedModelAbi:1},
+  {currentModelAbi:1},{storedModelAbi:'../../unsafe'},{currentModelAbi:''},{currentSimRevision:undefined},
   {currentSimRevision:1.5}]){
   const v=assess({...current,...patch});
   expect(v.ok).toBe(false);expect(v.stats).toBe('stale');
@@ -40,7 +41,7 @@ test('no implicit trust from missing, corrupted, or unversioned metadata',()=>{
 });
 test('neither caller-modified booleans nor unknown fields can bypass required model ABI',()=>{
  expect(assess({...current,hasTrustedEvaluation:1}).stats).toBe('stale');
- expect(assess({...current,currentModelAbi:2,forceCurrent:true,hasTrustedEvaluation:true}).ok).toBe(false);
+ expect(assess({...current,currentModelAbi:'future-brain-2',forceCurrent:true,hasTrustedEvaluation:true}).ok).toBe(false);
 });
 test('frozen stable decisions never mutate source metadata or learned bytes',()=>{
  const original=Object.freeze({...current});

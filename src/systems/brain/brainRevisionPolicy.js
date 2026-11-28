@@ -4,6 +4,8 @@
  */
 export const BRAIN_REVISION_POLICY_ABI=1;
 const integer=n=>Number.isSafeInteger(n)&&n>0;
+// #451's bounded checkpoint wire format uses explicit VERSIONED ABI strings.
+const modelAbi=n=>typeof n==='string'&&/^[a-zA-Z0-9._-]{1,128}$/.test(n);
 const fail=reason=>Object.freeze({
  ok:false,reason,weights:'retain-untrusted',stats:'stale',
  idle:'baseline',reevaluation:'blocked-pending-validation',
@@ -11,15 +13,15 @@ const fail=reason=>Object.freeze({
 /**
  * Receives ONLY metadata from a previously bounded #450 preflight + eventual
  * #24 model-ABI validator. Does not read, copy, execute, or mutate weights.
- * Explicit current model ABI and current SIM_REVISION MUST come from the
+ * Explicit current model ABI string and current SIM_REVISION MUST come from the
  * trusted installed game/trainer, not the imported brain document.
  * `fitness` is an opaque identifier for stats checked elsewhere, not a score.
  */
 export function assessBrainRevision({storedSimRevision,storedModelAbi,
  currentSimRevision,currentModelAbi,hasTrustedEvaluation=false}={}){
- if(!integer(currentSimRevision)||!integer(currentModelAbi))
+ if(!integer(currentSimRevision)||!modelAbi(currentModelAbi))
   return fail('unavailable-current-identity');
- if(!integer(storedSimRevision)||!integer(storedModelAbi))
+ if(!integer(storedSimRevision)||!modelAbi(storedModelAbi))
   return fail('invalid-brain-identity');
  if(storedModelAbi!==currentModelAbi)
   return fail('model-abi-incompatible');

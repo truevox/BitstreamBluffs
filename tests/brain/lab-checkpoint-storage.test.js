@@ -145,3 +145,41 @@ test('concurrent save is refused without cross-wiring checksum, weights or pendi
  expect(parsed(writes[0].bytes).generation).toBe(2);
  expect(await store.export({pending:true})).toEqual({ok:false,code:'no-pending-export'});
 });
+
+/** #452/#451 joint acceptance: the actual on-disk ABI string, not an invented
+ * numeric ABI, must cross the version policy without exposing trained bytes.
+ */
+test('read-only compatibility bridge handles retained old checkpoint and NEVER promotes Idle',async()=>{
+ const saved=inspectLabCheckpoint(wire());expect(saved.ok).toBe(true);
+ const store=new LocalBrainCheckpoints({cryptoRef:webcrypto});
+ let reads=0;
+ store._read=async id=>{reads++;expect(id).toBe('active');return {
+  ok:true,admission:'storage-only',bytes:Uint8Array.from(saved.bytes),
+  simRevision:saved.simRevision,modelAbi:saved.modelAbi,generation:saved.generation,
+ };};
+ const changed=await store.inspectCompatibility({currentSimRevision:10,currentModelAbi:'draft-test-1'});
+ expect(changed).toMatchObject({ok:true,admission:'storage-only',simRevision:9,
+  modelAbi:'draft-test-1',idle:'baseline',stats:'stale',
+  compatibility:{ok:true,reason:'sim-revision-changed',stats:'stale',
+   reevaluation:'required-before-use'}});
+ expect(changed).not.toHaveProperty('bytes');
+ expect(changed).not.toHaveProperty('brain');
+ expect(changed).not.toHaveProperty('weights');
+ const same=await store.inspectCompatibility({currentSimRevision:9,currentModelAbi:'draft-test-1'});
+ expect(same).toMatchObject({ok:true,idle:'baseline',
+  compatibility:{reason:'evaluation-missing',stats:'stale'}});
+ const wrongAbi=await store.inspectCompatibility({currentSimRevision:9,currentModelAbi:'next-version-2'});
+ expect(wrongAbi).toMatchObject({ok:true,idle:'baseline',
+  compatibility:{ok:false,reason:'model-abi-incompatible',stats:'stale'}});
+ expect(reads).toBe(3);
+});
+
+test('read-only compatibility rejects missing/corrupt checkpoint without inventing a usable brain',async()=>{
+ const store=new LocalBrainCheckpoints({cryptoRef:webcrypto});
+ store._read=async()=>({ok:false,code:'integrity-mismatch'});
+ expect(await store.inspectCompatibility({currentSimRevision:9,currentModelAbi:'draft-test-1'}))
+  .toEqual({ok:false,code:'integrity-mismatch',admission:'none',idle:'baseline',
+   stats:'stale',warning:null});
+ store._read=async()=>({ok:false,code:'empty'});
+ expect((await store.inspectCompatibility({currentSimRevision:9,currentModelAbi:'draft-test-1'})).ok).toBe(false);
+});

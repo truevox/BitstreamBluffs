@@ -6,6 +6,7 @@
  * Files enter only a quarantined syntax lane until #24's model ABI exists.
  */
 import {preflightBrainJson,BRAIN_PREFLIGHT_LIMITS} from './brainFilePreflight.js';
+import {assessBrainRevision} from './brainRevisionPolicy.js';
 
 export const LAB_CHECKPOINT_DB='bb-lab-checkpoint-v1';
 export const LAB_CHECKPOINT_STORE='checkpoints';
@@ -177,6 +178,25 @@ export class LocalBrainCheckpoints{
      warning:'BRAIN CHECKPOINT MISSING — RESTORE AN EXPORTED BACKUP'};
   }catch{}
   return record;
+ }
+ /** Read-only compatibility summary of a checksum-verified stored checkpoint.
+  * The installed game's SIM_REVISION and the approved model ABI string must
+  * be provided by trusted callers, never loaded from the brain file. This
+  * helper *never* returns model bytes or grants live Idle/model execution.
+  * Even matching revisions require a separately certified evaluation, so
+  * forced `hasTrustedEvaluation:false` cannot be bypassed by local metadata.
+  */
+ async inspectCompatibility({currentSimRevision,currentModelAbi}={}){
+  const saved=await this.read();
+  if(!saved.ok)return Object.freeze({ok:false,code:saved.code,
+   admission:'none',idle:'baseline',stats:'stale',warning:saved.warning??null});
+  const verdict=assessBrainRevision({storedSimRevision:saved.simRevision,
+   storedModelAbi:saved.modelAbi,currentSimRevision,currentModelAbi,
+   hasTrustedEvaluation:false});
+  return Object.freeze({ok:true,admission:'storage-only',checkpointPresent:true,
+   simRevision:saved.simRevision,modelAbi:saved.modelAbi,
+   generation:saved.generation,compatibility:verdict,
+   idle:'baseline',stats:'stale'});
  }
  /** Export returns a DETACHED snapshot, including after a failed disk write.
   * The caller must perform actual download on a separate user gesture.
