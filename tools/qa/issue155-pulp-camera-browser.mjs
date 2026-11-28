@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
 
-const vite=await createServer({server:{host:'127.0.0.1',port:8392,strictPort:true}});
+const vite=await createServer({server:{host:'127.0.0.1',port:8396,strictPort:true}});
 let browser;
 try{
   await vite.listen();
@@ -94,6 +94,29 @@ try{
   const persisted=await page.evaluate(()=>window.__bbGame.registry.get('settings'));
   assert.equal(persisted.pulp,'drone');assert.equal(persisted.reduceMotion,'off');
   console.log('PULP_PERSISTENCE_RELOAD_PASS');
+
+  // OS accessibility preferences can change while Settings is ALREADY
+  // visible. The painted label must update without a keypress or reopening.
+  await page.evaluate(()=>{
+    const t=window.__bbGame.scene.getScene('TitleScene');
+    t.menu.activate(t.menu.items.findIndex(x=>x.label==='SETTINGS'));
+    const v=t.view,i=v.menu.items.findIndex(x=>x.label==='REDUCE MOTION');
+    v.menu._adjust(i,1); // OFF -> AUTO
+  });
+  assert.equal(await page.evaluate(()=>window.__bbGame.registry.get('settings')?.reduceMotion),'auto');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.waitForFunction(()=>{
+    const v=window.__bbGame.scene.getScene('TitleScene').view;
+    const i=v.menu.items.findIndex(x=>x.label==='PULP');
+    return v.menu.rows[i].value?.main?.text?.includes('LOCKED');
+  },null,{timeout:5000});
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.waitForFunction(()=>{
+    const v=window.__bbGame.scene.getScene('TitleScene').view;
+    const i=v.menu.items.findIndex(x=>x.label==='PULP');
+    return v.menu.rows[i].value?.main?.text?.includes('100% PULP');
+  },null,{timeout:5000});
+  console.log('PULP_OS_MOTION_LIVE_LABEL_PASS');
 
   await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('pulp-browser-smoke'));
   await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene') &&

@@ -3291,6 +3291,10 @@ export class RunScene extends Phaser.Scene {
     // identical when a replay is rendered at a different display FPS.
     const pulp=effectivePulpLevel(this.settings?.pulp,isReducedMotion(this));
     if(pulp==='drone'){
+      // A landing, boost or explosion can still set these presentation
+      // impulses. Drain them NOW: returning to Original later must not
+      // replay stale shake or a long-obsolete zoom kick.
+      this.shakeAmp=0;this._zoomKick=0;
       let hazardAheadPx=Infinity;
       // Read existing generated hazards. No terrain generation, collision
       // mutation or new RNG draw can be triggered by this camera query.

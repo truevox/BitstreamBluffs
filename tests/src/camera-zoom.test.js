@@ -204,6 +204,19 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
     }
   });
 
+  test('Drone consumes pending cosmetic impact shake and zoom kick before Original can resume',()=>{
+    const s=makeScene('drone');
+    s.shakeAmp=23;s._zoomKick=.25;
+    s.updateCamera(16);
+    expect(s.shakeAmp).toBe(0);
+    expect(s._zoomKick).toBe(0);
+    s.settings.pulp='original';
+    s.updateCamera(16);
+    expect(s.shakeAmp).toBe(0);
+    expect(s._zoomKick).toBe(0);
+    expect(s.cameras.main.rotation).toBe(0);
+  });
+
   test('drone camera leaves view/collision/telegraph planner untouched',()=>{
     const s=makeScene();
     const hazard={x:s.sled.x+22};

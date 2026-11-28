@@ -768,7 +768,15 @@ function installRunSceneStateKit(global) {
   }
 
   function projectConfig(run){
-    return Object.fromEntries(CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner').map(k=>[k,JSON.stringify(run[k])]));
+    return Object.fromEntries(CONFIG.filter(k=>k in run&&k!=='content'&&k!=='tuner').map(k=>{
+      if(k!=='settings')return [k,JSON.stringify(run[k])];
+      // #155 Pulp affects ONLY camera presentation. Toggling it from Title
+      // must never invalidate an otherwise byte-exact suspended run. Omit
+      // this camera choice from the saved configuration equality contract.
+      const settings={...run.settings};
+      delete settings.pulp;
+      return [k,JSON.stringify(settings)];
+    }));
   }
   function projectEarly(run,clock,rng,terrain,queue,collected){
     const {enc,audit}=makeEncoder(run,bodyIndex(run).keyOf);

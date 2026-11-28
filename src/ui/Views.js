@@ -18,7 +18,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
-import { transitionIn, transitionOut, isReducedMotion } from './Motion.js';
+import { transitionIn, transitionOut, isReducedMotion, REDUCE_MOTION_QUERY } from './Motion.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -246,6 +246,21 @@ export class SettingsView extends View {
     ];
     this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:SETTINGS_ROW_H,
       items,color:'amber',parent:this.panel});
+    // AUTO follows OS motion preferences live; refresh the painted Pulp
+    // lock immediately when the desktop/browser preference changes.
+    try{
+      const media=typeof window!=='undefined'&&window.matchMedia?.(REDUCE_MOTION_QUERY);
+      if(media){
+        const onMotionChange=()=>this.menu?.refresh();
+        if(media.addEventListener){
+          media.addEventListener('change',onMotionChange);
+          this._removePulpMotionListener=()=>media.removeEventListener('change',onMotionChange);
+        }else if(media.addListener){
+          media.addListener(onMotionChange);
+          this._removePulpMotionListener=()=>media.removeListener(onMotionChange);
+        }
+      }
+    }catch{} // headless/unsupported browser still gets normal settings
     staggerMenuRows(scene,this.menu);
     this.swatch=scene.add.graphics();
     this.panel.add(this.swatch);
@@ -306,6 +321,7 @@ export class SettingsView extends View {
     return this.menu.handleAction(action);
   }
   destroy(){
+    this._removePulpMotionListener?.();this._removePulpMotionListener=null;
     this.soundView?.destroy();this.soundView=null;
     this.howView?.destroy();this.howView=null;
     this.historyView?.destroy();this.historyView=null;

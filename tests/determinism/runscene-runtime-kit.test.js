@@ -1,5 +1,5 @@
 /** #119 production import boundary: never globally install or grant rank. */
-import {createRunSceneRestoreKit} from '../../src/systems/savestate/RunSceneRestoreKit.js';
+import {createRunSceneRestoreKit,createDiagnosticRunSceneRestoreKit} from '../../src/systems/savestate/RunSceneRestoreKit.js';
 test('runtime snapshot kit is opt-in and rejects missing Phaser Matter without global mutation',()=>{
   const before=Object.prototype.hasOwnProperty.call(globalThis,'__ssGameKit');
   expect(createRunSceneRestoreKit).toBeInstanceOf(Function);
@@ -50,4 +50,16 @@ test('truncated or inconsistent causal sections refuse before touching fresh wor
     expect(()=>kit.restore(target,snap)).toThrow('only intact complete snapshot');
     expect(JSON.stringify(target)).toBe(original);
   }
+});
+
+
+test('#155 camera-only Pulp setting cannot invalidate a suspended run configuration',()=>{
+  const Matter={version:'0.20.0',Body:{},Engine:{},Common:{},Composite:{},Collision:{},Resolver:{},Sleeping:{},Pairs:{},Pair:{},Detector:{}};
+  const kit=createDiagnosticRunSceneRestoreKit({Physics:{Matter:{Matter}}});
+  const config={settings:{pulp:'original',reduceMotion:'auto',masterVolume:.5}};
+  const original=kit.projectConfig(config);
+  expect(original).toEqual(kit.projectConfig({settings:{...config.settings,pulp:'drone'}}));
+  expect(original).toEqual(kit.projectConfig({settings:{...config.settings,pulp:'less'}}));
+  expect(original).not.toEqual(kit.projectConfig({settings:{...config.settings,masterVolume:.3}}));
+  expect(config.settings.pulp).toBe('original'); // no mutation of live settings
 });
