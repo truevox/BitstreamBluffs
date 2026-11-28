@@ -1,13 +1,15 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last reconciled for release dependencies: 2026-11-27 20:41 UTC. GitHub main `222d599ac2db908083cd997ca53c72f881bbd425`, v2.25.34/SIM9; [exact Pages build/deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/46063115591) passed. Stock same-build one-use Suspend/Resume; no public ranking authority.
+Last reconciled for release dependencies: 2026-11-28 01:43 UTC. GitHub main `5d31860a049d0aff2c285904fd8bfcc2b2b8149f`, displayed v2.25.34/SIM9; [exact Pages build/deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/46089692164) passed. Stock same-build one-use Suspend/Resume; no public ranking authority.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **#78 ownership split (Nov 27):** Gal's [#480](https://github.com/truevox/BitstreamBluffs/pull/480) draft `c0c4c80d` adds Game Over → REPORT → existing local evidence panel; explicit EXPORT saves `.bbreplay`, not an upload or a redacted brief. Keep Morgan's #338 as the distinct developer-only replay/brief smoke, waiting for exact-head review. Do not duplicate player export or conflate downloaded raw replay evidence with the allowlisted developer output; #78 remains open for reproducible portable reports.
+- **#82/#84 ownership:** external open #487 `0e145f6b` adds a local Ranks screen over the shipped cohort calculation; #489 `02f8ccac` adds local archive seed+mask search/copy, not terrain tagging or hosted sharing. Neither merged at check; no new migration or second database. Do not duplicate these UI slices; #84 full traits and broader #60 identity remain separate.
+
+- **#78:** Gal's [#480](https://github.com/truevox/BitstreamBluffs/pull/480) merged/deployed `5d31860a`. Eligible Game Over → REPORT (pointer, R, RT) opens local evidence; separate EXPORT downloads `.bbreplay`, not a redacted brief or a submission. Compiled application artifact `main-D8LbLlkF.js`, same displayed version; served bundle/installed worker not independently checked. Keep Morgan #338 as distinct developer-only brief smoke awaiting exact-head review; full intake/reproduction remains open.
 
 - **#58/#81 launch boundary (Nov 27):** [#58](https://github.com/truevox/BitstreamBluffs/issues/58), #40 and #440 record the owner decision that hosted Brain Bazaar is strictly post-Early Access. Do not schedule hosted ghost upload/discovery/accounts for EA. Existing #69 explicit out-of-band `.bbghost` and URL share/preview is local, unranked and distinct; reuse rather than duplicate it. #81 stays a design proposal; local comparison is not hosted friend competition. Local course identity/library #60 remains separate from later publication.
 
