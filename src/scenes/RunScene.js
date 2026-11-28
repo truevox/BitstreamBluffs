@@ -1878,7 +1878,11 @@ export class RunScene extends Phaser.Scene {
       this.deathMarker.setPlacement(L.death);
     }
     this.drawStreaks(t);
-    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.terrain?.activeList);
+    // The hazard cue fallback classifier must use a viewport guaranteed
+    // visible AFTER the cosmetic drone roll. Other culling still receives
+    // the ordinary (wider) rect; physics/hazard cue TIMES stay untouched.
+    const cueView=this.pulpCueSafeView(this._view,cam.rotation||0,cam.zoom);
+    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, cueView, cam.zoom, this.terrain?.activeList);
     // Visual-only world dance: no music player/beat-grid mutation, and no
     // hidden synthetic tempo. With a muted/paused song or reduced motion the
     // backdrop returns immediately to its original neutral geometry.
@@ -1912,6 +1916,18 @@ export class RunScene extends Phaser.Scene {
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
+  }
+
+  /** Conservative inscribed viewport for HUD hazard-warning cue fit checks. */
+  pulpCueSafeView(view,roll,zoom){
+    if(!view||!this._cameraIntent||!Number.isFinite(roll)||Math.abs(roll)<1e-7)
+      return view;
+    const r=Math.min(Math.abs(roll),0.04),z=Math.max(.4,zoom||1);
+    const halfW=GAME_WIDTH/(2*z),halfH=GAME_HEIGHT/(2*z);
+    const insetX=pmath.sin(r)*halfH+(1-pmath.cos(r))*halfW;
+    const insetY=pmath.sin(r)*halfW+(1-pmath.cos(r))*halfH;
+    return {left:view.left+insetX,right:view.right-insetX,
+      top:view.top+insetY,bottom:view.bottom-insetY};
   }
 
   /** The visible world rectangle from the camera (`_view`). Shared by renderFrame and the takeover seek (#72). */
@@ -3303,7 +3319,12 @@ export class RunScene extends Phaser.Scene {
           // Hazard instances expose current world centre as cx (not x).
           // Read-only: do not update warning thresholds or hazard generation.
           const dx=h.cx-s.x;
-          if(Number.isFinite(dx)&&dx>=0&&dx<hazardAheadPx)hazardAheadPx=dx;
+          // A hazard's influence cannot disappear in a single 120 Hz tick
+          // when its center crosses the sled. Fade its framing pressure over
+          // the following 70 world pixels, not a one-frame snap to calm.
+          const effectiveDx=dx>=0?dx:dx>=-70?(-dx*3):Infinity;
+          if(Number.isFinite(effectiveDx)&&effectiveDx<hazardAheadPx)
+            hazardAheadPx=effectiveDx;
         }
       }
       const intent=droneCameraIntent({

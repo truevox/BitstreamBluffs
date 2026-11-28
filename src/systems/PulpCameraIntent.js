@@ -45,6 +45,10 @@ export function droneCameraIntent(state){
   const x=finite(state.x),y=finite(state.y);
   const speed=clamp(Math.abs(finite(state.speed,Math.hypot(finite(state.vx),finite(state.vy)))),0,2000);
   const energy=smooth((speed-110)/1000);
+  // Hazards remain influential briefly AFTER the rider passes them.
+  // `hazardAheadPx` is a nonnegative effective distance: behind distances
+  // from 0..70px map smoothly to 0..210px of faded residual influence.
+  // This avoids a 40+ screen-pixel snap at hazard center crossing.
   const hazard=finite(state.hazardAheadPx,Infinity);
   const hazardRisk=Number.isFinite(hazard)?1-smooth(hazard/210):0;
   const danger=Math.max(clamp(finite(state.bsodProximity),0,1),hazardRisk);

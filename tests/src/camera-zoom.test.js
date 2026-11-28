@@ -217,6 +217,50 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
     expect(s.cameras.main.rotation).toBe(0);
   });
 
+  test('hazard passage eases camera framing instead of snapping on center crossing',()=>{
+    const s=makeScene('drone');
+    s.sled.x=50000;s.sled.speed=1100;s.sled.vx=1100;
+    s.bsodState.proximity01=0;
+    s.hazards.set(1,[{cx:50000+1,cy:s.sled.y}]);
+    s.simClock.tick=986;
+    s.updateCamera(8.33);
+    const before=s._cameraIntent;
+    s.sled.x+=9.17;
+    s.simClock.tick++;
+    s.updateCamera(8.33);
+    const after=s._cameraIntent;
+    expect(Math.abs(after.riderScreenX-before.riderScreenX)).toBeLessThan(12);
+    // The fading influence should eventually disappear with no sim writes.
+    s.sled.x+=80;s.simClock.tick+=10;
+    s.updateCamera(8.33);
+    expect(s._cameraIntent.mode).toBe('drone');
+  });
+
+  test('rotated Pulp telegraph cue-fit view stays inscribed in actual viewport',()=>{
+    const s=makeScene('drone');
+    s.updateCamera(8);
+    const c=s.cameras.main;
+    const zoom=c.zoom;
+    const full={left:100,right:100+480/zoom,top:200,bottom:200+270/zoom};
+    const safe=s.pulpCueSafeView(full,c.rotation,zoom);
+    expect(safe.left).toBeGreaterThan(full.left);
+    expect(safe.right).toBeLessThan(full.right);
+    expect(safe.top).toBeGreaterThan(full.top);
+    expect(safe.bottom).toBeLessThan(full.bottom);
+    // Any corner within the reduced cue-fit rectangle must still project
+    // within the real unrotated screen; no clipped cue misjudged as fitting.
+    const cx=(full.left+full.right)/2,cy=(full.top+full.bottom)/2;
+    for(const x of [safe.left,safe.right])for(const y of [safe.top,safe.bottom]){
+      const dx=x-cx,dy=y-cy,a=c.rotation;
+      const px=dx*Math.cos(a)-dy*Math.sin(a);
+      const py=dx*Math.sin(a)+dy*Math.cos(a);
+      expect(Math.abs(px)).toBeLessThanOrEqual(240/zoom+1e-7);
+      expect(Math.abs(py)).toBeLessThanOrEqual(135/zoom+1e-7);
+    }
+    s._cameraIntent=null;
+    expect(s.pulpCueSafeView(full,c.rotation,zoom)).toBe(full);
+  });
+
   test('drone reads actual Hazard.cx without writing collision/telegraph or generation state',()=>{
     const s=makeScene();
     s.updateCamera(16.6);
