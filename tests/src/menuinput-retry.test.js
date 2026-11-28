@@ -98,6 +98,7 @@ describe('retryAction: true (Game Over)', () => {
     const p=rig({retryAction:true});
     pads=pad([7]);p.frame();p.frame();
     expect(p.got).toEqual(['report:gamepad']);
+    pads=[]; // fresh press: initialize Title with RT UP, then press it
     const title=rig();pads=pad([7]);title.frame();
     expect(title.got).toEqual([]);
   });

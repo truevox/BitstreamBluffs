@@ -220,6 +220,13 @@ try{
     s._onPointer({x:center.x,y:center.y},[]);
     const partialConsumed=retries===0&&!s.ghostView;
     const partialCancelledPrompt=cancelled===1;
+    // Camera shake can offset the screen pointer from the button's world
+    // space. A correct fallback must pass the pointer through the camera.
+    const camera=s.cameras.main,originalWorldPoint=camera.getWorldPoint;
+    camera.getWorldPoint=(x,y)=>({x:x+43,y:y+17});
+    s._onPointer({x:center.x-43,y:center.y-17},[]);
+    const shakenHitConsumed=retries===0&&!s.ghostView;
+    camera.getWorldPoint=originalWorldPoint;
     // A completely invisible REPORT location is still blank background.
     s.left.setAlpha(0);
     s._onPointer({x:center.x,y:center.y},[]);
@@ -228,11 +235,13 @@ try{
     s._cancelShopAutoprompt=oldCancel;
     s.left.setAlpha(savedAlpha);
     return {blocked,noModal,restored,hiddenRejected,noHiddenModal,
-      pendingRejected,noPendingModal,partialConsumed,partialCancelledPrompt,hiddenStillRetries};
+      pendingRejected,noPendingModal,partialConsumed,partialCancelledPrompt,
+      shakenHitConsumed,hiddenStillRetries};
   });
   assert.deepEqual(guarded,{blocked:true,noModal:true,restored:true,
     hiddenRejected:true,noHiddenModal:true,pendingRejected:true,noPendingModal:true,
-    partialConsumed:true,partialCancelledPrompt:true,hiddenStillRetries:true});
+    partialConsumed:true,partialCancelledPrompt:true,shakenHitConsumed:true,
+    hiddenStillRetries:true});
   assert.deepEqual(errors,[]);
   console.log('REAL_GAME_OVER_LOCAL_REPORT_EXPORT_PASS',before,opened,afterExport);
 }finally{

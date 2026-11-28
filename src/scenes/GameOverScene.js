@@ -189,7 +189,11 @@ export class GameOverScene extends Phaser.Scene {
       const zone=this.reportBtn?.zone;
       let hitReport=false;
       if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
-        const pt=zone.getWorldTransformMatrix().applyInverse(pointer.x,pointer.y);
+        // Phaser pointer.x/y are canvas coordinates; the panel's transform
+        // expects world coordinates. Account for any still-active Game Over
+        // camera shake / scroll before consuming a REPORT hit.
+        const world=this.cameras?.main?.getWorldPoint?.(pointer.x,pointer.y)||pointer;
+        const pt=zone.getWorldTransformMatrix().applyInverse(world.x,world.y);
         hitReport=pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height;
       }
       this.skipReveal();
