@@ -142,6 +142,8 @@ export class GameOverScene extends Phaser.Scene {
     this.entry = null;
     this.saved = false;
     this.rows = [];
+    this.reportBtn=null; // scene reuse must not retain a previous run's evidence entry
+    this._reportBoardPending=true; // leaderboard qualifier owns keyboard until resolved
     this.rec = this.registry.get(REG.LAST_RECORD) || this._emptyRecord();
     const rec = this.rec;
     const theme = (this.theme = new Theme(this));
@@ -179,12 +181,41 @@ export class GameOverScene extends Phaser.Scene {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
       if (this.shopOpen || this.ghostView || this.takeoverPicker || this.coachView) return;
+      // Capture the rendered REPORT hit BEFORE skipReveal changes alpha and
+      // geometry. A partially revealed visible control must never become a
+      // destructive background retry even while still non-activatable.
+      const reportWasReady=this._reportButtonReady();
+      const reportWasRendered=this._reportButtonRendered();
+      const zone=this.reportBtn?.zone;
+      let hitReport=false;
+      if(zone?.scene && pointer && typeof zone.getWorldTransformMatrix==='function'){
+        // Phaser pointer.x/y are canvas coordinates; the panel's transform
+        // expects world coordinates. Account for any still-active Game Over
+        // camera shake / scroll before consuming a REPORT hit.
+        const world=this.cameras?.main?.getWorldPoint?.(pointer.x,pointer.y)||pointer;
+        const pt=zone.getWorldTransformMatrix().applyInverse(world.x,world.y);
+        hitReport=pt.x>=0&&pt.x<=zone.width&&pt.y>=0&&pt.y<=zone.height;
+      }
       this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
       if (this.jukebox?.ownsPointer(pointer)) return;
+      // Native pointerdown can reach this scene-wide retry handler before
+      // the nested button's own event. A visible REPORT hit is consumed even
+      // while its panel is still unfolding; the player can select it once
+      // fully ready. No click should silently switch to Retry.
+      if(hitReport && reportWasRendered){
+        // Even if the panel cannot be activated yet, a deliberate visible
+        // tap cancels the shop autoprompt just like every other user input.
+        this._cancelShopAutoprompt();
+        if(reportWasReady)this._openLocalReport();
+        return;
+      }
       this._cancelShopAutoprompt();
-      if (!this.entry && over.length === 0) this.retry();
+      // A *completely invisible* REPORT zone is not a visible target:
+      // preserve the original tap-to-retry behavior on blank background.
+      const visibleTargets=reportWasRendered ? over : over.filter(o=>o!==zone);
+      if (!this.entry && visibleTargets.length === 0) this.retry();
     };
     this.input.on('pointerdown', this._onPointer);
     this.events.once('shutdown', () => {
@@ -331,9 +362,18 @@ export class GameOverScene extends Phaser.Scene {
     // Issue #56: pin this run as a ghost favorite. In the panel's title row (right of the tab), the only
     // free band of a full report; shown only when this run actually recorded a ghost tape.
     const tape = this.registry.get(REG.LAST_GHOST_TAPE);
-    if (tape && tape.runId === rec.id && this.registry.get(REG.GHOSTS)) {
-      this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
-      p.add(this.ghostBtn);
+    if (tape && tape.runId === rec.id) {
+      // #78: direct entry to the existing explicit, local-only evidence
+      // export. Player must still choose EXPORT; nothing is uploaded.
+      // The title-tab gap ends at x155, where GHOST FAV begins.
+      this.reportBtn = new Button(this, theme, { x: 92, y: 1, w: 63, h: 12,
+        label: 'REPORT R/RT', color: 'amber', onClick: () => this._openLocalReport() });
+      this.reportBtn.setDisabled(true); // asynchronous qualification must resolve first
+      p.add(this.reportBtn);
+      if (this.registry.get(REG.GHOSTS)) {
+        this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
+        p.add(this.ghostBtn);
+      }
     }
     // The score is built at its final value; _startReveal() counts it up from zero (and shows the final
     // value at once under reduced motion or when the player skips).
@@ -626,6 +666,8 @@ export class GameOverScene extends Phaser.Scene {
         : (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10)), []),
     ]).then(([qualifies, rows]) => {
       if (!this.alive || this.leaving) return;
+      this._reportBoardPending=false;
+      this.reportBtn?.setDisabled(false);
       this.rows = Array.isArray(rows) ? rows : [];
       const already = this.rows.some((r) => r.id === rec.id);
       const worthy = this.rows.length >= 3 || (rec.score || 0) >= 200;
@@ -712,6 +754,7 @@ export class GameOverScene extends Phaser.Scene {
     this.right.add([hint, hint2]);
     this.entryGroup = [t1, hint, hint2];
     this.input_.rawKeyHandler = (e) => this._rawKey(e);
+    this.reportBtn?.setDisabled(true); // never route report hotkeys through initials entry
     // While typing, keyboard B is a letter, not the shop key, so the hint would be a lie (audit UI-A).
     // _leaveEntry() puts it back once the entry is saved or skipped.
     this._hideShopHint();
@@ -747,6 +790,7 @@ export class GameOverScene extends Phaser.Scene {
   _leaveEntry() {
     if (this.entry) this.entry.destroy();
     this.entry = null;
+    this.reportBtn?.setDisabled(false);
     for (const t of this.entryGroup || []) t.destroy();
     this.entryGroup = [];
     this.input_.rawKeyHandler = null;
@@ -994,6 +1038,43 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this.skipReveal === 'function') this.skipReveal();
     this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts(), onEvidence: () => this._openEvidenceView() });
+  }
+
+  /** Partially unfolded panel: consume a hit, but do not yet activate it. */
+  _reportButtonRendered() {
+    const panel=this.left;
+    return Boolean(this.reportBtn?.zone?.scene && panel?.scene &&
+      panel.visible!==false && panel.alpha>0.02 &&
+      this.reportBtn.visible!==false && this.reportBtn.alpha>0.02);
+  }
+
+  /** Never interpret a tap on a still-hidden animated button as consent. */
+  _reportButtonReady() {
+    const panel=this.left;
+    return Boolean(this.reportBtn?.zone?.scene && !this.reportBtn.disabled &&
+      this._reportBoardPending !== true && !this.entry &&
+      panel?.scene && panel.visible !== false && panel.alpha >= 0.995 &&
+      Math.abs(panel.scaleX-1)<0.005 && Math.abs(panel.scaleY-1)<0.005);
+  }
+
+  /** #78: a visible REPORT entry for the exact finished run. This is a
+   * *local export entry*, not a report submission or proof of verification.
+   * Reuse the existing read-only, run-bound evidence controls: the player
+   * must explicitly click EXPORT and chooses whether to share the file.
+   */
+  _openLocalReport() {
+    const tape=this.registry.get(REG.LAST_GHOST_TAPE);
+    if (!this._reportButtonReady() || this.entry || this.ghostView ||
+        this.takeoverPicker || this.coachView ||
+        this.shopOpen || !this.alive || this.leaving || !tape ||
+        tape.runId !== this.rec.id) return;
+    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
+    this.ghostDim=this.add.rectangle(0,0,GAME_WIDTH,GAME_HEIGHT,0x000000,0.6)
+      .setOrigin(0,0).setDepth(400).setInteractive();
+    this.ghostView=new ReplayEvidenceView(this,this.theme,{
+      tape,onClose:()=>this._closeGhosts(),
+    });
   }
 
   /** Keep the existing dimmed Game Over screen; only swap the overlay panel. */
@@ -1396,6 +1477,7 @@ export class GameOverScene extends Phaser.Scene {
       return;
     }
     if (this.ghostView) { this.ghostView.handleAction(action); return; }
+    if (action === 'report' && !this.shopOpen && !this.entry) { this._openLocalReport(); return; }
     if (action === 'ghost' && !this.shopOpen && !this.entry) { this._openGhosts(); return; }
     if (action === 'montage' && !this.shopOpen && !this.entry) { this._openMontage(); return; }
     if (this.shopOpen) {
