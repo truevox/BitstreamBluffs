@@ -65,6 +65,23 @@ export class ReplayEvidenceView extends View {
     this.buttons[0].setHover(true);
     text(12,144,'IMPORTS REMAIN LOCAL AND UNVERIFIED.','amber');
     text(12,156,'KEEP DOES NOT PREVENT CLEARING SITE DATA.','text');
+    // Status capture is deferred after Game Over. A player can open REPORT
+    // before the write finishes: when that SAME run's status arrives, recheck
+    // the local store read-only. No implicit retry, download, Keep, or upload.
+    this._lastCaptureStatus=null;
+    const onStatus=()=>{
+      if(!this.alive)return;
+      const status=this._captureStatus();
+      if(!status || status===this._lastCaptureStatus)return;
+      if(this.busy){this._reconcileRequested=true;return;}
+      this._refresh({retryPending:false});
+    };
+    this._onRunStatusChanged=onStatus;
+    this._onRunStatusSet=(_manager,key)=>{
+      if(key===EVIDENCE_STATUS_BY_RUN_KEY)onStatus();
+    };
+    scene.registry?.events?.on?.(`changedata-${EVIDENCE_STATUS_BY_RUN_KEY}`,onStatus);
+    scene.registry?.events?.on?.('setdata',this._onRunStatusSet);
     this._installNativeImportInput();
     this._refresh({retryPending:false}); // opening the panel is NOT an explicit retry request
   }
@@ -119,6 +136,7 @@ export class ReplayEvidenceView extends View {
     this.buttons[0].setDisabled(true);
     this.buttons[1].setDisabled(true);
     const status=this._captureStatus();
+    this._lastCaptureStatus=status;
     const capture=currentRunEvidence(status,this.tape.runId,{allowFailed:true});
     if (!status) {
       this.digestText.setText('EVIDENCE: STILL SAVING / RETRY');
@@ -410,6 +428,8 @@ export class ReplayEvidenceView extends View {
   });}
 
   destroy() {
+    this.scene.registry?.events?.off?.(`changedata-${EVIDENCE_STATUS_BY_RUN_KEY}`,this._onRunStatusChanged);
+    this.scene.registry?.events?.off?.('setdata',this._onRunStatusSet);
     this._restoreGameFocus();
     if(this._nativeInput){this._nativeInput.remove();this._nativeInput=null;}
     if(this._positionNativeInput){

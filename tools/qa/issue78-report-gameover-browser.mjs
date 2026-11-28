@@ -1,5 +1,7 @@
 /** #78: Real Game Over exposes a local-only report without upload or silent export. */
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
 
@@ -121,8 +123,18 @@ try{
   await page.mouse.click(exportPos.x,exportPos.y);
   const downloaded=await downloadPromise;
   assert.match(downloaded.suggestedFilename(),/^[a-f0-9]{64}\.bbreplay$/i);
+  const expectedDigest=await page.evaluate(()=>{
+    const g=window.__bbGame,id=g.scene.getScene('GameOverScene').rec.id;
+    return g.registry.get('evidenceStatusByRun')?.get(id)?.digest;
+  });
+  assert.match(expectedDigest,/^sha256:[a-f0-9]{64}$/i);
+  const bytes=await readFile(await downloaded.path());
+  assert.ok(bytes.length>0,'export must contain actual replay evidence bytes');
+  const actualSha=createHash('sha256').update(bytes).digest('hex');
+  assert.equal('sha256:'+actualSha,expectedDigest,'download bytes must match FINISHED RUN digest');
+  assert.equal(downloaded.suggestedFilename(),actualSha+'.bbreplay');
   assert.equal(downloads.length,1);
-  assertPrivateNetwork(before.recordId,downloaded.suggestedFilename().replace(/\.bbreplay$/,''));
+  assertPrivateNetwork(before.recordId,actualSha);
   const afterExport=await page.evaluate(()=>{
     const v=window.__bbGame.scene.getScene('GameOverScene').ghostView;
     return {status:v?.status?.main?.text,detail:v?.detail?.main?.text};
@@ -134,6 +146,42 @@ try{
   await page.waitForFunction(()=>!!window.__bbGame.scene.getScene('GameOverScene').ghostView,
     null,{timeout:5000});
   assert.equal(downloads.length,1,'keyboard shortcut only opens the modal, not another export');
+  await page.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView.close());
+  await page.waitForFunction(()=>!window.__bbGame.scene.getScene('GameOverScene').ghostView);
+  // Simulate a player opening the real REPORT view before deferred capture
+  // publishes its run status. Only a matching, read-only registry update
+  // may enable EXPORT; the panel must never require manual REFRESH or write.
+  await page.evaluate(()=>{
+    const g=window.__bbGame,reg=g.registry,id=g.scene.getScene('GameOverScene').rec.id;
+    const byRun=new Map(reg.get('evidenceStatusByRun'));
+    window.__issue78SavedStatus=byRun.get(id);
+    byRun.delete(id);
+    reg.set('evidenceStatusByRun',byRun);
+    reg.set('lastEvidenceStatus',null);
+  });
+  // MenuInput deduplicates repeated R presses from multiple browser input
+  // paths: a distinct later player action cannot be within that grace window.
+  await page.waitForTimeout(120);
+  await page.keyboard.press('r');
+  await page.waitForFunction(()=>{
+    const v=window.__bbGame.scene.getScene('GameOverScene').ghostView;
+    return v?.status?.main?.text==='NOT READY' && v.buttons[1].disabled===true;
+  },null,{timeout:10000});
+  const beforeAutoRefreshDownloads=downloads.length;
+  await page.evaluate(()=>{
+    const g=window.__bbGame,reg=g.registry,id=g.scene.getScene('GameOverScene').rec.id;
+    const byRun=new Map(reg.get('evidenceStatusByRun'));
+    byRun.set(id,window.__issue78SavedStatus);
+    reg.set('evidenceStatusByRun',byRun);
+    reg.set('lastEvidenceStatus',window.__issue78SavedStatus);
+    delete window.__issue78SavedStatus;
+  });
+  await page.waitForFunction(()=>{
+    const v=window.__bbGame.scene.getScene('GameOverScene').ghostView;
+    return v?.buttons?.[1]?.disabled===false && v?.status?.main?.text==='SAVED LOCALLY';
+  },null,{timeout:12000});
+  assert.equal(downloads.length,beforeAutoRefreshDownloads,'status update must not download evidence');
+  assertPrivateNetwork(before.recordId,actualSha);
   await page.evaluate(()=>window.__bbGame.scene.getScene('GameOverScene').ghostView.close());
   await page.waitForFunction(()=>!window.__bbGame.scene.getScene('GameOverScene').ghostView);
   // A real initials input owns Enter/Escape while active. REPORT must be
