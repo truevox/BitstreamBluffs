@@ -5,7 +5,7 @@
 > **The code is the source of truth.** If this file and the code disagree, the code wins, and the
 > file gets fixed in the same PR.
 >
-> Written from `main` @ `40a5bc4` (v2.25.34 plus later merges). Suggested line for `AGENTS.md`:
+> Last updated from `main` @ `5d31860` (Nov 27, 2026, after the design review outside-voice round). Suggested line for `AGENTS.md`:
 > *"Before building or changing any screen, read `DESIGN.md`."*
 
 ---
@@ -17,6 +17,9 @@ striped sun, layered neon ridgelines, a perspective grid floor, scanlines, and a
 
 Principles:
 
+- **Amplify the relationship, hide the machinery.** Every interface should amplify the player's
+  relationship with the game, the slopes, or their riders. If an interface mainly exposes the machinery
+  underneath (hyperparameters, algorithm names, raw stats), it belongs in Advanced.
 - **One cabinet, one voice.** Every screen, including the Evolution Lab, uses this visual language.
   Nothing looks like a different product with a neon coat of paint.
 - **Crisp pixels.** Native 480×270 grid, integer text scales, pixel-exact strokes. No blur shaders.
@@ -127,6 +130,13 @@ gets an icon or a word, so it survives the colour-blind palette.
   A new screen gets its own layout module and overlap tests in the same PR.
 - **Row counts are computed, not assumed:** `titleMenuLayout` derives geometry from the row count and
   warns if a menu doesn't fit, after an added seventh row once overlapped SETTINGS.
+- **Spec at 1x before code.** Every new or redesigned screen gets a native 480x270 layout spec first:
+  exact rectangles, text scale per string, maximum character counts and truncation rules, and the
+  pixel size of every non-text graphic (sprite, primitive or glyph).
+- **The title menu panel fits 6 rows** at the current 16 px pitch. The title is being reworked to fewer
+  top-level rows (design review, outside-voice round): Resume sits directly beside Start when a save
+  exists, Daily appears in exactly one place, Autopilot gets a row once unlocked, and supporting
+  features live under MORE.
 - **Title screen bands** (`TITLE_BANDS`): logo y 2–94, tagline y 96, horizon y 192, menu panel x 8–216
   at y 154–254, cabinet card x 316–472 at y 94–254, control hint y 258–266.
 
@@ -155,8 +165,12 @@ invariant, and the four input methods. Decided in the Nov 27 design review (6A) 
 - **Reference devices:** phone landscape (about 667×375 CSS px) and a Kompanio Chromebook
   (1366×768). Every screen must read on both.
 - **Minimum text:** scale 1 is the floor. No information is drawn smaller.
-- **Touch targets:** at least about 44 CSS px on the phone reference. On touch devices, hit zones
-  can be taller than the drawn art.
+- **Touch targets:** at least about 44 CSS px on the phone reference, which is about **32 native px**
+  per touch action at that scale. Enlarging hit zones around tightly packed rows only makes them
+  overlap, so touch devices get a **separate compact layout** (fewer, larger actions; secondary views),
+  not a padded desktop layout. Trigger it by input and device (coarse pointer, small viewport), never by
+  canvas size.
+- **Decision-critical text on phones uses scale 2.** Scale 1 is for supplementary information.
 - **Portrait:** an on-brand "rotate your device" screen, not a squashed game.
 - **Never colour alone** (see §3.3).
 
@@ -172,9 +186,50 @@ The Lab speaks the cabinet's language, **not** a machine-learning dashboard:
 | Lineage | A **family tree** of pixel-portrait cards with names (Gen 1 "faceplant" ... champion) |
 | Charts, sliders, hyperparameters | Behind an **ADVANCED** panel, never the main view |
 
-Related decided flows (mockups on the design canvas): guided first "Teach it" run with a visible
-improvement within about 2 minutes, a claim moment (name and look) at the first clean landing, a
-one-time "While you were away" report, and a "Teach it" prompt on Game Over.
+Layout and flow rules (design review plus outside-voice round):
+
+- **Spectacle first.** The live training view takes most of the Lab screen (roughly 60-70%). Rider
+  identity and score share one compact overlay. Lineage lives on the rider detail screen. Slot
+  management is its own secondary screen. Limit ghost trails: one prominent rider plus a few fading
+  trails.
+- **One contextual main action** that reflects state (for example "PUT RIDER TO WORK (+0.17 KM)" when
+  the trainee beats the working rider, "PAUSED - RESUME" when stopped), plus MAKE A REEL.
+- **Timers stay quiet.** The 12-hour unattended-training limit is a safety pause: no countdown in the
+  main view; it appears only when it triggers ("cabinet cooling down - resume"). Rented-slot timers
+  live on the slot screen, which also states that slots are paid with Bits earned in play. The
+  mechanics (12-hour limit, Bits-paid rentals and boosts) are unchanged.
+- **Show provenance only when it is measured.** Never display a split like "NEAT 82% / tapes 18%"
+  unless the trainer emits that number; otherwise show honest counts ("212 GENS, 4 OF YOUR TAPES").
+- **The guided first run must be reliable and honest:** a tested intro course and starting population,
+  a bounded time budget, celebration of whatever real milestone happens (lasting longer, clearing the
+  first gap, landing), real progress kept if no milestone arrives, and never a faked result. Say "YOU
+  TAUGHT THAT" only when the player's tape actually contributed; otherwise celebrate evolution.
+- **The claim moment is a celebration, not a sale:** optional name, look, PUT RIDER TO WORK, MAKE A
+  REEL. No unlock pitch on this screen or anywhere in the guided run.
+- **Naming works on every input.** Keyboard and touch use a real text input (`DomTextBox`); gamepad gets
+  an on-screen keyboard or a "random name" option, and accepting the default name is always allowed.
+- **"Teach it" on Game Over appears only when it matters:** after the first manual run, then only when
+  the run beat the rider or did something the rider cannot do yet.
+- **The return report is one short recap** with a visual before/after, Bits credited automatically
+  (the button acknowledges, it doesn't collect), and one CONTINUE. Report only what really ran:
+  training happens only while the game is open, offline Autopilot earnings are modeled from real runs,
+  and the two are never blurred together.
+
+Beginner-facing vocabulary (technical terms stay available in Advanced):
+
+| Internal term | Player-facing |
+|---|---|
+| Sim-Slot | Training Slot |
+| Governor | Training Speed (in settings) |
+| Fitness | Performance / Best Run |
+| Champion | Best Rider |
+| Deploy to Autopilot | Put Rider to Work |
+| Advanced parameters | Advanced Training |
+| Rented 9H | 9H REMAINING |
+
+Mockups on the design canvas (approved as mockups, not final art; drawn before the outside-voice round,
+so where they disagree with the rules above, the rules win): Lab main, guided run and claim, return
+report, crash and Game Over, revised title.
 
 ### Required states for new Lab and Autopilot screens
 
@@ -189,20 +244,25 @@ Loading, empty, error, success and partial are all designed. Highlights:
 ## 11. Monetization UI rules (CEO and design review decisions)
 
 - **Free web:** sled and Autopilot, supported by **opt-in rewarded ads only**. Premium (Steam, unlock,
-  honor button, schools): no ads, full Lab, offline Autopilot earnings.
-- **Ads are never mid-run, never stacked, never a nag, never a pop-up.** If no ad loads, the player
-  still gets the reward.
-- **Ads never buy a competitive edge.** Rewards touch progression (Shards, Bits), never scores, and
-  never anything on a leaderboard or daily patch.
-- **Crash rewind:** a pickup arms it for everyone. Free players watch an ad to *activate* one they
-  collected, never to get an extra one.
+  honor button, schools): no ads, full Lab, offline Autopilot earnings, and **double Shards by
+  default**, so paying never means slower progress than watching ads.
+- **Ads are never mid-run, never stacked, never a nag, never a pop-up, and never delay RETRY.**
+- **Crash rewind:** a pickup arms it. Premium rewinds work immediately. A free player who wants the
+  rewind watches an ad; RETRY stays available the whole time and declining costs nothing. If the ad
+  fails to load, the rewind is granted anyway. Explain the rewind when it is collected, not first at
+  the crash.
+- **Double Shards** is offered only when an ad is actually ready; with no ad, the offer is not shown.
+- **Ads may help a player's result** (a rewind counts in ranked play). This is a deliberate decision:
+  anyone can watch an ad, and the game never penalizes a failed ad load.
 - **The Steam pitch** appears only after a real ceiling, at most weekly, in one place, and **always
-  next to the honor button** ("Can't afford it? Unlock free").
+  next to the honor button** ("Can't afford it? Unlock free"). Never in the first session, the guided
+  run, the claim moment, rides or Game Over.
 - **Privacy UI (once ads exist):** a neutral birth-year screen (no hint of the "right" answer), with
   the child-treatment ad setup for under-13s and a certified consent banner for EU/UK visitors.
 
 ## 12. New-screen checklist
 
+- [ ] A 1x layout spec exists (rectangles, text scales, max characters, graphic sizes).
 - [ ] Native 480×270 layout in a layout module, with overlap tests.
 - [ ] Colours from palette keys through `Theme.bind`. Correct under the colour-blind palette and
       every equipped theme. `danger` only for danger.
@@ -213,6 +273,8 @@ Loading, empty, error, success and partial are all designed. Highlights:
 - [ ] Loading, empty, error, success and partial states designed.
 - [ ] Readable on the phone-landscape and Chromebook references. Touch hit zones big enough.
 - [ ] State never shown by colour alone.
+- [ ] Automated checks pass: only glyphs that pass `hasGlyph`, integer text scales only, no
+      overlapping tap zones on the desktop or compact touch layout. (Checks to be added; see §13.)
 
 ## 13. Known gaps and tensions
 
@@ -228,4 +290,8 @@ Loading, empty, error, success and partial are all designed. Highlights:
 - **Lab engine vs. Lab UI:** the Lab's engine side is landing (real Web Worker bootstrap #134, local
   checkpoint storage #451, play-aware admission governor #453), but none of the Lab screens in §10
   exist yet. Build them to §10 and §12.
-- **Accent roles (§3.3)** are a proposed convention, not enforced in code.
+- **Accent roles (§3.3)** are a proposed convention, not enforced in code. Both outside reviewers asked
+  for enforcement through shared components.
+- **Automated UI checks** (glyph set, integer scales, overlapping tap zones) are decided but not built.
+- **Autopilot needs a real design** centered on watching and managing riders (live race, recent
+  accomplishments, racing against them), not just collecting Bits.
