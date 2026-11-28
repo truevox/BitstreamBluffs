@@ -902,8 +902,40 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.calls).toContainEqual([0,ctx.currentTime,.03]);
     expect(a._vinylPauseSession.manualOverride).toBe(true);
     expect(a.jukeboxSnapshot().state).toBe('stopped');
+    // No ghost synth from already queued WebAudio frames when _setPaused
+    // reapplies filtering after the explicit SKIP retired the scheduler.
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall[0]).toBe(0);
     events.emit(EVT.GAME_RESUME,{reason:'manual'});
     expect(a._musicTimer).toBeNull();
+    a.destroy();
+  });
+
+  test('private-only song requested before catalog discovery survives a quiet Pause and Resume',()=>{
+    const {a,d,events}=setup();
+    const privateSong=GAME_SONGS[4].id;
+    a.settings.musicEnabledSongs=Object.fromEntries(
+      GAME_SONGS.map(song=>[song.id,song.id===privateSong]));
+    d.ready=false;d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=null;a._musicWanted=true;
+    expect(a._hasEnabledSongs()).toBe(false); // unknown song cannot synthesize
+    expect(a._hasPendingCatalogSelection()).toBe(true);
+    events.emit(EVT.GAME_PAUSE,{reason:'manual',runId:'private',pauseToken:'private:1'});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    a._startScheduler=jest.fn();
+    events.emit(EVT.GAME_RESUME,{reason:'manual',runId:'private',pauseToken:'private:1'});
+    expect(a._paused).toBe(false);
+    expect(a._musicWanted).toBe(true); // private original still wanted
+    expect(a._startScheduler).not.toHaveBeenCalled(); // no uninstalled synth
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    d.catalog=[{id:privateSong,title:'Selected Private Song'}];
+    d.ready=true;
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    a._onStemCatalogReady();
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._musicTimer).toBeNull();
+    expect(a._musicWanted).toBe(true);
     a.destroy();
   });
 

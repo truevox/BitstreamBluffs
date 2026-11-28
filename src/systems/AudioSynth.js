@@ -137,6 +137,16 @@ export class AudioSynth {
     return hasEnabledSongs(selection, installedSongChoices(this._stemMusic?.catalog));
   }
 
+  /** Private-only selections must wait for catalog discovery. This checks
+   * playback INTENT only: NEVER treat an undiscovered track as installed,
+   * start procedural fallback for it, or bypass the offline-music gate.
+   */
+  _hasPendingCatalogSelection() {
+    return this._stemMusic?.ready !== true &&
+      !this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
+      Object.values(this.settings?.musicEnabledSongs || {}).some(value=>value===true);
+  }
+
   /** A private-only selected track may not be discoverable when Title first
    * calls startMenuMusic(). Preserve that *one* autoplay request until the
    * installed catalog arrives, without inventing an uninstalled source or
@@ -787,8 +797,12 @@ export class AudioSynth {
       const fadeTime = paused ? 0.025 : 0.05;
       this.nodes.musicFilter.frequency.setTargetAtTime(
         paused && !pauseMusic ? 500 : 18000, t, fadeTime);
+      // Wanted music is not equivalent to an AUDIBLE procedural source:
+      // explicit Jukebox SKIP may retire the fallback timer while awaiting
+      // an original, and must not re-open already-scheduled synth notes.
       const sourceGain = paused && !pauseMusic ? 0 :
-        this._stemMusic?.started ? 0 : this._musicWanted ? 1 : 0;
+        this._stemMusic?.started ? 0 :
+        this._musicWanted && this._musicTimer !== null ? 1 : 0;
       this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, fadeTime);
       this._applyWindFromBsod();
     } catch { /* unsupported/closed nodes must never block gameplay */ }
@@ -849,8 +863,8 @@ export class AudioSynth {
         // request. A catalog may still finish loading after we enter Title;
         // onReady should be allowed to start the original, without starting
         // another procedural scheduler or overriding an explicit Jukebox PAUSE.
-        this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs) &&
-          !session?.manualOverride;
+        this._musicWanted=(this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+          this._hasPendingCatalogSelection()) && !session?.manualOverride;
         this.nodes?.musicSrc?.gain?.setTargetAtTime?.(0,this.ctx?.currentTime??0,.03);
       }
     }
@@ -860,9 +874,11 @@ export class AudioSynth {
     // transport. If a song was re-enabled, Quit must honor the deferred
     // choice too: Title uses its original-only jukebox policy (no synth).
     if (snap.restartOnResume) {
-      if (this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+      if (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+          this._hasPendingCatalogSelection()) {
         this._musicWanted = true;
-        if (this.ctx?.state === 'running') this._activateStemMusic();
+        if (this.ctx?.state === 'running' && this._stemMusic?.ready)
+          this._activateStemMusic();
       }
       return;
     }
@@ -870,8 +886,10 @@ export class AudioSynth {
     if (snap.procedural) {
       // Restore only an original catalog source on Title. This is a menu,
       // never an alternative run-scoring procedural soundtrack session.
-      this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs);
-      if (this._musicWanted && this.ctx?.state === 'running') this._activateStemMusic();
+      this._musicWanted=this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+        this._hasPendingCatalogSelection();
+      if (this._musicWanted && this.ctx?.state === 'running' && this._stemMusic?.ready)
+        this._activateStemMusic();
       return;
     }
     if (!d?.transportPaused || d.started || d._token !== snap.token ||
@@ -1080,6 +1098,14 @@ export class AudioSynth {
       this._setPaused(false);
       if (!session?.shouldResume || session.manualOverride) return;
       const d = this._stemMusic;
+      // Only the confirmed installed roster may produce sound. Yet a
+      // PRIVATE-ONLY selection can be unresolved when gameplay resumes;
+      // keep the user's original-only request alive for onReady rather
+      // than discarding it before catalog discovery finishes.
+      if (session.restartOnResume && this._hasPendingCatalogSelection()) {
+        this._musicWanted=true;
+        return;
+      }
       if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
       if (session.restartOnResume) {
         // The previous source was invalidated by all-songs-off. Use the
