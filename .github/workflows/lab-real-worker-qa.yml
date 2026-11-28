@@ -1,0 +1,51 @@
+name: Lab real compiled module Worker bootstrap QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lab-real-worker-qa.yml'
+      - 'tools/lab/**'
+      - 'src/systems/Rng.js'
+      - 'vite.config.js'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lab-real-worker-qa.yml'
+      - 'tools/lab/**'
+      - 'src/systems/Rng.js'
+      - 'vite.config.js'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-workers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Verify source identity and old scheduler
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+          npm test -- --runInBand tests/lab/episode-batch.test.js
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Compiled real Workers at 1/2/4 lanes, verified result identity and fault isolation
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/lab/test-real-worker-browser.mjs
