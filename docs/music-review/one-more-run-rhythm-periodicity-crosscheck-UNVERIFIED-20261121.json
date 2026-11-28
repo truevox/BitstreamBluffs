@@ -1,0 +1,3785 @@
+{
+  "format": "bitstream-original-source-rhythm-consensus-UNVERIFIED-v1",
+  "status": "RESEARCH_ONLY_NO_VERIFIED_BEATS_OR_DRIFT",
+  "sourceSongId": "local-one-more-run-bitstream-bluffs",
+  "sampleRate": 48000,
+  "sourceFrameCount": 8380800,
+  "sourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "originalDrumBassStemSha256": {
+    "0": {
+      "drums": "0040ca6cfa771eab0a57593daedcbe72aeee40b7c858e5933bfc23bd0876416b",
+      "bass": "f7506c0bdadeda0bce72666b6506229977345c28b9fe0b884e7c1758dc78131a"
+    },
+    "1": {
+      "drums": "83df34a57c0bbe07ca7e010ec6c4cd6417831fcd26e9229ecbc9758b6a246f30",
+      "bass": "89bc022b9aa9a3d79d629ba7f40be351dde63fec45fe174c6aa9be5b17525625"
+    },
+    "2": {
+      "drums": "3be96dba7b2c7db369170c4cde59d086713646c8272a21e751833125395e84d8",
+      "bass": "8e17b4c5ade45e7b701329b246a83b682c5eb69987f52691062cfac2d574c3d6"
+    },
+    "3": {
+      "drums": "b08312601acbbc5cc69403a883a25067231e567d880f012ab710f3ca89c69484",
+      "bass": "157d136e5dca7b4c89e0c3d7da1204044e083093eb3ea7e4ce6a06ff3e70bfd2"
+    },
+    "4": {
+      "drums": "a8a7ca42426d21f9d8dc7309b3207e20998b59c4751dd3e215077d6e4720698d",
+      "bass": "78c699bee87e8637ce258859e54e9147ee1edec15eb2b2a488a00771bcc6a46b"
+    },
+    "5": {
+      "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+      "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5"
+    },
+    "6": {
+      "drums": "8e4ac58c3c5a97f74c389d5eb63095482aee81c661f43f259eb758cbe114850b",
+      "bass": "a734fb1487761229e5f8be4bb7d1401e31b5bf2d02daf92ca1c4ca9c652cd706"
+    },
+    "7": {
+      "drums": "c66e7a06ca1f079c14d3253a75dd029e5b1cc0d1e0a1fba357dffaf16e5d42aa",
+      "bass": "a82a8c36ed736bef197ed7b566dcb0762df83817a6c40158e2057ede124e6743"
+    },
+    "8": {
+      "drums": "b78e7621444becba0c84d035c3e88ff7f4cbdb823a42cc809c9321601e72e5c1",
+      "bass": "e4742a6b5e4eb6a76a3d9685a30bd054866d06714e58e083bd56e96e3f34d8dc"
+    },
+    "9": {
+      "drums": "4646aefeb54ec9d9e36c28c73ab06a312cf4dfcc847cd7082504d934fcbb9709",
+      "bass": "2434ddb6820898b73e0a71c2b931cab3574d977f7aca0ea49d567f4d65b73901"
+    },
+    "10": {
+      "drums": "0e9c06dd8a9473bf61874914b0ea3f49ed8b948021cfd52505b57fac78fc7fe9",
+      "bass": "90c71c886ebfd9e64243c9465cd574e54d5e03a33655bf74d212e9fa20fd1d61"
+    },
+    "11": {
+      "drums": "231642c281dd12911dab7d66fb5e1a4de7373d2aaa563401cf0299a86b021b1b",
+      "bass": "357b70a235e06be7465d923c20ff42f214a904d2d14b927aacad675718c7b10c"
+    },
+    "12": {
+      "drums": "bb27549104eba7dfe040e835c985bdf48ead1ec109ac57c833766dfaf487eb23",
+      "bass": "5b07c43222977ab628b0fdeb26e4f8793e0362e21f350104520f8b19bb519eb9"
+    },
+    "13": {
+      "drums": "2d4f6e9ed4ca9b6cb9a03975f2d7c724fba64e4ce141d9cc89e8a33d82e359da",
+      "bass": "0b00c9bdf99315f1d91e0d204b53585175800110f296a015b143390af2603409"
+    },
+    "14": {
+      "drums": "be7d2bf56dab6d49798171a0384be93363093e4dc8091c19357b68b4492b6be0",
+      "bass": "d6a1a9301636bb6c8cfd0b932f077d0f44247df21a7411e0f6a87e783119c935"
+    }
+  },
+  "windowLengthSeconds": 18,
+  "windowHopSeconds": 6,
+  "method": "18s windowed autocorrelation of locally detrended original OGG drum/bass onsets; deliberately independent of Viterbi period tracking, but shares source stem separation and onset extraction",
+  "phaseHypothesisComparison": {
+    "candidateOnly": true,
+    "assumedDiagnosticPeriodSeconds": 0.375,
+    "alignments": [
+      {
+        "shiftSeconds": 0.0,
+        "within40msFraction": 0.20807,
+        "medianNearestSeconds": 0.12971
+      },
+      {
+        "shiftSeconds": 0.09375,
+        "within40msFraction": 0.17197,
+        "medianNearestSeconds": 0.07586
+      },
+      {
+        "shiftSeconds": 0.1875,
+        "within40msFraction": 0.38217,
+        "medianNearestSeconds": 0.05779
+      },
+      {
+        "shiftSeconds": -0.09375,
+        "within40msFraction": 0.09766,
+        "medianNearestSeconds": 0.1058
+      },
+      {
+        "shiftSeconds": -0.1875,
+        "within40msFraction": 0.38429,
+        "medianNearestSeconds": 0.05196
+      }
+    ],
+    "bestShiftIsNotActualBeatOne": true
+  },
+  "regions": [
+    {
+      "startSeconds": 0,
+      "endSeconds": 18.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6873,
+            "candidateBpm": 163.916,
+            "autocorrelation": 0.5178
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5035
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4556
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4212
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3473
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0143,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0228
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.4406
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.8363,
+            "candidateBpm": 158.938,
+            "autocorrelation": 0.1332
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1274
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.1218
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1056
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0956
+          }
+        ],
+        "preferredQuarterTick": 38,
+        "quarterContrast": 0.0058,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 20,
+              "periodicBpm": 300.682,
+              "autocorrelation": -0.0958
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.2918
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -1,
+        "bestLagSeconds": -0.01,
+        "bestNormalizedCorrelation": 0.3811,
+        "zeroLagNormalizedCorrelation": 0.3626,
+        "gainOverNoShift": 0.0185,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 6,
+      "endSeconds": 24.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.726,
+            "candidateBpm": 163.743,
+            "autocorrelation": 0.7228
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.7006
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.6467
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5913
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.5062
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0222,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0635
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.6048
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.0179,
+            "candidateBpm": 162.452,
+            "autocorrelation": 0.1573
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1486
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.148
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1235
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.1218
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0087,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 22,
+              "periodicBpm": 273.347,
+              "autocorrelation": -0.103
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.2668
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -19,
+        "bestLagSeconds": -0.1896,
+        "bestNormalizedCorrelation": 0.3225,
+        "zeroLagNormalizedCorrelation": 0.1532,
+        "gainOverNoShift": 0.1693,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 12,
+      "endSeconds": 30.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.762,
+            "candidateBpm": 163.583,
+            "autocorrelation": 0.8158
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.7869
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.7343
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.6604
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.5774
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0289,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0287
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.7434
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.2952,
+            "candidateBpm": 165.687,
+            "autocorrelation": 0.1603
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1568
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1467
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1361
+          },
+          {
+            "lagTicks": 34,
+            "interpolatedLagTicks": 34.5,
+            "candidateBpm": 174.308,
+            "autocorrelation": 0.1177
+          }
+        ],
+        "preferredQuarterTick": 36,
+        "quarterContrast": 0.0035,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0874
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.3034
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -20,
+        "bestLagSeconds": -0.1995,
+        "bestNormalizedCorrelation": 0.3862,
+        "zeroLagNormalizedCorrelation": 0.0606,
+        "gainOverNoShift": 0.3256,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 18,
+      "endSeconds": 36.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7615,
+            "candidateBpm": 163.585,
+            "autocorrelation": 0.7756
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.7454
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.6902
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.6144
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.5286
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0302,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0877
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.6863
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7386,
+            "candidateBpm": 163.687,
+            "autocorrelation": 0.1421
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1393
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1331
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1233
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.1134
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0028,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.1323
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.2556
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": 16,
+        "bestLagSeconds": 0.1596,
+        "bestNormalizedCorrelation": 0.2742,
+        "zeroLagNormalizedCorrelation": 0.0838,
+        "gainOverNoShift": 0.1904,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 24,
+      "endSeconds": 42.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7837,
+            "candidateBpm": 163.486,
+            "autocorrelation": 0.6864
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.6556
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.6087
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5307
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.458
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0308,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.272
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.6008
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.8544,
+            "candidateBpm": 154.774,
+            "autocorrelation": 0.0898
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0859
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0828
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0734
+          },
+          {
+            "lagTicks": 41,
+            "interpolatedLagTicks": 40.5,
+            "candidateBpm": 148.485,
+            "autocorrelation": 0.0673
+          }
+        ],
+        "preferredQuarterTick": 39,
+        "quarterContrast": 0.0039,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 20,
+              "periodicBpm": 300.682,
+              "autocorrelation": -0.0891
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.1516
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 2,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.3559,
+        "zeroLagNormalizedCorrelation": 0.1404,
+        "gainOverNoShift": 0.2155,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 30,
+      "endSeconds": 48.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7874,
+            "candidateBpm": 163.47,
+            "autocorrelation": 0.6119
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5825
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5389
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4632
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3964
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0294,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.429
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.5309
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 39.064,
+            "candidateBpm": 153.943,
+            "autocorrelation": 0.0456
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0433
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0426
+          },
+          {
+            "lagTicks": 41,
+            "interpolatedLagTicks": 41.0,
+            "candidateBpm": 146.674,
+            "autocorrelation": 0.0407
+          },
+          {
+            "lagTicks": 42,
+            "interpolatedLagTicks": 41.5,
+            "candidateBpm": 144.907,
+            "autocorrelation": 0.0394
+          }
+        ],
+        "preferredQuarterTick": 39,
+        "quarterContrast": 0.0023,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 23,
+              "periodicBpm": 261.462,
+              "autocorrelation": -0.0493
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 71,
+              "periodicBpm": 84.699,
+              "autocorrelation": 0.1199
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 2,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.2474,
+        "zeroLagNormalizedCorrelation": 0.1223,
+        "gainOverNoShift": 0.1251,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 36,
+      "endSeconds": 54.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7661,
+            "candidateBpm": 163.565,
+            "autocorrelation": 0.6913
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.6618
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.6098
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5325
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4513
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0295,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.5554
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.6386
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.3417,
+            "candidateBpm": 161.043,
+            "autocorrelation": 0.0916
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0877
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0707
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0644
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.036
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0039,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 21,
+              "periodicBpm": 286.364,
+              "autocorrelation": 0.0201
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.2358
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.3608,
+        "zeroLagNormalizedCorrelation": 0.0496,
+        "gainOverNoShift": 0.3112,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 42,
+      "endSeconds": 60.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7125,
+            "candidateBpm": 163.804,
+            "autocorrelation": 0.5642
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5447
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4922
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4416
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3571
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0195,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.4464
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.5935
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.4154,
+            "candidateBpm": 160.726,
+            "autocorrelation": 0.1042
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1021
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0814
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0789
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.0477
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0021,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0199
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.1933
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.3722,
+        "zeroLagNormalizedCorrelation": 0.0439,
+        "gainOverNoShift": 0.3282,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 48,
+      "endSeconds": 66.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6951,
+            "candidateBpm": 163.881,
+            "autocorrelation": 0.6433
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.6269
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5755
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5322
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4486
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0164,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.1426
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.533
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 38.0588,
+            "candidateBpm": 158.009,
+            "autocorrelation": 0.1155
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.108
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.106
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0855
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0779
+          }
+        ],
+        "preferredQuarterTick": 38,
+        "quarterContrast": 0.0075,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0006
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.21
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.3592,
+        "zeroLagNormalizedCorrelation": -0.0272,
+        "gainOverNoShift": 0.3864,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 54,
+      "endSeconds": 72.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7532,
+            "candidateBpm": 163.622,
+            "autocorrelation": 0.6118
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5946
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5611
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5148
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4581
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0172,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.0022
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.5134
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.8412,
+            "candidateBpm": 150.94,
+            "autocorrelation": 0.0889
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0822
+          },
+          {
+            "lagTicks": 41,
+            "interpolatedLagTicks": 40.5,
+            "candidateBpm": 148.485,
+            "autocorrelation": 0.0759
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0621
+          },
+          {
+            "lagTicks": 42,
+            "interpolatedLagTicks": 41.5,
+            "candidateBpm": 144.907,
+            "autocorrelation": 0.0469
+          }
+        ],
+        "preferredQuarterTick": 40,
+        "quarterContrast": 0.0067,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 16,
+              "periodicBpm": 375.852,
+              "autocorrelation": -0.0917
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.1766
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 3,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.1983,
+        "zeroLagNormalizedCorrelation": 0.029,
+        "gainOverNoShift": 0.1692,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 60,
+      "endSeconds": 78.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8272,
+            "candidateBpm": 163.294,
+            "autocorrelation": 0.724
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.6977
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.67
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.5982
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.5526
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0263,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.0926
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.6786
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.7224,
+            "candidateBpm": 155.301,
+            "autocorrelation": 0.0969
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0943
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0878
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.087
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0729
+          }
+        ],
+        "preferredQuarterTick": 39,
+        "quarterContrast": 0.0026,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 23,
+              "periodicBpm": 261.462,
+              "autocorrelation": -0.1084
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.1554
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 2,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -20,
+        "bestLagSeconds": -0.1995,
+        "bestNormalizedCorrelation": 0.2923,
+        "zeroLagNormalizedCorrelation": -0.0043,
+        "gainOverNoShift": 0.2966,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 66,
+      "endSeconds": 84.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8066,
+            "candidateBpm": 163.385,
+            "autocorrelation": 0.6074
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5837
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.554
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4905
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4402
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0237,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.2795
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.4614
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.2388,
+            "candidateBpm": 165.945,
+            "autocorrelation": 0.0424
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0382
+          },
+          {
+            "lagTicks": 46,
+            "interpolatedLagTicks": 46.3052,
+            "candidateBpm": 129.87,
+            "autocorrelation": 0.0344
+          },
+          {
+            "lagTicks": 45,
+            "interpolatedLagTicks": 45.0,
+            "candidateBpm": 133.636,
+            "autocorrelation": 0.033
+          },
+          {
+            "lagTicks": 44,
+            "interpolatedLagTicks": 44.0,
+            "candidateBpm": 136.674,
+            "autocorrelation": 0.0322
+          }
+        ],
+        "preferredQuarterTick": 36,
+        "quarterContrast": 0.0042,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 22,
+              "periodicBpm": 273.347,
+              "autocorrelation": -0.0591
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 90,
+              "periodicBpm": 66.818,
+              "autocorrelation": 0.0916
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -20,
+        "bestLagSeconds": -0.1995,
+        "bestNormalizedCorrelation": 0.1924,
+        "zeroLagNormalizedCorrelation": 0.0838,
+        "gainOverNoShift": 0.1086,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 72,
+      "endSeconds": 90.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.747,
+            "candidateBpm": 163.65,
+            "autocorrelation": 0.5916
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5719
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5316
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4791
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4138
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0197,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.2155
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.3839
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.0389,
+            "candidateBpm": 162.36,
+            "autocorrelation": 0.1079
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1024
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1015
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0924
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0796
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0055,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 21,
+              "periodicBpm": 286.364,
+              "autocorrelation": -0.1026
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.1105
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.2258,
+        "zeroLagNormalizedCorrelation": 0.0813,
+        "gainOverNoShift": 0.1445,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 78,
+      "endSeconds": 96.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6937,
+            "candidateBpm": 163.888,
+            "autocorrelation": 0.5736
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5558
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4997
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4542
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3689
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0178,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.271
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.4989
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 45,
+            "interpolatedLagTicks": 44.9146,
+            "candidateBpm": 133.89,
+            "autocorrelation": 0.0771
+          },
+          {
+            "lagTicks": 44,
+            "interpolatedLagTicks": 44.5,
+            "candidateBpm": 135.138,
+            "autocorrelation": 0.0759
+          },
+          {
+            "lagTicks": 46,
+            "interpolatedLagTicks": 45.5,
+            "candidateBpm": 132.168,
+            "autocorrelation": 0.0754
+          },
+          {
+            "lagTicks": 43,
+            "interpolatedLagTicks": 43.5,
+            "candidateBpm": 138.245,
+            "autocorrelation": 0.0743
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.4353,
+            "candidateBpm": 160.641,
+            "autocorrelation": 0.0726
+          }
+        ],
+        "preferredQuarterTick": 45,
+        "quarterContrast": 0.0012,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 22,
+              "periodicBpm": 273.347,
+              "autocorrelation": -0.0498
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 89,
+              "periodicBpm": 67.569,
+              "autocorrelation": 0.0937
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 8,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.2457,
+        "zeroLagNormalizedCorrelation": 0.0827,
+        "gainOverNoShift": 0.1629,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 84,
+      "endSeconds": 102.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.662,
+            "candidateBpm": 164.029,
+            "autocorrelation": 0.5629
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5464
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4778
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4393
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3301
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0165,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.3598
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.4825
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 46,
+            "interpolatedLagTicks": 46.0001,
+            "candidateBpm": 130.731,
+            "autocorrelation": 0.0873
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.3154,
+            "candidateBpm": 161.157,
+            "autocorrelation": 0.0843
+          },
+          {
+            "lagTicks": 45,
+            "interpolatedLagTicks": 45.5,
+            "candidateBpm": 132.168,
+            "autocorrelation": 0.0826
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0819
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0736
+          }
+        ],
+        "preferredQuarterTick": 46,
+        "quarterContrast": 0.003,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.079
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 90,
+              "periodicBpm": 66.818,
+              "autocorrelation": 0.117
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 9,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.2867,
+        "zeroLagNormalizedCorrelation": 0.1162,
+        "gainOverNoShift": 0.1705,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 90,
+      "endSeconds": 108.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7533,
+            "candidateBpm": 163.622,
+            "autocorrelation": 0.4986
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.4756
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4308
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.3734
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3065
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.023,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.2148
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.4738
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7498,
+            "candidateBpm": 163.637,
+            "autocorrelation": 0.1044
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1005
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0929
+          },
+          {
+            "lagTicks": 46,
+            "interpolatedLagTicks": 45.5259,
+            "candidateBpm": 132.093,
+            "autocorrelation": 0.0846
+          },
+          {
+            "lagTicks": 45,
+            "interpolatedLagTicks": 45.5,
+            "candidateBpm": 132.168,
+            "autocorrelation": 0.0843
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0039,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0849
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 89,
+              "periodicBpm": 67.569,
+              "autocorrelation": 0.1289
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.2409,
+        "zeroLagNormalizedCorrelation": 0.1051,
+        "gainOverNoShift": 0.1359,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 96,
+      "endSeconds": 114.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7563,
+            "candidateBpm": 163.608,
+            "autocorrelation": 0.475
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.4546
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4157
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.3654
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3033
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0204,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.1779
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.4825
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8634,
+            "candidateBpm": 163.133,
+            "autocorrelation": 0.0983
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.094
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0907
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0784
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.0739
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0043,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": -0.04
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 90,
+              "periodicBpm": 66.818,
+              "autocorrelation": 0.1249
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -4,
+        "bestLagSeconds": -0.0399,
+        "bestNormalizedCorrelation": 0.3117,
+        "zeroLagNormalizedCorrelation": 0.1245,
+        "gainOverNoShift": 0.1871,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 102,
+      "endSeconds": 120.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7185,
+            "candidateBpm": 163.777,
+            "autocorrelation": 0.5304
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5131
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4686
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4253
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3531
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0173,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0973
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.5857
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.0763,
+            "candidateBpm": 162.196,
+            "autocorrelation": 0.0799
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0739
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0718
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0578
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.053
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.006,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0031
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 91,
+              "periodicBpm": 66.084,
+              "autocorrelation": 0.0986
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.2748,
+        "zeroLagNormalizedCorrelation": 0.0655,
+        "gainOverNoShift": 0.2094,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 108,
+      "endSeconds": 126.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6323,
+            "candidateBpm": 164.162,
+            "autocorrelation": 0.5497
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5385
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4763
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4504
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3471
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0112,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.2426
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.5893
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.6098,
+            "candidateBpm": 159.895,
+            "autocorrelation": 0.0278
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0267
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0191
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0148
+          },
+          {
+            "lagTicks": 40,
+            "interpolatedLagTicks": 39.5,
+            "candidateBpm": 152.244,
+            "autocorrelation": 0.0049
+          }
+        ],
+        "preferredQuarterTick": 38,
+        "quarterContrast": 0.0011,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0254
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 91,
+              "periodicBpm": 66.084,
+              "autocorrelation": 0.1345
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.3134,
+        "zeroLagNormalizedCorrelation": 0.0337,
+        "gainOverNoShift": 0.2797,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 114,
+      "endSeconds": 132.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6436,
+            "candidateBpm": 164.112,
+            "autocorrelation": 0.4323
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.4216
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.3681
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.3461
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.2557
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0107,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.1793
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.4355
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8472,
+            "candidateBpm": 163.205,
+            "autocorrelation": 0.102
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0934
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0858
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.0,
+            "candidateBpm": 171.818,
+            "autocorrelation": 0.072
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0512
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0086,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.031
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.1744
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.3334,
+        "zeroLagNormalizedCorrelation": -0.0062,
+        "gainOverNoShift": 0.3397,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 120,
+      "endSeconds": 138.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8686,
+            "candidateBpm": 163.11,
+            "autocorrelation": 0.4671
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.442
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4241
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.3598
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3366
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0251,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": -0.0291
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.2652
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.2992,
+            "candidateBpm": 165.668,
+            "autocorrelation": 0.2243
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.2174
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1968
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1786
+          },
+          {
+            "lagTicks": 34,
+            "interpolatedLagTicks": 34.5,
+            "candidateBpm": 174.308,
+            "autocorrelation": 0.1486
+          }
+        ],
+        "preferredQuarterTick": 36,
+        "quarterContrast": 0.0069,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.0491
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.2494
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -5,
+        "bestLagSeconds": -0.0499,
+        "bestNormalizedCorrelation": 0.2835,
+        "zeroLagNormalizedCorrelation": -0.0187,
+        "gainOverNoShift": 0.3022,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 126,
+      "endSeconds": 144.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7883,
+            "candidateBpm": 163.466,
+            "autocorrelation": 0.5997
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5766
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5426
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4835
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.43
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0231,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": -0.0031
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.423
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6926,
+            "candidateBpm": 163.892,
+            "autocorrelation": 0.243
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.2353
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.2106
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1959
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.1512
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0077,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 20,
+              "periodicBpm": 300.682,
+              "autocorrelation": -0.0185
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.266
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -6,
+        "bestLagSeconds": -0.0599,
+        "bestNormalizedCorrelation": 0.3095,
+        "zeroLagNormalizedCorrelation": -0.0879,
+        "gainOverNoShift": 0.3975,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 132,
+      "endSeconds": 150.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7756,
+            "candidateBpm": 163.523,
+            "autocorrelation": 0.6653
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.6422
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.6046
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.544
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4844
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0231,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0013
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.5313
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.771,
+            "candidateBpm": 163.543,
+            "autocorrelation": 0.2141
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.2042
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1874
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1676
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.1328
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0099,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 20,
+              "periodicBpm": 300.682,
+              "autocorrelation": -0.0184
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.2503
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -42,
+        "bestLagSeconds": -0.419,
+        "bestNormalizedCorrelation": 0.2292,
+        "zeroLagNormalizedCorrelation": 0.0902,
+        "gainOverNoShift": 0.139,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 138,
+      "endSeconds": 156.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8209,
+            "candidateBpm": 163.321,
+            "autocorrelation": 0.575
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5512
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5246
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4638
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.4204
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0238,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": -0.0343
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 74,
+              "periodicBpm": 81.265,
+              "autocorrelation": 0.3975
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.2159,
+            "candidateBpm": 161.588,
+            "autocorrelation": 0.1578
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1494
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1366
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.119
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.0973
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0084,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 22,
+              "periodicBpm": 273.347,
+              "autocorrelation": -0.0453
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 75,
+              "periodicBpm": 80.182,
+              "autocorrelation": 0.1641
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -2,
+        "bestLagSeconds": -0.02,
+        "bestNormalizedCorrelation": 0.3314,
+        "zeroLagNormalizedCorrelation": 0.2834,
+        "gainOverNoShift": 0.048,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 144,
+      "endSeconds": 162.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7858,
+            "candidateBpm": 163.477,
+            "autocorrelation": 0.5648
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5388
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.5
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.436
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3737
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.026,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.2302
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 73,
+              "periodicBpm": 82.379,
+              "autocorrelation": 0.4235
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.4119,
+            "candidateBpm": 165.156,
+            "autocorrelation": 0.1499
+          },
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1469
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1192
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1144
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0668
+          }
+        ],
+        "preferredQuarterTick": 36,
+        "quarterContrast": 0.003,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.0553
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.1978
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 1,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -2,
+        "bestLagSeconds": -0.02,
+        "bestNormalizedCorrelation": 0.4213,
+        "zeroLagNormalizedCorrelation": 0.3516,
+        "gainOverNoShift": 0.0696,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 150,
+      "endSeconds": 168.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7958,
+            "candidateBpm": 163.433,
+            "autocorrelation": 0.5484
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5203
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4816
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.4117
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.3506
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0281,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.3359
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.5121
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7851,
+            "candidateBpm": 163.48,
+            "autocorrelation": 0.1665
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1557
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1395
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1094
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0877
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0108,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 19,
+              "periodicBpm": 316.507,
+              "autocorrelation": 0.0859
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.2188
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -2,
+        "bestLagSeconds": -0.02,
+        "bestNormalizedCorrelation": 0.3444,
+        "zeroLagNormalizedCorrelation": 0.2554,
+        "gainOverNoShift": 0.089,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 156,
+      "endSeconds": 174.0,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.8039,
+            "candidateBpm": 163.397,
+            "autocorrelation": 0.5618
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.5269
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.4817
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.3977
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.328
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0349,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.4734
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.5333
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.6213,
+            "candidateBpm": 164.212,
+            "autocorrelation": 0.1468
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.1422
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.1133
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.1001
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.0555
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0046,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.0697
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.165
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -2,
+        "bestLagSeconds": -0.02,
+        "bestNormalizedCorrelation": 0.2598,
+        "zeroLagNormalizedCorrelation": 0.1955,
+        "gainOverNoShift": 0.0643,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 162,
+      "endSeconds": 174.6,
+      "drumPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 36.7926,
+            "candidateBpm": 163.447,
+            "autocorrelation": 0.4383
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.4087
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.3668
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.2991
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.234
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0296,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": 0.3072
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.3823
+            }
+          }
+        ]
+      },
+      "bassPeriodicity": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "frequencyEstimateResolution": "fractional-tick parabolic interpolant of 10ms-period ACF; no sub-10ms ground truth",
+        "quarterAlternatives": [
+          {
+            "lagTicks": 37,
+            "interpolatedLagTicks": 37.1463,
+            "candidateBpm": 161.891,
+            "autocorrelation": 0.0818
+          },
+          {
+            "lagTicks": 38,
+            "interpolatedLagTicks": 37.5,
+            "candidateBpm": 160.364,
+            "autocorrelation": 0.0714
+          },
+          {
+            "lagTicks": 36,
+            "interpolatedLagTicks": 36.5,
+            "candidateBpm": 164.757,
+            "autocorrelation": 0.0627
+          },
+          {
+            "lagTicks": 39,
+            "interpolatedLagTicks": 38.5,
+            "candidateBpm": 156.198,
+            "autocorrelation": 0.038
+          },
+          {
+            "lagTicks": 35,
+            "interpolatedLagTicks": 35.5,
+            "candidateBpm": 169.398,
+            "autocorrelation": 0.0213
+          }
+        ],
+        "preferredQuarterTick": 37,
+        "quarterContrast": 0.0104,
+        "octaveFamily": [
+          {
+            "hypothesis": "double_time",
+            "best": {
+              "lagTicks": 18,
+              "periodicBpm": 334.091,
+              "autocorrelation": -0.0098
+            }
+          },
+          {
+            "hypothesis": "half_time",
+            "best": {
+              "lagTicks": 92,
+              "periodicBpm": 65.366,
+              "autocorrelation": 0.1255
+            }
+          }
+        ]
+      },
+      "quarterLagDisagreementTicks": 0,
+      "crossStemOnsetLag": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "bestLagTicks": -1,
+        "bestLagSeconds": -0.01,
+        "bestNormalizedCorrelation": 0.3328,
+        "zeroLagNormalizedCorrelation": 0.3227,
+        "gainOverNoShift": 0.0101,
+        "lagSignConvention": "positive = drums occur later than bass; negative = drums earlier than bass",
+        "lagIsBeatOneEvidence": false
+      },
+      "candidateOnly": true
+    }
+  ],
+  "limitations": [
+    "Autocorrelation candidate BPM assumes one quarter-note onset every 32\u201346 analysis ticks; does not identify musical quarter notes, beat one, phrase starts or meter",
+    "Rhythmic periodicity of half/double notes and syncopation can masquerade as tempo changes; the strongest lag may be a subdivision",
+    "Overlapping 18s analysis windows at 6s hop are correlated; do not treat agreement percentages as independent samples",
+    "Both tracks use the same previous onset extraction and Demucs-separated recording, so they are not independent ground truth",
+    "Per-segment original OGG codec/analysis boundaries are locally masked; timing resolution is about 10ms",
+    "Cross-correlation peaks may reflect instrumentation lag, syncopation and periodic patterns, not real musical beat boundaries",
+    "No actual source human musical review, source-trusted tempo map or confidence is established",
+    "No original OGG changes, source tempo approval or gameplay release state may follow from this report"
+  ]
+}

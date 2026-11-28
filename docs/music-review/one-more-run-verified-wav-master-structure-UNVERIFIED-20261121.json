@@ -1,0 +1,1724 @@
+{
+  "format": "bitstream-lossless-original-master-structural-cues-UNVERIFIED-v1",
+  "status": "MASTER_VERIFIED_RHYTHM_AND_PHRASE_CANDIDATES_ONLY",
+  "master": {
+    "remoteSourceHost": "root@192.168.86.211",
+    "remotePath": "/root/bitstream-maxi/launch33/audio/33_one_more_run.wav",
+    "masterSha256": "636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721",
+    "formatName": "wav",
+    "codecName": "pcm_s16le",
+    "channelCount": 2,
+    "sourceRate": 48000,
+    "sourceFrameCount": 8380800,
+    "durationSeconds": 174.6,
+    "decodedTransientRate": 11025,
+    "decodedFrameCount": 1924965,
+    "remoteReadOnly": true,
+    "noPersistentAudioCopy": true
+  },
+  "originalMp3Sha256": "931402316385f7a1afd302d59132b812f0ae6a312b46b8cd85826c0a63906a8e",
+  "originalMp3PriorReportSha256": "2a61b050c639e975edab27a06075ec664ce3363d1d0d821797519b94330d8622",
+  "originalMasterVsMp3SourceAlignment": [
+    {
+      "sourceStartSeconds": 0.0,
+      "durationSeconds": 12.0,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.99911,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 132300
+    },
+    {
+      "sourceStartSeconds": 84.0,
+      "durationSeconds": 12.0,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.99839,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 132300
+    },
+    {
+      "sourceStartSeconds": 168.0,
+      "durationSeconds": 6.6,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.99915,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 72765
+    }
+  ],
+  "fullOriginalWavRhythmicFrequencyCandidate": {
+    "candidateOnly": true,
+    "status": "CANDIDATES_UNVERIFIED",
+    "best": {
+      "bpm": 163.85,
+      "relativeCoherence": 0.105241,
+      "phaseRadians": 0.732686
+    },
+    "rivalSeparatedCandidates": [
+      {
+        "bpm": 163.85,
+        "relativeCoherence": 0.105241,
+        "phaseRadians": 0.732686
+      },
+      {
+        "bpm": 172.65,
+        "relativeCoherence": 0.041049,
+        "phaseRadians": 1.441811
+      },
+      {
+        "bpm": 160.1,
+        "relativeCoherence": 0.040614,
+        "phaseRadians": 2.589069
+      },
+      {
+        "bpm": 163.35,
+        "relativeCoherence": 0.040212,
+        "phaseRadians": 2.407328
+      },
+      {
+        "bpm": 165.5,
+        "relativeCoherence": 0.038179,
+        "phaseRadians": 1.911599
+      }
+    ]
+  },
+  "originalWavVsMp3SourcePeriodComparisons": [
+    {
+      "sourceStartSeconds": 0,
+      "sourceEndSeconds": 18.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.2443,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.01582,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.31577,
+            "candidateBpm": 163.2443,
+            "autocorrelation": 0.51122
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.4954
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.44116
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.40117
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.3079
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.2379,
+      "candidateDifferenceBpm": 0.0064,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 6,
+      "sourceEndSeconds": 24.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.1887,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.01383,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.33734,
+            "candidateBpm": 163.1887,
+            "autocorrelation": 0.5749
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.56107
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.50374
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.46851
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.36972
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.1779,
+      "candidateDifferenceBpm": 0.0108,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 12,
+      "sourceEndSeconds": 30.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.4655,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02431,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.2301,
+            "candidateBpm": 163.4655,
+            "autocorrelation": 0.63739
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.61308
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57161
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.50731
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43609
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.4657,
+      "candidateDifferenceBpm": -0.0002,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 18,
+      "sourceEndSeconds": 36.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8345,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03379,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08766,
+            "candidateBpm": 163.8345,
+            "autocorrelation": 0.62538
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59159
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57722
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48509
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.46349
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8328,
+      "candidateDifferenceBpm": 0.0017,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 24,
+      "sourceEndSeconds": 42.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7962,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02647,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.10242,
+            "candidateBpm": 163.7962,
+            "autocorrelation": 0.55107
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.5246
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.51096
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43682
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.41825
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8162,
+      "candidateDifferenceBpm": -0.02,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 30,
+      "sourceEndSeconds": 48.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.2365,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02581,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.93326,
+            "candidateBpm": 164.2365,
+            "autocorrelation": 0.53383
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.50802
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.50007
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.42998
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.41559
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 164.2225,
+      "candidateDifferenceBpm": 0.014,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 36,
+      "sourceEndSeconds": 54.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0148,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.0362,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.01832,
+            "candidateBpm": 164.0148,
+            "autocorrelation": 0.57476
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.53856
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5358
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.4388
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43156
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 164.0168,
+      "candidateDifferenceBpm": -0.002,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 42,
+      "sourceEndSeconds": 60.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8209,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03822,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.0929,
+            "candidateBpm": 163.8209,
+            "autocorrelation": 0.6342
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59598
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57854
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.47675
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44543
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8056,
+      "candidateDifferenceBpm": 0.0153,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 48,
+      "sourceEndSeconds": 66.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6583,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.032,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.15558,
+            "candidateBpm": 163.6583,
+            "autocorrelation": 0.63435
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60235
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57344
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48772
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43895
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6652,
+      "candidateDifferenceBpm": -0.0069,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 54,
+      "sourceEndSeconds": 72.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7172,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03478,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.13289,
+            "candidateBpm": 163.7172,
+            "autocorrelation": 0.6784
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64362
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.61845
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.52561
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.48258
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.7139,
+      "candidateDifferenceBpm": 0.0033,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 60,
+      "sourceEndSeconds": 78.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8453,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03331,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.0835,
+            "candidateBpm": 163.8453,
+            "autocorrelation": 0.61257
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.57926
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5659
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.47702
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45305
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8371,
+      "candidateDifferenceBpm": 0.0082,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 66,
+      "sourceEndSeconds": 84.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8467,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03207,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08297,
+            "candidateBpm": 163.8467,
+            "autocorrelation": 0.59857
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.5665
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.55374
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.46774
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44571
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8284,
+      "candidateDifferenceBpm": 0.0183,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 72,
+      "sourceEndSeconds": 90.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6369,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02249,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16385,
+            "candidateBpm": 163.6369,
+            "autocorrelation": 0.50929
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.4868
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.46488
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.4034
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.36776
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6157,
+      "candidateDifferenceBpm": 0.0212,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 78,
+      "sourceEndSeconds": 96.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.4471,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02039,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.23721,
+            "candidateBpm": 163.4471,
+            "autocorrelation": 0.6107
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59031
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5535
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.49812
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43604
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.4192,
+      "candidateDifferenceBpm": 0.0279,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 84,
+      "sourceEndSeconds": 102.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6346,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02717,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16476,
+            "candidateBpm": 163.6346,
+            "autocorrelation": 0.63073
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60356
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57685
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.50262
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45733
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6336,
+      "candidateDifferenceBpm": 0.001,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 90,
+      "sourceEndSeconds": 108.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8385,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04502,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08612,
+            "candidateBpm": 163.8385,
+            "autocorrelation": 0.72157
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.67655
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.65781
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.53861
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.5086
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8364,
+      "candidateDifferenceBpm": 0.0021,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 96,
+      "sourceEndSeconds": 114.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.007,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05427,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.02132,
+            "candidateBpm": 164.007,
+            "autocorrelation": 0.7448
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.69053
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.68569
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.5407
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.53472
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 164.0122,
+      "candidateDifferenceBpm": -0.0052,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 102,
+      "sourceEndSeconds": 120.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9858,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.06204,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.02945,
+            "candidateBpm": 163.9858,
+            "autocorrelation": 0.835
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.77296
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.7652
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.59925
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.58853
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.9863,
+      "candidateDifferenceBpm": -0.0005,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 108,
+      "sourceEndSeconds": 126.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0541,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05969,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.00323,
+            "candidateBpm": 164.0541,
+            "autocorrelation": 0.80148
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.74179
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.74102
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.58001
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.57853
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 164.056,
+      "candidateDifferenceBpm": -0.0019,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 114,
+      "sourceEndSeconds": 132.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9493,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05045,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.04348,
+            "candidateBpm": 163.9493,
+            "autocorrelation": 0.73503
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.68458
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.67497
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.54397
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.52617
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.9617,
+      "candidateDifferenceBpm": -0.0124,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 120,
+      "sourceEndSeconds": 138.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6855,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03733,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14509,
+            "candidateBpm": 163.6855,
+            "autocorrelation": 0.71782
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.68049
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.64996
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.55473
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.50394
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6871,
+      "candidateDifferenceBpm": -0.0016,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 126,
+      "sourceEndSeconds": 144.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6697,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04255,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.15119,
+            "candidateBpm": 163.6697,
+            "autocorrelation": 0.80562
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.76307
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.72618
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.61596
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.55454
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6741,
+      "candidateDifferenceBpm": -0.0044,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 132,
+      "sourceEndSeconds": 150.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8107,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04926,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09684,
+            "candidateBpm": 163.8107,
+            "autocorrelation": 0.77249
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.72323
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.69957
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.57006
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.53056
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8072,
+      "candidateDifferenceBpm": 0.0035,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 138,
+      "sourceEndSeconds": 156.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9919,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04699,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.02712,
+            "candidateBpm": 163.9919,
+            "autocorrelation": 0.66076
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.61377
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.60838
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48423
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47398
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.9878,
+      "candidateDifferenceBpm": 0.0041,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 144,
+      "sourceEndSeconds": 162.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.1004,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04136,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.98544,
+            "candidateBpm": 164.1004,
+            "autocorrelation": 0.60517
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.56381
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.56133
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45077
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.44808
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 164.0988,
+      "candidateDifferenceBpm": 0.0016,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 150,
+      "sourceEndSeconds": 168.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.809,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02909,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09751,
+            "candidateBpm": 163.809,
+            "autocorrelation": 0.55248
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.52339
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5093
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.42991
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.40653
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.8112,
+      "candidateDifferenceBpm": -0.0022,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 156,
+      "sourceEndSeconds": 174.0,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7316,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03976,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.12731,
+            "candidateBpm": 163.7316,
+            "autocorrelation": 0.68829
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64853
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.62137
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51364
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47013
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.7417,
+      "candidateDifferenceBpm": -0.0101,
+      "candidateOnly": true
+    },
+    {
+      "sourceStartSeconds": 162,
+      "sourceEndSeconds": 174.6,
+      "wavMasterSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6741,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03898,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14951,
+            "candidateBpm": 163.6741,
+            "autocorrelation": 0.68976
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.65078
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.61752
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51147
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45973
+          }
+        ]
+      },
+      "originalMp3SpectralRhythmBpm": 163.6811,
+      "candidateDifferenceBpm": -0.007,
+      "candidateOnly": true
+    }
+  ],
+  "originalWavChromaAndLoudnessChangeCandidates": [
+    {
+      "originalSourceSeconds": 167.1256,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.49209,
+      "heuristicReviewPriority": 0.92381,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 45.7317,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.4137,
+      "heuristicReviewPriority": 0.91205,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 172.234,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.3254,
+      "heuristicReviewPriority": 0.89881,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 146.7849,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.23305,
+      "heuristicReviewPriority": 0.88496,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 121.8351,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.16591,
+      "heuristicReviewPriority": 0.87489,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 16.4397,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.15678,
+      "heuristicReviewPriority": 0.87352,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 153.5303,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.14817,
+      "heuristicReviewPriority": 0.87223,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 156.6999,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.13761,
+      "heuristicReviewPriority": 0.87064,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 134.0372,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.13441,
+      "heuristicReviewPriority": 0.87016,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 101.9704,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.13014,
+      "heuristicReviewPriority": 0.86952,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 149.9661,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.08306,
+      "heuristicReviewPriority": 0.86246,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 12.62,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.07903,
+      "heuristicReviewPriority": 0.86186,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 38.9283,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.07757,
+      "heuristicReviewPriority": 0.86164,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 51.0839,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.06563,
+      "heuristicReviewPriority": 0.85984,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 62.5662,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.04991,
+      "heuristicReviewPriority": 0.85749,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 25.4142,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.04133,
+      "heuristicReviewPriority": 0.8562,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 161.2742,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.04051,
+      "heuristicReviewPriority": 0.85608,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 85.7977,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.03968,
+      "heuristicReviewPriority": 0.85595,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 90.9642,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.03615,
+      "heuristicReviewPriority": 0.85542,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 79.807,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.0304,
+      "heuristicReviewPriority": 0.85456,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 76.2892,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.02468,
+      "heuristicReviewPriority": 0.8537,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    },
+    {
+      "originalSourceSeconds": 55.2751,
+      "normalizedChromaNovelty": 1.0,
+      "prominenceWithinSong": 1.0,
+      "logRmsChangeAcross2p5Seconds": 0.02214,
+      "heuristicReviewPriority": 0.85332,
+      "candidateOnly": true,
+      "sectionStartVerified": false
+    }
+  ],
+  "suggestedShortHumanListeningReview": [
+    {
+      "centerSeconds": 90.0,
+      "suggestedListenRangeSeconds": [
+        85.5,
+        94.5
+      ],
+      "reviewReason": "prior low-band bass outlier 78\u2013102s; high-band detector did NOT replicate",
+      "noveltyScore": null,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 126.0,
+      "suggestedListenRangeSeconds": [
+        121.5,
+        130.5
+      ],
+      "reviewReason": "previously weak/harmonically ambiguous 120\u2013132s region",
+      "noveltyScore": null,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 167.126,
+      "suggestedListenRangeSeconds": [
+        162.626,
+        171.626
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.92381,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 45.732,
+      "suggestedListenRangeSeconds": [
+        41.232,
+        50.232
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.91205,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 172.234,
+      "suggestedListenRangeSeconds": [
+        167.734,
+        174.6
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.89881,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 146.785,
+      "suggestedListenRangeSeconds": [
+        142.285,
+        151.285
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.88496,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 16.44,
+      "suggestedListenRangeSeconds": [
+        11.94,
+        20.94
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87352,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 153.53,
+      "suggestedListenRangeSeconds": [
+        149.03,
+        158.03
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87223,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 134.037,
+      "suggestedListenRangeSeconds": [
+        129.537,
+        138.537
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87016,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 101.97,
+      "suggestedListenRangeSeconds": [
+        97.47,
+        106.47
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.86952,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 38.928,
+      "suggestedListenRangeSeconds": [
+        34.428,
+        43.428
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.86164,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 51.084,
+      "suggestedListenRangeSeconds": [
+        46.584,
+        55.584
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.85984,
+      "candidateOnly": true,
+      "humanVerified": false
+    }
+  ],
+  "limitations": [
+    "Original lossless WAV was SHA-checked on CT211 and its PCM read-only decoded through SSH; no master or resampled-audio file persisted locally",
+    "Quarter-like spectral periodicity scanned only 140\u2013180 BPM, and separate whole-song phase scan 155\u2013173 BPM; these priors do NOT rule out true half-time meter",
+    "The original source WAV and MP3 are encodings of the SAME musical recording, not independent performances",
+    "Windowed ACF/phasor frequency agreement is NOT a verified musical downbeat, quarter note or bar-start grid",
+    "Original full-mix chroma/loudness peak is NOT an actual musical phrase, section, chorus or bridge boundary",
+    "Explicitly user-identified prior anomaly regions are research review priorities, not discovered tempo shifts",
+    "The 28 overlapping 18s windows at 6s hops are statistically dependent, and correlated with prior MP3 analysis",
+    "Original WAV PCM was resampled to 11025Hz mono for temporary *analysis in memory* only; no media files altered",
+    "No artist/owner listening judgment, released source beat grid, RELEASE_BEAT_GRIDS or gameplay changes follow from these candidates"
+  ]
+}
