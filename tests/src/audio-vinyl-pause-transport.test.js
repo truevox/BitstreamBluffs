@@ -910,6 +910,55 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('turning continuous Pause ON queues an undiscovered private original without synth',()=>{
+    const {a,d,events}=setup();
+    const id=GAME_SONGS[4].id;
+    a.settings.musicEnabledSongs=Object.fromEntries(GAME_SONGS.map(song=>[song.id,song.id===id]));
+    d.ready=false;d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=null;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    expect(a._musicWanted).toBe(false);
+    a._startScheduler=jest.fn();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._musicWanted).toBe(true);
+    expect(a._startScheduler).not.toHaveBeenCalled();
+    expect(d.started).toBe(false);
+    expect(a._paused).toBe(true);
+    d.ready=true;d.catalog=[{id}];
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    a._onStemCatalogReady();
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    expect(a._musicTimer).toBeNull();
+    a.destroy();
+  });
+
+  test('turning private-only continuous Pause ON then OFF defers catalog until gameplay Resume',()=>{
+    const {a,d,events}=setup();
+    const id=GAME_SONGS[4].id;
+    a.settings.musicEnabledSongs=Object.fromEntries(GAME_SONGS.map(song=>[song.id,song.id===id]));
+    d.ready=false;d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=null;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._musicWanted).toBe(true);
+    a.applySettings({...a.settings,musicDuringPause:false});
+    expect(a._musicWanted).toBe(false);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    const activate=jest.fn(()=>{d.started=true;return true;});
+    a._activateStemMusic=activate;
+    d.ready=true;d.catalog=[{id}];
+    a._onStemCatalogReady();
+    expect(activate).not.toHaveBeenCalled(); // quiet Pause is authoritative
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(a._musicWanted).toBe(true);
+    expect(a._paused).toBe(false);
+    a.destroy();
+  });
+
   test('private-only song requested before catalog discovery survives a quiet Pause and Resume',()=>{
     const {a,d,events}=setup();
     const privateSong=GAME_SONGS[4].id;

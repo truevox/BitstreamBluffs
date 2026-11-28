@@ -977,12 +977,15 @@ export class AudioSynth {
     const d = this._stemMusic;
     if (keepPlaying) {
       if (session.restartOnResume &&
-          this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
-        // The old transport was invalidated when all tracks were turned off.
-        // Turning continuous Pause music ON explicitly permits starting the
-        // newly selected source before gameplay resumes.
+          (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+           this._hasPendingCatalogSelection())) {
+        // Turning continuous Pause music ON permits the newly selected
+        // original source before gameplay resumes. A private-only song may
+        // remain undiscovered: keep its request for onReady, but never
+        // substitute synth or claim that an uninstalled song is playable.
         this._musicWanted = true;
-        if (this.ctx?.state === 'running') {
+        if (this.ctx?.state === 'running' &&
+            this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
           const started=this._activateStemMusic();
           if (!started && !this._musicTimer) this.musicProviderFailed();
           if (started || this._musicTimer !== null) {
@@ -1024,13 +1027,21 @@ export class AudioSynth {
           }
         }
       }
+    } else if (session.shouldResume && session.restartOnResume &&
+        this._musicWanted && this._hasPendingCatalogSelection()) {
+      // Player turned OFF continuous music again before a private catalog
+      // finished loading. Leave its original-only restart intent in this
+      // pause transaction, but do NOT let catalog-ready auto-play on Pause.
+      this._musicWanted=false;
     } else if (!session.shouldResume && this._musicWanted) {
       const live = !!(d?.started && !d.transportPaused &&
         d.ctx === this.ctx);
       const frozen = live && d.transportPause();
       const procedural = !frozen && this._musicTimer !== null;
       const pendingStart = !frozen && !procedural && !d?.started &&
-        !d?.transportPaused && this._hasEnabledSongs(this.settings?.musicEnabledSongs);
+        !d?.transportPaused &&
+        (this._hasEnabledSongs(this.settings?.musicEnabledSongs) ||
+         this._hasPendingCatalogSelection());
       if (frozen || procedural || pendingStart) {
         this._musicWanted = false;
         if (this._musicTimer !== null) clearInterval(this._musicTimer);
