@@ -2,7 +2,8 @@
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import { GHOST_TAPE_FORMAT } from '../../src/systems/ghost/GhostTape.js';
 import {
-  MAX_NOISE_SEC, MAX_NOISE_SEEDS, NOISE_PROFILES, summarizeNoise, noiseOutcome,
+  FATIGUE_RAMP, HUMAN_NOISE_FATIGUE_VERSION, MAX_NOISE_SEC, MAX_NOISE_SEEDS, NOISE_PROFILES,
+  summarizeNoise, noiseOutcome,
 } from './human-noise.js';
 
 export const MAX_PANEL_BYTES = 4 * 1024 * 1024;
@@ -45,14 +46,34 @@ function readSettings(settings) {
     profiles: Object.fromEntries(names.map((name) => [name, NOISE_PROFILES[name]])) };
 }
 
-function validStats(stats, frames, profile) {
+function validStats(stats, frames, profile, fatigueMode) {
   if (!object(stats)) return false;
   const { intents, missed, sent, coalesced, delayFrames, pendingAtEnd } = stats;
   const scheduled = sent + Number(pendingAtEnd);
-  return [intents, missed, sent, coalesced].every((n) => integer(n, 0, frames)) &&
+  if (!([intents, missed, sent, coalesced].every((n) => integer(n, 0, frames)) &&
     typeof pendingAtEnd === 'boolean' && (profile.missRate !== 0 || missed === 0) &&
-    intents === missed + scheduled + coalesced &&
-    integer(delayFrames, profile.minDelayFrames * scheduled, profile.maxDelayFrames * scheduled);
+    intents === missed + scheduled + coalesced)) return false;
+  let extra = 0;
+  if (fatigueMode) {
+    const { fatigue } = stats;
+    if (!object(fatigue) || !object(fatigue.phaseIntents) ||
+        Object.keys(fatigue).length !== 3 || Object.keys(fatigue.phaseIntents).length !== 3) return false;
+    const { preRamp, ramp, capped } = fatigue.phaseIntents;
+    const applies = profile !== NOISE_PROFILES[FATIGUE_RAMP.unaffectedProfile];
+    const { startFrame, fullFrame, maxAddedDelayFrames: maxExtra } = FATIGUE_RAMP;
+    // The planner samples one intent per frame, numbered 0 through frames - 1.
+    const rampFrames = Math.max(0, Math.min(frames, fullFrame) - (startFrame + 1));
+    const cappedFrames = Math.max(0, frames - fullFrame);
+    // Each capped scheduled attempt adds the full delay; attempts can also miss.
+    if (fatigue.applies !== applies || !integer(preRamp, 0, Math.min(frames, startFrame + 1)) ||
+        !integer(ramp, 0, rampFrames) || !integer(capped, 0, cappedFrames) ||
+        preRamp + ramp + capped !== (applies ? intents - coalesced : 0) ||
+        !integer(fatigue.addedDelayFrames, Math.max(0, capped - missed) * maxExtra,
+          Math.min(scheduled * maxExtra, ramp * (maxExtra - 1) + capped * maxExtra))) return false;
+    extra = fatigue.addedDelayFrames;
+  }
+  return Number.isSafeInteger(delayFrames) &&
+    integer(delayFrames - extra, profile.minDelayFrames * scheduled, profile.maxDelayFrames * scheduled);
 }
 
 function validTickInput(input, frames, crashed) {
@@ -72,14 +93,14 @@ function validTickInput(input, frames, crashed) {
   return true;
 }
 
-function evidenceFor(cell, settings, index) {
+function evidenceFor(cell, settings, index, fatigueMode) {
   const at = `Trial ${index + 1}`;
   requireValue(object(cell) && object(cell.humanNoise) && object(cell.verification) &&
     cell.verification.seededRepeat === true && cell.verification.inputPlayback === true, `${at}: missing successful verification flags`);
   const { frames, simSec, distM, score, endReason, humanNoise: noise, trace } = cell;
   const { profile, version, frameHz, stats, input, final } = noise;
   requireValue(typeof profile === 'string' && owns(settings.profiles, profile) && settings.seeds.includes(cell.seed), `${at}: unknown seed or profile`);
-  requireValue(version === 1 && frameHz === FRAME_HZ &&
+  requireValue(version === (fatigueMode ? HUMAN_NOISE_FATIGUE_VERSION : 1) && frameHz === FRAME_HZ &&
     integer(frames, 1, Math.ceil(settings.maxSec * FRAME_HZ) + 1) && finite(simSec, 0) &&
     Math.abs(simSec - frames / FRAME_HZ) <= .005 + EPSILON && finite(distM) && Number.isSafeInteger(score), `${at}: invalid run observations`);
   requireValue(typeof endReason === 'string' && /^(?:maxM|timeout|stalled|crash:[A-Za-z][A-Za-z0-9_-]{0,31})$/.test(endReason),
@@ -91,7 +112,7 @@ function evidenceFor(cell, settings, index) {
     (outcome !== 'timeout' || time >= settings.maxSec - EPSILON) &&
     (outcome === 'crash' || (outcome === 'pass' ? distM >= settings.passDistanceM - .05 - EPSILON :
       distM <= settings.passDistanceM + .05 + EPSILON)), `${at}: inconsistent terminal outcome`);
-  requireValue(validStats(stats, frames, settings.profiles[profile]) && validTickInput(input, frames, outcome === 'crash') &&
+  requireValue(validStats(stats, frames, settings.profiles[profile], fatigueMode) && validTickInput(input, frames, outcome === 'crash') &&
     Array.isArray(trace) && trace.length === Math.floor(frames / TRACE_EVERY) &&
     trace.every((row) => tuple(row, 4) && integer(row[3], 0, Number.MAX_SAFE_INTEGER)) &&
     object(final) && tuple(final.position, 2) && tuple(final.velocity, 2) && finite(final.angle) &&
@@ -99,22 +120,17 @@ function evidenceFor(cell, settings, index) {
   return { profile, outcome, endReason, distanceM: distM, simulatedSeconds: simSec, fixedTicks: input.ticks };
 }
 
-/** Deterministic summary of one complete, runner-reported verified panel. No raw traces or scores leave here. */
-export function createDailyShortlist(panel, { sourceSha256, buildCommit } = {}) {
-  requireValue(typeof buildCommit === 'string' && /^[a-f\d]{40}$/i.test(buildCommit), 'Provide a full 40-hex Git commit for the producing build');
-  requireValue(typeof sourceSha256 === 'string' && /^[a-f\d]{64}$/i.test(sourceSha256), 'Invalid report SHA-256 digest');
-  if (object(panel) && panel.kind === 'local-tool-assisted-fatigue-bot-panel') {
-    throw new TypeError('Fatigue panels (noise model v2) are not supported by the classic-only shortlist. ' +
-      'Rerun the #126 bot panel with --verify and without --fatigue.');
-  }
-  requireValue(object(panel) && panel.kind === 'local-tool-assisted-bot-panel' && panel.verify === true,
+// The fatigue comparator shares validation, not Daily selection.
+function readPanel(panel, fatigueMode) {
+  const kind = fatigueMode ? 'local-tool-assisted-fatigue-bot-panel' : 'local-tool-assisted-bot-panel';
+  requireValue(object(panel) && panel.kind === kind && panel.verify === true,
     'Use a local #126 bot panel produced with successful --verify');
   const settings = readSettings(panel.settings);
   const profiles = Object.keys(settings.profiles);
   const matrix = new Map(settings.seeds.map((seed) => [seed, new Map()]));
   requireValue(Array.isArray(panel.results) && panel.results.length === matrix.size * profiles.length, 'Incomplete seed/profile matrix');
   for (let i = 0; i < panel.results.length; i++) {
-    const cell = panel.results[i], evidence = evidenceFor(cell, settings, i), byProfile = matrix.get(cell.seed);
+    const cell = panel.results[i], evidence = evidenceFor(cell, settings, i, fatigueMode), byProfile = matrix.get(cell.seed);
     requireValue(!byProfile.has(evidence.profile), 'Duplicate seed/profile trial');
     byProfile.set(evidence.profile, evidence);
   }
@@ -126,6 +142,27 @@ export function createDailyShortlist(panel, { sourceSha256, buildCommit } = {}) 
       Object.entries(counts).every(([key, value]) => owns(stated, key) && stated[key] === value), 'Profile summary disagrees with trials');
     return [name, counts];
   }));
+  return { settings, profiles, matrix, summary };
+}
+
+export function validateFatiguePanel(panel) {
+  const { fatigue } = panel?.settings ?? {};
+  requireValue(object(fatigue) && Object.keys(fatigue).length === Object.keys(FATIGUE_RAMP).length &&
+    Object.entries(FATIGUE_RAMP).every(([key, value]) => owns(fatigue, key) && fatigue[key] === value),
+    'Unsupported fatigue ramp');
+  const { settings, matrix } = readPanel(panel, true);
+  return { settings, matrix };
+}
+
+/** Deterministic summary of one complete, runner-reported verified panel. No raw traces or scores leave here. */
+export function createDailyShortlist(panel, { sourceSha256, buildCommit } = {}) {
+  requireValue(typeof buildCommit === 'string' && /^[a-f\d]{40}$/i.test(buildCommit), 'Provide a full 40-hex Git commit for the producing build');
+  requireValue(typeof sourceSha256 === 'string' && /^[a-f\d]{64}$/i.test(sourceSha256), 'Invalid report SHA-256 digest');
+  if (object(panel) && panel.kind === 'local-tool-assisted-fatigue-bot-panel') {
+    throw new TypeError('Fatigue panels (noise model v2) are not supported by the classic-only shortlist. ' +
+      'Rerun the #126 bot panel with --verify and without --fatigue.');
+  }
+  const { settings, profiles, matrix, summary } = readPanel(panel, false);
   const seeds = [...matrix].map(([seed, byProfile]) => {
     const trials = profiles.map((name) => byProfile.get(name));
     const idealPassed = trials[0].outcome === 'pass';

@@ -1,11 +1,13 @@
 /** Local JSON input adapter; writes a descriptive report to stdout only. */
 import { constants, openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { MAX_PANEL_BYTES } from './daily-shortlist.js';
-import { compareNoiseSensitivity, MIN_NOISE_PANELS, MAX_NOISE_PANELS } from './noise-seed-sensitivity.js';
+import { compareNoiseSensitivity, compareFatiguePair, MIN_NOISE_PANELS, MAX_NOISE_PANELS } from './noise-seed-sensitivity.js';
 
 const USAGE = 'Usage: node tools/sim/compare-noise-seeds.mjs --build FULL_GIT_COMMIT --panel FILE --panel FILE [--panel FILE …]';
 
-function parseArgs(args) {
+const FATIGUE_USAGE = '       node tools/sim/compare-noise-seeds.mjs --fatigue-pair --build FULL_GIT_COMMIT --panel CLASSIC --panel FATIGUE';
+
+function parseArgs(args, fatiguePair) {
   const paths = [];
   let buildCommit;
   for (let i = 0; i < args.length; i += 2) {
@@ -15,6 +17,7 @@ function parseArgs(args) {
     else if (key === '--build' && buildCommit === undefined) buildCommit = value;
     else throw new Error(USAGE);
   }
+  if (fatiguePair && paths.length !== 2) throw new Error('Provide exactly two panels: classic first, fatigue second');
   if (paths.length < MIN_NOISE_PANELS || paths.length > MAX_NOISE_PANELS) {
     throw new Error(`Provide ${MIN_NOISE_PANELS}–${MAX_NOISE_PANELS} --panel files. ${USAGE}`);
   }
@@ -53,10 +56,12 @@ function readPanel(path, index) {
 try {
   const args = process.argv.slice(2);
   if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
-    process.stdout.write(`${USAGE}\n`);
+    process.stdout.write(`${USAGE}\n${FATIGUE_USAGE}\n`);
   } else {
-    const { paths, buildCommit } = parseArgs(args);
-    const report = compareNoiseSensitivity(paths.map(readPanel), { buildCommit });
+    const fatiguePair = args[0] === '--fatigue-pair';
+    const { paths, buildCommit } = parseArgs(fatiguePair ? args.slice(1) : args, fatiguePair);
+    const bytes = paths.map(readPanel);
+    const report = fatiguePair ? compareFatiguePair(...bytes, { buildCommit }) : compareNoiseSensitivity(bytes, { buildCommit });
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   }
 } catch (error) {

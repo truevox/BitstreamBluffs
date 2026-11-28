@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MAX_PANEL_BYTES } from '../../tools/sim/daily-shortlist.js';
-import { NOISE_PROFILES, summarizeNoise } from '../../tools/sim/human-noise.js';
-import { compareNoiseSensitivity, MAX_NOISE_PANELS } from '../../tools/sim/noise-seed-sensitivity.js';
+import { createDailyShortlist, MAX_PANEL_BYTES } from '../../tools/sim/daily-shortlist.js';
+import { FATIGUE_RAMP, NOISE_PROFILES, makeHopNoise, summarizeNoise } from '../../tools/sim/human-noise.js';
+import { compareFatiguePair, compareNoiseSensitivity, MAX_NOISE_PANELS } from '../../tools/sim/noise-seed-sensitivity.js';
 
 const BUILD = 'A'.repeat(40);
 const PROFILES = ['ideal', 'steady', 'distracted'];
@@ -190,5 +190,98 @@ test('CLI hashes exact raw bytes and produces deterministic output, suppressing 
     failed(run(), 'UTF-8 JSON');
     writeFileSync(fileB, Buffer.alloc(MAX_PANEL_BYTES + 1));
     failed(run(), '4 MiB panel limit');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+function fatiguePair() {
+  const classic = panel('paired', { scenarios: { 'sim-b': [PASS, CRASH, PASS], 'sim-a': [CRASH, PASS, CRASH] } });
+  const fatigue = panel('paired', { scenarios: { 'sim-b': [PASS, PASS, PASS], 'sim-a': [CRASH, CRASH, CRASH] } });
+  fatigue.kind = 'local-tool-assisted-fatigue-bot-panel';
+  fatigue.settings.fatigue = { ...FATIGUE_RAMP };
+  for (const [p, enabled] of [[classic, false], [fatigue, true]]) {
+    p.settings.maxSec = 25;
+    for (const trial of p.results) {
+      const n = trial.humanNoise;
+      const frames = 1200;
+      const planner = makeHopNoise(n.profile, trial.seed, p.settings.noiseSeed, { fatigue: enabled });
+      for (let f = 0; f < frames; ++f) planner.step(f, [10, 780, 1120].includes(f));
+      n.stats = planner.stats();
+      n.version = enabled ? 2 : 1;
+      n.input.ticks = frames * 2 - Number(trial.endReason === CRASH);
+      trial.frames = frames;
+      trial.simSec = frames / 60;
+      trial.trace = Array.from({ length: frames / 60 }, () => [4, 3, 2, 1]);
+    }
+  }
+  return [classic, fatigue];
+}
+
+const pairReport = ([a, b]) => compareFatiguePair(raw(a), raw(b), { buildCommit: BUILD });
+const fatigueV2Error = /complete fatigue v2 bot panel/;
+
+test('paired fatigue report is symmetric about gains and losses, ordered, and excludes raw evidence', () => {
+  const pair = fatiguePair(), result = pairReport(pair);
+  expect(result).toMatchObject({
+    kind: 'local-noise-fatigue-pair', version: 1,
+    matched: { courseCount: 2, noiseSeed: 'paired', passDistanceM: 500, maxSec: 25 },
+    sources: {
+      classicSha256: createHash('sha256').update(raw(pair[0])).digest('hex'),
+      fatigueSha256: createHash('sha256').update(raw(pair[1])).digest('hex'),
+    },
+    provenance: { assertedGitCommit: BUILD.toLowerCase(), buildVerified: false },
+  });
+  expect(result.profiles).toEqual([
+    { profile: 'ideal', counts: { bothPass: 1, classicOnly: 0, fatigueOnly: 0, neitherPass: 1 }, flips: [] },
+    { profile: 'steady', counts: { bothPass: 0, classicOnly: 1, fatigueOnly: 1, neitherPass: 0 },
+      flips: [{ courseSeed: 'sim-a', passedIn: 'classic' }, { courseSeed: 'sim-b', passedIn: 'fatigue' }] },
+    { profile: 'distracted', counts: { bothPass: 1, classicOnly: 0, fatigueOnly: 0, neitherPass: 1 }, flips: [] },
+  ]);
+  expect(JSON.stringify(result)).not.toMatch(/987654321|123456789|bb-ghost-tape|"(trace|rows|score|position|endReason|shortlist)"/);
+  for (const p of pair) {
+    p.results.reverse();
+    p.settings.seeds.reverse();
+  }
+  expect(pairReport(pair).profiles).toEqual(result.profiles);
+});
+
+test.each([
+  ['same reaction seed', (_, b) => { b.settings.noiseSeed = 'other'; }, /must match apart from fatigue/],
+  ['course settings', (_, b) => { b.settings.hopLeadMs++; }, /must match apart from fatigue/],
+  ['ideal final state', (_, b) => { b.results[0].humanNoise.final.physicsRng++; }, /ideal control differs/],
+  ['ramp identity', (_, b) => { b.settings.fatigue.fullFrame++; }, fatigueV2Error],
+  ['verification', (_, b) => { b.results[1].verification.seededRepeat = false; }, fatigueV2Error],
+  ['duplicate result', (_, b) => { b.results[2] = b.results[1]; }, fatigueV2Error],
+  ['summary disagreement', (_, b) => { b.summary.steady.pass++; }, fatigueV2Error],
+  ['trial v2 version', (_, b) => { b.results[1].humanNoise.version = 1; }, fatigueV2Error],
+  ['ideal fatigue metadata', (_, b) => { b.results[0].humanNoise.stats.fatigue.applies = true; }, fatigueV2Error],
+  ['impossible phase metadata', (_, b) => { b.results[1].humanNoise.stats.fatigue.phaseIntents.capped++; }, fatigueV2Error],
+  ['impossible added delay', (_, b) => { b.results[1].humanNoise.stats.fatigue.addedDelayFrames = 100; }, fatigueV2Error],
+  ['string base delay', (_, b) => { b.results[1].humanNoise.stats.delayFrames += ''; }, fatigueV2Error],
+  ['unknown settings', (_, b) => { b.settings.altPolicy = true; }, /unexpected fatigue v2 panel fields/],
+])('paired intake rejects %s', (_, change, error) => {
+  const pair = fatiguePair();
+  change(...pair);
+  expect(() => pairReport(pair)).toThrow(error);
+});
+
+test('fatigue is opt-in, type/order checked, and still rejected by the classic Daily shortlist', () => {
+  const [a, b] = fatiguePair();
+  expect(() => pairReport([b, a])).toThrow(/classic v1/);
+  expect(() => pairReport([a, a])).toThrow(fatigueV2Error);
+  expect(() => compare(a, b)).toThrow(/classic v1/);
+  expect(() => createDailyShortlist(b, { buildCommit: BUILD, sourceSha256: 'f'.repeat(64) })).toThrow(/classic-only shortlist/);
+  const dir = mkdtempSync(join(tmpdir(), 'bb-noise-fatigue-'));
+  try {
+    const first = join(dir, 'classic.json'), second = join(dir, 'fatigue.json');
+    writeFileSync(first, raw(a));
+    writeFileSync(second, raw(b));
+    const run = (...paths) => spawnSync(process.execPath, ['tools/sim/compare-noise-seeds.mjs', '--fatigue-pair',
+      '--build', BUILD, ...paths.flatMap((p) => ['--panel', p])], { encoding: 'utf8', timeout: 4000 });
+    const success = run(first, second);
+    expect(success).toMatchObject({ status: 0, stderr: '' });
+    expect(JSON.parse(success.stdout)).toEqual(pairReport([a, b]));
+    expect(run(first, second).stdout).toBe(success.stdout);
+    expect(run(second, first)).toMatchObject({ status: 1, stdout: '', stderr: expect.stringContaining('classic v1') });
+    expect(run(first, second, second)).toMatchObject({ status: 1, stdout: '', stderr: expect.stringContaining('exactly two') });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
