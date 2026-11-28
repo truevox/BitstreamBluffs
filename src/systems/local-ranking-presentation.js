@@ -15,10 +15,13 @@ const fmt = (number) => {
   return (Math.abs(number) >= 10000 ? Math.round(number) : Number(number.toFixed(2))).toLocaleString('en-US');
 };
 
+// Not a leaderboard: ordinary local runs are visible even without entering
+// initials for a Top-10 slot. All other hash/scope/provenance rules still apply.
+const LOCAL_ONLY_OPTIONS = Object.freeze({ includeUnenteredLocalRuns: true });
 export function presentLocalRunRankings(history, record) {
-  const selection = localRankingSelectionForRecord(record);
+  const selection = localRankingSelectionForRecord(record, LOCAL_ONLY_OPTIONS);
   if (!selection) return { status: 'ineligible', message: 'RUN NOT ELIGIBLE FOR LOCAL COMPARISON' };
-  const result = calculateLocalRankings(history, selection);
+  const result = calculateLocalRankings(history, selection, LOCAL_ONLY_OPTIONS);
   const own = result.rows.find((row) => row.id === record.id);
   if (!own) return { status: 'not-saved', message: 'NO MATCHING HASH-VALID LOCAL HISTORY ENTRY' };
   return {

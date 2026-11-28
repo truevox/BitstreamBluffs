@@ -1,5 +1,6 @@
 import { SaveStore } from '../../src/systems/SaveStore.js';
 import { presentLocalRunRankings } from '../../src/systems/local-ranking-presentation.js';
+import { calculateLocalRankings, localRankingSelectionForRecord } from '../../src/systems/local-rankings.js';
 
 function run(id, changes={}) {
   const rec={ version:1, hashV:2, id, seed:'PORTAL', dailyRuleId:'featherweight',
@@ -53,4 +54,24 @@ test('identical id with contradictory local history excludes that id', () => {
   const only=run('collision');
   const other=run('collision',{score:230});
   expect(presentLocalRunRankings([only,other],only).status).toBe('not-saved');
+});
+
+
+test('ordinary runs with NO initials are visible locally but remain excluded from initials-gated boards', () => {
+  // RunScene creates records before (and usually without) Top-10 initials.
+  const everyday=run('ordinary');delete everyday.initials;
+  const ranked=run('named',{score:180,distanceM:150});
+  const history=[everyday,ranked];
+  const selection=localRankingSelectionForRecord(ranked);
+  expect(calculateLocalRankings(history,selection).rows.map(r=>r.id)).toEqual(['named']);
+  expect(localRankingSelectionForRecord(everyday)).toBeNull();
+  expect(localRankingSelectionForRecord(everyday,{includeUnenteredLocalRuns:true})).toEqual(selection);
+  const data=presentLocalRunRankings(history,everyday);
+  expect(data.status).toBe('ready');
+  expect(data.sampleSize).toBe(2);
+  expect(data.metrics[1].percentile).toBe('25%');
+  expect(data.frontier).toBe('dominated');
+  // Missing initials do not bypass proof or provenance rules.
+  expect(presentLocalRunRankings([{...everyday,score:99999}],everyday).status).toBe('not-saved');
+  expect(presentLocalRunRankings([{...everyday,imported:true}],everyday).status).toBe('not-saved');
 });
