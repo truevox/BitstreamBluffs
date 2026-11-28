@@ -775,6 +775,53 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a.destroy();
   });
 
+  test('switching the selected song while frozen replaces stale source on opting into Pause music',()=>{
+    const {a,d,events}=setup();
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,trackIndex:0,offset:22});
+    const replacement={...a.settings.musicEnabledSongs,[FIRST_SONG_ID]:false,[OTHER_SONG_ID]:true};
+    // This is the real StemMusicDirector.setSongSelection paused behavior:
+    // retarget to next enabled track without bumping token, reset its offset.
+    d.applySettings.mockImplementation(()=>{
+      if(d.transportPaused && replacement[FIRST_SONG_ID]===false){
+        d.trackIndex=1;d._resumeOffset=0;
+      }
+    });
+    a.applySettings({...a.settings,musicEnabledSongs:replacement});
+    expect(d.trackIndex).toBe(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:true,restartOnResume:true});
+    a._activateStemMusic=jest.fn(()=>{d.started=true;d.transportPaused=false;return true;});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    expect(a._activateStemMusic).toHaveBeenCalledTimes(1);
+    expect(a._vinylPauseSession).toMatchObject({shouldResume:false,restartOnResume:false});
+    expect(d.trackIndex).toBe(1);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._activateStemMusic).toHaveBeenCalledTimes(1);
+    expect(d.transportPlay).not.toHaveBeenCalled(); // original disabled song never resumes
+    a.destroy();
+  });
+
+  test('pause Jukebox shows the audible procedural fallback and explicit PAUSE stops it',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.pack=null;
+    d.transportSnapshot=jest.fn(()=>({state:'stopped',current:null,upcoming:[],position:0}));
+    a._musicTimer=773; // running seeded fallback, even though no stem is available
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a.jukeboxSnapshot()).toMatchObject({
+      state:'playing',current:{id:'procedural',title:'PROCEDURAL FALLBACK'}});
+    expect(a.jukeboxPause()).toBe(true);
+    expect(a._musicTimer).toBeNull();
+    expect(a._musicWanted).toBe(false);
+    expect(a._vinylPauseSession.manualOverride).toBe(true);
+    expect(a.nodes.musicSrc.gain.setTargetAtTime.mock.lastCall[0]).toBe(0);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    jest.advanceTimersByTime(300);
+    expect(a._musicWanted).toBe(false);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
   test('quiet default-OFF Pause retains not-yet-loaded catalog start for gameplay Resume',()=>{
     const {a,d,events}=setup();
     d.started=false;d.transportPaused=false;d.ready=false;

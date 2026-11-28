@@ -688,6 +688,21 @@ export class AudioSynth {
           musicDuringPause: settings.musicDuringPause === true,
         };
         this._stemMusic?.applySettings(this.settings);
+        // The chosen frozen song can be disabled while another song stays
+        // selected. The director correctly retargets the paused track and
+        // resets its offset; our saved track snapshot is now intentionally
+        // stale. Honor the replacement on Resume/opt-in instead of silently
+        // rejecting both the new and old source.
+        const pausedSession=this._vinylPauseSession;
+        const director=this._stemMusic;
+        if (this._paused && pausedSession?.shouldResume &&
+            !pausedSession.manualOverride && !pausedSession.procedural &&
+            director?.transportPaused && director._token===pausedSession.token &&
+            this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            (director.trackIndex!==pausedSession.trackIndex ||
+             director._resumeOffset!==pausedSession.offset)) {
+          pausedSession.restartOnResume=true;
+        }
         // Enabling a song while gameplay is paused is a preference change,
         // not an explicit Jukebox PLAY. If all-off invalidated the frozen
         // transport, restart the selected music only after gameplay resumes.
@@ -1357,9 +1372,17 @@ export class AudioSynth {
    * because a disabled playlist means genuine silence.
    */
   jukeboxSnapshot() {
-    return this._stemMusic?.transportSnapshot()||{
+    const snapshot=this._stemMusic?.transportSnapshot()||{
       state:'stopped',current:null,previous:null,upcoming:[],position:0,
     };
+    // The continuous Pause setting can lawfully play the seeded procedural
+    // fallback if the original catalog cannot decode. Give the same Jukebox
+    // a truthful PLAYING indicator and a PAUSE action for that audible bus;
+    // do not pretend the currently selected original track is sounding.
+    if (this._paused && this._musicWanted && this._musicTimer!==null &&
+        this._vinylPauseSession && !this._vinylPauseSession.manualOverride)
+      return {...snapshot,state:'playing',current:{id:'procedural',title:'PROCEDURAL FALLBACK'}};
+    return snapshot;
   }
 
   jukeboxPlay() {
@@ -1379,8 +1402,9 @@ export class AudioSynth {
 
   jukeboxPause() {
     this._menuAutoplayPending = false; // intentional manual pause cancels pending autoplay
+    const proceduralPlaying=this._paused && this._musicWanted && this._musicTimer!==null;
     this._vinylJukeboxIntent();
-    const ok=this._stemMusic?.transportPause()||false;
+    const ok=(this._stemMusic?.transportPause()||false)||proceduralPlaying;
     if(ok){
       this._musicWanted=false; // don't auto-resume after tab suspension
       if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
