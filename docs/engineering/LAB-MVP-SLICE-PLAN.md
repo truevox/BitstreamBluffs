@@ -219,7 +219,7 @@ message flow (worker pool).
 - [ ] **T10 (P1, CC ~1 hr)** — CI — Training golden: Node + Chrome + Electron; 1 vs 4 workers; resume at gen 4; population + fitness hashes
 - [ ] **T11 (P1, CC ~2 hr)** — lab — Free-run accounting, background-training contract tests, tab-kill sentinel, browser gate ("The Lab needs Chrome or the Steam app")
 - [ ] **T12 (P1, CC ~2 hr)** — CI — Guided-run regression: fixed-seed milestone ladder (per PR), 30-seed generalization + real worker throttle (nightly)
-- [ ] **T13 (P2, CC ~10 min)** — issues — #24 platform note, #508 relabel, #510 trigger moved to Phase 1
+- [x] **T13 (P2, CC ~10 min)** — issues — #24 platform note, #508 relabel, #510 trigger moved to Phase 1
 
 Phase 0-2 effort: CC ~2-4 days plus playtest calendar time. Phase 3: CC ~3-4 days.
 
