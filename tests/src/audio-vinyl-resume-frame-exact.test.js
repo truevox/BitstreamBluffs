@@ -169,3 +169,48 @@ describe('pause before scheduled first audible source frame',()=>{
     expect(d.transportPaused).toBe(true);
   });
 });
+
+describe('a new song must own its frame even before original stems decode',()=>{
+  test('pause after incoming manifest swaps track but before buffers arrive saves incoming frame zero',async()=>{
+    const d=Object.create(StemMusicDirector.prototype);
+    d.started=true;d.transportPaused=false;d.disposed=false;d.ready=true;
+    d._token=5;d._loading=null;d._timer=null;
+    d.catalog=[{id:'outgoing',title:'Old'},{id:'incoming',title:'New'}];
+    d.songEnabled={outgoing:true,incoming:true};d.trackIndex=0;d.track=d.catalog[0];
+    d.pack={id:'outgoing',duration:120};d.clockStart=10;
+    d.ctx={state:'running',currentTime:88}; // old song at 78 seconds
+    d._resumeOffset=0;d._pendingResumeOffset=null;d._resumeGateAt=null;
+    d._lastPlayed=null;d._transportHistory=[];d._skipHistoryOnce=true;
+    d.shuffleEnabled=false;
+    d.cache=new Map();d.inflight=new Map();d.scheduled=new Set();
+    d._nextIndex=null;d._nextPromise=null;d._nextPrepared=null;
+    d.gains=new Map();d._effectSignatures=new Map();d._timbreSignatures=new Map();
+    d._consumeShuffledIndex=jest.fn();d._refreshVoices=jest.fn();
+    d._applyMusicTimbres=jest.fn();d._invalidateContinuousFxMemoAfterTrackReplace=jest.fn();
+    d._restoreArcadeBridgeAfterTrackReplace=jest.fn();
+    d.mixer={setRoomSend:jest.fn(),setGain:jest.fn(),addSource:jest.fn(()=>({}))};
+    const pack={id:'incoming',duration:90,sourceNames:[],effects:{},layers:{},roomSends:{}};
+    d._getTrack=jest.fn(async()=>({track:d.catalog[1],pack,base:'incoming'}));
+    let releaseDecode;
+    d._wantedNames=()=>['drums'];
+    d._fetchSource=jest.fn(()=>new Promise(resolve=>{releaseDecode=resolve;}));
+    d.stop=jest.fn(function(){
+      this.started=false;this.transportPaused=false;this._resumeOffset=0;
+      this._pendingResumeOffset=null;this._token++;
+    });
+    const flight=d._beginTrack(1,null,0);
+    await Promise.resolve();await Promise.resolve();await Promise.resolve();
+    expect(d._fetchSource).toHaveBeenCalledTimes(1);
+    expect(d.trackIndex).toBe(1);
+    expect(d.pack.id).toBe('incoming');
+    expect(d.clockStart).toBe(10); // still the OLD song's WebAudio clock
+    expect(d._pendingResumeOffset).toBe(0);
+    expect(d.transportSnapshot().position).toBe(0);
+    expect(d.transportPause()).toBe(true);
+    expect(d._resumeOffset).toBe(0); // MUST NOT copy outgoing 78 seconds
+    expect(d.transportPaused).toBe(true);
+    releaseDecode();
+    await flight; // old generation exits after Pause invalidates its token
+    expect(d.started).toBe(false);
+  });
+});

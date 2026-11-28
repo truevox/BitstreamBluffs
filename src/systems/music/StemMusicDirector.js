@@ -1215,6 +1215,12 @@ export class StemMusicDirector {
 			this.track = info.track;
 			this.packBase = info.base;
 			this.trackIndex = index;
+			// The old song's clockStart remains valid UNTIL this incoming song's
+			// first decoded buffers own a new WebAudio clock. A Pause in that
+			// async interval must save this song's requested offset (often zero),
+			// never the outgoing song's elapsed seconds under the new track ID.
+			if(!transition) this._pendingResumeOffset=clamp(Number(offsetSeconds)||0,0,
+				Math.max(0,info.pack.duration-.1));
 			this._consumeShuffledIndex(index);
 			this.captionWords = [];
 			for (const name of info.pack.sourceNames) {
@@ -1459,6 +1465,8 @@ export class StemMusicDirector {
 			previous:this._lastPlayed||this._transportHistory.at(-1)||null,
 			upcoming,
 			position:this.transportPaused?this._resumeOffset:
+				this._pendingResumeOffset!==null&&this._pendingResumeOffset!==undefined?
+					this._pendingResumeOffset:
 				this.started&&this.ctx&&this.clockStart!==null?
 					// A manually resumed source is scheduled slightly in the future.
 					// Don't show its saved position moving BACKWARD during that silent
@@ -1472,10 +1480,12 @@ export class StemMusicDirector {
 
 	transportPause() {
 		if(!this.started)return false;
-		const position=this.pack&&this.ctx&&this.clockStart!==null?
-			clamp(Math.max(this.ctx.currentTime,this._resumeGateAt??this.ctx.currentTime)-this.clockStart,0,
-				Math.max(0,this.pack.duration-.1)):
-			(this._pendingResumeOffset??this._resumeOffset??0);
+		const position=this._pendingResumeOffset!==null&&this._pendingResumeOffset!==undefined?
+			this._pendingResumeOffset:
+			this.pack&&this.ctx&&this.clockStart!==null?
+				clamp(Math.max(this.ctx.currentTime,this._resumeGateAt??this.ctx.currentTime)-this.clockStart,0,
+					Math.max(0,this.pack.duration-.1)):
+				(this._resumeOffset??0);
 		this.stop();
 		this._resumeOffset=position;
 		this.transportPaused=true;
