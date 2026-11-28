@@ -1,13 +1,15 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last reconciled for release dependencies: 2026-11-28 01:43 UTC. GitHub main `5d31860a049d0aff2c285904fd8bfcc2b2b8149f`, displayed v2.25.34/SIM9; [exact Pages build/deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/46089692164) passed. Stock same-build one-use Suspend/Resume; no public ranking authority.
+Last reconciled for release dependencies: 2026-11-28 14:31 UTC. GitHub main `1ca95c3f71b691dd737efbe14fd8d21817c49b44`, displayed v2.25.34/SIM9; [exact Pages build/deploy](https://github.com/truevox/BitstreamBluffs/actions/runs/46111831696) passed. Stock same-build one-use Suspend/Resume; no public ranking authority.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
 
-- **#82/#84 ownership:** external open #487 `0e145f6b` adds a local Ranks screen over the shipped cohort calculation; #489 `02f8ccac` adds local archive seed+mask search/copy, not terrain tagging or hosted sharing. Neither merged at check; no new migration or second database. Do not duplicate these UI slices; #84 full traits and broader #60 identity remain separate.
+- **#155 ownership (Nov 28):** [Gal's Pulp camera claim](https://github.com/truevox/BitstreamBluffs/issues/155#issuecomment-7234574570) is separate from Morgan #375 developer-only roll diagnostics and shipped #196/#208. Preserve current cue/physics timing, do not take on Pulp settings or alter #375 to implement the camera. When a combined camera candidate is ready, the six #375 clip/badge arms are a QA reference, not approval or evidence on that new build.
+
+- **#82/#84 ownership:** external open #487 `04fbbf31` adds a local Ranks screen over the shipped cohort calculation (11 green workflows, no formal review; author separately tested both Game Over overlays); #489 `02f8ccac` adds local archive seed+mask search/copy, not terrain tagging or hosted sharing. Neither merged at check; no new migration or second database. Do not duplicate these UI slices; #84 full traits and broader #60 identity remain separate.
 
 - **#78:** Gal's [#480](https://github.com/truevox/BitstreamBluffs/pull/480) merged/deployed `5d31860a`. Eligible Game Over → REPORT (pointer, R, RT) opens local evidence; separate EXPORT downloads `.bbreplay`, not a redacted brief or a submission. Compiled application artifact `main-D8LbLlkF.js`, same displayed version; served bundle/installed worker not independently checked. Keep Morgan #338 as distinct developer-only brief smoke awaiting exact-head review; full intake/reproduction remains open.
 
