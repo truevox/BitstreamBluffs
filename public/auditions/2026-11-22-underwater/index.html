@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitstream Bluffs · Underwater Hydrostatic Listening Lab</title>
+<style>
+:root{font:16px system-ui,sans-serif;color-scheme:dark;background:#0a1525;color:#eff9ff}body{margin:0;padding:20px;background:radial-gradient(ellipse at 60% 0,#123e54,#0a1525 60%);min-height:100vh}
+main{max-width:840px;margin:auto}.kicker{text-transform:uppercase;letter-spacing:.12em;color:#72d5e6;font-weight:700;font-size:.81rem}h1{font-size:clamp(1.9rem,5vw,3.3rem);margin:8px 0 12px}p{line-height:1.55}.panel{background:#11263b;border:1px solid #285268;border-radius:17px;padding:20px 24px;box-shadow:0 20px 45px #07112380}.row{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 20px}button{background:#254458;color:#f2fbff;border:1px solid #5790a2;border-radius:11px;padding:12px 16px;font:inherit;cursor:pointer}button.primary{background:#0e7c90}button:disabled{opacity:.45;cursor:not-allowed}button[aria-pressed=true]{border-color:#ffe08a;background:#756138}label{display:block;font-weight:700;margin:18px 0 6px}input[type=range]{accent-color:#73d4ed;width:100%}.meter{height:14px;border-radius:7px;background:#294154;overflow:hidden;margin:5px 0 12px}.meter>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#50b6d2,#ffbc6c);transition:width .15s}.small{font-size:.9rem;color:#b7d1df}#status{min-height:2rem;color:#ace6ee}a{color:#bde7fc}
+</style>  <script type="module" crossorigin src="./assets/hydrostatic-audition-C2h-k7LS.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-DgNyTvzX.js">
+  <link rel="modulepreload" crossorigin href="./assets/HydrostaticPressure-D8WFYpZh.js">
+  <link rel="modulepreload" crossorigin href="./assets/DynamicOrchestraPresets-Cmo5Y2ij.js">
+</head><body><main>
+<div class="kicker">Bitstream Bluffs / Musical Physics Lab</div><h1>🌊 Underwater Mountain</h1>
+<p><strong>One original song, five untouched instrument stems, one persistent pressure memory.</strong> The deeper the <em>terrain</em> goes, the stronger the underwater coloration. Returning uphill never erases it. A rising jump briefly clears the sound; falling and landing bring the pressure back.</p>
+<section class="panel" aria-label="Hydrostatic audio experiment">
+<div class="row"><button id="load" class="primary">🎵 Load original stems</button><button id="play" disabled>▶ Play</button><button id="bypass" disabled aria-pressed="false">Compare dry</button></div>
+<label for="terrain">Terrain elevation relative to entry (positive = deeper): <output id="terrain-value">0 px</output></label>
+<input id="terrain" type="range" min="-300" max="1800" step="20" value="0">
+<label for="contrast">Depth-pressure contrast: <output id="contrast-value">190%</output></label>
+<input id="contrast" type="range" min="60" max="220" step="5" value="190">
+<p class="small">More contrast makes deep water darker and the return to bright open sound on rising more noticeable. It does not change the stored depth.</p>
+<label for="wave">Landing pressure-wave strength: <output id="wave-value">60%</output></label>
+<input id="wave" type="range" min="0" max="240" step="10" value="60">
+<p class="small">60% is the owner-liked provisional landing-wave level. The low-mid water-hammer thump, rush and bubbles can still be adjusted without changing the song or depth pressure.</p>
+<p class="small">Slide right to descend. Then move left to climb uphill: the remembered pressure should NOT go down. This is a simulated terrain trace feeding the same pressure policy as the actual game.</p>
+<div class="row"><button id="jump" disabled>⬆️ Jump (rising)</button><button id="apex" disabled>☁️ Apex</button><button id="fall" disabled>⬇️ Falling</button><button id="land" disabled>💧 Land + pressure wave</button><button id="wave-hit" disabled>🌊 Test pressure wave</button><button id="exit" disabled>Exit biome / reset pressure</button></div>
+<label>Stored depth pressure: <output id="stored-value">0%</output></label><div class="meter"><span id="stored-bar"></span></div>
+<label>Currently audible pressure: <output id="audible-value">0%</output></label><div class="meter"><span id="audible-bar"></span></div>
+<p class="small">Jump relief: <strong id="relief-value">0%</strong>. Stored depth never decreases before leaving the biome; only the audible pressure lifts while rising. Compare full-depth sound against a rising jump, then use Test pressure wave independently from landing.</p>
+<p id="status" role="status" aria-live="polite">Load the original five recorded stems to start.</p>
+</section>
+<p class="small">Audition: 20 seconds from the existing <em>Pope Leo Wants the AI Root Password</em> original separated instrument sample. This draft is not a production mix. It changes no recorded masters, music clock, game physics, or separate biome-specific MIDI leads. Pressure tracks terrain depth, not horizontal travel or rider jumping height. <a href="https://github.com/truevox/BitstreamBluffs/issues/250">Hydrostatic issue #250</a>.</p>
+</main></body></html>

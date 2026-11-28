@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Soundcheck · Bitstream Bluffs biome audio comparison</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf1ff;background:#080f20}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#21365c 0%,#0c1427 48%,#080f20 100%)}
+main{max-width:960px;margin:auto;padding:clamp(22px,5vw,70px) 22px 70px}
+.eyebrow{color:#9fe9f2;font-weight:750;letter-spacing:.16em;font-size:.74rem}
+h1{font-size:clamp(2.2rem,6vw,4rem);line-height:1.04;letter-spacing:-.045em;margin:14px 0 16px}
+.intro{font-size:1.1rem;line-height:1.65;color:#c5d1ea;max-width:770px}
+strong{color:white}
+.panel{border:1px solid #435879;border-radius:22px;background:#121d33cf;padding:clamp(18px,3vw,32px);margin-top:26px;box-shadow:0 18px 70px #0003}
+.label{font-size:.75rem;text-transform:uppercase;letter-spacing:.13em;color:#adc5e6;font-weight:750}
+#current{font-size:1.6rem;font-weight:760;margin:9px 0 5px}
+#description{color:#c4d2e5;line-height:1.45;margin:0 0 20px}
+audio{display:block;width:100%;accent-color:#94ebed}
+#status{font-size:.85rem;color:#95abc9;min-height:1.3rem;margin:12px 0 0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px}
+.pick{color:#edf4ff;text-align:left;display:flex;gap:14px;align-items:flex-start;width:100%;border:1px solid #435a7b;background:#16223a;border-radius:16px;padding:18px;cursor:pointer;transition:transform .13s,border-color .13s,background .13s}
+.pick:hover{transform:translateY(-2px);border-color:#9eeef0;background:#21304d}
+.pick[aria-pressed="true"]{outline:2px solid #9eeef0;outline-offset:1px;background:#1c3951;border-color:#99e3e9}
+.pick:focus-visible{outline:3px solid #e7d77e;outline-offset:3px}
+.emoji{font-size:1.7rem;line-height:1.1}
+.pick b{display:block;font-size:1.03rem;margin-bottom:5px}
+.pick small{display:block;font-size:.85rem;line-height:1.4;color:#a9bbd5}
+.notice{font-size:.87rem;line-height:1.55;color:#aabbd1;margin-top:24px}
+a{color:#99e8ee}
+footer{color:#899db7;font-size:.82rem;margin-top:30px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.panel{padding:20px}.pick{padding:15px}}
+</style>
+</head>
+<body>
+<main>
+<p class="eyebrow">BITSTREAM BLUFFS / EXPERIMENTAL AUDIO LAB</p>
+<h1>One song.<br>Four very different worlds.</h1>
+<p class="intro">Hear how the <strong>same original six recorded stems</strong> can be transformed through biome-specific processing. This is a direct A/B comparison: switching worlds keeps approximately the same timestamp, so you can compare the same musical moment.</p>
+<section class="panel" aria-label="Listening player">
+<div class="label">Now auditioning</div>
+<div id="current">Unprocessed reference</div>
+<p id="description">The existing separated stem mix, before biome-specific effects.</p>
+<audio id="player" controls preload="metadata" src="00-stems-unprocessed-reference.mp3" aria-label="Audio comparison player"></audio>
+<p id="status" role="status" aria-live="polite">Choose a biome below, then press Play.</p>
+</section>
+<div class="grid" role="group" aria-label="Choose audio treatment">
+<button type="button" class="pick" aria-pressed="true" data-src="00-stems-unprocessed-reference.mp3" data-title="Unprocessed reference" data-description="The existing separated stem mix, before biome-specific effects.">
+<span class="emoji" aria-hidden="true">🎼</span><span><b>Reference / dry</b><small>The starting point. No biome effects.</small></span>
+</button>
+<button type="button" class="pick" aria-pressed="false" data-src="01-debumont-snow-blanket.mp3" data-title="Debumont · Snow Blanket" data-description="Thick snow swallows cymbals and sharp attacks. Drums become distant thumps; the instruments are dark and muted.">
+<span class="emoji" aria-hidden="true">❄️</span><span><b>Debumont / snow</b><small>Deep absorption, muffled drums, soft edges and dark reflections.</small></span>
+</button>
+<button type="button" class="pick" aria-pressed="false" data-src="02-garbage-industrial.mp3" data-title="Garbage Dump Glacier · Industrial" data-description="Distortion, mechanical reflections, rough percussion and grit transform the recorded arrangement into junkyard machinery.">
+<span class="emoji" aria-hidden="true">🛠️</span><span><b>Garbage / industrial</b><small>Metallic slap delays, dirty bass, saturated percussion.</small></span>
+</button>
+<button type="button" class="pick" aria-pressed="false" data-src="03-arcade-digital.mp3" data-title="Arcade · Digital" data-description="Bitcrushing, tremolo, modulation and phasing turn the same stems into a flickering arcade soundscape.">
+<span class="emoji" aria-hidden="true">🕹️</span><span><b>Arcade / digital</b><small>Bitrot, rhythmic modulation and broken-chip textures.</small></span>
+</button>
+</div>
+<p class="notice"><strong>Next experiment:</strong> <a href="../2026-11-22-scrapheap/">Try the live Garbage Dump Glacier physics-driven stem processor</a> — adjust speed, jump, and land on actual recorded instruments.</p>
+<p class="notice"><strong>About this test:</strong> Every clip is a 20-second sample from <em>Pope Leo Wants the AI Root Password</em>, rendered with the existing vocals, drums, bass, guitar, piano and Other stems. These are static experiments, not live physics-responsive mixes. The vocals are still the original recorded vocal stem; biome-specific vocal MIDI is future work. Nothing here replaces or deletes the original masters.</p>
+<footer>Made for critical listening, not a production game build. Use headphones to hear the smaller differences, but check Debumont on speakers too.</footer>
+</main>
+<script>
+(() => {
+  const player = document.getElementById('player');
+  const options = [...document.querySelectorAll('.pick')];
+  const current = document.getElementById('current');
+  const description = document.getElementById('description');
+  const status = document.getElementById('status');
+  let selected = options[0];
+  let requestId = 0;
+  for (const option of options) {
+    option.addEventListener('click', () => {
+      if (option === selected) return;
+      const resumeTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+      const wasPlaying = !player.paused;
+      selected = option;
+      for (const button of options) button.setAttribute('aria-pressed', String(button === option));
+      current.textContent = option.dataset.title;
+      description.textContent = option.dataset.description;
+      status.textContent = wasPlaying ? 'Switching mix at the same song position…' : 'Ready: press Play.';
+      player.pause();
+      player.src = option.dataset.src;
+      player.load();
+      const myRequest = ++requestId;
+      player.addEventListener('loadedmetadata', () => {
+        if (myRequest !== requestId) return;
+        if (Number.isFinite(player.duration) && player.duration > .15) {
+          player.currentTime = Math.min(resumeTime, player.duration - .1);
+        }
+        status.textContent = 'Same song · different production';
+        if (wasPlaying) player.play().catch(() => { status.textContent = 'Press Play to continue the comparison.'; });
+      }, { once: true });
+    });
+  }
+  player.addEventListener('error', () => { status.textContent = 'Audio could not load. Try refreshing the page.'; });
+  player.addEventListener('ended', () => { status.textContent = 'End of the 20-second excerpt. Choose another version or replay.'; });
+})();
+</script>
+</body>
+</html>

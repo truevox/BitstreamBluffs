@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bitstream Bluffs · Candy Cane Canyon Sugar Fizz Lab</title>
+<style>
+:root{font:16px system-ui,sans-serif;color:#fff1fa;background:#1b071a;color-scheme:dark}*{box-sizing:border-box}body{margin:0;padding:18px;background:radial-gradient(ellipse at 75% 0,#77213e,#350c2a 55%,#1d0b1e);min-height:100vh}main{max-width:900px;margin:auto}h1{font-size:clamp(2rem,5vw,3.15rem);margin:.3em 0}.kicker{color:#ffbdc9;letter-spacing:.15em;font-size:.82rem;text-transform:uppercase;font-weight:700}p{line-height:1.52;color:#ffe1ed}.panel{background:#4c163ce8;padding:22px;border-radius:17px;border:1px solid #c56994;box-shadow:0 14px 45px #0005}.row{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}button{font:inherit;background:#8c3263;border:1px solid #f4a5c1;color:#fff4fc;padding:11px 15px;border-radius:10px;cursor:pointer}button.primary{background:#b43f73;border-color:#ffc9b8}button:disabled{opacity:.42;cursor:not-allowed}button[aria-pressed=true]{background:#5469a4;border-color:#d6e3ff}label{display:block;font-weight:700;margin:16px 0 6px}input[type=range]{width:100%;accent-color:#ffbad0}output{color:#ffd38e}.phase{padding:11px;border:1px solid #d87c9e;border-radius:9px;background:#67314f}.note{padding:13px;background:#74244a;border-left:3px solid #ffe9a7;border-radius:9px}.help{font-size:.92rem;color:#f2c4d9}.candybox{font-size:4.3rem;min-height:90px;text-align:center}#candy-emoji{display:inline-block;transition:transform .35s ease;filter:drop-shadow(0 0 15px #ffb6db)}#status{font-weight:600;color:#ffe4cd;min-height:3.2rem}
+</style>  <script type="module" crossorigin src="./assets/sugarfizz-audition-CG3_oPxe.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-C_krpwOU.js">
+  <link rel="modulepreload" crossorigin href="./assets/DynamicOrchestraPresets-xs4aC4xz.js">
+</head><body><main>
+<div class="kicker">Bitstream Bluffs / original-stem Sugar Rush</div>
+<h1>🍭 Candy Cane Canyon</h1>
+<p>The rider hits the real <strong>Sugar Rush</strong> terrain and the original instrumental music goes fizzy and bright with increasing sled speed. Takeoff gives a short candy-wrapper <strong>CRRRT</strong>; genuine touchdown makes crunchy <strong>POP-KRRRRK</strong> pop rocks.</p>
+<section class="panel"><div class="candybox" aria-hidden="true"><span id="candy-emoji">🍭🍬</span></div>
+<div class="row"><button id="load" class="primary">🎵 Load original sample stems</button><button id="play" disabled>▶ Play</button><button id="dry" disabled aria-pressed="false">Compare dry</button><button id="solo" disabled aria-pressed="false">Solo drums</button></div>
+<p class="phase" id="phase">Grounded — sugar rush and fizzy candy</p>
+<label for="sweet">Candy sweet sheen: <output id="sweet-value">125%</output></label><input id="sweet" type="range" min="0" max="200" step="5" value="125">
+<label for="fizz">Speed-fed fizzy sparkle: <output id="fizz-value">150%</output></label><input id="fizz" type="range" min="0" max="200" step="5" value="150">
+<label for="speed">Actual sled speed (original song tempo unchanged): <output id="speed-value">0 px/s</output></label><input id="speed" type="range" min="0" max="2000" step="50" value="0">
+<p class="help">At low speed the original music is only lightly sweetened. At actual high speed the wet original-source fizz grows sharper and pulses faster. The music itself never speeds up or gains fabricated notes.</p>
+<label for="pop-level">Real landing POP-KRRRRK crunch: <output id="pop-value">130%</output></label><input id="pop-level" type="range" min="0" max="200" step="5" value="130">
+<label for="wrapper-level">Takeoff wrapper CRRRT: <output id="wrapper-value">90%</output></label><input id="wrapper-level" type="range" min="0" max="200" step="5" value="90">
+<div class="row"><button id="takeoff" disabled>🍬 Take off — tear wrapper</button><button id="land" disabled>💥 Land — Pop Rocks</button></div>
+<div class="row"><button id="wrapper" disabled>Test wrapper snap alone</button><button id="pop" disabled>Test Pop Rocks alone</button></div>
+<div class="note"><strong>Try it:</strong> Load → Play → speed 1,600–1,800 → Compare dry → Hear Sugar Fizz → Take off → Land → Solo drums. The source-fed fizz is independent from the physical one-shot crunches.</div>
+<p id="status" role="status" aria-live="polite">Load the five original instrument sources.</p></section>
+<p class="help">Standalone preview loops a synchronized sample excerpt. Game implementation uses real speed, takeoff and valid landings, never a guessed beat grid. Sugar Rush's existing higher speed and ground steering controls are unchanged. All original stereo recordings and separate MIDI leads are preserved. Experimental and not merged or approved.</p>
+</main></body></html>

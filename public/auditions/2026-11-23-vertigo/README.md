@@ -1,0 +1,13 @@
+# Vertigo Vents original-stem sound audition, November 23, 2026
+
+This is a self-contained static preview of game implementation draft #268, stacked on Jellyfish draft #265; the real game music source is on the implementation branch, NOT the audition repository. All actual master OGGs and MP3 stem files are unchanged.
+
+**Source/sample distinction:** this main-based PR201 built snapshot references by relative URL five EXISTING synchronized 20s **Pope MP3** instrumental audition stems from the neighboring Scrapheap preview directory; no audio files copied or rewritten. The implementation and numerical Web Audio QA use original **One More Run release OGG** source recordings, so those signal-RMS/peak figures must not be presented as measurements of the Pope MP3 excerpt.
+
+**Sound:** Vertigo's real geyser physics has a specific cooldown increase when the actual vent launches the grounded sled. Audio observes the real cooldown before and after the SAME simulation tick. An ordinary jump (even upward velocity) changes the heat shimmer but can NEVER fire the geyser eruption. The native ventforge processor keeps unity dry original stems and adds modest geothermal distortion and ascending thermal shimmer; on real geyser launch makes a short physically deterministic WHUUMMP–FSSSHH sub-pressure gust. Real valid touchdown gets separate KRAK-KRR rocky debris. No new beat grid, source musical notes, score, gameplay impulse, external audio file, or melody/MIDI rewrite. The preview's button labeled Trigger Actual-Geyser Sound intentionally demonstrates that event sound; the full game requires real physical cooldown evidence.
+
+**Proposed FIRST-LISTEN settings (not approved):** rumble 125%, shimmer 125%, eruption 130%, rocky landing 80%. Dry A/B, solo drums, vertical rising-speed slider, ordinary jump vs confirmed eruption, and valid rock landing are independently testable.
+
+**Objective OGG proof:** 295 focused tests across 29 suites, 483 determinism tests, 525 Vite build modules and real Chromium 8-processor game boot pass. Offline original One More Run 3.5s test: grounded difference 38.71% of dry source RMS, upward difference 40.42%, ground/updraft 13.95%, genuine eruption 42.50% of grounded RMS, rock landing 9.45%. After initial excessively hot wet distortion was corrected, processed sample peak in tested ascent was .922 and no tested waveform clipped. These are not subjective loudness or full-song true peak. The source-independent physical eruption remains audible with all recorded stems silent.
+
+**Unmerged review only:** owner Marvin has NOT heard this biome yet. Feedback controls and a copyable verdict tracker are available in the neighboring multi-biome hub. Await independent review and ears before any production merge.

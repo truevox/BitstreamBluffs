@@ -1,0 +1,40 @@
+{
+  "source": "Pope Leo Wants the AI Root Password",
+  "portion": "old separated pack chunks 0003\u20130004, nominal 30\u201350 s",
+  "duration_seconds": 20,
+  "presets": {
+    "00-stems-unprocessed-reference": [
+      "volume=0.82",
+      "volume=0.82",
+      "volume=0.80",
+      "volume=0.75",
+      "volume=0.72",
+      "volume=0.73"
+    ],
+    "01-debumont-snow-blanket": [
+      "lowpass=f=1600,lowpass=f=1600,volume=0.72",
+      "lowpass=f=490,lowpass=f=490,volume=0.72",
+      "highpass=f=38,lowpass=f=390,volume=0.75",
+      "lowpass=f=850,lowpass=f=850,volume=0.78",
+      "lowpass=f=740,lowpass=f=740,volume=0.78",
+      "lowpass=f=660,aecho=0.5:0.3:95:0.17,volume=0.69"
+    ],
+    "02-garbage-industrial": [
+      "highpass=f=180,lowpass=f=5100,volume=0.76",
+      "highpass=f=110,asoftclip=type=tanh:threshold=0.6,aecho=0.65:0.40:73|153:0.27|0.17,volume=0.88",
+      "asoftclip=type=tanh:threshold=0.5,lowpass=f=4200,volume=0.86",
+      "highpass=f=210,acrusher=bits=10:mix=0.33,volume=0.78",
+      "highpass=f=230,aecho=0.5:0.24:107:0.16,volume=0.73",
+      "acrusher=bits=8:mix=0.44,volume=0.78"
+    ],
+    "03-arcade-digital": [
+      "highpass=f=240,lowpass=f=4100,volume=0.78",
+      "acrusher=bits=7:mix=0.78,volume=0.83",
+      "acrusher=bits=9:mix=0.42,treble=g=4:f=2700,volume=0.78",
+      "tremolo=f=8:d=0.55,acrusher=bits=10:mix=0.48,volume=0.72",
+      "aphaser=in_gain=0.4:out_gain=0.8:delay=2:decay=0.2:speed=1:type=t,volume=0.77",
+      "tremolo=f=4:d=0.50,acrusher=bits=7:mix=0.35,volume=0.72"
+    ]
+  },
+  "note": "Proof of concept; vocals use original separated stem, not biome vocal MIDI. Original media unchanged."
+}

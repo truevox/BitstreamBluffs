@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bitstream Bluffs · Vertigo Vents Sound Lab</title>
+<style>
+:root{font:16px system-ui,sans-serif;color:#fff0e9;color-scheme:dark;background:#160a1f}*{box-sizing:border-box}body{margin:0;padding:20px;background:radial-gradient(ellipse at 60% -10%,#702443,#251326 56%,#160a20);min-height:100vh}main{max-width:920px;margin:0 auto}.kicker{letter-spacing:.15em;text-transform:uppercase;font-size:.83rem;font-weight:700;color:#ffc7ad}h1{font-size:clamp(2rem,5vw,3.3rem);margin:.24em 0}p{line-height:1.55;color:#f0d7e7}.panel{padding:22px;border:1px solid #b56d7e;border-radius:17px;background:#331c37e8;box-shadow:0 15px 40px #0007}.row{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}button{font:inherit;background:#7d405d;color:#fff0f2;border:1px solid #ed9aaf;border-radius:10px;padding:11px 15px;cursor:pointer}button.primary{background:#bb604f;border-color:#ffbf9e}button:disabled{opacity:.45;cursor:not-allowed}button[aria-pressed=true]{background:#387b7e;border-color:#b2ece7}label{display:block;font-weight:700;margin:18px 0 6px}input[type=range]{width:100%;accent-color:#feb18d}output{color:#ffd39f}.phase{background:#4d263c;border:1px solid #855f77;padding:11px;border-radius:9px;color:#ffe6dd}.help{font-size:.92rem;color:#d6b7ce}.note{border-left:3px solid #ffbd97;background:#542737;padding:13px;border-radius:8px}.visual{text-align:center;font-size:4rem;min-height:95px;filter:drop-shadow(0 0 19px #ff70479a)}#status{color:#ffe0cd;font-weight:600;min-height:3rem}
+</style>  <script type="module" crossorigin src="./assets/ventforge-audition-B86upxFz.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-pVQQ_CAC.js">
+  <link rel="modulepreload" crossorigin href="./assets/DynamicOrchestraPresets-DxiW2Dn0.js">
+</head><body><main><div class="kicker">Bitstream Bluffs / original-stem physics</div><h1>🌋 Vertigo Vents</h1>
+<p>The mountain is breathing out. Grounded music grinds through a rumbling volcanic crust; ascending air warps and shimmers the <strong>original instrumental recording</strong>. A <strong>real geyser</strong> produces one violent WHUUMMP–FSSSHH, and a valid landing scatters rock.</p>
+<section class="panel">
+<div class="visual" id="vent-icon" aria-hidden="true">🌋</div>
+<div class="row"><button id="load" class="primary">🎵 Load original sample stems</button><button id="play" disabled>▶ Play</button><button id="dry" disabled aria-pressed="false">Compare dry</button><button id="solo" disabled aria-pressed="false">Solo drums</button></div>
+<p id="phase" class="phase">Grounded — volcanic crust hums</p>
+<label for="rumble">Volcanic source-fed rumble: <output id="rumble-value">125%</output></label><input id="rumble" type="range" min="0" max="200" value="125" step="5">
+<label for="shimmer">Heat haze and turbulent overtones: <output id="shimmer-value">125%</output></label><input id="shimmer" type="range" min="0" max="200" value="125" step="5">
+<label for="rising">Upward physical speed: <output id="rising-value">0 px/s upward</output></label><input id="rising" type="range" min="0" max="1600" value="0" step="50">
+<p class="help">In the game, this speed comes from the actual vertical velocity. A normal jump can sound hot, but it cannot trigger the geyser explosion: that requires a genuine increase in the physics geyser cooldown during one simulation tick.</p>
+<label for="blast">Real geyser WHUUMMP–FSSSHH intensity: <output id="blast-value">130%</output></label><input id="blast" type="range" min="0" max="200" value="130" step="5">
+<label for="crust">Landing rocky KRAK-KRR: <output id="crust-value">80%</output></label><input id="crust" type="range" min="0" max="200" value="80" step="5">
+<div class="row"><button id="takeoff" disabled>⬆️ Ordinary jump (no eruption)</button><button id="erupt" disabled>🌋 Trigger actual-geyser sound</button><button id="settle" disabled>⬇️ Return to ground</button><button id="land" disabled>💥 Land and scatter rocks</button></div>
+<div class="row"><button id="rocks" disabled>🪨 Test rocky impact alone</button></div>
+<div class="note"><strong>First test:</strong> Load → Play → increase upward velocity → Compare dry → Ordinary jump (notice NO blast) → Trigger actual-geyser sound → Land → Solo Drums. This lab exposes the exact sound, but the game's real eruption is triggered only by confirmed physics, not this demonstration button.</div>
+<p id="status" role="status" aria-live="polite">Load the original recordings to begin.</p></section>
+<p class="help">Unmerged experiment. The standalone page loops one synchronized original Pope MP3 excerpt. Original stereo recordings, separate MIDI leads, melody timings, physics and scoring are untouched. Your listening approval is required.</p>
+</main></body></html>
