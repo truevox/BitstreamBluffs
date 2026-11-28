@@ -1035,6 +1035,42 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     a._musicTimer=null;a.destroy();
   });
 
+  test('SKIP while catalog unavailable preserves audible fallback and leaves session unclaimed',()=>{
+    const {a,d,events}=setup();
+    a.applySettings({...a.settings,musicDuringPause:true});
+    d.started=false;d.transportPaused=false;d.ready=false;d.pack=null;
+    a._musicTimer=9371;a._musicWanted=true;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    expect(a.jukeboxStep(1)).toBe(false);
+    expect(a._musicTimer).toBe(9371);
+    expect(a._musicWanted).toBe(true);
+    expect(a._vinylPauseSession.manualOverride).toBe(false);
+    expect(d.transportStep).not.toHaveBeenCalled();
+    a._musicTimer=null;a.destroy();
+  });
+
+  test('selection re-enable cannot override Jukebox PAUSE that predates current gameplay Pause',()=>{
+    const {a,d,events}=setup();
+    d.started=false;d.transportPaused=false;d.pack=null;
+    a._musicTimer=7293;a._musicWanted=true;
+    // The prior human control is authoritative even if it paused a synth,
+    // not an original stem transport.
+    a._jukeboxUserPaused=true;a._musicTimer=null;a._musicWanted=false;
+    events.emit(EVT.GAME_PAUSE,{reason:'manual'});
+    a.applySettings({...a.settings,musicDuringPause:true});
+    const off=Object.fromEntries(Object.keys(a.settings.musicEnabledSongs).map(k=>[k,false]));
+    a.applySettings({...a.settings,musicEnabledSongs:off});
+    a.applySettings({...a.settings,musicEnabledSongs:defaultSongSelection()});
+    expect(a._jukeboxUserPaused).toBe(true);
+    expect(a._vinylPauseSession.shouldResume).toBe(false);
+    expect(a._musicTimer).toBeNull();
+    expect(a._musicWanted).toBe(false);
+    events.emit(EVT.GAME_RESUME,{reason:'manual'});
+    expect(a._musicWanted).toBe(false);
+    expect(d.transportPlay).not.toHaveBeenCalled();
+    a.destroy();
+  });
+
   test('explicit PAUSE of procedural Jukebox survives Restart without spawning music',()=>{
     const {a,d,events}=setup();
     a.applySettings({...a.settings,musicDuringPause:true});

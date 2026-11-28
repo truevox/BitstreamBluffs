@@ -732,8 +732,8 @@ export class AudioSynth {
         // Enabling a song while gameplay is paused is a preference change,
         // not an explicit Jukebox PLAY. If all-off invalidated the frozen
         // transport, restart the selected music only after gameplay resumes.
-        if (newlyRequested && this._paused && this._vinylPauseSession &&
-            !this._vinylPauseSession.manualOverride) {
+        if (newlyRequested && !this._jukeboxUserPaused && this._paused &&
+            this._vinylPauseSession && !this._vinylPauseSession.manualOverride) {
           // A pause entered while ALL songs were disabled has no frozen
           // transport, so shouldResume was false. Enabling a song is still
           // an explicit playback preference for Resume (or immediately if
@@ -741,13 +741,15 @@ export class AudioSynth {
           this._vinylPauseSession.restartOnResume=true;
           this._vinylPauseSession.shouldResume=true;
         }
-        if (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
-            (newlyRequested && this._paused && this.settings.musicDuringPause))
+        if (!this._jukeboxUserPaused &&
+            (previouslyPlayingDuringPause !== this.settings.musicDuringPause ||
+             (newlyRequested && this._paused && this.settings.musicDuringPause)))
           this._reconcileManualPauseMusic(this.settings.musicDuringPause);
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
-        if (this._autoStartAttempted && this._musicMode === 'menu' &&
-            !this._paused && !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
+        if (!this._jukeboxUserPaused && this._autoStartAttempted &&
+            this._musicMode === 'menu' && !this._paused && !hadMusic &&
+            this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
             !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
@@ -999,7 +1001,8 @@ export class AudioSynth {
    */
   _reconcileManualPauseMusic(keepPlaying) {
     const session = this._vinylPauseSession;
-    if (!this._paused || !session || session.manualOverride) return;
+    if (!this._paused || !session || session.manualOverride ||
+        this._jukeboxUserPaused) return;
     const d = this._stemMusic;
     if (keepPlaying) {
       if (session.restartOnResume &&
@@ -1504,6 +1507,10 @@ export class AudioSynth {
     this._menuAutoplayPending = false; // next/previous is explicit manual intent
     try {
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      // Don't consume an explicit Next/Previous when no catalog can execute
+      // the request. In particular, don't kill a valid procedural fallback
+      // on a button that could not advance the original playlist.
+      if (!this._stemMusic?.ready) return false;
       // A skip hands sound ownership to an explicitly selected ORIGINAL.
       // Retire any pause-only procedural substitute before the generation
       // changes, even when the next original is not yet decodable.
