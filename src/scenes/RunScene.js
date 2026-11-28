@@ -84,7 +84,7 @@ import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
-import {droneCameraIntent,effectivePulpLevel} from '../systems/PulpCameraIntent.js';
+import {droneCameraIntent,effectivePulpLevel,PULP_SAFE} from '../systems/PulpCameraIntent.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { installPortableMatter } from '../systems/MatterPortable.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
@@ -3345,7 +3345,11 @@ export class RunScene extends Phaser.Scene {
       if(cam.setRotation)cam.setRotation(intent.roll);
       let scrollX=intent.focusX-GAME_WIDTH/2;
       const visibleLeft=scrollX+GAME_WIDTH/2-GAME_WIDTH/(2*intent.zoom);
-      if(visibleLeft < -30) scrollX+=-30-visibleLeft;
+      // The spawn is x≈44: a hard -30 world-edge clamp would push the
+      // rider below the promised 94px safe margin. Allow a little extra
+      // empty world at spawn instead of making the rider unreadable.
+      const minLeft=Math.min(-30,s.x-(PULP_SAFE.minScreenX+6)/intent.zoom);
+      if(visibleLeft<minLeft)scrollX+=minLeft-visibleLeft;
       cam.scrollX=Math.round(scrollX);
       cam.scrollY=Math.round(intent.focusY-GAME_HEIGHT/2);
       // Full-screen flash / blindness are uniform, screen-space effects,

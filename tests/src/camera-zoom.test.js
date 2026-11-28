@@ -177,6 +177,18 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
     expect(s._cameraIntent).toBeNull();
     expect(s.cameras.main.rotation).toBe(0);
   });
+  test('Drone keeps actual spawn rider at least 94px from left edge',()=>{
+    const s=makeScene('drone');
+    s.sled.x=44;s.sled.y=180;s.simClock.tick=1;
+    s.updateCamera(8.33);
+    const c=s.cameras.main;
+    const viewLeft=c.scrollX+480/2-480/(2*c.zoom);
+    const actualX=(s.sled.x-viewLeft)*c.zoom;
+    expect(actualX).toBeGreaterThanOrEqual(94);
+    expect(actualX).toBeLessThanOrEqual(202);
+    expect(s._cameraIntent.mode).toBe('drone');
+  });
+
   test('both new modes retain world-start clamp and full-screen effects overscan on roll',()=>{
     for(const mode of ['less','drone']){
       const s=makeScene(mode);
@@ -191,12 +203,13 @@ describe('#155 RunScene Pulp camera integration remains visual-only',()=>{
       s.updateCamera(16);
       const z=s.cameras.main.zoom;
       const visibleLeft=s.cameras.main.scrollX+480/2-480/(2*z);
-      expect(visibleLeft).toBeGreaterThanOrEqual(-31);
       if(mode==='less'){
+        expect(visibleLeft).toBeGreaterThanOrEqual(-31);
         expect(s.cameras.main.rotation).toBe(0);
         expect(s.cameras.main.zoom).toBe(1);
       }else{
         expect(s._cameraIntent.mode).toBe('drone');
+        expect((s.sled.x-visibleLeft)*z).toBeGreaterThanOrEqual(94);
         expect(updates.filter(x=>x[0]==='scale').length).toBeGreaterThanOrEqual(2);
         // Uniform rectangle expands beyond the zoom compensated viewport.
         expect(updates.at(-2)[1]).toBeGreaterThan(1/z);

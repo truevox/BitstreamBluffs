@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
 
-const vite=await createServer({server:{host:'127.0.0.1',port:8439,strictPort:true}});
+const vite=await createServer({server:{host:'127.0.0.1',port:8453,strictPort:true}});
 let browser;
 try{
   await vite.listen();
