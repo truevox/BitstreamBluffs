@@ -1,0 +1,67 @@
+name: P0 real RunScene and Matter browser Worker parity QA
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/real-runscene-worker-physics-qa.yml'
+      - 'tools/lab/qa-real-physics-*'
+      - 'tools/lab/test-physics-worker-browser.mjs'
+      - 'tests/replay/real-runscene-worker-golden.test.js'
+      - 'tests/replay/headlessRun.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/entities/**'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/PhysicsTuner.js'
+      - 'src/systems/replay/**'
+      - 'src/data/**'
+      - 'package*.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/real-runscene-worker-physics-qa.yml'
+      - 'tools/lab/qa-real-physics-*'
+      - 'tools/lab/test-physics-worker-browser.mjs'
+      - 'tests/replay/real-runscene-worker-golden.test.js'
+      - 'tests/replay/headlessRun.js'
+      - 'src/scenes/RunScene.js'
+      - 'src/entities/**'
+      - 'src/systems/TerrainGenerator.js'
+      - 'src/systems/PhysicsTuner.js'
+      - 'src/systems/replay/**'
+      - 'src/data/**'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-main-worker-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact triggering commit
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Preserve game source tripwire and build identity
+        run: |
+          node tools/ruleset/build-ruleset.mjs --check
+          node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Compare real Node Jest RunScene/Matter against fixed Chromium golden
+        run: npm test -- --runInBand tests/replay/real-runscene-worker-golden.test.js
+      - name: Install Chromium browser and OS dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Compare compiled Chromium main-thread and real Worker RunScene/Matter with golden
+        run: |
+          export CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright";console.log(chromium.executablePath())')"
+          node tools/lab/test-physics-worker-browser.mjs
